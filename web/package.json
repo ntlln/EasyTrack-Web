@@ -16,7 +16,8 @@
     "critters": "^0.0.23",
     "next": "15.3.1",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "recharts": "^2.15.3"
   },
   "devDependencies": {
     "@types/node": "22.15.2",
