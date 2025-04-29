@@ -9,11 +9,12 @@ export default function Page() {
   const isDark = theme.palette.mode === "dark";
 
   const cards = [
-    { title: "User Management", route: "/egc-admin/user-management" },
-    { title: "Delivery History & Reports", route: "/egc-admin/history-and-reports" },
-    { title: "Luggage Tracking", route: "/egc-admin/luggage-tracking" },
-    { title: "Statistics", route: "/egc-admin/statistics" },
-    { title: "Message Center", route: "/egc-admin/chat-support" },
+    { title: "Contracting", route: "/contractor/user-management" },
+    { title: "Delivery History & Reports", route: "/contractor/history-and-reports" },
+    { title: "Luggage Tracking", route: "/contractor/luggage-tracking" },
+    { title: "Statistics", route: "/contractor/statistics" },
+    { title: "Message Center", route: "/contractor/chat-support" },
+    { title: "Payments", route: "/contractor/chat-support" },
   ];
 
   return (

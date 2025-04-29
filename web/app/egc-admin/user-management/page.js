@@ -1,10 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { Box, MenuItem, TextField, Typography, Button, TableContainer, Table, TableHead, TableRow, TableCell, TableBody, TablePagination, Paper, IconButton, Menu, Pagination } from "@mui/material";
+import { useRouter } from "next/navigation";
+import {
+  Box, MenuItem, TextField, Typography, Button, TableContainer,
+  Table, TableHead, TableRow, TableCell, TableBody, Paper,
+  IconButton, Menu, Pagination
+} from "@mui/material";
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 
 export default function Page() {
+  const router = useRouter();
+
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(5);
   const [anchorEl, setAnchorEl] = useState(null);
@@ -57,6 +64,10 @@ export default function Page() {
     handleCloseMenu();
   };
 
+  const handleCreateAccount = () => {
+    router.push("/egc-admin/user-management/create-account");
+  };
+
   const totalPages = Math.ceil(accounts.length / rowsPerPage);
 
   return (
@@ -67,23 +78,30 @@ export default function Page() {
         </Typography>
       </Box>
 
+      {/* Filter and Actions */}
       <Box display="flex" alignItems="center" gap={2} flexWrap="wrap">
-        <TextField label="Search" sx={{ width: "250px" }} />
-        <TextField label="All Departments" sx={{ width: "200px" }} select>
-          <MenuItem value="All Departments">All Departments</MenuItem>
-          <MenuItem value="IT Personnel">IT Personnel</MenuItem>
-          <MenuItem value="Delivery Personnel">Delivery Personnel</MenuItem>
-          <MenuItem value="Airline Staff">Airline Staff</MenuItem>
-          <MenuItem value="Customer">Customer</MenuItem>
-        </TextField>
-        <Button variant="contained" sx={{ width: "170px" }}>
-          Create Account
-        </Button>
-        <Button variant="outlined" sx={{ width: "150px" }}>
-          Refresh
-        </Button>
+        <Box display="flex" gap={2}>
+          <TextField label="Search" sx={{ width: "250px" }} />
+          <TextField label="All Departments" sx={{ width: "200px" }} select>
+            <MenuItem value="All Departments">All Departments</MenuItem>
+            <MenuItem value="IT Personnel">IT Personnel</MenuItem>
+            <MenuItem value="Delivery Personnel">Delivery Personnel</MenuItem>
+            <MenuItem value="Airline Staff">Airline Staff</MenuItem>
+            <MenuItem value="Customer">Customer</MenuItem>
+          </TextField>
+        </Box>
+
+        <Box display="flex" gap={2} ml="auto">
+          <Button variant="contained" sx={{ width: "170px" }} onClick={handleCreateAccount}>
+            Create Account
+          </Button>
+          <Button variant="outlined" sx={{ width: "150px" }}>
+            Refresh
+          </Button>
+        </Box>
       </Box>
 
+      {/* Table */}
       <Box>
         <TableContainer component={Paper}>
           <Table>
@@ -96,25 +114,26 @@ export default function Page() {
                 <TableCell>Action</TableCell>
               </TableRow>
             </TableHead>
-
             <TableBody>
-              {accounts.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((account) => (
-                <TableRow key={account.id}>
-                  <TableCell>{account.id}</TableCell>
-                  <TableCell>{account.name}</TableCell>
-                  <TableCell>{account.role}</TableCell>
-                  <TableCell>{account.status}</TableCell>
-                  <TableCell>
-                    <IconButton onClick={(event) => handleOpenMenu(event, account)}>
-                      <MoreVertIcon />
-                    </IconButton>
-                  </TableCell>
-                </TableRow>
-              ))}
+              {accounts
+                .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                .map((account) => (
+                  <TableRow key={account.id}>
+                    <TableCell>{account.id}</TableCell>
+                    <TableCell>{account.name}</TableCell>
+                    <TableCell>{account.role}</TableCell>
+                    <TableCell>{account.status}</TableCell>
+                    <TableCell>
+                      <IconButton onClick={(event) => handleOpenMenu(event, account)}>
+                        <MoreVertIcon />
+                      </IconButton>
+                    </TableCell>
+                  </TableRow>
+                ))}
             </TableBody>
           </Table>
 
-          {/* Custom Pagination */}
+          {/* Pagination */}
           <Box display="flex" justifyContent="space-between" alignItems="center" p={2}>
             <TextField
               select
@@ -144,19 +163,13 @@ export default function Page() {
         </TableContainer>
       </Box>
 
-      {/* Action Menu */}
+      {/* Actions Menu */}
       <Menu
         anchorEl={anchorEl}
         open={Boolean(anchorEl)}
         onClose={handleCloseMenu}
-        anchorOrigin={{
-          vertical: 'top',
-          horizontal: 'left',
-        }}
-        transformOrigin={{
-          vertical: 'top',
-          horizontal: 'left',
-        }}
+        anchorOrigin={{ vertical: "top", horizontal: "left" }}
+        transformOrigin={{ vertical: "top", horizontal: "left" }}
       >
         <MenuItem onClick={handleEdit}>Edit</MenuItem>
         <MenuItem onClick={handleDelete}>Delete</MenuItem>

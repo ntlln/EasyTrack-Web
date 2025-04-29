@@ -5,7 +5,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { Box, Divider, List, ListItemButton, ListItemIcon, ListItemText, Collapse, Button } from "@mui/material";
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
-import GroupsIcon from '@mui/icons-material/Groups';
+import PaymentIcon from '@mui/icons-material/Payment';
 import InventoryIcon from '@mui/icons-material/Inventory';
 import ExpandLess from '@mui/icons-material/ExpandLess';
 import ExpandMore from '@mui/icons-material/ExpandMore';
@@ -34,9 +34,9 @@ export default function Sidebar() {
     const isDropdownActive = () => {
         return (
             openPages ||
-            pathname === "/egc-admin/luggage-tracking" ||
-            pathname === "/egc-admin/history-and-reports" ||
-            pathname === "/egc-admin/statistics"
+            pathname === "/contractor/luggage-tracking" ||
+            pathname === "/contractor/history-and-reports" ||
+            pathname === "/contractor/statistics"
         );
     };
 
@@ -58,7 +58,7 @@ export default function Sidebar() {
             position="fixed"
             sx={{ overflowY: 'auto' }}
         >
-            <Box p={3} display="flex" justifyContent="center" alignItems="center" onClick={() => router.push("/egc-admin/")} sx={{ cursor: "pointer" }}>
+            <Box p={3} display="flex" justifyContent="center" alignItems="center" onClick={() => router.push("/contractor/")} sx={{ cursor: "pointer" }}>
                 <Box component="img" src="../brand-2.png" alt="EasyTrack Logo" sx={{ height: 70 }} />
             </Box>
 
@@ -66,25 +66,18 @@ export default function Sidebar() {
 
             <Box flexGrow={1}>
                 <List component="nav" sx={{ flexGrow: 1 }}>
-                    <ListItemButton onClick={() => router.push("/egc-admin/")} sx={isActive("/egc-admin/") ? activeStyles : {}}>
+                    <ListItemButton onClick={() => router.push("/contractor/")} sx={isActive("/contractor/") ? activeStyles : {}}>
                         <ListItemIcon>
-                            <DashboardIcon sx={{ color: isActive("/egc-admin/") ? theme.palette.primary.main : "primary.main" }} />
+                            <DashboardIcon sx={{ color: isActive("/contractor/") ? theme.palette.primary.main : "primary.main" }} />
                         </ListItemIcon>
                         <ListItemText primary="Dashboard" />
                     </ListItemButton>
 
-                    <ListItemButton onClick={() => router.push("/egc-admin/profile")} sx={isActive("/egc-admin/profile") ? activeStyles : {}}>
+                    <ListItemButton onClick={() => router.push("/contractor/profile")} sx={isActive("/contractor/profile") ? activeStyles : {}}>
                         <ListItemIcon>
-                            <AccountCircleIcon sx={{ color: isActive("/egc-admin/profile") ? theme.palette.primary.main : "primary.main" }} />
+                            <AccountCircleIcon sx={{ color: isActive("/contractor/profile") ? theme.palette.primary.main : "primary.main" }} />
                         </ListItemIcon>
                         <ListItemText primary="Profile" />
-                    </ListItemButton>
-
-                    <ListItemButton onClick={() => router.push("/egc-admin/user-management")} sx={isActive("/egc-admin/user-management") ? activeStyles : {}}>
-                        <ListItemIcon>
-                            <GroupsIcon sx={{ color: isActive("/egc-admin/user-management") ? theme.palette.primary.main : "primary.main" }} />
-                        </ListItemIcon>
-                        <ListItemText primary="User Management" />
                     </ListItemButton>
 
                     {/* Transactions Dropdown */}
@@ -98,32 +91,39 @@ export default function Sidebar() {
 
                     <Collapse in={openPages} timeout="auto" unmountOnExit>
                         <List component="div" disablePadding>
-                            <ListItemButton sx={{ pl: 4, ...(isActive("/egc-admin/luggage-tracking") ? activeStyles : {}) }} onClick={() => router.push("/egc-admin/luggage-tracking")}>
+                            <ListItemButton sx={{ pl: 4, ...(isActive("/contractor/luggage-tracking") ? activeStyles : {}) }} onClick={() => router.push("/contractor/luggage-tracking")}>
                                 <ListItemIcon>
-                                    <MyLocationIcon sx={{ color: isActive("/egc-admin/luggage-tracking") ? theme.palette.primary.main : "primary.main" }} />
+                                    <MyLocationIcon sx={{ color: isActive("/contractor/luggage-tracking") ? theme.palette.primary.main : "primary.main" }} />
                                 </ListItemIcon>
                                 <ListItemText primary="Luggage Tracking" />
                             </ListItemButton>
 
-                            <ListItemButton sx={{ pl: 4, ...(isActive("/egc-admin/history-and-reports") ? activeStyles : {}) }} onClick={() => router.push("/egc-admin/history-and-reports")}>
+                            <ListItemButton sx={{ pl: 4, ...(isActive("/contractor/history-and-reports") ? activeStyles : {}) }} onClick={() => router.push("/contractor/history-and-reports")}>
                                 <ListItemIcon>
-                                    <AssignmentIcon sx={{ color: isActive("/egc-admin/history-and-reports") ? theme.palette.primary.main : "primary.main" }} />
+                                    <AssignmentIcon sx={{ color: isActive("/contractor/history-and-reports") ? theme.palette.primary.main : "primary.main" }} />
                                 </ListItemIcon>
                                 <ListItemText primary="History and Reports" />
                             </ListItemButton>
 
-                            <ListItemButton sx={{ pl: 4, ...(isActive("/egc-admin/statistics") ? activeStyles : {}) }} onClick={() => router.push("/egc-admin/statistics")}>
+                            <ListItemButton sx={{ pl: 4, ...(isActive("/contractor/statistics") ? activeStyles : {}) }} onClick={() => router.push("/contractor/statistics")}>
                                 <ListItemIcon>
-                                    <BarChartIcon sx={{ color: isActive("/egc-admin/statistics") ? theme.palette.primary.main : "primary.main" }} />
+                                    <BarChartIcon sx={{ color: isActive("/contractor/statistics") ? theme.palette.primary.main : "primary.main" }} />
                                 </ListItemIcon>
                                 <ListItemText primary="Statistics" />
+                            </ListItemButton>
+
+                            <ListItemButton sx={{ pl: 4, ...(isActive("/contractor/payments") ? activeStyles : {}) }} onClick={() => router.push("/contractor/payments")}>
+                                <ListItemIcon>
+                                    <PaymentIcon sx={{ color: isActive("/contractor/payments") ? theme.palette.primary.main : "primary.main" }} />
+                                </ListItemIcon>
+                                <ListItemText primary="Payments" />
                             </ListItemButton>
                         </List>
                     </Collapse>
 
-                    <ListItemButton onClick={() => router.push("/egc-admin/chat-support")} sx={isActive("/egc-admin/chat-support") ? activeStyles : {}}>
+                    <ListItemButton onClick={() => router.push("/contractor/chat-support")} sx={isActive("/contractor/chat-support") ? activeStyles : {}}>
                         <ListItemIcon>
-                            <SupportAgentIcon sx={{ color: isActive("/egc-admin/chat-support") ? theme.palette.primary.main : "primary.main" }} />
+                            <SupportAgentIcon sx={{ color: isActive("/contractor/chat-support") ? theme.palette.primary.main : "primary.main" }} />
                         </ListItemIcon>
                         <ListItemText primary="Chat Support" />
                     </ListItemButton>

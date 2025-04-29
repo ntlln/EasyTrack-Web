@@ -1,6 +1,6 @@
 "use client";
 
-import Sidebar from "../components/admin-sidebar/page";
+import Sidebar from "../components/contractor-sidebar/page";
 import { CssBaseline } from "@mui/material";
 import { ColorModeContext } from "../layout"; // correct path
 import '../globals.css';

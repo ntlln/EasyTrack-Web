@@ -4,6 +4,7 @@ import { ThemeProvider } from "@mui/material/styles";
 import { CssBaseline } from "@mui/material";
 import { getTheme } from "./theme"; // updated import
 import { useState, useEffect, createContext, useContext } from "react";
+import './globals.css'
 
 export const ColorModeContext = createContext({ toggleMode: () => {}, mode: "light" });
 

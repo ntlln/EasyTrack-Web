@@ -1,7 +1,23 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Box, MenuItem, TextField, Typography, TableContainer, Table, TableHead, TableRow, TableCell, TableBody, Paper, IconButton, Menu, Pagination, InputAdornment } from "@mui/material";
+import {
+  Box,
+  MenuItem,
+  TextField,
+  Typography,
+  TableContainer,
+  Table,
+  TableHead,
+  TableRow,
+  TableCell,
+  TableBody,
+  Paper,
+  IconButton,
+  Menu,
+  Pagination,
+  InputAdornment,
+} from "@mui/material";
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import SearchIcon from '@mui/icons-material/Search';
@@ -15,7 +31,6 @@ export default function Page() {
   const [toDate, setToDate] = useState(null);
   const [mounted, setMounted] = useState(false);
 
-  // Hydration Fix
   useEffect(() => {
     setMounted(true);
   }, []);
@@ -37,11 +52,10 @@ export default function Page() {
     resolutionStatus: "placeholder",
   }));
 
-  // Status counts
   const totalTransactions = transactions.length;
-  const completedCount = transactions.filter((t) => t.deliveryStatus === "Completed").length;
-  const pendingCount = transactions.filter((t) => t.deliveryStatus === "Pending").length;
-  const failedCount = transactions.filter((t) => t.deliveryStatus === "Failed").length;
+  const completedCount = transactions.filter(t => t.deliveryStatus === "Completed").length;
+  const pendingCount = transactions.filter(t => t.deliveryStatus === "Pending").length;
+  const failedCount = transactions.filter(t => t.deliveryStatus === "Failed").length;
 
   const handleChangePage = (event, newPage) => {
     setPage(newPage - 1);
@@ -76,28 +90,27 @@ export default function Page() {
   const totalPages = Math.ceil(transactions.length / rowsPerPage);
 
   return (
-    <Box p={4} display="flex" flexDirection="column" gap={4}>
-      {/* Title */}
+    <Box pt={4} display="flex" flexDirection="column" gap={4} sx={{ overflowX: 'hidden' }}>
       <Box>
-        <Typography variant="h4" color="primary.main" fontWeight="bold">
+        <Typography variant="h3" color="primary.main" fontWeight="bold">
           History & Reports
         </Typography>
       </Box>
 
-      {/* Top Controls */}
       <Box display="flex" flexWrap="wrap" gap={2} alignItems="center">
-        {/* Search */}
         <TextField
           placeholder="Search for transaction"
           size="small"
-          slots={{ InputAdornment: SearchIcon }}
-          slotProps={{
-            startAdornment: <SearchIcon sx={{ mr: 1 }} />,
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchIcon />
+              </InputAdornment>
+            ),
           }}
           sx={{ flex: "1", minWidth: "250px" }}
         />
 
-        {/* Status Cards */}
         <Box sx={statusBoxStyle}>
           <Typography variant="body2" fontWeight="bold">Total</Typography>
           <Typography>{totalTransactions.toLocaleString()}</Typography>
@@ -115,24 +128,21 @@ export default function Page() {
           <Typography>{failedCount.toLocaleString()}</Typography>
         </Box>
 
-        {/* Date Pickers (render only after mounted) */}
         {mounted && (
           <>
-            <TextField size="small" label="From Date" type="date" InputLabelProps={{ shrink: true, }} sx={{ minWidth: "150px" }} value={fromDate || ""} onChange={(e) => setFromDate(e.target.value)} />
-            <TextField size="small" label="To Date" type="date" InputLabelProps={{ shrink: true, }} sx={{ minWidth: "150px" }} value={toDate || ""} onChange={(e) => setToDate(e.target.value)} />
+            <TextField size="small" label="From Date" type="date" InputLabelProps={{ shrink: true }} sx={{ minWidth: "150px" }} value={fromDate || ""} onChange={(e) => setFromDate(e.target.value)} />
+            <TextField size="small" label="To Date" type="date" InputLabelProps={{ shrink: true }} sx={{ minWidth: "150px" }} value={toDate || ""} onChange={(e) => setToDate(e.target.value)} />
           </>
         )}
 
-        {/* Refresh Button */}
         <IconButton onClick={handleRefresh} sx={{ border: "1px solid #ccc", borderRadius: 2, p: 1 }}>
           <RefreshIcon />
         </IconButton>
       </Box>
 
-      {/* Table */}
-      <Box>
-        <TableContainer component={Paper}>
-          <Table>
+      <Box sx={{ width: '100%', overflowX: 'auto' }}>
+        <TableContainer component={Paper} sx={{ maxWidth: '100vw' }}>
+          <Table sx={{ width: '100%' }}>
             <TableHead>
               <TableRow>
                 <TableCell>Tracking ID</TableCell>
@@ -152,7 +162,6 @@ export default function Page() {
                 <TableCell>Actions</TableCell>
               </TableRow>
             </TableHead>
-
             <TableBody>
               {transactions
                 .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
@@ -182,8 +191,7 @@ export default function Page() {
             </TableBody>
           </Table>
 
-          {/* Pagination */}
-          <Box display="flex" justifyContent="space-between" alignItems="center" p={2} flexWrap="wrap">
+          <Box display="flex" justifyContent="space-between" alignItems="center" p={2} flexWrap="wrap" gap={2}>
             <Typography variant="body2">
               Showing {page * rowsPerPage + 1} - {Math.min((page + 1) * rowsPerPage, transactions.length)} of {transactions.length} transactions
             </Typography>
@@ -203,19 +211,12 @@ export default function Page() {
         </TableContainer>
       </Box>
 
-      {/* Action Menu */}
       <Menu
         anchorEl={anchorEl}
         open={Boolean(anchorEl)}
         onClose={handleCloseMenu}
-        anchorOrigin={{
-          vertical: "top",
-          horizontal: "left",
-        }}
-        transformOrigin={{
-          vertical: "top",
-          horizontal: "left",
-        }}
+        anchorOrigin={{ vertical: "top", horizontal: "left" }}
+        transformOrigin={{ vertical: "top", horizontal: "left" }}
       >
         <MenuItem onClick={handleTrack}>Track</MenuItem>
         <MenuItem onClick={handleContact}>Contact</MenuItem>
@@ -224,7 +225,6 @@ export default function Page() {
   );
 }
 
-// Small styling for status summary cards
 const statusBoxStyle = {
   px: 2,
   py: 1,

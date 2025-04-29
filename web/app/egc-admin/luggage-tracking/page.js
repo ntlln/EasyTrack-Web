@@ -60,7 +60,7 @@ export default function Page() {
   return (
     <Box p={4} display="flex" flexDirection="column" gap={4}>
       <Box>
-        <Typography variant="h4" color="primary.main" fontWeight="bold">
+        <Typography variant="h3" color="primary.main" fontWeight="bold">
           Luggage Tracking
         </Typography>
       </Box>

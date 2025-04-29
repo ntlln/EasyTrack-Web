@@ -27,7 +27,7 @@ const fuelData = [
 export default function StatisticsPage() {
     return (
         <Box p={3}>
-            <Typography variant="h4" mb={3}>Statistics</Typography>
+            <Typography variant="h3" mb={3} color='primary.main' fontWeight={'bold'}>Statistics</Typography>
 
             <Grid container spacing={2}>
                 <Grid item xs={12} md={4}>
