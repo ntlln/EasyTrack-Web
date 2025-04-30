@@ -9,12 +9,12 @@ export default function Page() {
   const isDark = theme.palette.mode === "dark";
 
   const cards = [
-    { title: "Contracting", route: "/contractor/user-management" },
+    { title: "Contracting", route: "/contractor/contracting" },
     { title: "Delivery History & Reports", route: "/contractor/history-and-reports" },
     { title: "Luggage Tracking", route: "/contractor/luggage-tracking" },
     { title: "Statistics", route: "/contractor/statistics" },
     { title: "Message Center", route: "/contractor/chat-support" },
-    { title: "Payments", route: "/contractor/chat-support" },
+    { title: "Payments", route: "/contractor/payments" },
   ];
 
   return (

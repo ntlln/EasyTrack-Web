@@ -9,6 +9,7 @@ import PaymentIcon from '@mui/icons-material/Payment';
 import InventoryIcon from '@mui/icons-material/Inventory';
 import ExpandLess from '@mui/icons-material/ExpandLess';
 import ExpandMore from '@mui/icons-material/ExpandMore';
+import ArticleIcon from '@mui/icons-material/Article';
 import MyLocationIcon from '@mui/icons-material/MyLocation';
 import AssignmentIcon from '@mui/icons-material/Assignment';
 import BarChartIcon from '@mui/icons-material/BarChart';
@@ -91,6 +92,13 @@ export default function Sidebar() {
 
                     <Collapse in={openPages} timeout="auto" unmountOnExit>
                         <List component="div" disablePadding>
+                            <ListItemButton sx={{ pl: 4, ...(isActive("/contractor/contracting") ? activeStyles : {}) }} onClick={() => router.push("/contractor/contracting")}>
+                                <ListItemIcon>
+                                    <ArticleIcon sx={{ color: isActive("/contractor/contracting") ? theme.palette.primary.main : "primary.main" }} />
+                                </ListItemIcon>
+                                <ListItemText primary="Contracting" />
+                            </ListItemButton>
+
                             <ListItemButton sx={{ pl: 4, ...(isActive("/contractor/luggage-tracking") ? activeStyles : {}) }} onClick={() => router.push("/contractor/luggage-tracking")}>
                                 <ListItemIcon>
                                     <MyLocationIcon sx={{ color: isActive("/contractor/luggage-tracking") ? theme.palette.primary.main : "primary.main" }} />
