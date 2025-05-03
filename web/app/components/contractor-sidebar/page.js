@@ -92,11 +92,11 @@ export default function Sidebar() {
 
                     <Collapse in={openPages} timeout="auto" unmountOnExit>
                         <List component="div" disablePadding>
-                            <ListItemButton sx={{ pl: 4, ...(isActive("/contractor/contracting") ? activeStyles : {}) }} onClick={() => router.push("/contractor/contracting")}>
+                            <ListItemButton sx={{ pl: 4, ...(isActive("/contractor/contracts") ? activeStyles : {}) }} onClick={() => router.push("/contractor/contracts")}>
                                 <ListItemIcon>
-                                    <ArticleIcon sx={{ color: isActive("/contractor/contracting") ? theme.palette.primary.main : "primary.main" }} />
+                                    <ArticleIcon sx={{ color: isActive("/contractor/contracts") ? theme.palette.primary.main : "primary.main" }} />
                                 </ListItemIcon>
-                                <ListItemText primary="Contracting" />
+                                <ListItemText primary="Contracts" />
                             </ListItemButton>
 
                             <ListItemButton sx={{ pl: 4, ...(isActive("/contractor/luggage-tracking") ? activeStyles : {}) }} onClick={() => router.push("/contractor/luggage-tracking")}>
