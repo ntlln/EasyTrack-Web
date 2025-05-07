@@ -67,13 +67,7 @@ export default function Page() {
 
       {/* Top bar with Refresh and Search aligned right */}
       <Box display="flex" justifyContent="flex-end" alignItems="center" gap={2}>
-        <Button
-          variant="outlined"
-          startIcon={<RefreshIcon />}
-          onClick={handleRefresh}
-        >
-          Refresh
-        </Button>
+        <Button variant="outlined" startIcon={<RefreshIcon />} onClick={handleRefresh}>Refresh</Button>
         <TextField label="Search" size="small" sx={{ width: "250px" }} />
       </Box>
 
@@ -131,35 +125,13 @@ export default function Page() {
               Showing {page * rowsPerPage + 1} - {Math.min((page + 1) * rowsPerPage, deliveries.length)} of {deliveries.length} ongoing deliveries
             </Typography>
 
-            <Pagination
-              count={totalPages}
-              page={page + 1}
-              onChange={handleChangePage}
-              color="primary"
-              shape="rounded"
-              siblingCount={1}
-              boundaryCount={2}
-              showFirstButton
-              showLastButton
-            />
+            <Pagination count={totalPages} page={page + 1} onChange={handleChangePage} color="primary" shape="rounded" siblingCount={1} boundaryCount={2} showFirstButton showLastButton />
           </Box>
         </TableContainer>
       </Box>
 
       {/* Action Menu */}
-      <Menu
-        anchorEl={anchorEl}
-        open={Boolean(anchorEl)}
-        onClose={handleCloseMenu}
-        anchorOrigin={{
-          vertical: "top",
-          horizontal: "left",
-        }}
-        transformOrigin={{
-          vertical: "top",
-          horizontal: "left",
-        }}
-      >
+      <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleCloseMenu} anchorOrigin={{ vertical: "top", horizontal: "left" }} transformOrigin={{ vertical: "top", horizontal: "left" }}>
         <MenuItem onClick={handleTrack}>Track</MenuItem>
         <MenuItem onClick={handleContact}>Contact</MenuItem>
       </Menu>

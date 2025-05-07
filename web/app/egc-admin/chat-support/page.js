@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import {Box, Typography, TextField, IconButton, InputAdornment,Paper, Avatar, Button, useTheme} from "@mui/material";
+import { Box, Typography, TextField, IconButton, InputAdornment, Paper, Avatar, Button, useTheme } from "@mui/material";
 import SearchIcon from '@mui/icons-material/Search';
 import SendIcon from '@mui/icons-material/Send';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
@@ -29,49 +29,14 @@ export default function ChatSupportPage() {
   };
 
   return (
-    <Box
-      position="absolute"
-      top={0}
-      left="280px"
-      right={0}
-      bottom={0}
-      display="flex"
-      bgcolor={theme.palette.background.default}
-    >
+    <Box position="absolute" top={0} left="280px" right={0} bottom={0} display="flex" bgcolor={theme.palette.background.default}>
       {/* Sidebar: Conversations */}
-      <Box
-        width="350px"
-        borderRight="1px solid"
-        borderColor="divider"
-        bgcolor={theme.palette.background.paper}
-        display="flex"
-        flexDirection="column"
-        p={2}
-        gap={2}
-      >
-        <TextField
-          placeholder="Search"
-          size="small"
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchIcon />
-              </InputAdornment>
-            )
-          }}
-          sx={{ bgcolor: theme.palette.background.default, borderRadius: 2 }}
-        />
+      <Box width="350px" borderRight="1px solid" borderColor="divider" bgcolor={theme.palette.background.paper} display="flex" flexDirection="column" p={2} gap={2}>
+        <TextField placeholder="Search" size="small" InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon /></InputAdornment> }} sx={{ bgcolor: theme.palette.background.default, borderRadius: 2 }} />
 
         <Box flexGrow={1} overflow="auto" display="flex" flexDirection="column" gap={1}>
           {conversations.map((c, index) => (
-            <Paper key={index} sx={{
-              p: 1.5,
-              display: "flex",
-              alignItems: "center",
-              gap: 1,
-              borderRadius: 2,
-              bgcolor: theme.palette.background.default
-            }}>
+            <Paper key={index} sx={{ p: 1.5, display: "flex", alignItems: "center", gap: 1, borderRadius: 2, bgcolor: theme.palette.background.default }}>
               <Avatar>{c.name.charAt(0)}</Avatar>
               <Box flexGrow={1}>
                 <Typography fontSize="14px" fontWeight="bold">{c.name}</Typography>
@@ -80,18 +45,7 @@ export default function ChatSupportPage() {
               <Box textAlign="right">
                 <Typography fontSize="10px" color="text.secondary">{c.time}</Typography>
                 {c.unread > 0 && (
-                  <Box
-                    bgcolor="primary.main"
-                    color="white"
-                    borderRadius="50%"
-                    width="20px"
-                    height="20px"
-                    display="flex"
-                    alignItems="center"
-                    justifyContent="center"
-                    fontSize="12px"
-                    mx="auto"
-                  >
+                  <Box bgcolor="primary.main" color="white" borderRadius="50%" width="20px" height="20px" display="flex" alignItems="center" justifyContent="center" fontSize="12px" mx="auto">
                     {c.unread}
                   </Box>
                 )}
@@ -102,21 +56,9 @@ export default function ChatSupportPage() {
       </Box>
 
       {/* Chat Area */}
-      <Box
-        flexGrow={1}
-        display="flex"
-        flexDirection="column"
-        bgcolor={theme.palette.background.default}
-      >
+      <Box flexGrow={1} display="flex" flexDirection="column" bgcolor={theme.palette.background.default}>
         {/* Header */}
-        <Box
-          p={2}
-          display="flex"
-          alignItems="center"
-          justifyContent="space-between"
-          borderBottom="1px solid"
-          borderColor="divider"
-        >
+        <Box p={2} display="flex" alignItems="center" justifyContent="space-between" borderBottom="1px solid" borderColor="divider">
           <Box display="flex" alignItems="center" gap={2}>
             <Avatar />
             <Box>
@@ -157,14 +99,7 @@ export default function ChatSupportPage() {
           borderColor="divider"
           gap={2}
         >
-          <TextField
-            fullWidth
-            size="small"
-            placeholder="Type a message"
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            sx={{ bgcolor: theme.palette.background.paper, borderRadius: 2 }}
-          />
+          <TextField fullWidth size="small" placeholder="Type a message" value={message} onChange={(e) => setMessage(e.target.value)} sx={{ bgcolor: theme.palette.background.paper, borderRadius: 2 }} />
           <IconButton color="primary" onClick={handleSend}>
             <SendIcon />
           </IconButton>

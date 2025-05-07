@@ -1,18 +1,26 @@
 "use client";
 
 import Sidebar from "../components/admin-sidebar/page";
-import { CssBaseline } from "@mui/material";
-import { ColorModeContext } from "../layout"; // correct path
 import '../globals.css';
+import { usePathname } from "next/navigation";
 
 export default function Layout({ children }) {
+  const pathname = usePathname();
+  const isAuthPage = pathname === "/egc-admin/login" || pathname === "/egc-admin/forgot-password";
+
   return (
     <div style={{ display: "flex", minHeight: "100vh" }}>
       {/* Sidebar */}
-      <Sidebar />
+      {!isAuthPage && <Sidebar />}
 
       {/* Main Content */}
-      <div style={{ flexGrow: 1, padding: "24px", marginLeft: "280px", backgroundColor: "background.default", minHeight: "100vh" }}>
+      <div style={{ 
+        flexGrow: 1, 
+        padding: "24px", 
+        marginLeft: isAuthPage ? "0" : "280px", 
+        backgroundColor: "background.default", 
+        minHeight: "100vh" 
+      }}>
         {children}
       </div>
     </div>

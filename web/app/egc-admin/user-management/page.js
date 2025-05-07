@@ -2,11 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  Box, MenuItem, TextField, Typography, Button, TableContainer,
-  Table, TableHead, TableRow, TableCell, TableBody, Paper,
-  IconButton, Menu, Pagination
-} from "@mui/material";
+import { Box, MenuItem, TextField, Typography, Button, TableContainer, Table, TableHead, TableRow, TableCell, TableBody, Paper, IconButton, Menu, Pagination } from "@mui/material";
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 
 export default function Page() {
@@ -92,10 +88,10 @@ export default function Page() {
         </Box>
 
         <Box display="flex" gap={2} ml="auto">
-          <Button variant="contained" sx={{ width: "170px" }} onClick={handleCreateAccount}>
+          <Button variant="contained" sx={{ height: "50px", width: "170px" }} onClick={handleCreateAccount}>
             Create Account
           </Button>
-          <Button variant="outlined" sx={{ width: "150px" }}>
+          <Button variant="outlined" sx={{ height: "50px", width: "150px" }}>
             Refresh
           </Button>
         </Box>
@@ -115,34 +111,25 @@ export default function Page() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {accounts
-                .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-                .map((account) => (
-                  <TableRow key={account.id}>
-                    <TableCell>{account.id}</TableCell>
-                    <TableCell>{account.name}</TableCell>
-                    <TableCell>{account.role}</TableCell>
-                    <TableCell>{account.status}</TableCell>
-                    <TableCell>
-                      <IconButton onClick={(event) => handleOpenMenu(event, account)}>
-                        <MoreVertIcon />
-                      </IconButton>
-                    </TableCell>
-                  </TableRow>
-                ))}
+              {accounts.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((account) => (
+                <TableRow key={account.id}>
+                  <TableCell>{account.id}</TableCell>
+                  <TableCell>{account.name}</TableCell>
+                  <TableCell>{account.role}</TableCell>
+                  <TableCell>{account.status}</TableCell>
+                  <TableCell>
+                    <IconButton onClick={(event) => handleOpenMenu(event, account)}>
+                      <MoreVertIcon />
+                    </IconButton>
+                  </TableCell>
+                </TableRow>
+              ))}
             </TableBody>
           </Table>
 
           {/* Pagination */}
           <Box display="flex" justifyContent="space-between" alignItems="center" p={2}>
-            <TextField
-              select
-              label="Rows per page"
-              value={rowsPerPage}
-              onChange={handleChangeRowsPerPage}
-              size="small"
-              sx={{ width: "120px" }}
-            >
+            <TextField select label="Rows per page" value={rowsPerPage} onChange={handleChangeRowsPerPage} size="small" sx={{ width: "120px" }}>
               {[5, 10, 15].map((rows) => (
                 <MenuItem key={rows} value={rows}>
                   {rows}
@@ -150,27 +137,13 @@ export default function Page() {
               ))}
             </TextField>
 
-            <Pagination
-              count={totalPages}
-              page={page + 1}
-              onChange={handleChangePage}
-              color="primary"
-              shape="rounded"
-              showFirstButton
-              showLastButton
-            />
+            <Pagination count={totalPages} page={page + 1} onChange={handleChangePage} color="primary" shape="rounded" showFirstButton showLastButton />
           </Box>
         </TableContainer>
       </Box>
 
       {/* Actions Menu */}
-      <Menu
-        anchorEl={anchorEl}
-        open={Boolean(anchorEl)}
-        onClose={handleCloseMenu}
-        anchorOrigin={{ vertical: "top", horizontal: "left" }}
-        transformOrigin={{ vertical: "top", horizontal: "left" }}
-      >
+      <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleCloseMenu} anchorOrigin={{ vertical: "top", horizontal: "left" }} transformOrigin={{ vertical: "top", horizontal: "left" }}>
         <MenuItem onClick={handleEdit}>Edit</MenuItem>
         <MenuItem onClick={handleDelete}>Delete</MenuItem>
       </Menu>

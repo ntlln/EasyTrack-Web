@@ -34,18 +34,7 @@ export default function Page() {
                 </Typography>
 
                 <Link href={card.route} style={{ textDecoration: "none" }}>
-                  <Typography
-                    variant="body2"
-                    sx={{
-                      mt: 1,
-                      color: isDark ? "#fff" : "#000",
-                      cursor: "pointer",
-                      "&:hover": {
-                        color: theme.palette.primary.main,
-                        textDecoration: "underline",
-                      },
-                    }}
-                  >
+                  <Typography variant="body2" sx={{ mt: 1, color: isDark ? "#fff" : "#000", cursor: "pointer", "&:hover": { color: theme.palette.primary.main, textDecoration: "underline", } }}>
                     View Details
                   </Typography>
                 </Link>

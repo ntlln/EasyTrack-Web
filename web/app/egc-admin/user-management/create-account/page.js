@@ -1,190 +1,105 @@
 "use client";
 
-import {
-  Box, Typography, Grid, TextField, MenuItem,
-  InputAdornment, IconButton, Button, useTheme
-} from "@mui/material";
+import { Box, Typography, Grid, TextField, Button, MenuItem, Alert, Snackbar } from "@mui/material";
 import { useState } from "react";
-import UploadIcon from "@mui/icons-material/Upload";
 
 export default function CreateAccount() {
-  const [accountType, setAccountType] = useState("Delivery Personnel");
-  const theme = useTheme();
+    const [formData, setFormData] = useState({
+        email: "",
+        password: "",
+        confirmPassword: "",
+        role: "user"
+    });
 
-  const banks = ["BDO", "BPI", "Metrobank", "Landbank", "PNB"];
-  const showVehicleSection = accountType === "Delivery Personnel";
+    const [error, setError] = useState("");
+    const [success, setSuccess] = useState(false);
 
-  const handleClear = () => {
-    window.location.reload();
-  };
+    const roles = [
+        { value: "admin", label: "Administrator" },
+        { value: "manager", label: "Manager" },
+        { value: "user", label: "Regular User" }
+    ];
 
-  return (
-    <Box p={4} maxWidth="1400px" mx="auto">
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={4}>
-        <Typography variant="h4" fontWeight="bold" color="primary">
-          Create Account
-        </Typography>
-        <TextField
-          select
-          label="Account Type"
-          size="small"
-          value={accountType}
-          onChange={(e) => setAccountType(e.target.value)}
-          sx={{ width: 250 }}
-          InputLabelProps={{ sx: { color: 'primary.main' } }}
-          required
-        >
-          <MenuItem value="Admin">Admin</MenuItem>
-          <MenuItem value="Delivery Personnel">Delivery Personnel</MenuItem>
-        </TextField>
-      </Box>
+    const handleChange = (e) => {
+        const { name, value } = e.target;
+        setFormData(prev => ({
+            ...prev,
+            [name]: value
+        }));
+    };
 
-      {/* Personal Information */}
-      <Typography variant="h6" fontWeight="bold" mb={2} color="primary">Personal Information</Typography>
-      <Grid container spacing={2} mb={4}>
-        <Grid item xs={12} sm={4}><TextField fullWidth sx={{ minWidth: 300 }} label="First Name" required /></Grid>
-        <Grid item xs={12} sm={4}><TextField fullWidth sx={{ minWidth: 300 }} label="Middle Name" required /></Grid>
-        <Grid item xs={12} sm={4}><TextField fullWidth sx={{ minWidth: 300 }} label="Last Name" required /></Grid>
-        <Grid item xs={12} sm={6}><TextField fullWidth sx={{ minWidth: 300 }} label="Work Email Address" required /></Grid>
-        <Grid item xs={12} sm={6}><TextField fullWidth sx={{ minWidth: 300 }} label="Employee ID" required /></Grid>
-        <Grid item xs={12} sm={6}>
-          <TextField
-            fullWidth
-            sx={{ minWidth: 300 }}
-            label="Date of Birth"
-            type="date"
-            InputLabelProps={{ shrink: true }}
-            required
-          />
-        </Grid>
-        <Grid item xs={12} sm={6}>
-          <TextField fullWidth sx={{ minWidth: 300 }} label="Contact Number" placeholder="+63 XXX XXX XXXX" required />
-        </Grid>
-      </Grid>
+    const handleSubmit = (e) => {
+        e.preventDefault();
 
-      {/* Login Credentials */}
-      <Typography variant="h6" fontWeight="bold" mb={2} color="primary">Login Credentials</Typography>
-      <Grid container spacing={2} mb={4}>
-        <Grid item xs={12} sm={6}><TextField fullWidth sx={{ minWidth: 300 }} label="Password" type="password" required /></Grid>
-        <Grid item xs={12} sm={6}><TextField fullWidth sx={{ minWidth: 300 }} label="Re-enter Password" type="password" required /></Grid>
-      </Grid>
+        // Basic validation
+        if (!formData.email || !formData.password) {
+            setError("Please fill in all required fields");
+            return;
+        }
 
-      {/* Emergency Contact */}
-      <Typography variant="h6" fontWeight="bold" mb={2} color="primary">Emergency Contact Information</Typography>
-      <Grid container spacing={2} mb={4}>
-        <Grid item xs={12} sm={6}><TextField fullWidth sx={{ minWidth: 300 }} label="Emergency Contact Name" required /></Grid>
-        <Grid item xs={12} sm={3}>
-          <TextField
-            fullWidth
-            label="Relationship"
-            select
-            sx={{ minWidth: 300 }}
-            required
-          >
-            <MenuItem value="Single">Single</MenuItem>
-            <MenuItem value="Married">Married</MenuItem>
-          </TextField>
-        </Grid>
-        <Grid item xs={12} sm={3}><TextField fullWidth sx={{ minWidth: 300 }} label="Contact Number" required /></Grid>
-      </Grid>
+        if (formData.password !== formData.confirmPassword) {
+            setError("Passwords do not match");
+            return;
+        }
 
-      {/* ID & Verification */}
-      <Typography variant="h6" fontWeight="bold" mb={2} color="primary">Identification & Verification</Typography>
-      <Grid container spacing={2} mb={4}>
-        <Grid item xs={12} sm={6}><TextField fullWidth sx={{ minWidth: 300 }} label="Government ID Type" required /></Grid>
-        <Grid item xs={12} sm={6}><TextField fullWidth sx={{ minWidth: 300 }} label="Government ID Number" required /></Grid>
-        <Grid item xs={12} sm={6}>
-          <TextField
-            fullWidth
-            sx={{ minWidth: 300 }}
-            label="NBI Clearance Upload"
-            InputProps={{
-              endAdornment: (
-                <InputAdornment position="end">
-                  <IconButton><UploadIcon /></IconButton>
-                </InputAdornment>
-              )
-            }}
-            required
-          />
-        </Grid>
-        <Grid item xs={12} sm={6}>
-          <TextField
-            fullWidth
-            sx={{ minWidth: 300 }}
-            label="Selfie with ID"
-            InputProps={{
-              endAdornment: (
-                <InputAdornment position="end">
-                  <IconButton><UploadIcon /></IconButton>
-                </InputAdornment>
-              )
-            }}
-            required
-          />
-        </Grid>
-      </Grid>
+        // Here you would typically make an API call to create the account
+        console.log("Creating account with data:", formData);
 
-      {/* Vehicle Info (if delivery personnel) */}
-      {showVehicleSection && (
-        <>
-          <Typography variant="h6" fontWeight="bold" mb={2} color="primary">Vehicle Information</Typography>
-          <Grid container spacing={2} mb={4}>
-            <Grid item xs={12} sm={6}>
-              <TextField fullWidth sx={{ minWidth: 300 }} label="Vehicle Type" select required>
-                <MenuItem value="Motorcycle">Motorcycle</MenuItem>
-                <MenuItem value="Van">Van</MenuItem>
-              </TextField>
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField fullWidth sx={{ minWidth: 300 }} label="Plate Number" placeholder="e.g., ABC-1234" required />
-            </Grid>
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                sx={{ minWidth: 300 }}
-                label="Vehicle OR/CR Upload"
-                InputProps={{
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <IconButton><UploadIcon /></IconButton>
-                    </InputAdornment>
-                  )
-                }}
-                required
-              />
-            </Grid>
-          </Grid>
-        </>
-      )}
+        // Show success message
+        setSuccess(true);
+        setError("");
 
-      {/* Bank Info */}
-      <Typography variant="h6" fontWeight="bold" mb={2} color="primary">Bank Details (For Salary & Reimbursement)</Typography>
-      <Grid container spacing={2} mb={4}>
-        <Grid item xs={12} sm={6}>
-          <TextField fullWidth sx={{ minWidth: 300 }} label="Bank Name" select required>
-            {banks.map((bank) => (
-              <MenuItem key={bank} value={bank}>{bank}</MenuItem>
-            ))}
-          </TextField>
-        </Grid>
-        <Grid item xs={12} sm={6}>
-          <TextField fullWidth sx={{ minWidth: 300 }} label="Account Number" placeholder="e.g., 012345678901" required />
-        </Grid>
-        <Grid item xs={12}>
-          <TextField fullWidth sx={{ minWidth: 300 }} label="Account Name" placeholder="e.g., Juan D. Santos" required />
-        </Grid>
-      </Grid>
+        // Reset form
+        setFormData({ email: "", password: "", confirmPassword: "", role: "user" });
+    };
 
-      {/* Submit/Reset */}
-      <Box mt={4} display="flex" justifyContent="center" gap={2}>
-        <Button variant="outlined" color="inherit" onClick={handleClear}>
-          Clear All Fields
-        </Button>
-        <Button variant="contained">
-          Create Account
-        </Button>
-      </Box>
-    </Box>
-  );
+    return (
+        <Box sx={{ width: '100%', height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: "background.default" }} >
+            <Box sx={{ display: "flex", flexDirection: "column", width: { xs: '90vw', sm: '400px', md: '50vh' }, backgroundColor: "background.default", boxShadow: 5, borderRadius: 3, alignItems: "center", pt: 5, pb: 5, gap: 2 }}>
+                <Typography variant="h4" component="h1" color="primary" fontWeight="bold" mb={2} align="center">
+                    Create New Account
+                </Typography>
+                <form onSubmit={handleSubmit} style={{ width: '100%' }}>
+                    <Grid container spacing={3} direction="column" alignItems="center">
+                        <Grid item xs={12} sx={{ width: '70%' }}>
+                            <TextField fullWidth label="Email Address" name="email" type="email" value={formData.email} onChange={handleChange} required />
+                        </Grid>
+                        <Grid item xs={12} sx={{ width: '70%' }}>
+                            <TextField fullWidth label="Password" name="password" type="password" value={formData.password} onChange={handleChange} required />
+                        </Grid>
+                        <Grid item xs={12} sx={{ width: '70%' }}>
+                            <TextField fullWidth label="Confirm Password" name="confirmPassword" type="password" value={formData.confirmPassword} onChange={handleChange} required />
+                        </Grid>
+                        <Grid item xs={12} sx={{ width: '70%' }}>
+                            <TextField fullWidth select label="Role" name="role" value={formData.role} onChange={handleChange} required>
+                                {roles.map((role) => (
+                                    <MenuItem key={role.value} value={role.value}>
+                                        {role.label}
+                                    </MenuItem>
+                                ))}
+                            </TextField>
+                        </Grid>
+                        <Grid item xs={12} sx={{ width: '70%' }}>
+                            <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2, mt: 2 }}>
+                                <Button variant="outlined" onClick={() => setFormData({ email: "", password: "", confirmPassword: "", role: "user" })} fullWidth sx={{ height: "50px" }}>Clear</Button>
+                                <Button type="submit" variant="contained" color="primary" fullWidth sx={{ height: "50px" }}>Create Account</Button>
+                            </Box>
+                        </Grid>
+                    </Grid>
+                </form>
+            </Box>
+            {/* Error Message */}
+            <Snackbar open={!!error} autoHideDuration={6000} onClose={() => setError("")}>
+                <Alert severity="error" onClose={() => setError("")}>
+                    {error}
+                </Alert>
+            </Snackbar>
+            {/* Success Message */}
+            <Snackbar open={success} autoHideDuration={6000} onClose={() => setSuccess(false)}>
+                <Alert severity="success" onClose={() => setSuccess(false)}>
+                    Account created successfully!
+                </Alert>
+            </Snackbar>
+        </Box>
+    );
 }

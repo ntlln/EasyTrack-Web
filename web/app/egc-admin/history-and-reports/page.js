@@ -1,23 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import {
-  Box,
-  MenuItem,
-  TextField,
-  Typography,
-  TableContainer,
-  Table,
-  TableHead,
-  TableRow,
-  TableCell,
-  TableBody,
-  Paper,
-  IconButton,
-  Menu,
-  Pagination,
-  InputAdornment,
-} from "@mui/material";
+import { Box, MenuItem, TextField, Typography, TableContainer, Table, TableHead, TableRow, TableCell, TableBody, Paper, IconButton, Menu, Pagination, InputAdornment } from "@mui/material";
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import SearchIcon from '@mui/icons-material/Search';
@@ -98,18 +82,7 @@ export default function Page() {
       </Box>
 
       <Box display="flex" flexWrap="wrap" gap={2} alignItems="center">
-        <TextField
-          placeholder="Search for transaction"
-          size="small"
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchIcon />
-              </InputAdornment>
-            ),
-          }}
-          sx={{ flex: "1", minWidth: "250px" }}
-        />
+        <TextField placeholder="Search for transaction" size="small" InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon /></InputAdornment> }} sx={{ flex: "1", minWidth: "250px" }} />
 
         <Box sx={statusBoxStyle}>
           <Typography variant="body2" fontWeight="bold">Total</Typography>
@@ -196,28 +169,12 @@ export default function Page() {
               Showing {page * rowsPerPage + 1} - {Math.min((page + 1) * rowsPerPage, transactions.length)} of {transactions.length} transactions
             </Typography>
 
-            <Pagination
-              count={totalPages}
-              page={page + 1}
-              onChange={handleChangePage}
-              color="primary"
-              shape="rounded"
-              siblingCount={1}
-              boundaryCount={2}
-              showFirstButton
-              showLastButton
-            />
+            <Pagination count={totalPages} page={page + 1} onChange={handleChangePage} color="primary" shape="rounded" siblingCount={1} boundaryCount={2} showFirstButton showLastButton />
           </Box>
         </TableContainer>
       </Box>
 
-      <Menu
-        anchorEl={anchorEl}
-        open={Boolean(anchorEl)}
-        onClose={handleCloseMenu}
-        anchorOrigin={{ vertical: "top", horizontal: "left" }}
-        transformOrigin={{ vertical: "top", horizontal: "left" }}
-      >
+      <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleCloseMenu} anchorOrigin={{ vertical: "top", horizontal: "left" }} transformOrigin={{ vertical: "top", horizontal: "left" }}>
         <MenuItem onClick={handleTrack}>Track</MenuItem>
         <MenuItem onClick={handleContact}>Contact</MenuItem>
       </Menu>
