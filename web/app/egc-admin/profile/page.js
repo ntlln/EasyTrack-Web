@@ -57,8 +57,8 @@ export default function ProfilePage() {
         email: profile.email || '',
         password: '********',
         contactNumber: profile.contact_number || 'Not provided',
-        emergencyContact: profile.emergency_contact || 'Not provided',
-        emergencyContactNumber: profile['emergency_contact#'] || 'Not provided',
+        emergencyContact: profile.emergency_contact_name || 'Not provided',
+        emergencyContactNumber: profile.emergency_contact_number || 'Not provided',
     };
 
     const handleEditProfile = () => {

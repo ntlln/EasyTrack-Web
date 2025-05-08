@@ -3,35 +3,10 @@
 import { Box, Card, CardContent, Typography, Grid } from "@mui/material";
 import Link from "next/link";
 import { useTheme } from "@mui/material/styles";
-import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
-import CircularProgress from "@mui/material/CircularProgress";
 
 export default function Page() {
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
-  const router = useRouter();
-  const supabase = createClientComponentClient();
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session || !session.user) {
-        router.push("/egc-admin/login");
-      } else {
-        setLoading(false);
-      }
-    };
-    checkSession();
-  }, []);
-
-  if (loading) return (
-    <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', width: '100vw' }}>
-      <CircularProgress />
-    </Box>
-  );
 
   const cards = [
     { title: "Profile", route: "/egc-admin/profile" },
@@ -60,7 +35,18 @@ export default function Page() {
                 </Typography>
 
                 <Link href={card.route} style={{ textDecoration: "none" }}>
-                  <Typography variant="body2" sx={{ mt: 1, color: isDark ? "#fff" : "#000", cursor: "pointer", "&:hover": { color: theme.palette.primary.main, textDecoration: "underline", } }}>
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      mt: 1,
+                      color: isDark ? "#fff" : "#000",
+                      cursor: "pointer",
+                      "&:hover": {
+                        color: theme.palette.primary.main,
+                        textDecoration: "underline",
+                      },
+                    }}
+                  >
                     View Details
                   </Typography>
                 </Link>

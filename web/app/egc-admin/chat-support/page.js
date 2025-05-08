@@ -13,7 +13,7 @@ export default function ChatSupportPage() {
   const [message, setMessage] = useState("");
 
   const conversations = [
-    { name: "Naiza Albina", lastMessage: "Hi, I’d like to check...", time: "4:30pm", unread: 3 },
+    { name: "Naiza Albina", lastMessage: "Hi, I'd like to check...", time: "4:30pm", unread: 3 },
     { name: "Curtis C", lastMessage: "How are you today?", time: "5:30pm", unread: 0 },
     { name: "Allen C", lastMessage: "Good day! I'm still...", time: "Thu", unread: 2 },
     { name: "Francis S", lastMessage: "Hi there! I haven't...", time: "Wed", unread: 0 },

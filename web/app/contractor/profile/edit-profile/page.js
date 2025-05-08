@@ -73,16 +73,15 @@ export default function EditProfile() {
     });
     if (Object.keys(updates).length === 0) {
       setLoading(false);
-      router.push("/egc-admin/profile");
+      router.push("/contractor/profile");
       return;
     }
     const { error } = await supabase
       .from('profiles')
       .update(updates)
       .eq('email', userEmail);
-    console.log('Supabase update error:', error);
     setLoading(false);
-    if (!error) router.push("/egc-admin/profile");
+    if (!error) router.push("/contractor/profile");
   };
 
   const handleClear = () => {
@@ -112,37 +111,6 @@ export default function EditProfile() {
       <Grid container spacing={2} mb={4}>
         <Grid item xs={12} sm={6}><TextField fullWidth sx={{ minWidth: 300 }} label="Emergency Contact Name" name="emergency_contact_name" value={form.emergency_contact_name} onChange={handleChange} required /></Grid>
         <Grid item xs={12} sm={6}><TextField fullWidth sx={{ minWidth: 300 }} label="Contact Number" name="emergency_contact_number" value={form.emergency_contact_number} onChange={handleChange} required /></Grid>
-      </Grid>
-
-      {/* ID & Verification */}
-      <Typography variant="h6" fontWeight="bold" mb={2} color="primary">Identification & Verification</Typography>
-      <Grid container spacing={2} mb={4}>
-        <Grid item xs={12} sm={6}><TextField fullWidth sx={{ minWidth: 300 }} label="Government ID Type" /></Grid>
-        <Grid item xs={12} sm={6}><TextField fullWidth sx={{ minWidth: 300 }} label="Government ID Number" /></Grid>
-        <Grid item xs={12} sm={6}>
-          <TextField fullWidth sx={{ minWidth: 300 }} label="NBI Clearance Upload" InputProps={{ endAdornment: <InputAdornment position="end"><IconButton><UploadIcon /></IconButton></InputAdornment> }} />
-        </Grid>
-        <Grid item xs={12} sm={6}>
-          <TextField fullWidth sx={{ minWidth: 300 }} label="Selfie with ID" InputProps={{ endAdornment: <InputAdornment position="end"><IconButton><UploadIcon /></IconButton></InputAdornment> }} />
-        </Grid>
-      </Grid>
-
-      {/* Bank Info */}
-      <Typography variant="h6" fontWeight="bold" mb={2} color="primary">Bank Details (For Salary & Reimbursement)</Typography>
-      <Grid container spacing={2} mb={4}>
-        <Grid item xs={12} sm={6}>
-          <TextField fullWidth sx={{ minWidth: 300 }} label="Bank Name" select>
-            {banks.map((bank) => (
-              <MenuItem key={bank} value={bank}>{bank}</MenuItem>
-            ))}
-          </TextField>
-        </Grid>
-        <Grid item xs={12} sm={6}>
-          <TextField fullWidth sx={{ minWidth: 300 }} label="Account Number" placeholder="e.g., 012345678901" />
-        </Grid>
-        <Grid item xs={12}>
-          <TextField fullWidth sx={{ minWidth: 300 }} label="Account Name" placeholder="e.g., Juan D. Santos" />
-        </Grid>
       </Grid>
 
       {/* Submit/Reset */}

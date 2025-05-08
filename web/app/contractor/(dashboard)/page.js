@@ -3,10 +3,14 @@
 import { Box, Card, CardContent, Typography, Grid } from "@mui/material";
 import Link from "next/link";
 import { useTheme } from "@mui/material/styles";
+import { useRouter } from "next/navigation";
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
 export default function Page() {
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
+  const router = useRouter();
+  const supabase = createClientComponentClient();
 
   const cards = [
     { title: "Contracting", route: "/contractor/contracting" },

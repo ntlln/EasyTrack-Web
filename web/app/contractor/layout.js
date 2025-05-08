@@ -1,11 +1,56 @@
 "use client";
 
 import Sidebar from "../components/contractor-sidebar/page";
-import { CssBaseline } from "@mui/material";
-import { ColorModeContext } from "../layout"; // correct path
 import '../globals.css';
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
 export default function Layout({ children }) {
+  const pathname = usePathname();
+  const router = useRouter();
+  const supabase = createClientComponentClient();
+  const [checkingSession, setCheckingSession] = useState(true);
+
+  useEffect(() => {
+    // Only check session for non-login pages
+    if (pathname === "/contractor/login") {
+      setCheckingSession(false);
+      return;
+    }
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session || !session.user) {
+        router.replace("/contractor/login");
+        return;
+      }
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role_id')
+        .eq('id', session.user.id)
+        .single();
+      const { data: contractorRole } = await supabase
+        .from('profiles_roles')
+        .select('id')
+        .eq('role_name', 'Contractor')
+        .single();
+      if (!profile || !contractorRole || Number(profile.role_id) !== Number(contractorRole.id)) {
+        router.replace("/contractor/login");
+        return;
+      }
+      setCheckingSession(false);
+    };
+    checkSession();
+  }, [pathname]);
+
+  if (checkingSession) {
+    return null; // or a loading spinner
+  }
+
+  if (pathname === "/contractor/login") {
+    return <>{children}</>;
+  }
+
   return (
     <div style={{ display: "flex", minHeight: "100vh" }}>
       {/* Sidebar */}
