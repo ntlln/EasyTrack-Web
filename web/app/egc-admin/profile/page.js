@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Box, Grid, CardContent, Typography, Button, Avatar, Paper, IconButton } from '@mui/material';
+import { Box, Grid, CardContent, Typography, Button, Avatar, Paper, IconButton, Alert } from '@mui/material';
 import { useRouter } from 'next/navigation';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useTheme } from '@mui/material/styles';
@@ -20,16 +20,21 @@ export default function ProfilePage() {
     const supabase = createClientComponentClient();
     const theme = useTheme();
     const [resetOpen, setResetOpen] = useState(false);
+    const [resetEmail, setResetEmail] = useState('');
+    const [resetStatus, setResetStatus] = useState({ message: '', severity: '' });
+    const [resetLoading, setResetLoading] = useState(false);
+    const [userEmail, setUserEmail] = useState('');
 
     useEffect(() => {
         const fetchProfile = async () => {
             const { data: { session } } = await supabase.auth.getSession();
             if (!session || !session.user) return;
-            const userEmail = session.user.email;
+            const email = session.user.email;
+            setUserEmail(email); // Store the user's email for validation
             const { data, error } = await supabase
                 .from('profiles')
                 .select('*')
-                .eq('email', userEmail)
+                .eq('email', email)
                 .single();
             if (data) setProfile(data);
             setLoading(false);
@@ -63,6 +68,48 @@ export default function ProfilePage() {
 
     const handleEditProfile = () => {
         router.push('/egc-admin/profile/edit-profile');
+    };
+
+    const handleResetPassword = async () => {
+        setResetLoading(true);
+        setResetStatus({ message: '', severity: '' });
+        
+        // Validate if the entered email matches the logged-in user's email
+        if (resetEmail !== userEmail) {
+            setResetStatus({
+                message: 'Please enter your registered email address',
+                severity: 'error'
+            });
+            setResetLoading(false);
+            return;
+        }
+        
+        try {
+            const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
+                redirectTo: `${window.location.origin}/egc-admin/profile/reset-password`,
+            });
+
+            if (error) throw error;
+
+            setResetStatus({
+                message: 'Password reset link has been sent to your email',
+                severity: 'success'
+            });
+            
+            // Close the dialog after 2 seconds
+            setTimeout(() => {
+                setResetOpen(false);
+                setResetStatus({ message: '', severity: '' });
+                setResetEmail(''); // Clear the email input
+            }, 2000);
+        } catch (error) {
+            setResetStatus({
+                message: error.message || 'Failed to send reset link',
+                severity: 'error'
+            });
+        } finally {
+            setResetLoading(false);
+        }
     };
 
     // Use theme default background for card and paper
@@ -190,7 +237,11 @@ export default function ProfilePage() {
             {/* Reset Password Modal */}
             <Dialog
                 open={resetOpen}
-                onClose={() => setResetOpen(false)}
+                onClose={() => {
+                    setResetOpen(false);
+                    setResetStatus({ message: '', severity: '' });
+                    setResetEmail(''); // Clear the email input
+                }}
                 sx={{
                     '& .MuiDialog-paper': {
                         bgcolor: theme.palette.background.paper,
@@ -208,12 +259,44 @@ export default function ProfilePage() {
             >
                 <DialogTitle variant="h5" sx={{ bgcolor: theme.palette.background.paper, color: theme.palette.text.primary, textAlign: 'center', border: 'none', outline: 'none' }}>Change Password</DialogTitle>
                 <DialogContent sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, minWidth: 350, pt: 3, bgcolor: theme.palette.background.paper, color: theme.palette.text.primary }}>
-                    <Typography fontSize={14} color={theme.palette.text.secondary}>Change your password</Typography>
-                    <TextField label="Email" type="email" placeholder="Enter your email" required sx={{ width: "100%" }} />
+                    <Typography fontSize={14} color={theme.palette.text.secondary}>Enter your registered email to receive a password reset link</Typography>
+                    <TextField 
+                        label="Email" 
+                        type="email" 
+                        value={resetEmail}
+                        onChange={(e) => setResetEmail(e.target.value)}
+                        placeholder="Enter your email"
+                        required
+                        sx={{ width: "100%" }} 
+                    />
+                    {resetStatus.message && (
+                        <Alert severity={resetStatus.severity} sx={{ width: '100%' }}>
+                            {resetStatus.message}
+                        </Alert>
+                    )}
                 </DialogContent>
                 <DialogActions sx={{ flexDirection: 'column', gap: 1.5, alignItems: 'center', justifyContent: 'center', pb: 2, bgcolor: theme.palette.background.paper }}>
-                    <Button sx={{ width: '70%' }} variant="contained" color="primary">Send Reset Link</Button>
-                    <Button sx={{ width: '70%' }} onClick={() => setResetOpen(false)} color="secondary">Cancel</Button>
+                    <Button 
+                        sx={{ width: '70%' }} 
+                        variant="contained" 
+                        color="primary"
+                        onClick={handleResetPassword}
+                        disabled={resetLoading || !resetEmail}
+                    >
+                        {resetLoading ? 'Sending...' : 'Send Reset Link'}
+                    </Button>
+                    <Button 
+                        sx={{ width: '70%' }} 
+                        onClick={() => {
+                            setResetOpen(false);
+                            setResetStatus({ message: '', severity: '' });
+                            setResetEmail(''); // Clear the email input
+                        }} 
+                        color="secondary"
+                        disabled={resetLoading}
+                    >
+                        Cancel
+                    </Button>
                 </DialogActions>
             </Dialog>
         </Box>

@@ -3,8 +3,10 @@
 import { Box, Typography, Grid, TextField, Button, MenuItem, Alert, Snackbar } from "@mui/material";
 import { useState, useEffect } from "react";
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { useRouter } from 'next/navigation';
 
 export default function CreateAccount() {
+    const router = useRouter();
     const supabase = createClientComponentClient();
     const [roles, setRoles] = useState([]);
 
@@ -25,9 +27,16 @@ export default function CreateAccount() {
         role_id: ""
     });
 
-    const [error, setError] = useState("");
-    const [success, setSuccess] = useState(false);
+    const [snackbar, setSnackbar] = useState({
+        open: false,
+        message: '',
+        severity: 'success' // 'success' | 'error' | 'info' | 'warning'
+    });
     const [loading, setLoading] = useState(false);
+
+    const handleCloseSnackbar = () => {
+        setSnackbar(prev => ({ ...prev, open: false }));
+    };
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -40,26 +49,34 @@ export default function CreateAccount() {
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
-        setError("");
 
         // Basic validation
         if (!formData.email || !formData.password || !formData.role_id) {
-            setError("Please fill in all required fields");
+            setSnackbar({
+                open: true,
+                message: "Please fill in all required fields",
+                severity: 'error'
+            });
             setLoading(false);
             return;
         }
 
         if (formData.password !== formData.confirmPassword) {
-            setError("Passwords do not match");
+            setSnackbar({
+                open: true,
+                message: "Passwords do not match",
+                severity: 'error'
+            });
             setLoading(false);
             return;
         }
 
         try {
-            // Sign up the user with Supabase
-            const { data: authData, error: authError } = await supabase.auth.signUp({
+            // Create the user with Supabase admin API
+            const { data: authData, error: authError } = await supabase.auth.admin.createUser({
                 email: formData.email,
-                password: formData.password
+                password: formData.password,
+                email_confirm: true // Auto-confirm the email
             });
 
             if (authError) throw authError;
@@ -78,13 +95,25 @@ export default function CreateAccount() {
             if (profileError) throw profileError;
 
             // Show success message
-            setSuccess(true);
-            setError("");
+            setSnackbar({
+                open: true,
+                message: "Account created successfully!",
+                severity: 'success'
+            });
 
             // Reset form
             setFormData({ email: "", password: "", confirmPassword: "", role_id: "" });
+
+            // Redirect to user management after a short delay
+            setTimeout(() => {
+                router.push('/egc-admin/user-management');
+            }, 1500);
         } catch (error) {
-            setError(error.message || "An error occurred during signup");
+            setSnackbar({
+                open: true,
+                message: error.message || "An error occurred during signup",
+                severity: 'error'
+            });
         } finally {
             setLoading(false);
         }
@@ -137,16 +166,20 @@ export default function CreateAccount() {
                     </Grid>
                 </form>
             </Box>
-            {/* Error Message */}
-            <Snackbar open={!!error} autoHideDuration={6000} onClose={() => setError("")}>
-                <Alert severity="error" onClose={() => setError("")}>
-                    {error}
-                </Alert>
-            </Snackbar>
-            {/* Success Message */}
-            <Snackbar open={success} autoHideDuration={6000} onClose={() => setSuccess(false)}>
-                <Alert severity="success" onClose={() => setSuccess(false)}>
-                    Account created successfully!
+
+            {/* Snackbar for messages */}
+            <Snackbar 
+                open={snackbar.open} 
+                autoHideDuration={6000} 
+                onClose={handleCloseSnackbar}
+                anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+            >
+                <Alert 
+                    onClose={handleCloseSnackbar} 
+                    severity={snackbar.severity} 
+                    sx={{ width: '100%' }}
+                >
+                    {snackbar.message}
                 </Alert>
             </Snackbar>
         </Box>

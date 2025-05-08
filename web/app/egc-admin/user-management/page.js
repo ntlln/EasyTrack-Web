@@ -73,7 +73,6 @@ export default function Page() {
       .from('profiles_status')
       .select('id, status_name');
     if (!error && data) {
-      // Exclude Online, Offline, Pending
       setStatusOptions(data.filter(opt => !['Online', 'Offline', 'Pending'].includes(opt.status_name)));
     }
   };
@@ -120,7 +119,6 @@ export default function Page() {
 
         if (error) throw error;
 
-        // Refresh the accounts list
         fetchAccounts();
       } catch (error) {
         console.error('Error deleting account:', error);
@@ -140,12 +138,12 @@ export default function Page() {
 
   const handleSearchChange = (event) => {
     setSearchQuery(event.target.value);
-    setPage(0); // Reset to first page when searching
+    setPage(0);
   };
 
   const handleDepartmentChange = (event) => {
     setSelectedDepartment(event.target.value);
-    setPage(0); // Reset to first page when filtering
+    setPage(0);
   };
 
   const totalPages = Math.ceil(filteredAccounts.length / rowsPerPage);
