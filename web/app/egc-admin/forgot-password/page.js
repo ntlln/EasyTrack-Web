@@ -1,9 +1,11 @@
 "use client"
 import { Box, Typography, Button, TextField } from "@mui/material";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 export default function Page() {
   const router = useRouter()
+  const searchParams = useSearchParams();
+  const fromProfile = searchParams.get('from') === 'profile';
   return (
     <Box sx={{ display: "flex", width: "auto", height: "100vh", justifyContent: "center", alignItems: "center", backgroundImage: "url(/login-bg.png)", backgroundSize: "80%", backgroundRepeat: "no-repeat", backgroundPosition: "center", backgroundopacity: "30%" }} >
 
@@ -15,7 +17,7 @@ export default function Page() {
 
         <Button variant="contained" color="primary" sx={{ width: "40%" }} onClick={() => router.push("./")}>Login</Button>
 
-        <Typography color="secondary.main" sx={{ fontSize: "1rem", textDecoration: "none", cursor: "pointer", "&:hover": { textDecoration: "underline", color: "primary.main" } }}>Back to Login</Typography>
+        <Typography color="secondary.main" sx={{ fontSize: "1rem", textDecoration: "none", cursor: "pointer", "&:hover": { textDecoration: "underline", color: "primary.main" } }} onClick={() => router.push(fromProfile ? "/egc-admin/profile" : "/egc-admin/login")}>Back to {fromProfile ? "Profile" : "Login"}</Typography>
       </Box>
     </Box>
   )

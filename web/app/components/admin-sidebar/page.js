@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useContext } from "react";
+import { useState, useContext, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { Box, Divider, List, ListItemButton, ListItemIcon, ListItemText, Collapse, Button } from "@mui/material";
 import DashboardIcon from '@mui/icons-material/Dashboard';
@@ -18,6 +18,7 @@ import DarkModeIcon from '@mui/icons-material/DarkMode';
 import LightModeIcon from '@mui/icons-material/LightMode';
 import { ColorModeContext } from "../../layout";
 import { useTheme } from "@mui/material/styles";
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
 export default function Sidebar() {
     const [openPages, setOpenPages] = useState(false);
@@ -25,9 +26,23 @@ export default function Sidebar() {
     const theme = useTheme();
     const router = useRouter();
     const pathname = usePathname();
+    const supabase = createClientComponentClient();
 
     const handleClickPages = () => setOpenPages(!openPages);
-    const handleLogout = () => console.log("Logging out...");
+    useEffect(() => {
+        const checkSession = async () => {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session || !session.user) {
+                router.push("/egc-admin/login");
+            }
+        };
+        checkSession();
+    }, []);
+
+    const handleLogout = async () => {
+        await supabase.auth.signOut();
+        router.push("/egc-admin/login");
+    };
 
     const isActive = (route) => pathname === route;
 

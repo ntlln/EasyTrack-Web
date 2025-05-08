@@ -2,11 +2,88 @@
 
 import { Box, Typography, Grid, TextField, MenuItem, InputAdornment, IconButton, Button, useTheme } from "@mui/material";
 import UploadIcon from "@mui/icons-material/Upload";
+import { useState, useEffect } from "react";
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { useRouter } from "next/navigation";
 
 export default function EditProfile() {
   const theme = useTheme();
 
   const banks = ["BDO", "BPI", "Metrobank", "Landbank", "PNB"];
+
+  const [form, setForm] = useState({
+    first_name: "",
+    middle_initial: "",
+    last_name: "",
+    contact_number: "",
+    birth_date: "",
+    emergency_contact: "",
+    "emergency_contact#": ""
+  });
+  const [loading, setLoading] = useState(false);
+  const supabase = createClientComponentClient();
+  const router = useRouter();
+  const [original, setOriginal] = useState(null);
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      setLoading(true);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session || !session.user) return;
+      const userEmail = session.user.email;
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('first_name, middle_initial, last_name, contact_number, birth_date, emergency_contact, "emergency_contact#"')
+        .eq('email', userEmail)
+        .single();
+      if (data) {
+        const cleanData = {
+          first_name: data.first_name || "",
+          middle_initial: data.middle_initial || "",
+          last_name: data.last_name || "",
+          contact_number: data.contact_number || "",
+          birth_date: data.birth_date || "",
+          emergency_contact: data.emergency_contact || "",
+          "emergency_contact#": data["emergency_contact#"] || ""
+        };
+        setForm(cleanData);
+        setOriginal(cleanData);
+      }
+      setLoading(false);
+    };
+    fetchProfile();
+  }, []);
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleSave = async () => {
+    setLoading(true);
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session || !session.user) return;
+    const userEmail = session.user.email;
+    // Only update changed fields
+    const updates = {};
+    Object.keys(form).forEach(key => {
+      if (form[key] !== (original ? original[key] : "")) {
+        updates[key] = form[key];
+      }
+    });
+    if (Object.keys(updates).length === 0) {
+      setLoading(false);
+      router.push("/egc-admin/profile");
+      return;
+    }
+    const { error } = await supabase
+      .from('profiles')
+      .update(updates)
+      .eq('email', userEmail);
+    console.log('Supabase update error:', error);
+    setLoading(false);
+    if (!error) router.push("/egc-admin/profile");
+  };
 
   const handleClear = () => {
     window.location.reload();
@@ -23,18 +100,18 @@ export default function EditProfile() {
       {/* Personal Information */}
       <Typography variant="h6" fontWeight="bold" mb={2} color="primary">Personal Information</Typography>
       <Grid container spacing={2} mb={4}>
-        <Grid item xs={12} sm={4}> <TextField fullWidth sx={{ minWidth: 300 }} label="First Name" required /> </Grid>
-        <Grid item xs={12} sm={4}> <TextField fullWidth sx={{ minWidth: 300 }} label="Middle Name" required /> </Grid>
-        <Grid item xs={12} sm={4}> <TextField fullWidth sx={{ minWidth: 300 }} label="Last Name" required /> </Grid>
-        <Grid item xs={12} sm={6}> <TextField fullWidth sx={{ minWidth: 300 }} label="Contact Number" placeholder="+63 XXX XXX XXXX" required /> </Grid>
-        <Grid item xs={12} sm={6}> <TextField fullWidth sx={{ minWidth: 300 }} label="Date of Birth" type="date" InputLabelProps={{ shrink: true }} required /> </Grid>
+        <Grid item xs={12} sm={4}> <TextField fullWidth sx={{ minWidth: 300 }} label="First Name" name="first_name" value={form.first_name} onChange={handleChange} required /> </Grid>
+        <Grid item xs={12} sm={4}> <TextField fullWidth sx={{ minWidth: 300 }} label="Middle Name" name="middle_initial" value={form.middle_initial} onChange={handleChange} required /> </Grid>
+        <Grid item xs={12} sm={4}> <TextField fullWidth sx={{ minWidth: 300 }} label="Last Name" name="last_name" value={form.last_name} onChange={handleChange} required /> </Grid>
+        <Grid item xs={12} sm={6}> <TextField fullWidth sx={{ minWidth: 300 }} label="Contact Number" name="contact_number" value={form.contact_number} onChange={handleChange} placeholder="+63 XXX XXX XXXX" required /> </Grid>
+        <Grid item xs={12} sm={6}> <TextField fullWidth sx={{ minWidth: 300 }} label="Date of Birth" name="birth_date" value={form.birth_date} onChange={handleChange} type="date" InputLabelProps={{ shrink: true }} required /> </Grid>
       </Grid>
 
       {/* Emergency Contact */}
       <Typography variant="h6" fontWeight="bold" mb={2} color="primary">Emergency Contact</Typography>
       <Grid container spacing={2} mb={4}>
-        <Grid item xs={12} sm={6}><TextField fullWidth sx={{ minWidth: 300 }} label="Emergency Contact Name" required /></Grid>
-        <Grid item xs={12} sm={6}><TextField fullWidth sx={{ minWidth: 300 }} label="Contact Number" required /></Grid>
+        <Grid item xs={12} sm={6}><TextField fullWidth sx={{ minWidth: 300 }} label="Emergency Contact Name" name="emergency_contact" value={form.emergency_contact} onChange={handleChange} required /></Grid>
+        <Grid item xs={12} sm={6}><TextField fullWidth sx={{ minWidth: 300 }} label="Contact Number" name="emergency_contact#" value={form["emergency_contact#"]} onChange={handleChange} required /></Grid>
       </Grid>
 
       {/* ID & Verification */}
@@ -73,8 +150,8 @@ export default function EditProfile() {
         <Button variant="outlined" color="inherit" onClick={handleClear}>
           Clear All Fields
         </Button>
-        <Button variant="contained">
-          Save Changes
+        <Button variant="contained" onClick={handleSave} disabled={loading}>
+          {loading ? "Saving..." : "Save Changes"}
         </Button>
       </Box>
     </Box>
