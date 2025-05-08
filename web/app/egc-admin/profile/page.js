@@ -56,6 +56,9 @@ export default function ProfilePage() {
         dateRegistered: profile.created_at ? new Date(profile.created_at).toLocaleDateString() : '',
         email: profile.email || '',
         password: '********',
+        contactNumber: profile.contact_number || 'Not provided',
+        emergencyContact: profile.emergency_contact || 'Not provided',
+        emergencyContactNumber: profile['emergency_contact#'] || 'Not provided',
     };
 
     const handleEditProfile = () => {
@@ -67,13 +70,15 @@ export default function ProfilePage() {
     const paperBg = theme.palette.background.paper;
 
     return (
-        <Box sx={{ maxWidth: '1200px', margin: '0 auto', p: { xs: 2, md: 4 } }}>
-            <Typography variant="h3" mb={4} color='primary.main' fontWeight={'bold'} sx={{ textAlign: 'center', fontSize: { xs: '2rem', md: '2.5rem' } }} >
-                Profile
-            </Typography>
+        <Box pt={2} pl={4} display="flex" flexDirection="column" gap={4}>
+            <Box>
+                <Typography variant="h3" color="primary.main" fontWeight="bold">
+                    Profile
+                </Typography>
+            </Box>
 
             {/* Profile Card */}
-            <Paper elevation={3} sx={{ mb: 4, borderRadius: 2, background: cardBg }}>
+            <Paper elevation={3} sx={{ borderRadius: 2, background: cardBg }}>
                 <CardContent sx={{ p: 4 }}>
                     <Box display="flex" alignItems="center" justifyContent="space-between" flexWrap="wrap" gap={3}>
                         <Box display="flex" alignItems="center" gap={3}>
@@ -87,10 +92,14 @@ export default function ProfilePage() {
                                 </Typography>
                             </Box>
                         </Box>
-                        <Button variant="contained" component="label" sx={{ borderRadius: 2, textTransform: 'none', px: 3 }}>
-                            Update Profile Picture
-                            <input hidden accept="image/*" multiple type="file" />
-                        </Button>
+                        <Box display="flex" flexDirection="column" gap={2}>
+                            <Button variant="contained" component="label" sx={{ borderRadius: 2, textTransform: 'none', px: 3 }}>
+                                Update Profile Picture
+                                <input hidden accept="image/*" multiple type="file" />
+                            </Button>
+                            <Button variant="contained" onClick={handleEditProfile} sx={{ borderRadius: 2, textTransform: 'none', px: 3 }}>Edit Profile</Button>
+                            <Button variant="contained" color="error" sx={{ borderRadius: 2, textTransform: 'none', px: 3 }}>Delete Account</Button>
+                        </Box>
                     </Box>
                 </CardContent>
             </Paper>
@@ -106,12 +115,63 @@ export default function ProfilePage() {
                             </Typography>
                             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                                 <Box>
+                                    <Typography color="text.secondary" fontSize="0.9rem">Employee ID</Typography>
+                                    <Typography fontWeight="medium">{user.employeeId}</Typography>
+                                </Box>
+                                <Box>
                                     <Typography color="text.secondary" fontSize="0.9rem">Full Name</Typography>
                                     <Typography fontWeight="medium">{user.fullName}</Typography>
                                 </Box>
                                 <Box>
-                                    <Typography color="text.secondary" fontSize="0.9rem">Employee ID</Typography>
-                                    <Typography fontWeight="medium">{user.employeeId}</Typography>
+                                    <Typography color="text.secondary" fontSize="0.9rem">Contact Number</Typography>
+                                    <Typography fontWeight="medium">{user.contactNumber}</Typography>
+                                </Box>
+                            </Box>
+                        </CardContent>
+                    </Paper>
+                </Grid>
+
+                {/* Emergency Contact Information */}
+                <Grid item xs={12} md={6}>
+                    <Paper elevation={2} sx={{ height: '100%', borderRadius: 2, transition: 'transform 0.2s', '&:hover': { transform: 'translateY(-4px)' }, background: paperBg }}>
+                        <CardContent sx={{ p: 3 }}>
+                            <Typography variant="h6" mb={3} color="primary.main" sx={{ borderBottom: '2px solid', borderColor: 'primary.light', pb: 1 }}>
+                                Emergency Contact Information
+                            </Typography>
+                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                <Box>
+                                    <Typography color="text.secondary" fontSize="0.9rem">Emergency Contact Name</Typography>
+                                    <Typography fontWeight="medium">{user.emergencyContact}</Typography>
+                                </Box>
+                                <Box>
+                                    <Typography color="text.secondary" fontSize="0.9rem">Emergency Contact Number</Typography>
+                                    <Typography fontWeight="medium">{user.emergencyContactNumber}</Typography>
+                                </Box>
+                            </Box>
+                        </CardContent>
+                    </Paper>
+                </Grid>
+
+                {/* Account Information */}
+                <Grid item xs={12} md={6}>
+                    <Paper elevation={2} sx={{ height: '100%', borderRadius: 2, transition: 'transform 0.2s', '&:hover': { transform: 'translateY(-4px)' }, background: paperBg }}>
+                        <CardContent sx={{ p: 3 }}>
+                            <Typography variant="h6" mb={3} color="primary.main" sx={{ borderBottom: '2px solid', borderColor: 'primary.light', pb: 1 }}>
+                                Account Information
+                            </Typography>
+                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                <Box>
+                                    <Typography color="text.secondary" fontSize="0.9rem">Email Address</Typography>
+                                    <Typography fontWeight="medium">{user.email}</Typography>
+                                </Box>
+                                <Box>
+                                    <Typography color="text.secondary" fontSize="0.9rem">Password</Typography>
+                                    <Box display="flex" alignItems="center" gap={1}>
+                                        <Typography fontWeight="medium">********</Typography>
+                                        <IconButton color="primary" aria-label="Reset Password" onClick={() => setResetOpen(true)}>
+                                            <LockResetIcon />
+                                        </IconButton>
+                                    </Box>
                                 </Box>
                                 <Box>
                                     <Typography color="text.secondary" fontSize="0.9rem">Role</Typography>
@@ -125,57 +185,25 @@ export default function ProfilePage() {
                         </CardContent>
                     </Paper>
                 </Grid>
-
-                {/* Account Credentials */}
-                <Grid item xs={12} md={6}>
-                    <Paper elevation={2} sx={{ height: '100%', borderRadius: 2, transition: 'transform 0.2s', '&:hover': { transform: 'translateY(-4px)' }, background: paperBg }}>
-                        <CardContent sx={{ p: 3 }}>
-                            <Typography variant="h6" mb={3} color="primary.main" sx={{ borderBottom: '2px solid', borderColor: 'primary.light', pb: 1 }}>
-                                Account Credentials
-                            </Typography>
-                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                                <Box>
-                                    <Typography color="text.secondary" fontSize="0.9rem">Email Address</Typography>
-                                    <Typography fontWeight="medium">{user.email}</Typography>
-                                </Box>
-                                <Box>
-                                    <Typography color="text.secondary" fontSize="0.9rem">Password</Typography>
-                                    <Box display="flex" alignItems="center" gap={1}>
-                                        <Typography fontWeight="medium">{user.password}</Typography>
-                                        <IconButton color="primary" aria-label="Reset Password" onClick={() => setResetOpen(true)}>
-                                            <LockResetIcon />
-                                        </IconButton>
-                                    </Box>
-                                </Box>
-                            </Box>
-                        </CardContent>
-                    </Paper>
-                </Grid>
             </Grid>
 
-            {/* Action Buttons */}
-            <Box display="flex" gap={2} mt={4} flexWrap="wrap" justifyContent="center">
-                <Button variant="contained" onClick={handleEditProfile} sx={{ borderRadius: 2, textTransform: 'none', px: 4, py: 1 }}>Edit Profile</Button>
-                <Button variant="contained" color="error" sx={{ borderRadius: 2, textTransform: 'none', px: 4, py: 1 }}>Delete Account</Button>
-            </Box>
-
             {/* Reset Password Modal */}
-            <Dialog 
-                open={resetOpen} 
+            <Dialog
+                open={resetOpen}
                 onClose={() => setResetOpen(false)}
                 sx={{
-                  '& .MuiDialog-paper': {
-                    bgcolor: theme.palette.background.paper,
-                    color: theme.palette.text.primary,
-                    boxShadow: '0 8px 32px 0 rgba(0,0,0,0.25)',
-                    border: 'none !important',
-                    outline: 'none !important',
-                    borderWidth: '0 !important',
-                    borderStyle: 'none !important',
-                    borderColor: 'transparent !important',
-                    boxShadowColor: 'transparent',
-                    boxShadowInset: 'none',
-                  }
+                    '& .MuiDialog-paper': {
+                        bgcolor: theme.palette.background.paper,
+                        color: theme.palette.text.primary,
+                        boxShadow: '0 8px 32px 0 rgba(0,0,0,0.25)',
+                        border: 'none !important',
+                        outline: 'none !important',
+                        borderWidth: '0 !important',
+                        borderStyle: 'none !important',
+                        borderColor: 'transparent !important',
+                        boxShadowColor: 'transparent',
+                        boxShadowInset: 'none',
+                    }
                 }}
             >
                 <DialogTitle variant="h5" sx={{ bgcolor: theme.palette.background.paper, color: theme.palette.text.primary, textAlign: 'center', border: 'none', outline: 'none' }}>Change Password</DialogTitle>

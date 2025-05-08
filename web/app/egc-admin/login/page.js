@@ -61,6 +61,16 @@ export default function Page() {
           setLoading(false);
           return;
         }
+
+        // Update last_sign_in_at
+        const { error: updateError } = await supabase
+          .from('profiles')
+          .update({ last_sign_in_at: new Date().toISOString() })
+          .eq('id', userId);
+
+        if (updateError) {
+          console.error('Error updating last sign in:', updateError);
+        }
       }
       router.push("./");
     }

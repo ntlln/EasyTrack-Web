@@ -34,11 +34,12 @@ export default function Page() {
   );
 
   const cards = [
+    { title: "Profile", route: "/egc-admin/profile" },
     { title: "User Management", route: "/egc-admin/user-management" },
-    { title: "Delivery History & Reports", route: "/egc-admin/history-and-reports" },
     { title: "Luggage Tracking", route: "/egc-admin/luggage-tracking" },
+    { title: "History and Reports", route: "/egc-admin/history-and-reports" },
     { title: "Statistics", route: "/egc-admin/statistics" },
-    { title: "Message Center", route: "/egc-admin/chat-support" },
+    { title: "Chat Support", route: "/egc-admin/chat-support" },
   ];
 
   return (
