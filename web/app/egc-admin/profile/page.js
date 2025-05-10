@@ -1,22 +1,25 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Box, Grid, CardContent, Typography, Button, Avatar, Paper, IconButton, Alert } from '@mui/material';
+import {
+    Box, Grid, CardContent, Typography, Button, Avatar, Paper, IconButton,
+    Alert, CircularProgress, Snackbar, Dialog, DialogTitle, DialogContent,
+    DialogActions, TextField
+} from '@mui/material';
 import { useRouter } from 'next/navigation';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useTheme } from '@mui/material/styles';
 import LockResetIcon from '@mui/icons-material/LockReset';
-import Dialog from '@mui/material/Dialog';
-import DialogTitle from '@mui/material/DialogTitle';
-import DialogContent from '@mui/material/DialogContent';
-import DialogActions from '@mui/material/DialogActions';
-import TextField from '@mui/material/TextField';
+import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
 
 export default function ProfilePage() {
     const router = useRouter();
     const [profile, setProfile] = useState(null);
     const [loading, setLoading] = useState(true);
     const [roleName, setRoleName] = useState("");
+    const [uploading, setUploading] = useState(false);
+    const [uploadError, setUploadError] = useState(null);
+    const [profileImage, setProfileImage] = useState(null);
     const supabase = createClientComponentClient();
     const theme = useTheme();
     const [resetOpen, setResetOpen] = useState(false);
@@ -24,32 +27,179 @@ export default function ProfilePage() {
     const [resetStatus, setResetStatus] = useState({ message: '', severity: '' });
     const [resetLoading, setResetLoading] = useState(false);
     const [userEmail, setUserEmail] = useState('');
+    const [snackbarOpen, setSnackbarOpen] = useState(false);
 
     useEffect(() => {
         const fetchProfile = async () => {
             const { data: { session } } = await supabase.auth.getSession();
             if (!session || !session.user) return;
+
             const email = session.user.email;
-            setUserEmail(email); // Store the user's email for validation
+            setUserEmail(email);
+
             const { data, error } = await supabase
                 .from('profiles')
                 .select('*')
                 .eq('email', email)
                 .single();
-            if (data) setProfile(data);
-            setLoading(false);
-            // Fetch role name if role_id exists
-            if (data && data.role_id) {
-                const { data: roleData } = await supabase
-                    .from('profiles_roles')
-                    .select('role_name')
-                    .eq('id', data.role_id)
-                    .single();
-                if (roleData && roleData.role_name) setRoleName(roleData.role_name);
+
+            if (data) {
+                setProfile(data);
+
+                if (data['pfp-id']) {
+                    let found = false;
+                    // Try the exact filename first
+                    const filePathExact = `admin/${data['pfp-id']}`;
+                    let { data: imageData } = await supabase
+                        .storage
+                        .from('profile-images')
+                        .getPublicUrl(filePathExact);
+                    console.log('Trying exact filePath:', filePathExact, 'URL:', imageData?.publicUrl);
+                    if (imageData && imageData.publicUrl) {
+                        try {
+                            const res = await fetch(imageData.publicUrl, { method: 'HEAD' });
+                            if (res.ok) {
+                                setProfileImage(imageData.publicUrl);
+                                found = true;
+                            }
+                        } catch (e) { /* ignore */ }
+                    }
+                    // If not found, try common extensions
+                    if (!found) {
+                        const baseName = data['pfp-id'].replace(/\.[^/.]+$/, '');
+                        const extensions = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
+                        for (const ext of extensions) {
+                            const fileName = `${baseName}.${ext}`;
+                            const filePath = `admin/${fileName}`;
+                            imageData = await supabase
+                                .storage
+                                .from('profile-images')
+                                .getPublicUrl(filePath);
+                            console.log('Trying filePath:', filePath, 'URL:', imageData?.publicUrl);
+                            if (imageData && imageData.publicUrl) {
+                                try {
+                                    const res = await fetch(imageData.publicUrl, { method: 'HEAD' });
+                                    if (res.ok) {
+                                        setProfileImage(imageData.publicUrl);
+                                        found = true;
+                                        break;
+                                    }
+                                } catch (e) { /* ignore */ }
+                            }
+                        }
+                    }
+                    if (!found) setProfileImage(null);
+                } else {
+                    setProfileImage(null);
+                }
+
+                if (data.role_id) {
+                    const { data: roleData } = await supabase
+                        .from('profiles_roles')
+                        .select('role_name')
+                        .eq('id', data.role_id)
+                        .single();
+
+                    if (roleData?.role_name) setRoleName(roleData.role_name);
+                }
             }
+            setLoading(false);
         };
         fetchProfile();
     }, []);
+
+    const handleImageUpload = async (event) => {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        if (!file.type.startsWith('image/')) {
+            setUploadError('Please upload an image file');
+            setSnackbarOpen(true);
+            return;
+        }
+
+        if (file.size > 5 * 1024 * 1024) {
+            setUploadError('File size should be less than 5MB');
+            setSnackbarOpen(true);
+            return;
+        }
+
+        try {
+            setUploading(true);
+            setUploadError(null);
+
+            const fileName = file.name;
+            const filePath = `admin/${fileName}`;
+
+            const { error: uploadError } = await supabase.storage
+                .from('profile-images')
+                .upload(filePath, file, {
+                    upsert: true,
+                    cacheControl: '3600'
+                });
+
+            if (uploadError) throw new Error(uploadError.message);
+
+            await supabase
+                .from('profiles')
+                .update({ ['pfp-id']: fileName })
+                .eq('id', profile.id);
+
+            const { data: imageData } = await supabase
+                .storage
+                .from('profile-images')
+                .getPublicUrl(filePath);
+
+            if (imageData?.publicUrl) {
+                setProfileImage(imageData.publicUrl);
+            }
+
+        } catch (error) {
+            setUploadError(error.message || 'Failed to upload image');
+            setSnackbarOpen(true);
+        } finally {
+            setUploading(false);
+        }
+    };
+
+    const handleResetPassword = async () => {
+        setResetLoading(true);
+        setResetStatus({ message: '', severity: '' });
+
+        if (resetEmail !== userEmail) {
+            setResetStatus({ message: 'Please enter your registered email address', severity: 'error' });
+            setResetLoading(false);
+            return;
+        }
+
+        try {
+            const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
+                redirectTo: `${window.location.origin}/egc-admin/profile/reset-password`,
+            });
+
+            if (error) throw error;
+
+            setResetStatus({ message: 'Password reset link sent to your email', severity: 'success' });
+            setTimeout(() => {
+                setResetOpen(false);
+                setResetStatus({ message: '', severity: '' });
+                setResetEmail('');
+            }, 2000);
+
+        } catch (error) {
+            setResetStatus({ message: error.message || 'Failed to send reset link', severity: 'error' });
+        } finally {
+            setResetLoading(false);
+        }
+    };
+
+    const handleSnackbarClose = (_, reason) => {
+        if (reason !== 'clickaway') setSnackbarOpen(false);
+    };
+
+    const handleEditProfile = () => {
+        router.push('/egc-admin/profile/edit-profile');
+    };
 
     if (loading) return <Box p={4}><Typography>Loading...</Typography></Box>;
     if (!profile) return <Box p={4}><Typography>No profile found.</Typography></Box>;
@@ -58,61 +208,15 @@ export default function ProfilePage() {
         fullName: `${profile.first_name || ''} ${profile.middle_initial || ''} ${profile.last_name || ''}`.replace(/  +/g, ' ').trim(),
         employeeId: profile.id || '',
         role: roleName || '',
-        dateRegistered: profile.created_at ? new Date(profile.created_at).toLocaleDateString() : '',
+        dateRegistered: profile.created_at ? new Date(profile.created_at).toLocaleString() : '',
         email: profile.email || '',
         password: '********',
         contactNumber: profile.contact_number || 'Not provided',
+        birthDate: profile.birth_date ? new Date(profile.birth_date).toLocaleDateString() : 'Not provided',
         emergencyContact: profile.emergency_contact_name || 'Not provided',
         emergencyContactNumber: profile.emergency_contact_number || 'Not provided',
     };
 
-    const handleEditProfile = () => {
-        router.push('/egc-admin/profile/edit-profile');
-    };
-
-    const handleResetPassword = async () => {
-        setResetLoading(true);
-        setResetStatus({ message: '', severity: '' });
-        
-        // Validate if the entered email matches the logged-in user's email
-        if (resetEmail !== userEmail) {
-            setResetStatus({
-                message: 'Please enter your registered email address',
-                severity: 'error'
-            });
-            setResetLoading(false);
-            return;
-        }
-        
-        try {
-            const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
-                redirectTo: `${window.location.origin}/egc-admin/profile/reset-password`,
-            });
-
-            if (error) throw error;
-
-            setResetStatus({
-                message: 'Password reset link has been sent to your email',
-                severity: 'success'
-            });
-            
-            // Close the dialog after 2 seconds
-            setTimeout(() => {
-                setResetOpen(false);
-                setResetStatus({ message: '', severity: '' });
-                setResetEmail(''); // Clear the email input
-            }, 2000);
-        } catch (error) {
-            setResetStatus({
-                message: error.message || 'Failed to send reset link',
-                severity: 'error'
-            });
-        } finally {
-            setResetLoading(false);
-        }
-    };
-
-    // Use theme default background for card and paper
     const cardBg = theme.palette.background.paper;
     const paperBg = theme.palette.background.paper;
 
@@ -129,7 +233,44 @@ export default function ProfilePage() {
                 <CardContent sx={{ p: 4 }}>
                     <Box display="flex" alignItems="center" justifyContent="space-between" flexWrap="wrap" gap={3}>
                         <Box display="flex" alignItems="center" gap={3}>
-                            <Avatar alt={user.fullName} src="/avatar.png" sx={{ width: 100, height: 100, border: '2px solid', borderColor: 'primary.main' }} />
+                            <Box position="relative">
+                                <Avatar
+                                    alt={user.fullName}
+                                    src={profileImage || "/avatar.png"}
+                                    sx={{
+                                        width: 100,
+                                        height: 100,
+                                        border: '2px solid',
+                                        borderColor: 'primary.main'
+                                    }}
+                                />
+                                <input
+                                    accept="image/*"
+                                    style={{ display: 'none' }}
+                                    id="profile-image-upload"
+                                    type="file"
+                                    onChange={handleImageUpload}
+                                    disabled={uploading}
+                                />
+                                <label htmlFor="profile-image-upload">
+                                    <IconButton
+                                        component="span"
+                                        sx={{
+                                            position: 'absolute',
+                                            bottom: 0,
+                                            right: 0,
+                                            backgroundColor: 'primary.main',
+                                            color: 'white',
+                                            '&:hover': {
+                                                backgroundColor: 'primary.dark',
+                                            },
+                                        }}
+                                        disabled={uploading}
+                                    >
+                                        {uploading ? <CircularProgress size={24} color="inherit" /> : <PhotoCameraIcon />}
+                                    </IconButton>
+                                </label>
+                            </Box>
                             <Box>
                                 <Typography variant="h5" fontWeight="bold" gutterBottom>
                                     {user.fullName}
@@ -140,10 +281,6 @@ export default function ProfilePage() {
                             </Box>
                         </Box>
                         <Box display="flex" flexDirection="column" gap={2}>
-                            <Button variant="contained" component="label" sx={{ borderRadius: 2, textTransform: 'none', px: 3 }}>
-                                Update Profile Picture
-                                <input hidden accept="image/*" multiple type="file" />
-                            </Button>
                             <Button variant="contained" onClick={handleEditProfile} sx={{ borderRadius: 2, textTransform: 'none', px: 3 }}>Edit Profile</Button>
                             <Button variant="contained" color="error" sx={{ borderRadius: 2, textTransform: 'none', px: 3 }}>Delete Account</Button>
                         </Box>
@@ -172,6 +309,10 @@ export default function ProfilePage() {
                                 <Box>
                                     <Typography color="text.secondary" fontSize="0.9rem">Contact Number</Typography>
                                     <Typography fontWeight="medium">{user.contactNumber}</Typography>
+                                </Box>
+                                <Box>
+                                    <Typography color="text.secondary" fontSize="0.9rem">Birth Date</Typography>
+                                    <Typography fontWeight="medium">{user.birthDate}</Typography>
                                 </Box>
                             </Box>
                         </CardContent>
@@ -260,14 +401,14 @@ export default function ProfilePage() {
                 <DialogTitle variant="h5" sx={{ bgcolor: theme.palette.background.paper, color: theme.palette.text.primary, textAlign: 'center', border: 'none', outline: 'none' }}>Change Password</DialogTitle>
                 <DialogContent sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, minWidth: 350, pt: 3, bgcolor: theme.palette.background.paper, color: theme.palette.text.primary }}>
                     <Typography fontSize={14} color={theme.palette.text.secondary}>Enter your registered email to receive a password reset link</Typography>
-                    <TextField 
-                        label="Email" 
-                        type="email" 
+                    <TextField
+                        label="Email"
+                        type="email"
                         value={resetEmail}
                         onChange={(e) => setResetEmail(e.target.value)}
                         placeholder="Enter your email"
                         required
-                        sx={{ width: "100%" }} 
+                        sx={{ width: "100%" }}
                     />
                     {resetStatus.message && (
                         <Alert severity={resetStatus.severity} sx={{ width: '100%' }}>
@@ -276,22 +417,22 @@ export default function ProfilePage() {
                     )}
                 </DialogContent>
                 <DialogActions sx={{ flexDirection: 'column', gap: 1.5, alignItems: 'center', justifyContent: 'center', pb: 2, bgcolor: theme.palette.background.paper }}>
-                    <Button 
-                        sx={{ width: '70%' }} 
-                        variant="contained" 
+                    <Button
+                        sx={{ width: '70%' }}
+                        variant="contained"
                         color="primary"
                         onClick={handleResetPassword}
                         disabled={resetLoading || !resetEmail}
                     >
                         {resetLoading ? 'Sending...' : 'Send Reset Link'}
                     </Button>
-                    <Button 
-                        sx={{ width: '70%' }} 
+                    <Button
+                        sx={{ width: '70%' }}
                         onClick={() => {
                             setResetOpen(false);
                             setResetStatus({ message: '', severity: '' });
                             setResetEmail(''); // Clear the email input
-                        }} 
+                        }}
                         color="secondary"
                         disabled={resetLoading}
                     >
@@ -299,6 +440,18 @@ export default function ProfilePage() {
                     </Button>
                 </DialogActions>
             </Dialog>
+
+            {/* Snackbar for upload errors */}
+            <Snackbar
+                open={snackbarOpen}
+                autoHideDuration={5000}
+                onClose={handleSnackbarClose}
+                anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+            >
+                <Alert onClose={handleSnackbarClose} severity="error" sx={{ width: '100%' }}>
+                    {uploadError}
+                </Alert>
+            </Snackbar>
         </Box>
     );
 }
