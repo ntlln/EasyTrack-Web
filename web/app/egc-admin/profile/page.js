@@ -1,11 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import {
-    Box, Grid, CardContent, Typography, Button, Avatar, Paper, IconButton,
-    Alert, CircularProgress, Snackbar, Dialog, DialogTitle, DialogContent,
-    DialogActions, TextField
-} from '@mui/material';
+import { Box, Grid, CardContent, Typography, Button, Avatar, Paper, IconButton, Alert, CircularProgress, Snackbar, Dialog, DialogTitle, DialogContent, DialogActions, TextField } from '@mui/material';
 import { useRouter } from 'next/navigation';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useTheme } from '@mui/material/styles';
@@ -47,49 +43,55 @@ export default function ProfilePage() {
                 setProfile(data);
 
                 if (data['pfp-id']) {
-                    let found = false;
-                    // Try the exact filename first
-                    const filePathExact = `admin/${data['pfp-id']}`;
-                    let { data: imageData } = await supabase
-                        .storage
-                        .from('profile-images')
-                        .getPublicUrl(filePathExact);
-                    console.log('Trying exact filePath:', filePathExact, 'URL:', imageData?.publicUrl);
-                    if (imageData && imageData.publicUrl) {
-                        try {
-                            const res = await fetch(imageData.publicUrl, { method: 'HEAD' });
-                            if (res.ok) {
-                                setProfileImage(imageData.publicUrl);
-                                found = true;
-                            }
-                        } catch (e) { /* ignore */ }
-                    }
-                    // If not found, try common extensions
-                    if (!found) {
-                        const baseName = data['pfp-id'].replace(/\.[^/.]+$/, '');
-                        const extensions = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
-                        for (const ext of extensions) {
-                            const fileName = `${baseName}.${ext}`;
-                            const filePath = `admin/${fileName}`;
-                            imageData = await supabase
-                                .storage
-                                .from('profile-images')
-                                .getPublicUrl(filePath);
-                            console.log('Trying filePath:', filePath, 'URL:', imageData?.publicUrl);
-                            if (imageData && imageData.publicUrl) {
-                                try {
-                                    const res = await fetch(imageData.publicUrl, { method: 'HEAD' });
-                                    if (res.ok) {
-                                        setProfileImage(imageData.publicUrl);
-                                        found = true;
-                                        break;
-                                    }
-                                } catch (e) { /* ignore */ }
-                            }
+                    try {
+                        // Log the raw pfp-id value
+                        console.log('Raw pfp-id from database:', data['pfp-id']);
+
+                        // Clean the filename and construct the file path
+                        const cleanFileName = data['pfp-id'].trim();
+                        const filePath = `admin/${cleanFileName}`;
+                        console.log('Attempting to fetch profile image from path:', filePath);
+
+                        // List files in the bucket to verify the file exists
+                        const { data: listData, error: listError } = await supabase
+                            .storage
+                            .from('profile-images')
+                            .list('admin');
+
+                        if (listError) {
+                            console.error('Error listing files:', listError);
+                        } else {
+                            console.log('Files in admin folder:', listData);
+                            // Check if our file exists in the list
+                            const fileExists = listData.some(file => file.name === cleanFileName);
+                            console.log('File exists in bucket:', fileExists);
                         }
+
+                        // Get a signed URL (valid for 1 hour)
+                        const { data: signedData, error: signedError } = await supabase
+                            .storage
+                            .from('profile-images')
+                            .createSignedUrl(filePath, 60 * 60);
+
+                        if (signedError) {
+                            console.error('Error getting signed URL:', signedError);
+                            setProfileImage(null);
+                            return;
+                        }
+
+                        if (signedData?.signedUrl) {
+                            console.log('Generated signed URL:', signedData.signedUrl);
+                            setProfileImage(signedData.signedUrl);
+                        } else {
+                            console.error('No signed URL returned for image');
+                            setProfileImage(null);
+                        }
+                    } catch (error) {
+                        console.error('Error fetching profile image:', error);
+                        setProfileImage(null);
                     }
-                    if (!found) setProfileImage(null);
                 } else {
+                    console.log('No pfp-id found in profile data');
                     setProfileImage(null);
                 }
 
@@ -124,11 +126,23 @@ export default function ProfilePage() {
             return;
         }
 
-        try {
-            setUploading(true);
-            setUploadError(null);
+        setUploading(true);
+        setUploadError(null);
 
-            const fileName = file.name;
+        try {
+            if (profile && profile['pfp-id']) {
+                const oldFileName = profile['pfp-id'].trim();
+                const oldFilePath = `admin/${oldFileName}`;
+                const { error: deleteError } = await supabase.storage
+                    .from('profile-images')
+                    .remove([oldFilePath]);
+                if (deleteError) {
+                    console.warn('Could not delete old profile image:', oldFilePath, deleteError.message);
+                }
+            }
+
+            const fileExt = file.name.split('.').pop();
+            const fileName = `${Date.now()}.${fileExt}`;
             const filePath = `admin/${fileName}`;
 
             const { error: uploadError } = await supabase.storage
@@ -137,23 +151,21 @@ export default function ProfilePage() {
                     upsert: true,
                     cacheControl: '3600'
                 });
-
             if (uploadError) throw new Error(uploadError.message);
 
-            await supabase
+            const { error: updateError } = await supabase
                 .from('profiles')
                 .update({ ['pfp-id']: fileName })
                 .eq('id', profile.id);
+            if (updateError) throw new Error('Failed to update profile with new image');
 
-            const { data: imageData } = await supabase
+            const { data: signedData, error: urlError } = await supabase
                 .storage
                 .from('profile-images')
-                .getPublicUrl(filePath);
+                .createSignedUrl(filePath, 60 * 60);
+            if (urlError || !signedData?.signedUrl) throw new Error('Failed to generate signed URL');
 
-            if (imageData?.publicUrl) {
-                setProfileImage(imageData.publicUrl);
-            }
-
+            setProfileImage(signedData.signedUrl);
         } catch (error) {
             setUploadError(error.message || 'Failed to upload image');
             setSnackbarOpen(true);
