@@ -10,105 +10,92 @@ import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
 
 export default function ProfilePage() {
     const router = useRouter();
-    const [profile, setProfile] = useState(null);
-    const [loading, setLoading] = useState(true);
-    const [roleName, setRoleName] = useState("");
-    const [uploading, setUploading] = useState(false);
-    const [uploadError, setUploadError] = useState(null);
-    const [profileImage, setProfileImage] = useState(null);
     const supabase = createClientComponentClient();
     const theme = useTheme();
+
+    // Profile states
+    const [profile, setProfile] = useState(null);
+    const [profileImage, setProfileImage] = useState(null);
+    const [roleName, setRoleName] = useState('');
+    const [userEmail, setUserEmail] = useState('');
+
+    // Loading states
+    const [loading, setLoading] = useState(true);
+    const [uploading, setUploading] = useState(false);
+    const [resetLoading, setResetLoading] = useState(false);
+
+    // UI states
     const [resetOpen, setResetOpen] = useState(false);
     const [resetEmail, setResetEmail] = useState('');
     const [resetStatus, setResetStatus] = useState({ message: '', severity: '' });
-    const [resetLoading, setResetLoading] = useState(false);
-    const [userEmail, setUserEmail] = useState('');
+    const [uploadError, setUploadError] = useState(null);
     const [snackbarOpen, setSnackbarOpen] = useState(false);
 
     useEffect(() => {
-        const fetchProfile = async () => {
-            const { data: { session } } = await supabase.auth.getSession();
-            if (!session || !session.user) return;
-
-            const email = session.user.email;
-            setUserEmail(email);
-
-            const { data, error } = await supabase
-                .from('profiles')
-                .select('*')
-                .eq('email', email)
-                .single();
-
-            if (data) {
-                setProfile(data);
-
-                if (data['pfp-id']) {
-                    try {
-                        // Log the raw pfp-id value
-                        console.log('Raw pfp-id from database:', data['pfp-id']);
-
-                        // Clean the filename and construct the file path
-                        const cleanFileName = data['pfp-id'].trim();
-                        const filePath = `admin/${cleanFileName}`;
-                        console.log('Attempting to fetch profile image from path:', filePath);
-
-                        // List files in the bucket to verify the file exists
-                        const { data: listData, error: listError } = await supabase
-                            .storage
-                            .from('profile-images')
-                            .list('admin');
-
-                        if (listError) {
-                            console.error('Error listing files:', listError);
-                        } else {
-                            console.log('Files in admin folder:', listData);
-                            // Check if our file exists in the list
-                            const fileExists = listData.some(file => file.name === cleanFileName);
-                            console.log('File exists in bucket:', fileExists);
-                        }
-
-                        // Get a signed URL (valid for 1 hour)
-                        const { data: signedData, error: signedError } = await supabase
-                            .storage
-                            .from('profile-images')
-                            .createSignedUrl(filePath, 60 * 60);
-
-                        if (signedError) {
-                            console.error('Error getting signed URL:', signedError);
-                            setProfileImage(null);
-                            return;
-                        }
-
-                        if (signedData?.signedUrl) {
-                            console.log('Generated signed URL:', signedData.signedUrl);
-                            setProfileImage(signedData.signedUrl);
-                        } else {
-                            console.error('No signed URL returned for image');
-                            setProfileImage(null);
-                        }
-                    } catch (error) {
-                        console.error('Error fetching profile image:', error);
-                        setProfileImage(null);
-                    }
-                } else {
-                    console.log('No pfp-id found in profile data');
-                    setProfileImage(null);
-                }
-
-                if (data.role_id) {
-                    const { data: roleData } = await supabase
-                        .from('profiles_roles')
-                        .select('role_name')
-                        .eq('id', data.role_id)
-                        .single();
-
-                    if (roleData?.role_name) setRoleName(roleData.role_name);
-                }
-            }
-            setLoading(false);
-        };
         fetchProfile();
     }, []);
+
+    const fetchProfile = async () => {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.user) return;
+
+        const email = session.user.email;
+        setUserEmail(email);
+
+        const { data, error } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('email', email)
+            .single();
+
+        if (data) {
+            setProfile(data);
+            await fetchProfileImage(data);
+            await fetchRoleName(data.role_id);
+        }
+        setLoading(false);
+    };
+
+    const fetchProfileImage = async (profileData) => {
+        if (!profileData['pfp-id']) {
+            setProfileImage(null);
+            return;
+        }
+
+        try {
+            const cleanFileName = profileData['pfp-id'].trim();
+            const filePath = `admin/${cleanFileName}`;
+
+            const { data: signedData, error: signedError } = await supabase
+                .storage
+                .from('profile-images')
+                .createSignedUrl(filePath, 60 * 60);
+
+            if (signedError || !signedData?.signedUrl) {
+                setProfileImage(null);
+                return;
+            }
+
+            setProfileImage(signedData.signedUrl);
+        } catch (error) {
+            console.error('Error fetching profile image:', error);
+            setProfileImage(null);
+        }
+    };
+
+    const fetchRoleName = async (roleId) => {
+        if (!roleId) return;
+
+        const { data: roleData } = await supabase
+            .from('profiles_roles')
+            .select('role_name')
+            .eq('id', roleId)
+            .single();
+
+        if (roleData?.role_name) {
+            setRoleName(roleData.role_name);
+        }
+    };
 
     const handleImageUpload = async (event) => {
         const file = event.target.files[0];
@@ -130,48 +117,60 @@ export default function ProfilePage() {
         setUploadError(null);
 
         try {
-            if (profile && profile['pfp-id']) {
-                const oldFileName = profile['pfp-id'].trim();
-                const oldFilePath = `admin/${oldFileName}`;
-                const { error: deleteError } = await supabase.storage
-                    .from('profile-images')
-                    .remove([oldFilePath]);
-                if (deleteError) {
-                    console.warn('Could not delete old profile image:', oldFilePath, deleteError.message);
-                }
-            }
-
-            const fileExt = file.name.split('.').pop();
-            const fileName = `${Date.now()}.${fileExt}`;
-            const filePath = `admin/${fileName}`;
-
-            const { error: uploadError } = await supabase.storage
-                .from('profile-images')
-                .upload(filePath, file, {
-                    upsert: true,
-                    cacheControl: '3600'
-                });
-            if (uploadError) throw new Error(uploadError.message);
-
-            const { error: updateError } = await supabase
-                .from('profiles')
-                .update({ ['pfp-id']: fileName })
-                .eq('id', profile.id);
-            if (updateError) throw new Error('Failed to update profile with new image');
-
-            const { data: signedData, error: urlError } = await supabase
-                .storage
-                .from('profile-images')
-                .createSignedUrl(filePath, 60 * 60);
-            if (urlError || !signedData?.signedUrl) throw new Error('Failed to generate signed URL');
-
-            setProfileImage(signedData.signedUrl);
+            await deleteOldProfileImage();
+            await uploadNewProfileImage(file);
         } catch (error) {
             setUploadError(error.message || 'Failed to upload image');
             setSnackbarOpen(true);
         } finally {
             setUploading(false);
         }
+    };
+
+    const deleteOldProfileImage = async () => {
+        if (!profile?.['pfp-id']) return;
+
+        const oldFileName = profile['pfp-id'].trim();
+        const oldFilePath = `admin/${oldFileName}`;
+        
+        const { error: deleteError } = await supabase.storage
+            .from('profile-images')
+            .remove([oldFilePath]);
+
+        if (deleteError) {
+            console.warn('Could not delete old profile image:', deleteError.message);
+        }
+    };
+
+    const uploadNewProfileImage = async (file) => {
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Date.now()}.${fileExt}`;
+        const filePath = `admin/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+            .from('profile-images')
+            .upload(filePath, file, {
+                upsert: true,
+                cacheControl: '3600'
+            });
+
+        if (uploadError) throw new Error(uploadError.message);
+
+        const { error: updateError } = await supabase
+            .from('profiles')
+            .update({ ['pfp-id']: fileName })
+            .eq('id', profile.id);
+
+        if (updateError) throw new Error('Failed to update profile with new image');
+
+        const { data: signedData, error: urlError } = await supabase
+            .storage
+            .from('profile-images')
+            .createSignedUrl(filePath, 60 * 60);
+
+        if (urlError || !signedData?.signedUrl) throw new Error('Failed to generate signed URL');
+
+        setProfileImage(signedData.signedUrl);
     };
 
     const handleResetPassword = async () => {
@@ -213,7 +212,17 @@ export default function ProfilePage() {
         router.push('/egc-admin/profile/edit-profile');
     };
 
-    if (loading) return <Box p={4}><Typography>Loading...</Typography></Box>;
+    if (loading) return (
+        <Box 
+            display="flex" 
+            justifyContent="center" 
+            alignItems="center" 
+            minHeight="100vh"
+        >
+            <CircularProgress color="primary" />
+        </Box>
+    );
+
     if (!profile) return <Box p={4}><Typography>No profile found.</Typography></Box>;
 
     const user = {
@@ -229,19 +238,15 @@ export default function ProfilePage() {
         emergencyContactNumber: profile.emergency_contact_number || 'Not provided',
     };
 
-    const cardBg = theme.palette.background.paper;
-    const paperBg = theme.palette.background.paper;
-
     return (
-        <Box pt={2} pl={4} display="flex" flexDirection="column" gap={4}>
-            <Box>
+        <Box pt={2} px={4} display="flex" flexDirection="column" gap={4}>
+            <Box width="100%" maxWidth="1000px">
                 <Typography variant="h3" color="primary.main" fontWeight="bold">
                     Profile
                 </Typography>
             </Box>
 
-            {/* Profile Card */}
-            <Paper elevation={3} sx={{ borderRadius: 2, background: cardBg }}>
+            <Paper elevation={3} sx={{ borderRadius: 2, background: theme.palette.background.paper }}>
                 <CardContent sx={{ p: 4 }}>
                     <Box display="flex" alignItems="center" justifyContent="space-between" flexWrap="wrap" gap={3}>
                         <Box display="flex" alignItems="center" gap={3}>
@@ -293,18 +298,21 @@ export default function ProfilePage() {
                             </Box>
                         </Box>
                         <Box display="flex" flexDirection="column" gap={2}>
-                            <Button variant="contained" onClick={handleEditProfile} sx={{ borderRadius: 2, textTransform: 'none', px: 3 }}>Edit Profile</Button>
-                            <Button variant="contained" color="error" sx={{ borderRadius: 2, textTransform: 'none', px: 3 }}>Delete Account</Button>
+                            <Button 
+                                variant="contained" 
+                                onClick={handleEditProfile} 
+                                sx={{ borderRadius: 2, textTransform: 'none', px: 3 }}
+                            >
+                                Edit Profile
+                            </Button>
                         </Box>
                     </Box>
                 </CardContent>
             </Paper>
 
-            {/* Information Section */}
             <Grid container spacing={3}>
-                {/* Personal Information */}
                 <Grid item xs={12} md={6}>
-                    <Paper elevation={2} sx={{ height: '100%', borderRadius: 2, transition: 'transform 0.2s', '&:hover': { transform: 'translateY(-4px)' }, background: paperBg }}>
+                    <Paper elevation={2} sx={{ height: '100%', borderRadius: 2, transition: 'transform 0.2s', '&:hover': { transform: 'translateY(-4px)' }, background: theme.palette.background.paper }}>
                         <CardContent sx={{ p: 3 }}>
                             <Typography variant="h6" mb={3} color="primary.main" sx={{ borderBottom: '2px solid', borderColor: 'primary.light', pb: 1 }}>
                                 Personal Information
@@ -331,9 +339,8 @@ export default function ProfilePage() {
                     </Paper>
                 </Grid>
 
-                {/* Emergency Contact Information */}
                 <Grid item xs={12} md={6}>
-                    <Paper elevation={2} sx={{ height: '100%', borderRadius: 2, transition: 'transform 0.2s', '&:hover': { transform: 'translateY(-4px)' }, background: paperBg }}>
+                    <Paper elevation={2} sx={{ height: '100%', borderRadius: 2, transition: 'transform 0.2s', '&:hover': { transform: 'translateY(-4px)' }, background: theme.palette.background.paper }}>
                         <CardContent sx={{ p: 3 }}>
                             <Typography variant="h6" mb={3} color="primary.main" sx={{ borderBottom: '2px solid', borderColor: 'primary.light', pb: 1 }}>
                                 Emergency Contact Information
@@ -352,9 +359,8 @@ export default function ProfilePage() {
                     </Paper>
                 </Grid>
 
-                {/* Account Information */}
                 <Grid item xs={12} md={6}>
-                    <Paper elevation={2} sx={{ height: '100%', borderRadius: 2, transition: 'transform 0.2s', '&:hover': { transform: 'translateY(-4px)' }, background: paperBg }}>
+                    <Paper elevation={2} sx={{ height: '100%', borderRadius: 2, transition: 'transform 0.2s', '&:hover': { transform: 'translateY(-4px)' }, background: theme.palette.background.paper }}>
                         <CardContent sx={{ p: 3 }}>
                             <Typography variant="h6" mb={3} color="primary.main" sx={{ borderBottom: '2px solid', borderColor: 'primary.light', pb: 1 }}>
                                 Account Information
@@ -387,13 +393,12 @@ export default function ProfilePage() {
                 </Grid>
             </Grid>
 
-            {/* Reset Password Modal */}
             <Dialog
                 open={resetOpen}
                 onClose={() => {
                     setResetOpen(false);
                     setResetStatus({ message: '', severity: '' });
-                    setResetEmail(''); // Clear the email input
+                    setResetEmail('');
                 }}
                 sx={{
                     '& .MuiDialog-paper': {
@@ -410,9 +415,13 @@ export default function ProfilePage() {
                     }
                 }}
             >
-                <DialogTitle variant="h5" sx={{ bgcolor: theme.palette.background.paper, color: theme.palette.text.primary, textAlign: 'center', border: 'none', outline: 'none' }}>Change Password</DialogTitle>
+                <DialogTitle variant="h5" sx={{ bgcolor: theme.palette.background.paper, color: theme.palette.text.primary, textAlign: 'center', border: 'none', outline: 'none' }}>
+                    Change Password
+                </DialogTitle>
                 <DialogContent sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, minWidth: 350, pt: 3, bgcolor: theme.palette.background.paper, color: theme.palette.text.primary }}>
-                    <Typography fontSize={14} color={theme.palette.text.secondary}>Enter your registered email to receive a password reset link</Typography>
+                    <Typography fontSize={14} color={theme.palette.text.secondary}>
+                        Enter your registered email to receive a password reset link
+                    </Typography>
                     <TextField
                         label="Email"
                         type="email"
@@ -443,7 +452,7 @@ export default function ProfilePage() {
                         onClick={() => {
                             setResetOpen(false);
                             setResetStatus({ message: '', severity: '' });
-                            setResetEmail(''); // Clear the email input
+                            setResetEmail('');
                         }}
                         color="secondary"
                         disabled={resetLoading}
@@ -453,7 +462,6 @@ export default function ProfilePage() {
                 </DialogActions>
             </Dialog>
 
-            {/* Snackbar for upload errors */}
             <Snackbar
                 open={snackbarOpen}
                 autoHideDuration={5000}
