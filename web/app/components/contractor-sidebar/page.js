@@ -19,6 +19,7 @@ import DarkModeIcon from '@mui/icons-material/DarkMode';
 import LightModeIcon from '@mui/icons-material/LightMode';
 import { ColorModeContext } from "../../layout";
 import { useTheme } from "@mui/material/styles";
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
 export default function Sidebar() {
     const [openPages, setOpenPages] = useState(false);
@@ -26,9 +27,13 @@ export default function Sidebar() {
     const theme = useTheme();
     const router = useRouter();
     const pathname = usePathname();
+    const supabase = createClientComponentClient();
 
     const handleClickPages = () => setOpenPages(!openPages);
-    const handleLogout = () => console.log("Logging out...");
+    const handleLogout = async () => {
+        await supabase.auth.signOut();
+        router.push("/contractor/login");
+    };
 
     const isActive = (route) => pathname === route;
 

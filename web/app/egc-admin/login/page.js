@@ -68,16 +68,13 @@ export default function Page() {
         <form onSubmit={(e) => { e.preventDefault(); handleLogin(); }} style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
           <TextField label="Email" type="email" placeholder="Enter your email" required sx={{ width: "70%" }} value={email} onChange={e => setEmail(e.target.value)} disabled={loading} />
           <TextField label="Password" type="password" placeholder="Enter your password" required sx={{ width: "70%" }} value={password} onChange={e => setPassword(e.target.value)} disabled={loading} />
-          <Box sx={{ display: "flex", justifyContent: "flex-end", width: "70%" }}>
-            <Typography color="secondary.main" onClick={() => router.push("./forgot-password")} sx={{ fontSize: ".85rem", cursor: "pointer", "&:hover": { textDecoration: "underline", color: "primary.main" } }}>Forgot Password?</Typography>
-          </Box>
           <Button type="submit" variant="contained" color="primary" sx={{ width: "40%" }} disabled={loading}>
             {loading ? "Logging in..." : "Login"}
           </Button>
         </form>
         <Box sx={{ display: "flex", gap: 5 }}>
           <Typography color="secondary.main" sx={{ fontSize: ".75rem", cursor: "pointer", "&:hover": { textDecoration: "underline", color: "primary.main" } }}>Terms and Conditions</Typography>
-          <Typography color="secondary.main" sx={{ fontSize: ".75rem", cursor: "pointer", "&:hover": { textDecoration: "underline" } }}>Privacy Policy</Typography>
+          <Typography color="secondary.main" sx={{ fontSize: ".75rem", cursor: "pointer", "&:hover": { textDecoration: "underline", color: "primary.main" } }}>Privacy Policy</Typography>
         </Box>
       </Box>
       <Snackbar

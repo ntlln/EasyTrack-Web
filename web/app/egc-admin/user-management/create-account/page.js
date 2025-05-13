@@ -4,6 +4,7 @@ import { Box, Typography, Grid, TextField, Button, MenuItem, Alert, Snackbar } f
 import { useState, useEffect } from "react";
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useRouter } from 'next/navigation';
+import { createUser } from './actions';
 
 export default function CreateAccount() {
     const router = useRouter();
@@ -72,27 +73,7 @@ export default function CreateAccount() {
         }
 
         try {
-            // Create the user with Supabase admin API
-            const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-                email: formData.email,
-                password: formData.password,
-                email_confirm: true // Auto-confirm the email
-            });
-
-            if (authError) throw authError;
-
-            // Create a profile record in the profiles table
-            const { error: profileError } = await supabase
-                .from('profiles')
-                .insert([
-                    {
-                        id: authData.user.id,
-                        email: formData.email,
-                        role_id: formData.role_id
-                    }
-                ]);
-
-            if (profileError) throw profileError;
+            const result = await createUser(formData);
 
             // Show success message
             setSnackbar({

@@ -57,13 +57,13 @@ export default function ProfilePage() {
     };
 
     const fetchProfileImage = async (profileData) => {
-        if (!profileData['pfp-id']) {
+        if (!profileData['pfp_id']) {
             setProfileImage(null);
             return;
         }
 
         try {
-            const cleanFileName = profileData['pfp-id'].trim();
+            const cleanFileName = profileData['pfp_id'].trim();
             const filePath = `admin/${cleanFileName}`;
 
             const { data: signedData, error: signedError } = await supabase
@@ -128,11 +128,11 @@ export default function ProfilePage() {
     };
 
     const deleteOldProfileImage = async () => {
-        if (!profile?.['pfp-id']) return;
+        if (!profile?.['pfp_id']) return;
 
-        const oldFileName = profile['pfp-id'].trim();
+        const oldFileName = profile['pfp_id'].trim();
         const oldFilePath = `admin/${oldFileName}`;
-        
+
         const { error: deleteError } = await supabase.storage
             .from('profile-images')
             .remove([oldFilePath]);
@@ -158,7 +158,7 @@ export default function ProfilePage() {
 
         const { error: updateError } = await supabase
             .from('profiles')
-            .update({ ['pfp-id']: fileName })
+            .update({ ['pfp_id']: fileName })
             .eq('id', profile.id);
 
         if (updateError) throw new Error('Failed to update profile with new image');
@@ -213,10 +213,10 @@ export default function ProfilePage() {
     };
 
     if (loading) return (
-        <Box 
-            display="flex" 
-            justifyContent="center" 
-            alignItems="center" 
+        <Box
+            display="flex"
+            justifyContent="center"
+            alignItems="center"
             minHeight="100vh"
         >
             <CircularProgress color="primary" />
@@ -298,9 +298,9 @@ export default function ProfilePage() {
                             </Box>
                         </Box>
                         <Box display="flex" flexDirection="column" gap={2}>
-                            <Button 
-                                variant="contained" 
-                                onClick={handleEditProfile} 
+                            <Button
+                                variant="contained"
+                                onClick={handleEditProfile}
                                 sx={{ borderRadius: 2, textTransform: 'none', px: 3 }}
                             >
                                 Edit Profile

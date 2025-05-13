@@ -42,18 +42,18 @@ export default function ContractorLogin() {
         setLoading(false);
         return;
       }
-      const { data: airlineStaffRole, error: airlineStaffRoleError } = await supabase
+      const { data: contractorRole, error: contractorRoleError } = await supabase
         .from('profiles_roles')
         .select('id')
         .eq('role_name', 'Airline Staff')
         .single();
-      if (airlineStaffRoleError || !airlineStaffRole) {
+      if (contractorRoleError || !contractorRole) {
         setSnackbar({ open: true, message: "Account does not exist.", severity: 'error' });
         setLoading(false);
         return;
       }
-      if (Number(profile.role_id) !== Number(airlineStaffRole.id)) {
-        setSnackbar({ open: true, message: "Access denied: Only airline staff can log in here.", severity: 'error' });
+      if (Number(profile.role_id) !== Number(contractorRole.id)) {
+        setSnackbar({ open: true, message: "Access denied: Only contractors can log in here.", severity: 'error' });
         setLoading(false);
         return;
       }

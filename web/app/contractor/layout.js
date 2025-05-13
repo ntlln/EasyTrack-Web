@@ -14,7 +14,7 @@ export default function Layout({ children }) {
 
   useEffect(() => {
     // Only check session for non-login pages
-    if (pathname === "/contractor/login") {
+    if (pathname === "/contractor/login" || pathname === "/contractor/forgot-password" || pathname === "/contractor/reset-password") {
       setCheckingSession(false);
       return;
     }
@@ -32,7 +32,7 @@ export default function Layout({ children }) {
       const { data: contractorRole } = await supabase
         .from('profiles_roles')
         .select('id')
-        .eq('role_name', 'Contractor')
+        .eq('role_name', 'Airline Staff')
         .single();
       if (!profile || !contractorRole || Number(profile.role_id) !== Number(contractorRole.id)) {
         router.replace("/contractor/login");
@@ -47,7 +47,7 @@ export default function Layout({ children }) {
     return null; // or a loading spinner
   }
 
-  if (pathname === "/contractor/login") {
+  if (pathname === "/contractor/login" || pathname === "/contractor/forgot-password" || pathname === "/contractor/reset-password") {
     return <>{children}</>;
   }
 

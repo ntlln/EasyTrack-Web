@@ -11,7 +11,7 @@ export default function Layout({ children }) {
   const router = useRouter();
   const supabase = createClientComponentClient();
   const [checkingSession, setCheckingSession] = useState(true);
-  const isAuthPage = pathname === "/egc-admin/login" || pathname === "/egc-admin/forgot-password";
+  const isAuthPage = pathname === "/egc-admin/login" || pathname === "/egc-admin/reset-password";
 
   useEffect(() => {
     if (isAuthPage) {
