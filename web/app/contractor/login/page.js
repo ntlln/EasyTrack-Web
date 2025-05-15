@@ -21,6 +21,12 @@ export default function ContractorLogin() {
     setSnackbar(prev => ({ ...prev, open: false }));
   };
 
+  const handleKeyPress = (event) => {
+    if (event.key === 'Enter') {
+      handleLogin();
+    }
+  };
+
   const handleLogin = async () => {
     setLoading(true);
     setSnackbar({ open: false, message: '', severity: 'error' });
@@ -34,11 +40,26 @@ export default function ContractorLogin() {
       const userId = data.user.id;
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
-        .select('role_id')
+        .select(`
+          role_id,
+          user_status_id,
+          profiles_status (
+            status_name
+          )
+        `)
         .eq('id', userId)
         .single();
       if (profileError || !profile) {
         setSnackbar({ open: true, message: "Unable to fetch user profile.", severity: 'error' });
+        setLoading(false);
+        return;
+      }
+      if (profile.profiles_status?.status_name === 'Deactivated') {
+        setSnackbar({ 
+          open: true, 
+          message: 'This account has been deactivated. Please contact an administrator for assistance.', 
+          severity: 'error' 
+        });
         setLoading(false);
         return;
       }
@@ -70,29 +91,51 @@ export default function ContractorLogin() {
       <Box sx={{ display: "flex", flexDirection: "column", width: "50vh", backgroundColor: "background.default", boxShadow: 5, borderRadius: 3, alignItems: "center", pt: 5, pb: 5, gap: 2 }} >
         <Typography variant="h3" sx={{ color: "primary.main", fontWeight: "bold" }} >EasyTrack</Typography>
         <Typography color="secondary.main" >Login to EasyTrack</Typography>
-        <TextField label="Email" type="email" placeholder="Enter your email" required sx={{ width: "70%" }} value={email} onChange={e => setEmail(e.target.value)} disabled={loading} />
-        <TextField label="Password" type="password" placeholder="Enter your password" required sx={{ width: "70%" }} value={password} onChange={e => setPassword(e.target.value)} disabled={loading} />
-        <Box sx={{ display: "flex", justifyContent: "flex-end", width: "70%" }}>
-          <Typography color="secondary.main" onClick={() => router.push("./forgot-password")} sx={{ fontSize: ".85rem", cursor: "pointer", "&:hover": { textDecoration: "underline", color: "primary.main" } }}>Forgot Password?</Typography>
-        </Box>
-        <Snackbar
-          open={snackbar.open}
-          autoHideDuration={4000}
-          onClose={handleCloseSnackbar}
-          anchorOrigin={{ vertical: "top", horizontal: "center" }}
-        >
-          <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: '100%' }}>
-            {snackbar.message}
-          </Alert>
-        </Snackbar>
-        <Button variant="contained" color="primary" sx={{ width: "40%" }} onClick={handleLogin} disabled={loading}>
-          {loading ? "Logging in..." : "Login"}
-        </Button>
+        <form onSubmit={(e) => { e.preventDefault(); handleLogin(); }} style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
+          <TextField 
+            label="Email" 
+            type="email" 
+            placeholder="Enter your email" 
+            required 
+            sx={{ width: "70%" }} 
+            value={email} 
+            onChange={e => setEmail(e.target.value)} 
+            disabled={loading}
+            onKeyPress={handleKeyPress}
+          />
+          <TextField 
+            label="Password" 
+            type="password" 
+            placeholder="Enter your password" 
+            required 
+            sx={{ width: "70%" }} 
+            value={password} 
+            onChange={e => setPassword(e.target.value)} 
+            disabled={loading}
+            onKeyPress={handleKeyPress}
+          />
+          <Box sx={{ display: "flex", justifyContent: "flex-end", width: "70%" }}>
+            <Typography color="secondary.main" onClick={() => router.push("./forgot-password")} sx={{ fontSize: ".85rem", cursor: "pointer", "&:hover": { textDecoration: "underline", color: "primary.main" } }}>Forgot Password?</Typography>
+          </Box>
+          <Button type="submit" variant="contained" color="primary" sx={{ width: "40%" }} disabled={loading}>
+            {loading ? "Logging in..." : "Login"}
+          </Button>
+        </form>
         <Box sx={{ display: "flex", gap: 5 }}>
           <Typography color="secondary.main" sx={{ fontSize: ".75rem", cursor: "pointer", "&:hover": { textDecoration: "underline", color: "primary.main" } }}>Terms and Conditions</Typography>
           <Typography color="secondary.main" sx={{ fontSize: ".75rem", cursor: "pointer", "&:hover": { textDecoration: "underline" } }}>Privacy Policy</Typography>
         </Box>
       </Box>
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4000}
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}
+      >
+        <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: '100%' }}>
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 } 

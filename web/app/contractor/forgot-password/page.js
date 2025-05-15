@@ -12,6 +12,12 @@ export default function Page() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
 
+    const handleKeyPress = (event) => {
+        if (event.key === 'Enter') {
+            handleResetPassword(event);
+        }
+    };
+
     const handleResetPassword = async (e) => {
         e.preventDefault();
         setLoading(true);
@@ -40,26 +46,29 @@ export default function Page() {
                 <Box sx={{ display: "flex", flexDirection: "column", width: "50vh", height: "auto", backgroundColor: "background.default", boxShadow: 5, borderRadius: 3, alignItems: "center", pt: 5, pb: 5, gap: 2 }}>
                     <Typography variant="h3" sx={{ color: "primary.main", fontWeight: "bold" }}>EasyTrack</Typography>
                     <Typography color="secondary.main">Forgot Password</Typography>
-                    <TextField 
-                        label="Email" 
-                        type="email" 
-                        placeholder="Email" 
-                        required 
-                        sx={{ width: "70%" }}
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        error={!!error}
-                        helperText={error}
-                    />
-                    <Button 
-                        variant="contained" 
-                        color="primary" 
-                        sx={{ width: "60%" }}
-                        onClick={handleResetPassword}
-                        disabled={loading}
-                    >
-                        {loading ? 'Sending...' : 'Send Email Reset Link'}
-                    </Button>
+                    <form onSubmit={handleResetPassword} style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
+                        <TextField 
+                            label="Email" 
+                            type="email" 
+                            placeholder="Email" 
+                            required 
+                            sx={{ width: "70%" }}
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            error={!!error}
+                            helperText={error}
+                            onKeyPress={handleKeyPress}
+                        />
+                        <Button 
+                            type="submit"
+                            variant="contained" 
+                            color="primary" 
+                            sx={{ width: "60%" }}
+                            disabled={loading}
+                        >
+                            {loading ? 'Sending...' : 'Send Email Reset Link'}
+                        </Button>
+                    </form>
                     <Typography
                         sx={{
                             color: "secondary.main",

@@ -2,11 +2,11 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Box, MenuItem, TextField, Typography, Button, TableContainer, Table, TableHead, TableRow, TableCell, TableBody, Paper, IconButton, Menu, Pagination, TableSortLabel } from "@mui/material";
-import MoreVertIcon from '@mui/icons-material/MoreVert';
+import { Box, MenuItem, TextField, Typography, Button, TableContainer, Table, TableHead, TableRow, TableCell, TableBody, Paper, IconButton, Menu, Pagination, TableSortLabel, Snackbar, Alert, Dialog, DialogTitle, DialogContent, DialogActions } from "@mui/material";
+import { MoreVert as MoreVertIcon, Edit as EditIcon, Delete as DeleteIcon } from "@mui/icons-material";
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
-export default function Page() {
+export default function UserManagement() {
   const router = useRouter();
   const supabase = createClientComponentClient();
 
@@ -22,10 +22,18 @@ export default function Page() {
   const [statusOptions, setStatusOptions] = useState([]);
   const [orderBy, setOrderBy] = useState(null);
   const [order, setOrder] = useState('asc');
+  const [users, setUsers] = useState([]);
+  const [roles, setRoles] = useState([]);
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
+  const [editDialog, setEditDialog] = useState({ open: false, user: null });
+  const [deleteDialog, setDeleteDialog] = useState({ open: false, userId: null });
+  const [editForm, setEditForm] = useState({ role_id: '', user_status_id: '' });
 
   useEffect(() => {
     fetchAccounts();
     fetchStatusOptions();
+    fetchUsers();
+    fetchRoles();
   }, []);
 
   const fetchAccounts = async () => {
@@ -76,6 +84,38 @@ export default function Page() {
       .select('id, status_name');
     if (!error && data) {
       setStatusOptions(data.filter(opt => !['Online', 'Offline', 'Pending'].includes(opt.status_name)));
+    }
+  };
+
+  const fetchUsers = async () => {
+    try {
+      const { data: usersData, error: usersError } = await supabase
+        .from('profiles')
+        .select(`
+          id,
+          email,
+          role_id,
+          profiles_roles (
+            role_name
+          )
+        `);
+
+      if (usersError) throw usersError;
+      setUsers(usersData);
+    } catch (error) {
+      console.error('Error fetching users:', error);
+      setSnackbar({ open: true, message: 'Error fetching users', severity: 'error' });
+    }
+  };
+
+  const fetchRoles = async () => {
+    try {
+      const { data, error } = await supabase.from('profiles_roles').select('*');
+      if (error) throw error;
+      setRoles(data);
+    } catch (error) {
+      console.error('Error fetching roles:', error);
+      setSnackbar({ open: true, message: 'Error fetching roles', severity: 'error' });
     }
   };
 
@@ -191,6 +231,67 @@ export default function Page() {
   };
 
   const totalPages = Math.ceil(filteredAndSortedAccounts.length / rowsPerPage);
+
+  const handleMenuClick = (event, user) => {
+    setAnchorEl(event.currentTarget);
+    setSelectedAccount(user);
+  };
+
+  const handleEditClick = () => {
+    setEditDialog({ open: true, user: selectedAccount });
+    setEditForm({ 
+      role_id: selectedAccount.role_id,
+      user_status_id: selectedAccount.user_status_id 
+    });
+    handleCloseMenu();
+  };
+
+  const handleDeleteClick = () => {
+    setDeleteDialog({ open: true, userId: selectedAccount.id });
+    handleCloseMenu();
+  };
+
+  const handleEditSubmit = async () => {
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ role_id: editForm.role_id, user_status_id: editForm.user_status_id })
+        .eq('id', editDialog.user.id);
+
+      if (error) throw error;
+
+      setSnackbar({ open: true, message: 'User updated successfully', severity: 'success' });
+      fetchAccounts();
+    } catch (error) {
+      console.error('Error updating user:', error);
+      setSnackbar({ open: true, message: 'Error updating user', severity: 'error' });
+    } finally {
+      setEditDialog({ open: false, user: null });
+    }
+  };
+
+  const handleDeleteConfirm = async () => {
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .delete()
+        .eq('id', deleteDialog.userId);
+
+      if (error) throw error;
+
+      setSnackbar({ open: true, message: 'User deleted successfully', severity: 'success' });
+      fetchAccounts();
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      setSnackbar({ open: true, message: 'Error deleting user', severity: 'error' });
+    } finally {
+      setDeleteDialog({ open: false, userId: null });
+    }
+  };
+
+  const handleSnackbarClose = () => {
+    setSnackbar(prev => ({ ...prev, open: false }));
+  };
 
   if (loading) {
     return (
@@ -313,7 +414,7 @@ export default function Page() {
                   <TableCell>{account.role}</TableCell>
                   <TableCell>{account.status}</TableCell>
                   <TableCell>
-                    <IconButton onClick={(event) => handleOpenMenu(event, account)}>
+                    <IconButton onClick={(event) => handleMenuClick(event, account)}>
                       <MoreVertIcon />
                     </IconButton>
                   </TableCell>
@@ -339,24 +440,62 @@ export default function Page() {
 
       {/* Actions Menu */}
       <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleCloseMenu} anchorOrigin={{ vertical: "top", horizontal: "left" }} transformOrigin={{ vertical: "top", horizontal: "left" }}>
-        {statusOptions.map(opt => (
-          <MenuItem
-            key={opt.id}
-            onClick={async () => {
-              if (selectedAccount) {
-                await supabase
-                  .from('profiles')
-                  .update({ user_status_id: opt.id })
-                  .eq('id', selectedAccount.id);
-                await fetchAccounts();
-              }
-              handleCloseMenu();
-            }}
-          >
-            {opt.status_name}
-          </MenuItem>
-        ))}
+        <MenuItem onClick={handleEditClick}>
+          <EditIcon fontSize="small" sx={{ mr: 1 }} /> Edit
+        </MenuItem>
+        <MenuItem onClick={handleDeleteClick}>
+          <DeleteIcon fontSize="small" sx={{ mr: 1 }} /> Delete
+        </MenuItem>
       </Menu>
+
+      <Dialog open={editDialog.open} onClose={() => setEditDialog({ open: false, user: null })}>
+        <DialogTitle>Edit User</DialogTitle>
+        <DialogContent>
+          <TextField
+            select
+            fullWidth
+            label="Role"
+            value={editForm.role_id}
+            onChange={(e) => setEditForm(prev => ({ ...prev, role_id: e.target.value }))}
+            sx={{ mt: 2 }}
+          >
+            {roles.map((role) => (
+              <MenuItem key={role.id} value={role.id}>{role.role_name}</MenuItem>
+            ))}
+          </TextField>
+          <TextField
+            select
+            fullWidth
+            label="Status"
+            value={editForm.user_status_id}
+            onChange={(e) => setEditForm(prev => ({ ...prev, user_status_id: e.target.value }))}
+            sx={{ mt: 2 }}
+          >
+            {statusOptions.map((status) => (
+              <MenuItem key={status.id} value={status.id}>{status.status_name}</MenuItem>
+            ))}
+          </TextField>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setEditDialog({ open: false, user: null })}>Cancel</Button>
+          <Button onClick={handleEditSubmit} variant="contained" color="primary">Save</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={deleteDialog.open} onClose={() => setDeleteDialog({ open: false, userId: null })}>
+        <DialogTitle>Confirm Delete</DialogTitle>
+        <DialogContent>
+          <Typography>Are you sure you want to delete this user?</Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteDialog({ open: false, userId: null })}>Cancel</Button>
+          <Button onClick={handleDeleteConfirm} variant="contained" color="error">Delete</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Snackbar open={snackbar.open} autoHideDuration={6000} onClose={handleSnackbarClose} anchorOrigin={{ vertical: 'top', horizontal: 'center' }}>
+        <Alert onClose={handleSnackbarClose} severity={snackbar.severity} sx={{ width: '100%' }}>{snackbar.message}</Alert>
+      </Snackbar>
     </Box>
   );
 }

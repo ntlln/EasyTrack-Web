@@ -11,11 +11,7 @@ export default function Page() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [snackbar, setSnackbar] = useState({
-    open: false,
-    message: '',
-    severity: 'error'
-  });
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'error' });
 
   const handleCloseSnackbar = () => {
     setSnackbar(prev => ({ ...prev, open: false }));
@@ -43,7 +39,11 @@ export default function Page() {
         return;
       }
       if (profile.profiles_status?.status_name === 'Deactivated') {
-        setSnackbar({ open: true, message: 'This account has been deactivated and cannot be used to login.', severity: 'error' });
+        setSnackbar({ 
+          open: true, 
+          message: 'This account has been deactivated. Please contact an administrator for assistance.', 
+          severity: 'error' 
+        });
         setLoading(false);
         return;
       }
@@ -61,35 +61,22 @@ export default function Page() {
   };
 
   return (
-    <Box sx={{ display: "flex", width: "auto", height: "100vh", justifyContent: "center", alignItems: "center", backgroundImage: "url(/login-bg.png)", backgroundSize: "80%", backgroundRepeat: "no-repeat", backgroundPosition: "center", backgroundopacity: "30%" }} >
-      <Box sx={{ display: "flex", flexDirection: "column", width: "50vh", backgroundColor: "background.default", boxShadow: 5, borderRadius: 3, alignItems: "center", pt: 5, pb: 5, gap: 2 }} >
-        <Typography variant="h3" sx={{ color: "primary.main", fontWeight: "bold" }} >EasyTrack</Typography>
-        <Typography color="secondary.main" >Login to EasyTrack</Typography>
+    <Box sx={{ display: "flex", width: "auto", height: "100vh", justifyContent: "center", alignItems: "center", backgroundImage: "url(/login-bg.png)", backgroundSize: "80%", backgroundRepeat: "no-repeat", backgroundPosition: "center", backgroundopacity: "30%" }}>
+      <Box sx={{ display: "flex", flexDirection: "column", width: "50vh", backgroundColor: "background.default", boxShadow: 5, borderRadius: 3, alignItems: "center", pt: 5, pb: 5, gap: 2 }}>
+        <Typography variant="h3" sx={{ color: "primary.main", fontWeight: "bold" }}>EasyTrack</Typography>
+        <Typography color="secondary.main">Login to EasyTrack</Typography>
         <form onSubmit={(e) => { e.preventDefault(); handleLogin(); }} style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
           <TextField label="Email" type="email" placeholder="Enter your email" required sx={{ width: "70%" }} value={email} onChange={e => setEmail(e.target.value)} disabled={loading} />
           <TextField label="Password" type="password" placeholder="Enter your password" required sx={{ width: "70%" }} value={password} onChange={e => setPassword(e.target.value)} disabled={loading} />
-          <Button type="submit" variant="contained" color="primary" sx={{ width: "40%" }} disabled={loading}>
-            {loading ? "Logging in..." : "Login"}
-          </Button>
+          <Button type="submit" variant="contained" color="primary" sx={{ width: "40%" }} disabled={loading}>{loading ? "Logging in..." : "Login"}</Button>
         </form>
         <Box sx={{ display: "flex", gap: 5 }}>
           <Typography color="secondary.main" sx={{ fontSize: ".75rem", cursor: "pointer", "&:hover": { textDecoration: "underline", color: "primary.main" } }}>Terms and Conditions</Typography>
           <Typography color="secondary.main" sx={{ fontSize: ".75rem", cursor: "pointer", "&:hover": { textDecoration: "underline", color: "primary.main" } }}>Privacy Policy</Typography>
         </Box>
       </Box>
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={6000}
-        onClose={handleCloseSnackbar}
-        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
-      >
-        <Alert
-          onClose={handleCloseSnackbar}
-          severity={snackbar.severity}
-          sx={{ width: '100%' }}
-        >
-          {snackbar.message}
-        </Alert>
+      <Snackbar open={snackbar.open} autoHideDuration={6000} onClose={handleCloseSnackbar} anchorOrigin={{ vertical: 'top', horizontal: 'center' }}>
+        <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: '100%' }}>{snackbar.message}</Alert>
       </Snackbar>
     </Box>
   )
