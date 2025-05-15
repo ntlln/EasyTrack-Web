@@ -2,6 +2,7 @@
 
 import { Box, Typography, Grid, TextField, MenuItem, InputAdornment, IconButton, Button, useTheme, Snackbar, Alert } from "@mui/material";
 import UploadIcon from "@mui/icons-material/Upload";
+import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import { useState, useEffect, useRef } from "react";
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useRouter } from "next/navigation";
@@ -245,8 +246,11 @@ export default function EditProfile() {
   };
 
   return (
-    <Box p={4} maxWidth="1400px" mx="auto">
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={4}>
+    <Box sx={{ p: 4, maxWidth: "1400px", mx: "auto" }}>
+      <Box sx={{ display: "flex", alignItems: "center", mb: 4 }}>
+        <IconButton onClick={() => router.push("/egc-admin/profile")} sx={{ mr: 2, color: theme.palette.primary.main }}>
+          <ChevronLeftIcon />
+        </IconButton>
         <Typography variant="h4" fontWeight="bold" color="primary">
           Edit Profile
         </Typography>
@@ -363,7 +367,7 @@ export default function EditProfile() {
       </Grid>
 
       {/* Submit/Reset */}
-      <Box mt={4} display="flex" justifyContent="center" gap={2}>
+      <Box sx={{ mt: 4, display: "flex", justifyContent: "center", gap: 2 }}>
         <Button variant="outlined" color="inherit" onClick={handleClear}>
           Clear All Fields
         </Button>

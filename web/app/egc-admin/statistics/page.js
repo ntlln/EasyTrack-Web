@@ -11,11 +11,8 @@ const shipmentData = [
 ];
 
 const fleetData = [
-    { date: 'Jan', value: 100 },
-    { date: 'Feb', value: 200 },
-    { date: 'Mar', value: 150 },
-    { date: 'Apr', value: 300 },
-    { date: 'May', value: 250 },
+    { date: 'Jan', value: 100 }, { date: 'Feb', value: 200 }, { date: 'Mar', value: 150 },
+    { date: 'Apr', value: 300 }, { date: 'May', value: 250 },
 ];
 
 const fuelData = [
@@ -27,7 +24,7 @@ const fuelData = [
 export default function StatisticsPage() {
     return (
         <Box p={3}>
-            <Typography variant="h3" mb={3} color='primary.main' fontWeight={'bold'}>Statistics</Typography>
+            <Typography variant="h3" mb={3} color="primary.main" fontWeight="bold">Statistics</Typography>
 
             <Grid container spacing={2}>
                 <Grid item xs={12} md={4}>

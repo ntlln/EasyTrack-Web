@@ -13,18 +13,13 @@ export default function ProfilePage() {
     const theme = useTheme();
     const isDark = theme.palette.mode === "dark";
 
-    // Profile states
     const [profile, setProfile] = useState(null);
     const [profileImage, setProfileImage] = useState(null);
     const [roleName, setRoleName] = useState('');
     const [userEmail, setUserEmail] = useState('');
-
-    // Loading states
     const [loading, setLoading] = useState(true);
     const [uploading, setUploading] = useState(false);
     const [resetLoading, setResetLoading] = useState(false);
-
-    // UI states
     const [resetOpen, setResetOpen] = useState(false);
     const [resetEmail, setResetEmail] = useState('');
     const [resetStatus, setResetStatus] = useState({ message: '', severity: '' });
@@ -44,13 +39,10 @@ export default function ProfilePage() {
         try {
             const { data: { session } } = await supabase.auth.getSession();
             if (!session?.user) return;
-
             const email = session.user.email;
             setUserEmail(email);
-
             const { data, error } = await supabase.from('profiles').select('*').eq('email', email).single();
             if (error) return;
-
             if (data) {
                 setProfile(data);
                 setProfileImage(data.pfp_id || null);
@@ -71,22 +63,10 @@ export default function ProfilePage() {
     const handleImageUpload = async (event) => {
         const file = event.target.files[0];
         if (!file) return;
-
-        if (!file.type.startsWith('image/')) {
-            setUploadError('Please upload an image file');
-            setSnackbarOpen(true);
-            return;
-        }
-
-        if (file.size > 5 * 1024 * 1024) {
-            setUploadError('File size should be less than 5MB');
-            setSnackbarOpen(true);
-            return;
-        }
-
+        if (!file.type.startsWith('image/')) { setUploadError('Please upload an image file'); setSnackbarOpen(true); return; }
+        if (file.size > 5 * 1024 * 1024) { setUploadError('File size should be less than 5MB'); setSnackbarOpen(true); return; }
         setUploading(true);
         setUploadError(null);
-
         try {
             await deleteOldProfileImage();
             await uploadNewProfileImage(file);
@@ -107,7 +87,6 @@ export default function ProfilePage() {
             const fileName = pathMatch[1];
             const fileExt = pathMatch[2];
             const filePath = `airlines/${fileName}.${fileExt}`;
-
             await supabase.storage.from('profile-images').remove([filePath]);
             await supabase.from('profiles').update({ pfp_id: null }).eq('id', profile.id);
         } catch (error) {
@@ -120,18 +99,13 @@ export default function ProfilePage() {
             const fileExt = file.name.split('.').pop();
             const fileName = `${profile.id}.${fileExt}`;
             const filePath = `airlines/${fileName}`;
-
             await deleteOldProfileImage();
-
             const { error: uploadError } = await supabase.storage.from('profile-images').upload(filePath, file, { upsert: true, cacheControl: '3600' });
             if (uploadError) throw new Error(`Failed to upload image: ${uploadError.message}`);
-
             const { data: signedData, error: urlError } = await supabase.storage.from('profile-images').createSignedUrl(filePath, 60 * 60 * 24 * 365);
             if (urlError || !signedData?.signedUrl) throw new Error('Failed to generate signed URL');
-
             const { error: updateError } = await supabase.from('profiles').update({ pfp_id: signedData.signedUrl }).eq('id', profile.id).select();
             if (updateError) throw new Error(`Failed to update profile: ${updateError.message}`);
-
             setProfileImage(signedData.signedUrl);
             setProfile(prevProfile => ({ ...prevProfile, pfp_id: signedData.signedUrl }));
         } catch (error) {
@@ -145,23 +119,12 @@ export default function ProfilePage() {
     const handleResetPassword = async () => {
         setResetLoading(true);
         setResetStatus({ message: '', severity: '' });
-
-        if (resetEmail !== userEmail) {
-            setResetStatus({ message: 'Please enter your registered email address', severity: 'error' });
-            setResetLoading(false);
-            return;
-        }
-
+        if (resetEmail !== userEmail) { setResetStatus({ message: 'Please enter your registered email address', severity: 'error' }); setResetLoading(false); return; }
         try {
             const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, { redirectTo: `${window.location.origin}/contractor/profile/reset-password` });
             if (error) throw error;
-
             setResetStatus({ message: 'Password reset link sent to your email', severity: 'success' });
-            setTimeout(() => {
-                setResetOpen(false);
-                setResetStatus({ message: '', severity: '' });
-                setResetEmail('');
-            }, 2000);
+            setTimeout(() => { setResetOpen(false); setResetStatus({ message: '', severity: '' }); setResetEmail(''); }, 2000);
         } catch (error) {
             setResetStatus({ message: error.message || 'Failed to send reset link', severity: 'error' });
         } finally {
@@ -170,37 +133,15 @@ export default function ProfilePage() {
     };
 
     const handleChangePassword = async () => {
-        if (!newPassword || !confirmPassword) {
-            setSnackbarMessage('Please fill in all password fields.');
-            setSnackbarSeverity('error');
-            setSnackbarOpen(true);
-            return;
-        }
-        if (newPassword !== confirmPassword) {
-            setSnackbarMessage('Passwords do not match.');
-            setSnackbarSeverity('error');
-            setSnackbarOpen(true);
-            return;
-        }
+        if (!newPassword || !confirmPassword) { setSnackbarMessage('Please fill in all password fields.'); setSnackbarSeverity('error'); setSnackbarOpen(true); return; }
+        if (newPassword !== confirmPassword) { setSnackbarMessage('Passwords do not match.'); setSnackbarSeverity('error'); setSnackbarOpen(true); return; }
         setChangePwLoading(true);
         try {
             const { error } = await supabase.auth.updateUser({ password: newPassword });
-            if (error) {
-                setSnackbarMessage(error.message || 'Failed to change password.');
-                setSnackbarSeverity('error');
-                setSnackbarOpen(true);
-            } else {
-                setSnackbarMessage('Password changed successfully!');
-                setSnackbarSeverity('success');
-                setSnackbarOpen(true);
-                setChangePwOpen(false);
-                setNewPassword("");
-                setConfirmPassword("");
-            }
+            if (error) { setSnackbarMessage(error.message || 'Failed to change password.'); setSnackbarSeverity('error'); setSnackbarOpen(true); }
+            else { setSnackbarMessage('Password changed successfully!'); setSnackbarSeverity('success'); setSnackbarOpen(true); setChangePwOpen(false); setNewPassword(""); setConfirmPassword(""); }
         } catch (err) {
-            setSnackbarMessage('Failed to change password.');
-            setSnackbarSeverity('error');
-            setSnackbarOpen(true);
+            setSnackbarMessage('Failed to change password.'); setSnackbarSeverity('error'); setSnackbarOpen(true);
         } finally {
             setChangePwLoading(false);
         }
@@ -297,32 +238,11 @@ export default function ProfilePage() {
                 </Grid>
             </Grid>
 
-            <Dialog open={resetOpen} onClose={() => { setResetOpen(false); setResetStatus({ message: '', severity: '' }); setResetEmail(''); }}
-                PaperProps={{ 
-                    sx: { 
-                        backgroundColor: theme.palette.background.paper,
-                        color: theme.palette.text.primary,
-                        boxShadow: theme.shadows[4]
-                    } 
-                }}>
+            <Dialog open={resetOpen} onClose={() => { setResetOpen(false); setResetStatus({ message: '', severity: '' }); setResetEmail(''); }} PaperProps={{ sx: { backgroundColor: theme.palette.background.paper, color: theme.palette.text.primary, boxShadow: theme.shadows[4] } }}>
                 <DialogTitle variant="h5" sx={{ color: theme.palette.text.primary, textAlign: 'center', border: 'none', outline: 'none' }}>Change Password</DialogTitle>
                 <DialogContent sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, minWidth: 350, pt: 3 }}>
                     <Typography fontSize={14} color={theme.palette.text.secondary}>Enter your registered email to receive a password reset link</Typography>
-                    <TextField 
-                        label="Email" 
-                        type="email" 
-                        value={resetEmail} 
-                        onChange={(e) => setResetEmail(e.target.value)} 
-                        placeholder="Enter your email" 
-                        required 
-                        sx={{ width: "100%" }}
-                        InputLabelProps={{ 
-                            sx: { 
-                                color: theme.palette.text.secondary,
-                                '&.Mui-focused': { color: theme.palette.primary.main }
-                            } 
-                        }}
-                    />
+                    <TextField label="Email" type="email" value={resetEmail} onChange={(e) => setResetEmail(e.target.value)} placeholder="Enter your email" required sx={{ width: "100%" }} InputLabelProps={{ sx: { color: theme.palette.text.secondary, '&.Mui-focused': { color: theme.palette.primary.main } } }} />
                     {resetStatus.message && <Alert severity={resetStatus.severity} sx={{ width: '100%' }}>{resetStatus.message}</Alert>}
                 </DialogContent>
                 <DialogActions sx={{ flexDirection: 'column', gap: 1.5, alignItems: 'center', justifyContent: 'center', pb: 2, bgcolor: theme.palette.background.paper }}>
@@ -331,61 +251,12 @@ export default function ProfilePage() {
                 </DialogActions>
             </Dialog>
 
-            <Dialog open={changePwOpen} onClose={() => { setChangePwOpen(false); setCurrentPassword(""); setNewPassword(""); setConfirmPassword(""); }} fullWidth maxWidth="xs"
-                PaperProps={{ 
-                    sx: { 
-                        backgroundColor: theme.palette.background.paper,
-                        color: theme.palette.text.primary,
-                        boxShadow: theme.shadows[4]
-                    } 
-                }}>
+            <Dialog open={changePwOpen} onClose={() => { setChangePwOpen(false); setCurrentPassword(""); setNewPassword(""); setConfirmPassword(""); }} fullWidth maxWidth="xs" PaperProps={{ sx: { backgroundColor: theme.palette.background.paper, color: theme.palette.text.primary, boxShadow: theme.shadows[4] } }}>
                 <DialogContent sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, width: '100%', pt: 6 }}>
                     <Typography variant="h5" sx={{ color: theme.palette.text.primary, textAlign: 'center', fontWeight: 'bold', mb: 2 }}>Change Password</Typography>
-                    <TextField 
-                        label="Current Password" 
-                        type="password" 
-                        value={currentPassword} 
-                        onChange={e => setCurrentPassword(e.target.value)} 
-                        placeholder="Enter current password" 
-                        required 
-                        fullWidth 
-                        InputLabelProps={{ 
-                            sx: { 
-                                color: theme.palette.text.secondary,
-                                '&.Mui-focused': { color: theme.palette.primary.main }
-                            } 
-                        }} 
-                    />
-                    <TextField 
-                        label="New Password" 
-                        type="password" 
-                        value={newPassword} 
-                        onChange={e => setNewPassword(e.target.value)} 
-                        placeholder="Enter new password" 
-                        required 
-                        fullWidth 
-                        InputLabelProps={{ 
-                            sx: { 
-                                color: theme.palette.text.secondary,
-                                '&.Mui-focused': { color: theme.palette.primary.main }
-                            } 
-                        }} 
-                    />
-                    <TextField 
-                        label="Confirm Password" 
-                        type="password" 
-                        value={confirmPassword} 
-                        onChange={e => setConfirmPassword(e.target.value)} 
-                        placeholder="Confirm new password" 
-                        required 
-                        fullWidth 
-                        InputLabelProps={{ 
-                            sx: { 
-                                color: theme.palette.text.secondary,
-                                '&.Mui-focused': { color: theme.palette.primary.main }
-                            } 
-                        }} 
-                    />
+                    <TextField label="Current Password" type="password" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} placeholder="Enter current password" required fullWidth InputLabelProps={{ sx: { color: theme.palette.text.secondary, '&.Mui-focused': { color: theme.palette.primary.main } } }} />
+                    <TextField label="New Password" type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="Enter new password" required fullWidth InputLabelProps={{ sx: { color: theme.palette.text.secondary, '&.Mui-focused': { color: theme.palette.primary.main } } }} />
+                    <TextField label="Confirm Password" type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} placeholder="Confirm new password" required fullWidth InputLabelProps={{ sx: { color: theme.palette.text.secondary, '&.Mui-focused': { color: theme.palette.primary.main } } }} />
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, alignItems: 'center', justifyContent: 'center', width: '100%', pb: 2, mt: 2 }}>
                         <Button sx={{ width: '70%' }} variant="contained" color="primary" onClick={handleChangePassword} disabled={changePwLoading || !newPassword || !confirmPassword}>{changePwLoading ? 'Changing...' : 'Change Password'}</Button>
                         <Button sx={{ width: '70%' }} onClick={() => { setChangePwOpen(false); setCurrentPassword(""); setNewPassword(""); setConfirmPassword(""); }} color="secondary" disabled={changePwLoading}>Cancel</Button>

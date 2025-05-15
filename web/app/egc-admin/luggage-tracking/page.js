@@ -57,10 +57,10 @@ export default function Page() {
   const totalPages = Math.ceil(deliveries.length / rowsPerPage);
 
   return (
-    <Box p={4} display="flex" flexDirection="column" gap={4}>
+    <Box sx={{ p: 4, display: "flex", flexDirection: "column", gap: 4 }}>
       <Box><Typography variant="h3" color="primary.main" fontWeight="bold">Luggage Tracking</Typography></Box>
 
-      <Box display="flex" justifyContent="flex-end" alignItems="center" gap={2}>
+      <Box sx={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 2 }}>
         <Button variant="outlined" startIcon={<RefreshIcon />} onClick={handleRefresh}>Refresh</Button>
         <TextField label="Search" size="small" sx={{ width: "250px" }} />
       </Box>
@@ -107,7 +107,7 @@ export default function Page() {
             </TableBody>
           </Table>
 
-          <Box display="flex" justifyContent="space-between" alignItems="center" p={2} flexWrap="wrap">
+          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", p: 2, flexWrap: "wrap" }}>
             <Typography variant="body2">Showing {page * rowsPerPage + 1} - {Math.min((page + 1) * rowsPerPage, deliveries.length)} of {deliveries.length} ongoing deliveries</Typography>
             <Pagination count={totalPages} page={page + 1} onChange={handleChangePage} color="primary" shape="rounded" siblingCount={1} boundaryCount={2} showFirstButton showLastButton />
           </Box>

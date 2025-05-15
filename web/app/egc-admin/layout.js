@@ -24,16 +24,8 @@ export default function Layout({ children }) {
         router.replace("/egc-admin/login");
         return;
       }
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role_id')
-        .eq('id', session.user.id)
-        .single();
-      const { data: adminRole } = await supabase
-        .from('profiles_roles')
-        .select('id')
-        .eq('role_name', 'Administrator')
-        .single();
+      const { data: profile } = await supabase.from('profiles').select('role_id').eq('id', session.user.id).single();
+      const { data: adminRole } = await supabase.from('profiles_roles').select('id').eq('role_name', 'Administrator').single();
       if (!profile || !adminRole || Number(profile.role_id) !== Number(adminRole.id)) {
         router.replace("/egc-admin/login");
         return;
@@ -43,23 +35,12 @@ export default function Layout({ children }) {
     checkSession();
   }, [pathname]);
 
-  if (checkingSession) {
-    return null; // or a loading spinner
-  }
+  if (checkingSession) return null;
 
   return (
     <div style={{ display: "flex", minHeight: "100vh" }}>
-      {/* Sidebar */}
       {!isAuthPage && <Sidebar />}
-
-      {/* Main Content */}
-      <div style={{ 
-        flexGrow: 1, 
-        padding: "24px", 
-        marginLeft: isAuthPage ? "0" : "280px", 
-        backgroundColor: "background.default", 
-        minHeight: "100vh" 
-      }}>
+      <div style={{ flexGrow: 1, padding: "24px", marginLeft: isAuthPage ? "0" : "280px", backgroundColor: "background.default", minHeight: "100vh" }}>
         {children}
       </div>
     </div>

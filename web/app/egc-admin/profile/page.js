@@ -223,30 +223,30 @@ export default function ProfilePage() {
     };
 
     return (
-        <Box pt={2} px={4} display="flex" flexDirection="column" gap={4}>
-            <Box width="100%" maxWidth="1000px"><Typography variant="h3" color="primary.main" fontWeight="bold">Profile</Typography></Box>
+        <Box sx={{ pt: 2, px: 4, display: "flex", flexDirection: "column", gap: 4 }}>
+            <Box sx={{ width: "100%", maxWidth: "1000px" }}><Typography variant="h3" color="primary.main" fontWeight="bold">Profile</Typography></Box>
 
             <Paper elevation={3} sx={{ borderRadius: 2, background: theme.palette.background.paper }}>
                 <CardContent sx={{ p: 4 }}>
-                    <Box display="flex" alignItems="center" justifyContent="space-between" flexWrap="wrap" gap={3}>
-                        <Box display="flex" alignItems="center" gap={3}>
-                            <Box position="relative">
-                                <Avatar alt={user.fullName} src={profileImage || "/avatar.png"} sx={{ width: 100, height: 100, border: '2px solid', borderColor: 'primary.main' }} />
-                                <input accept="image/*" style={{ display: 'none' }} id="profile-image-upload" type="file" onChange={handleImageUpload} disabled={uploading} />
+                    <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 3 }}>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 3 }}>
+                            <Box sx={{ position: "relative" }}>
+                                <Avatar alt={user.fullName} src={profileImage || "/avatar.png"} sx={{ width: 100, height: 100, border: "2px solid", borderColor: "primary.main" }} />
+                                <input accept="image/*" style={{ display: "none" }} id="profile-image-upload" type="file" onChange={handleImageUpload} disabled={uploading} />
                                 <label htmlFor="profile-image-upload">
-                                    <IconButton component="span" sx={{ position: 'absolute', bottom: 0, right: 0, backgroundColor: 'primary.main', color: 'white', '&:hover': { backgroundColor: 'primary.dark' } }} disabled={uploading}>
+                                    <IconButton component="span" sx={{ position: "absolute", bottom: 0, right: 0, backgroundColor: "primary.main", color: "white", "&:hover": { backgroundColor: "primary.dark" } }} disabled={uploading}>
                                         {uploading ? <CircularProgress size={24} color="inherit" /> : <PhotoCameraIcon />}
                                     </IconButton>
                                 </label>
                             </Box>
                             <Box>
                                 <Typography variant="h5" fontWeight="bold" gutterBottom>{user.fullName}</Typography>
-                                <Typography color="primary.main" sx={{ fontSize: '1.1rem', fontWeight: 500 }}>{user.role}</Typography>
+                                <Typography color="primary.main" sx={{ fontSize: "1.1rem", fontWeight: 500 }}>{user.role}</Typography>
                             </Box>
                         </Box>
-                        <Box display="flex" flexDirection="column" gap={2}>
-                            <Button variant="contained" onClick={() => router.push('/egc-admin/profile/edit-profile')} sx={{ borderRadius: 2, textTransform: 'none', px: 3 }}>Edit Profile</Button>
-                            <Button variant="outlined" color="primary" onClick={() => setChangePwOpen(true)} sx={{ borderRadius: 2, textTransform: 'none', px: 3 }}>Change Password</Button>
+                        <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                            <Button variant="contained" onClick={() => router.push("/egc-admin/profile/edit-profile")} sx={{ borderRadius: 2, textTransform: "none", px: 3 }}>Edit Profile</Button>
+                            <Button variant="outlined" color="primary" onClick={() => setChangePwOpen(true)} sx={{ borderRadius: 2, textTransform: "none", px: 3 }}>Change Password</Button>
                         </Box>
                     </Box>
                 </CardContent>
@@ -254,10 +254,10 @@ export default function ProfilePage() {
 
             <Grid container spacing={3}>
                 <Grid item xs={12} md={6}>
-                    <Paper elevation={2} sx={{ height: '100%', borderRadius: 2, transition: 'transform 0.2s', '&:hover': { transform: 'translateY(-4px)' }, background: theme.palette.background.paper }}>
+                    <Paper elevation={2} sx={{ height: "100%", borderRadius: 2, transition: "transform 0.2s", "&:hover": { transform: "translateY(-4px)" }, background: theme.palette.background.paper }}>
                         <CardContent sx={{ p: 3 }}>
-                            <Typography variant="h6" mb={3} color="primary.main" sx={{ borderBottom: '2px solid', borderColor: 'primary.light', pb: 1 }}>Personal Information</Typography>
-                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                            <Typography variant="h6" mb={3} color="primary.main" sx={{ borderBottom: "2px solid", borderColor: "primary.light", pb: 1 }}>Personal Information</Typography>
+                            <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
                                 <Box><Typography color="text.secondary" fontSize="0.9rem">Employee ID</Typography><Typography fontWeight="medium">{user.employeeId}</Typography></Box>
                                 <Box><Typography color="text.secondary" fontSize="0.9rem">Full Name</Typography><Typography fontWeight="medium">{user.fullName}</Typography></Box>
                                 <Box><Typography color="text.secondary" fontSize="0.9rem">Contact Number</Typography><Typography fontWeight="medium">{user.contactNumber}</Typography></Box>
@@ -268,10 +268,10 @@ export default function ProfilePage() {
                 </Grid>
 
                 <Grid item xs={12} md={6}>
-                    <Paper elevation={2} sx={{ height: '100%', borderRadius: 2, transition: 'transform 0.2s', '&:hover': { transform: 'translateY(-4px)' }, background: theme.palette.background.paper }}>
+                    <Paper elevation={2} sx={{ height: "100%", borderRadius: 2, transition: "transform 0.2s", "&:hover": { transform: "translateY(-4px)" }, background: theme.palette.background.paper }}>
                         <CardContent sx={{ p: 3 }}>
-                            <Typography variant="h6" mb={3} color="primary.main" sx={{ borderBottom: '2px solid', borderColor: 'primary.light', pb: 1 }}>Emergency Contact Information</Typography>
-                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                            <Typography variant="h6" mb={3} color="primary.main" sx={{ borderBottom: "2px solid", borderColor: "primary.light", pb: 1 }}>Emergency Contact Information</Typography>
+                            <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
                                 <Box><Typography color="text.secondary" fontSize="0.9rem">Emergency Contact Name</Typography><Typography fontWeight="medium">{user.emergencyContact}</Typography></Box>
                                 <Box><Typography color="text.secondary" fontSize="0.9rem">Emergency Contact Number</Typography><Typography fontWeight="medium">{user.emergencyContactNumber}</Typography></Box>
                             </Box>
@@ -280,10 +280,10 @@ export default function ProfilePage() {
                 </Grid>
 
                 <Grid item xs={12} md={6}>
-                    <Paper elevation={2} sx={{ height: '100%', borderRadius: 2, transition: 'transform 0.2s', '&:hover': { transform: 'translateY(-4px)' }, background: theme.palette.background.paper }}>
+                    <Paper elevation={2} sx={{ height: "100%", borderRadius: 2, transition: "transform 0.2s", "&:hover": { transform: "translateY(-4px)" }, background: theme.palette.background.paper }}>
                         <CardContent sx={{ p: 3 }}>
-                            <Typography variant="h6" mb={3} color="primary.main" sx={{ borderBottom: '2px solid', borderColor: 'primary.light', pb: 1 }}>Account Information</Typography>
-                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                            <Typography variant="h6" mb={3} color="primary.main" sx={{ borderBottom: "2px solid", borderColor: "primary.light", pb: 1 }}>Account Information</Typography>
+                            <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
                                 <Box><Typography color="text.secondary" fontSize="0.9rem">Email Address</Typography><Typography fontWeight="medium">{user.email}</Typography></Box>
                                 <Box><Typography color="text.secondary" fontSize="0.9rem">Role</Typography><Typography fontWeight="medium">{user.role}</Typography></Box>
                                 <Box><Typography color="text.secondary" fontSize="0.9rem">Date of Registration</Typography><Typography fontWeight="medium">{user.dateRegistered}</Typography></Box>
@@ -293,104 +293,34 @@ export default function ProfilePage() {
                 </Grid>
             </Grid>
 
-            <Dialog open={resetOpen} onClose={() => { setResetOpen(false); setResetStatus({ message: '', severity: '' }); setResetEmail(''); }}
-                PaperProps={{ 
-                    sx: { 
-                        backgroundColor: theme.palette.background.paper,
-                        color: theme.palette.text.primary,
-                        boxShadow: theme.shadows[4]
-                    } 
-                }}>
-                <DialogTitle variant="h5" sx={{ color: theme.palette.text.primary, textAlign: 'center', border: 'none', outline: 'none' }}>Change Password</DialogTitle>
-                <DialogContent sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, minWidth: 350, pt: 3 }}>
+            <Dialog open={resetOpen} onClose={() => { setResetOpen(false); setResetStatus({ message: "", severity: "" }); setResetEmail(""); }} PaperProps={{ sx: { backgroundColor: theme.palette.background.paper, color: theme.palette.text.primary, boxShadow: theme.shadows[4] } }}>
+                <DialogTitle variant="h5" sx={{ color: theme.palette.text.primary, textAlign: "center", border: "none", outline: "none" }}>Change Password</DialogTitle>
+                <DialogContent sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2, minWidth: 350, pt: 3 }}>
                     <Typography fontSize={14} color={theme.palette.text.secondary}>Enter your registered email to receive a password reset link</Typography>
-                    <TextField 
-                        label="Email" 
-                        type="email" 
-                        value={resetEmail} 
-                        onChange={(e) => setResetEmail(e.target.value)} 
-                        placeholder="Enter your email" 
-                        required 
-                        sx={{ width: "100%" }}
-                        InputLabelProps={{ 
-                            sx: { 
-                                color: theme.palette.text.secondary,
-                                '&.Mui-focused': { color: theme.palette.primary.main }
-                            } 
-                        }}
-                    />
-                    {resetStatus.message && <Alert severity={resetStatus.severity} sx={{ width: '100%' }}>{resetStatus.message}</Alert>}
+                    <TextField label="Email" type="email" value={resetEmail} onChange={(e) => setResetEmail(e.target.value)} placeholder="Enter your email" required sx={{ width: "100%" }} InputLabelProps={{ sx: { color: theme.palette.text.secondary, "&.Mui-focused": { color: theme.palette.primary.main } } }} />
+                    {resetStatus.message && <Alert severity={resetStatus.severity} sx={{ width: "100%" }}>{resetStatus.message}</Alert>}
                 </DialogContent>
-                <DialogActions sx={{ flexDirection: 'column', gap: 1.5, alignItems: 'center', justifyContent: 'center', pb: 2, bgcolor: theme.palette.background.paper }}>
-                    <Button sx={{ width: '70%' }} variant="contained" color="primary" onClick={handleResetPassword} disabled={resetLoading || !resetEmail}>{resetLoading ? 'Sending...' : 'Send Reset Link'}</Button>
-                    <Button sx={{ width: '70%' }} onClick={() => { setResetOpen(false); setResetStatus({ message: '', severity: '' }); setResetEmail(''); }} color="secondary" disabled={resetLoading}>Cancel</Button>
+                <DialogActions sx={{ flexDirection: "column", gap: 1.5, alignItems: "center", justifyContent: "center", pb: 2, bgcolor: theme.palette.background.paper }}>
+                    <Button sx={{ width: "70%" }} variant="contained" color="primary" onClick={handleResetPassword} disabled={resetLoading || !resetEmail}>{resetLoading ? "Sending..." : "Send Reset Link"}</Button>
+                    <Button sx={{ width: "70%" }} onClick={() => { setResetOpen(false); setResetStatus({ message: "", severity: "" }); setResetEmail(""); }} color="secondary" disabled={resetLoading}>Cancel</Button>
                 </DialogActions>
             </Dialog>
 
-            <Dialog open={changePwOpen} onClose={() => { setChangePwOpen(false); setCurrentPassword(""); setNewPassword(""); setConfirmPassword(""); }} fullWidth maxWidth="xs"
-                PaperProps={{ 
-                    sx: { 
-                        backgroundColor: theme.palette.background.paper,
-                        color: theme.palette.text.primary,
-                        boxShadow: theme.shadows[4]
-                    } 
-                }}>
-                <DialogContent sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, width: '100%', pt: 6 }}>
-                    <Typography variant="h5" sx={{ color: theme.palette.text.primary, textAlign: 'center', fontWeight: 'bold', mb: 2 }}>Change Password</Typography>
-                    <TextField 
-                        label="Current Password" 
-                        type="password" 
-                        value={currentPassword} 
-                        onChange={e => setCurrentPassword(e.target.value)} 
-                        placeholder="Enter current password" 
-                        required 
-                        fullWidth 
-                        InputLabelProps={{ 
-                            sx: { 
-                                color: theme.palette.text.secondary,
-                                '&.Mui-focused': { color: theme.palette.primary.main }
-                            } 
-                        }} 
-                    />
-                    <TextField 
-                        label="New Password" 
-                        type="password" 
-                        value={newPassword} 
-                        onChange={e => setNewPassword(e.target.value)} 
-                        placeholder="Enter new password" 
-                        required 
-                        fullWidth 
-                        InputLabelProps={{ 
-                            sx: { 
-                                color: theme.palette.text.secondary,
-                                '&.Mui-focused': { color: theme.palette.primary.main }
-                            } 
-                        }} 
-                    />
-                    <TextField 
-                        label="Confirm Password" 
-                        type="password" 
-                        value={confirmPassword} 
-                        onChange={e => setConfirmPassword(e.target.value)} 
-                        placeholder="Confirm new password" 
-                        required 
-                        fullWidth 
-                        InputLabelProps={{ 
-                            sx: { 
-                                color: theme.palette.text.secondary,
-                                '&.Mui-focused': { color: theme.palette.primary.main }
-                            } 
-                        }} 
-                    />
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, alignItems: 'center', justifyContent: 'center', width: '100%', pb: 2, mt: 2 }}>
-                        <Button sx={{ width: '70%' }} variant="contained" color="primary" onClick={handleChangePassword} disabled={changePwLoading || !newPassword || !confirmPassword}>{changePwLoading ? 'Changing...' : 'Change Password'}</Button>
-                        <Button sx={{ width: '70%' }} onClick={() => { setChangePwOpen(false); setCurrentPassword(""); setNewPassword(""); setConfirmPassword(""); }} color="secondary" disabled={changePwLoading}>Cancel</Button>
+            <Dialog open={changePwOpen} onClose={() => { setChangePwOpen(false); setCurrentPassword(""); setNewPassword(""); setConfirmPassword(""); }} fullWidth maxWidth="xs" PaperProps={{ sx: { backgroundColor: theme.palette.background.paper, color: theme.palette.text.primary, boxShadow: theme.shadows[4] } }}>
+                <DialogContent sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2, width: "100%", pt: 6 }}>
+                    <Typography variant="h5" sx={{ color: theme.palette.text.primary, textAlign: "center", fontWeight: "bold", mb: 2 }}>Change Password</Typography>
+                    <TextField label="Current Password" type="password" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} placeholder="Enter current password" required fullWidth InputLabelProps={{ sx: { color: theme.palette.text.secondary, "&.Mui-focused": { color: theme.palette.primary.main } } }} />
+                    <TextField label="New Password" type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="Enter new password" required fullWidth InputLabelProps={{ sx: { color: theme.palette.text.secondary, "&.Mui-focused": { color: theme.palette.primary.main } } }} />
+                    <TextField label="Confirm Password" type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} placeholder="Confirm new password" required fullWidth InputLabelProps={{ sx: { color: theme.palette.text.secondary, "&.Mui-focused": { color: theme.palette.primary.main } } }} />
+                    <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5, alignItems: "center", justifyContent: "center", width: "100%", pb: 2, mt: 2 }}>
+                        <Button sx={{ width: "70%" }} variant="contained" color="primary" onClick={handleChangePassword} disabled={changePwLoading || !newPassword || !confirmPassword}>{changePwLoading ? "Changing..." : "Change Password"}</Button>
+                        <Button sx={{ width: "70%" }} onClick={() => { setChangePwOpen(false); setCurrentPassword(""); setNewPassword(""); setConfirmPassword(""); }} color="secondary" disabled={changePwLoading}>Cancel</Button>
                     </Box>
                 </DialogContent>
             </Dialog>
 
-            <Snackbar open={snackbarOpen} autoHideDuration={5000} onClose={(_, reason) => { if (reason !== 'clickaway') setSnackbarOpen(false); }} anchorOrigin={{ vertical: 'top', horizontal: 'center' }}>
-                <Alert onClose={() => setSnackbarOpen(false)} severity={snackbarSeverity} sx={{ width: '100%' }}>{snackbarMessage || uploadError}</Alert>
+            <Snackbar open={snackbarOpen} autoHideDuration={5000} onClose={(_, reason) => { if (reason !== "clickaway") setSnackbarOpen(false); }} anchorOrigin={{ vertical: "top", horizontal: "center" }}>
+                <Alert onClose={() => setSnackbarOpen(false)} severity={snackbarSeverity} sx={{ width: "100%" }}>{snackbarMessage || uploadError}</Alert>
             </Snackbar>
         </Box>
     );

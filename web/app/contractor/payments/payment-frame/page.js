@@ -9,128 +9,46 @@ export default function PaymentFrame() {
     const theme = useTheme();
 
     return (
-        <Box
-            sx={{
-                height: "100vh",
-                overflow: "hidden",
-                display: "flex",
-                flexDirection: "column",
-            }}
-        >
-            {/* Header top-left */}
+        <Box sx={{ height: "100vh", overflow: "hidden", display: "flex", flexDirection: "column" }}>
             <Box px={4} pt={4}>
-                <Typography variant="h3" fontWeight="bold" color="primary.main">
-                    Payment
-                </Typography>
+                <Typography variant="h3" fontWeight="bold" color="primary.main">Payment</Typography>
             </Box>
 
-            {/* Centered Paper Box */}
-            <Box
-                flexGrow={0.5}
-                display="flex"
-                justifyContent="center"
-                alignItems="center"
-                overflow="hidden"
-            >
-                <Paper
-                    elevation={2}
-                    sx={{
-                        width: "100%",
-                        maxWidth: 600,
-                        borderRadius: 3,
-                        p: 4,
-                    }}
-                >
-                    {/* Payment Method */}
+            <Box flexGrow={0.5} display="flex" justifyContent="center" alignItems="center" overflow="hidden">
+                <Paper elevation={2} sx={{ width: "100%", maxWidth: 600, borderRadius: 3, p: 4 }}>
                     <Box mb={4}>
-                        <Typography variant="h6" fontWeight="bold" mb={2}>
-                            Payment Method
-                        </Typography>
+                        <Typography variant="h6" fontWeight="bold" mb={2}>Payment Method</Typography>
 
-                        <Box
-                            display="flex"
-                            justifyContent="space-between"
-                            alignItems="center"
-                            p={2}
-                            border={`1px solid ${theme.palette.divider}`}
-                            borderRadius={2}
-                            mb={2}
-                        >
+                        <Box display="flex" justifyContent="space-between" alignItems="center" p={2} border={`1px solid ${theme.palette.divider}`} borderRadius={2} mb={2}>
                             <Box>
                                 <Typography fontWeight="bold">VISA **** 4242</Typography>
-                                <Typography variant="body2" color="text.secondary">
-                                    Expires 08/2025
-                                </Typography>
+                                <Typography variant="body2" color="text.secondary">Expires 08/2025</Typography>
                             </Box>
-                            <Typography fontWeight="bold" color="primary.main">
-                                Default
-                            </Typography>
+                            <Typography fontWeight="bold" color="primary.main">Default</Typography>
                         </Box>
 
-                        <Button
-                            startIcon={<AddIcon />}
-                            variant="contained"
-                            sx={{
-                                backgroundColor: "success.main",
-                                textTransform: "none",
-                                "&:hover": { backgroundColor: "success.dark" },
-                            }}
-                        >
+                        <Button startIcon={<AddIcon />} variant="contained" sx={{ backgroundColor: "success.main", textTransform: "none", "&:hover": { backgroundColor: "success.dark" } }}>
                             Add Payment Method
                         </Button>
                     </Box>
 
-                    {/* Billing Details */}
                     <Box>
-                        <Typography variant="h6" fontWeight="bold" mb={2}>
-                            Billing Details
-                        </Typography>
+                        <Typography variant="h6" fontWeight="bold" mb={2}>Billing Details</Typography>
 
                         <Box display="flex" gap={2} mb={2}>
-                            <TextField
-                                fullWidth
-                                size="small"
-                                label="Name on Card"
-                                placeholder="e.g., Jose Dela Cruz"
-                            />
-                            <TextField
-                                fullWidth
-                                size="small"
-                                label="Email"
-                                placeholder="e.g., jose@example.com"
-                            />
+                            <TextField fullWidth size="small" label="Name on Card" placeholder="e.g., Jose Dela Cruz" />
+                            <TextField fullWidth size="small" label="Email" placeholder="e.g., jose@example.com" />
                         </Box>
 
-                        <TextField
-                            fullWidth
-                            size="small"
-                            label="Billing Address"
-                            placeholder="e.g., 123 Main St."
-                            sx={{ mb: 4 }}
-                        />
+                        <TextField fullWidth size="small" label="Billing Address" placeholder="e.g., 123 Main St." sx={{ mb: 4 }} />
                     </Box>
 
-                    {/* Action Buttons */}
                     <Box display="flex" justifyContent="space-between">
-                        <Button
-                            variant="contained"
-                            startIcon={<CancelIcon />}
-                            sx={{
-                                bgcolor: "#4a4a4a",
-                                color: "#fff",
-                                textTransform: "none",
-                                "&:hover": { bgcolor: "#333" },
-                            }}
-                        >
+                        <Button variant="contained" startIcon={<CancelIcon />} sx={{ bgcolor: "#4a4a4a", color: "#fff", textTransform: "none", "&:hover": { bgcolor: "#333" } }}>
                             Cancel Payment
                         </Button>
 
-                        <Button
-                            variant="contained"
-                            color="success"
-                            endIcon={<PaymentIcon />}
-                            sx={{ textTransform: "none" }}
-                        >
+                        <Button variant="contained" color="success" endIcon={<PaymentIcon />} sx={{ textTransform: "none" }}>
                             Pay
                         </Button>
                     </Box>

@@ -1,4 +1,5 @@
 "use client"
+
 import { Box, Typography, Button, TextField } from "@mui/material";
 import { Global } from '@emotion/react';
 import { useRouter } from 'next/navigation';
@@ -13,9 +14,7 @@ export default function Page() {
     const [error, setError] = useState(null);
 
     const handleKeyPress = (event) => {
-        if (event.key === 'Enter') {
-            handleResetPassword(event);
-        }
+        if (event.key === 'Enter') handleResetPassword(event);
     };
 
     const handleResetPassword = async (e) => {
@@ -24,13 +23,8 @@ export default function Page() {
         setError(null);
 
         try {
-            const { error } = await supabase.auth.resetPasswordForEmail(email, {
-                redirectTo: `${window.location.origin}/contractor/reset-password`,
-            });
-
+            const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/contractor/reset-password` });
             if (error) throw error;
-
-            // If successful, redirect to login
             router.push('/contractor/login');
         } catch (error) {
             setError(error.message);
@@ -47,42 +41,10 @@ export default function Page() {
                     <Typography variant="h3" sx={{ color: "primary.main", fontWeight: "bold" }}>EasyTrack</Typography>
                     <Typography color="secondary.main">Forgot Password</Typography>
                     <form onSubmit={handleResetPassword} style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
-                        <TextField 
-                            label="Email" 
-                            type="email" 
-                            placeholder="Email" 
-                            required 
-                            sx={{ width: "70%" }}
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            error={!!error}
-                            helperText={error}
-                            onKeyPress={handleKeyPress}
-                        />
-                        <Button 
-                            type="submit"
-                            variant="contained" 
-                            color="primary" 
-                            sx={{ width: "60%" }}
-                            disabled={loading}
-                        >
-                            {loading ? 'Sending...' : 'Send Email Reset Link'}
-                        </Button>
+                        <TextField label="Email" type="email" placeholder="Email" required sx={{ width: "70%" }} value={email} onChange={(e) => setEmail(e.target.value)} error={!!error} helperText={error} onKeyPress={handleKeyPress} />
+                        <Button type="submit" variant="contained" color="primary" sx={{ width: "60%" }} disabled={loading}>{loading ? 'Sending...' : 'Send Email Reset Link'}</Button>
                     </form>
-                    <Typography
-                        sx={{
-                            color: "secondary.main",
-                            cursor: "pointer",
-                            '&:hover': {
-                                color: 'primary.main',
-                                textDecoration: 'underline'
-                            },
-                            fontSize: ".85rem"
-                        }}
-                        onClick={() => router.push("/contractor/login")}
-                    >
-                        Back to Login
-                    </Typography>
+                    <Typography sx={{ color: "secondary.main", cursor: "pointer", '&:hover': { color: 'primary.main', textDecoration: 'underline' }, fontSize: ".85rem" }} onClick={() => router.push("/contractor/login")}>Back to Login</Typography>
                 </Box>
             </Box>
         </>

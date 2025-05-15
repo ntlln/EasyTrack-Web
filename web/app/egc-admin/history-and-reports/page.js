@@ -74,16 +74,16 @@ export default function Page() {
   const totalPages = Math.ceil(transactions.length / rowsPerPage);
 
   return (
-    <Box pt={4} display="flex" flexDirection="column" gap={4} sx={{ overflowX: 'hidden' }}>
+    <Box sx={{ pt: 4, display: "flex", flexDirection: "column", gap: 4, overflowX: "hidden" }}>
       <Box><Typography variant="h3" color="primary.main" fontWeight="bold">History & Reports</Typography></Box>
 
-      <Box display="flex" flexWrap="wrap" gap={2} alignItems="center">
+      <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2, alignItems: "center" }}>
         <TextField placeholder="Search for transaction" size="small" InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon /></InputAdornment> }} sx={{ flex: "1", minWidth: "250px" }} />
 
-        <Box sx={statusBoxStyle}><Typography variant="body2" fontWeight="bold">Total</Typography><Typography>{totalTransactions.toLocaleString()}</Typography></Box>
-        <Box sx={statusBoxStyle}><Typography variant="body2" fontWeight="bold">Completed</Typography><Typography>{completedCount.toLocaleString()}</Typography></Box>
-        <Box sx={statusBoxStyle}><Typography variant="body2" fontWeight="bold">Pending</Typography><Typography>{pendingCount.toLocaleString()}</Typography></Box>
-        <Box sx={statusBoxStyle}><Typography variant="body2" fontWeight="bold">Failed</Typography><Typography>{failedCount.toLocaleString()}</Typography></Box>
+        <Box sx={{ px: 2, py: 1, borderRadius: 2, border: "1px solid #ccc", minWidth: "120px", textAlign: "center" }}><Typography variant="body2" fontWeight="bold">Total</Typography><Typography>{totalTransactions.toLocaleString()}</Typography></Box>
+        <Box sx={{ px: 2, py: 1, borderRadius: 2, border: "1px solid #ccc", minWidth: "120px", textAlign: "center" }}><Typography variant="body2" fontWeight="bold">Completed</Typography><Typography>{completedCount.toLocaleString()}</Typography></Box>
+        <Box sx={{ px: 2, py: 1, borderRadius: 2, border: "1px solid #ccc", minWidth: "120px", textAlign: "center" }}><Typography variant="body2" fontWeight="bold">Pending</Typography><Typography>{pendingCount.toLocaleString()}</Typography></Box>
+        <Box sx={{ px: 2, py: 1, borderRadius: 2, border: "1px solid #ccc", minWidth: "120px", textAlign: "center" }}><Typography variant="body2" fontWeight="bold">Failed</Typography><Typography>{failedCount.toLocaleString()}</Typography></Box>
 
         {mounted && (
           <>
@@ -95,9 +95,9 @@ export default function Page() {
         <IconButton onClick={handleRefresh} sx={{ border: "1px solid #ccc", borderRadius: 2, p: 1 }}><RefreshIcon /></IconButton>
       </Box>
 
-      <Box sx={{ width: '100%', overflowX: 'auto' }}>
-        <TableContainer component={Paper} sx={{ maxWidth: '100vw' }}>
-          <Table sx={{ width: '100%' }}>
+      <Box sx={{ width: "100%", overflowX: "auto" }}>
+        <TableContainer component={Paper} sx={{ maxWidth: "100vw" }}>
+          <Table sx={{ width: "100%" }}>
             <TableHead>
               <TableRow>
                 <TableCell>Tracking ID</TableCell>
@@ -140,7 +140,7 @@ export default function Page() {
             </TableBody>
           </Table>
 
-          <Box display="flex" justifyContent="space-between" alignItems="center" p={2} flexWrap="wrap" gap={2}>
+          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", p: 2, flexWrap: "wrap", gap: 2 }}>
             <Typography variant="body2">Showing {page * rowsPerPage + 1} - {Math.min((page + 1) * rowsPerPage, transactions.length)} of {transactions.length} transactions</Typography>
             <Pagination count={totalPages} page={page + 1} onChange={handleChangePage} color="primary" shape="rounded" siblingCount={1} boundaryCount={2} showFirstButton showLastButton />
           </Box>
@@ -154,12 +154,3 @@ export default function Page() {
     </Box>
   );
 }
-
-const statusBoxStyle = {
-  px: 2,
-  py: 1,
-  borderRadius: 2,
-  border: "1px solid #ccc",
-  minWidth: "120px",
-  textAlign: "center",
-};

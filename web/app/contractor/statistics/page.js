@@ -30,41 +30,16 @@ export default function StatisticsPage() {
             <Typography variant="h3" mb={3} color='primary.main' fontWeight={'bold'}>Statistics</Typography>
 
             <Grid container spacing={2}>
-                <Grid item xs={12} md={4}>
-                    <Card>
-                        <CardContent>
-                            <Typography variant="subtitle2">Shipment Track</Typography>
-                            <Typography variant="h5">4,425</Typography>
-                        </CardContent>
-                    </Card>
-                </Grid>
-                <Grid item xs={12} md={4}>
-                    <Card>
-                        <CardContent>
-                            <Typography variant="subtitle2">Fleet Performance</Typography>
-                            <Typography variant="h5">134</Typography>
-                        </CardContent>
-                    </Card>
-                </Grid>
-                <Grid item xs={12} md={4}>
-                    <Card>
-                        <CardContent>
-                            <Typography variant="subtitle2">Delivery Status</Typography>
-                            <Typography variant="h5">2,562</Typography>
-                        </CardContent>
-                    </Card>
-                </Grid>
+                <Grid item xs={12} md={4}><Card><CardContent><Typography variant="subtitle2">Shipment Track</Typography><Typography variant="h5">4,425</Typography></CardContent></Card></Grid>
+                <Grid item xs={12} md={4}><Card><CardContent><Typography variant="subtitle2">Fleet Performance</Typography><Typography variant="h5">134</Typography></CardContent></Card></Grid>
+                <Grid item xs={12} md={4}><Card><CardContent><Typography variant="subtitle2">Delivery Status</Typography><Typography variant="h5">2,562</Typography></CardContent></Card></Grid>
             </Grid>
 
             <Grid container spacing={2} mt={2}>
                 <Grid item xs={12} md={8}>
                     <Card>
                         <CardContent>
-                            <Tabs value={0}>
-                                <Tab label="Daily" />
-                                <Tab label="Monthly" />
-                                <Tab label="Year" />
-                            </Tabs>
+                            <Tabs value={0}><Tab label="Daily" /><Tab label="Monthly" /><Tab label="Year" /></Tabs>
                             <Table>
                                 <TableHead>
                                     <TableRow>

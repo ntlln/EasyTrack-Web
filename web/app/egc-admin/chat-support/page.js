@@ -28,21 +28,21 @@ export default function ChatSupportPage() {
   };
 
   return (
-    <Box position="absolute" top={0} left="280px" right={0} bottom={0} display="flex" bgcolor={theme.palette.background.default}>
-      <Box width="350px" borderRight="1px solid" borderColor="divider" bgcolor={theme.palette.background.paper} display="flex" flexDirection="column" p={2} gap={2}>
+    <Box sx={{ position: "absolute", top: 0, left: "280px", right: 0, bottom: 0, display: "flex", bgcolor: theme.palette.background.default }}>
+      <Box sx={{ width: "350px", borderRight: "1px solid", borderColor: "divider", bgcolor: theme.palette.background.paper, display: "flex", flexDirection: "column", p: 2, gap: 2 }}>
         <TextField placeholder="Search" size="small" InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon /></InputAdornment> }} sx={{ bgcolor: theme.palette.background.default, borderRadius: 2 }} />
-        <Box flexGrow={1} overflow="auto" display="flex" flexDirection="column" gap={1}>
+        <Box sx={{ flexGrow: 1, overflow: "auto", display: "flex", flexDirection: "column", gap: 1 }}>
           {conversations.map((c, index) => (
             <Paper key={index} sx={{ p: 1.5, display: "flex", alignItems: "center", gap: 1, borderRadius: 2, bgcolor: theme.palette.background.default }}>
               <Avatar>{c.name.charAt(0)}</Avatar>
-              <Box flexGrow={1}>
-                <Typography fontSize="14px" fontWeight="bold">{c.name}</Typography>
-                <Typography fontSize="12px" color="text.secondary" noWrap>{c.lastMessage}</Typography>
+              <Box sx={{ flexGrow: 1 }}>
+                <Typography sx={{ fontSize: "14px", fontWeight: "bold" }}>{c.name}</Typography>
+                <Typography sx={{ fontSize: "12px", color: "text.secondary", noWrap: true }}>{c.lastMessage}</Typography>
               </Box>
-              <Box textAlign="right">
-                <Typography fontSize="10px" color="text.secondary">{c.time}</Typography>
+              <Box sx={{ textAlign: "right" }}>
+                <Typography sx={{ fontSize: "10px", color: "text.secondary" }}>{c.time}</Typography>
                 {c.unread > 0 && (
-                  <Box bgcolor="primary.main" color="white" borderRadius="50%" width="20px" height="20px" display="flex" alignItems="center" justifyContent="center" fontSize="12px" mx="auto">{c.unread}</Box>
+                  <Box sx={{ bgcolor: "primary.main", color: "white", borderRadius: "50%", width: "20px", height: "20px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", mx: "auto" }}>{c.unread}</Box>
                 )}
               </Box>
             </Paper>
@@ -50,26 +50,26 @@ export default function ChatSupportPage() {
         </Box>
       </Box>
 
-      <Box flexGrow={1} display="flex" flexDirection="column" bgcolor={theme.palette.background.default}>
-        <Box p={2} display="flex" alignItems="center" justifyContent="space-between" borderBottom="1px solid" borderColor="divider">
-          <Box display="flex" alignItems="center" gap={2}>
+      <Box sx={{ flexGrow: 1, display: "flex", flexDirection: "column", bgcolor: theme.palette.background.default }}>
+        <Box sx={{ p: 2, display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid", borderColor: "divider" }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
             <Avatar />
             <Box>
-              <Typography fontWeight="bold">Curtis Cullen</Typography>
-              <Typography fontSize="12px" color="green">Online</Typography>
+              <Typography sx={{ fontWeight: "bold" }}>Curtis Cullen</Typography>
+              <Typography sx={{ fontSize: "12px", color: "green" }}>Online</Typography>
             </Box>
           </Box>
           <IconButton><MoreVertIcon /></IconButton>
         </Box>
 
-        <Box flexGrow={1} p={2} overflow="auto" display="flex" flexDirection="column" gap={2}>
-          <Box alignSelf="flex-start" bgcolor={theme.palette.background.paper} p={2} borderRadius={2} maxWidth="70%">
-            <Typography fontSize="14px">Can I get an update on my luggage please? Here's my reference number: <b>ET789101</b>.</Typography>
+        <Box sx={{ flexGrow: 1, p: 2, overflow: "auto", display: "flex", flexDirection: "column", gap: 2 }}>
+          <Box sx={{ alignSelf: "flex-start", bgcolor: theme.palette.background.paper, p: 2, borderRadius: 2, maxWidth: "70%" }}>
+            <Typography sx={{ fontSize: "14px" }}>Can I get an update on my luggage please? Here's my reference number: <b>ET789101</b>.</Typography>
           </Box>
 
-          <Box alignSelf="flex-end" bgcolor={isDark ? "#4d664d" : "#D0E8D0"} p={2} borderRadius={2} maxWidth="70%">
-            <Typography fontWeight="bold">Jamie L</Typography>
-            <Typography fontSize="14px" mt={1}>
+          <Box sx={{ alignSelf: "flex-end", bgcolor: isDark ? "#4d664d" : "#D0E8D0", p: 2, borderRadius: 2, maxWidth: "70%" }}>
+            <Typography sx={{ fontWeight: "bold" }}>Jamie L</Typography>
+            <Typography sx={{ fontSize: "14px", mt: 1 }}>
               Hi there! Thank you for providing your reference number: ET789101. <br />
               Let me check the latest status... <br /><br />
               ✅ Update: Your luggage is currently in transit and is expected to arrive at your delivery location by [insert date/time]. <br />
@@ -78,7 +78,7 @@ export default function ChatSupportPage() {
           </Box>
         </Box>
 
-        <Box p={2} display="flex" alignItems="center" borderTop="1px solid" borderColor="divider" gap={2}>
+        <Box sx={{ p: 2, display: "flex", alignItems: "center", borderTop: "1px solid", borderColor: "divider", gap: 2 }}>
           <TextField fullWidth size="small" placeholder="Type a message" value={message} onChange={(e) => setMessage(e.target.value)} sx={{ bgcolor: theme.palette.background.paper, borderRadius: 2 }} />
           <IconButton color="primary" onClick={handleSend}><SendIcon /></IconButton>
         </Box>
