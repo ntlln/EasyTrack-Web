@@ -3,33 +3,11 @@
 import { Box, Typography, Button, TextField } from "@mui/material";
 import { Global } from '@emotion/react';
 import { useRouter } from 'next/navigation';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useState } from 'react';
 
 export default function Page() {
-    // State and client setup
     const router = useRouter();
-    const supabase = createClientComponentClient();
     const [email, setEmail] = useState('');
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState(null);
-
-    // Event handlers
-    const handleKeyPress = (event) => { if (event.key === 'Enter') handleResetPassword(event); };
-    const handleResetPassword = async (e) => {
-        e.preventDefault();
-        setLoading(true);
-        setError(null);
-        try {
-            const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/contractor/reset-password` });
-            if (error) throw error;
-            router.push('/contractor/login');
-        } catch (error) {
-            setError(error.message);
-        } finally {
-            setLoading(false);
-        }
-    };
 
     // Styling constants
     const globalStyles = { 'html, body': { margin: 0, padding: 0, height: '100%', overflow: 'hidden' } };
@@ -45,11 +23,28 @@ export default function Page() {
                 <Box sx={formContainerStyles}>
                     <Typography variant="h3" sx={{ color: "primary.main", fontWeight: "bold" }}>EasyTrack</Typography>
                     <Typography color="secondary.main">Forgot Password</Typography>
-                    <form onSubmit={handleResetPassword} style={formStyles}>
-                        <TextField label="Email" type="email" placeholder="Email" required sx={{ width: "70%" }} value={email} onChange={(e) => setEmail(e.target.value)} error={!!error} helperText={error} onKeyPress={handleKeyPress} />
-                        <Button type="submit" variant="contained" color="primary" sx={{ width: "60%" }} disabled={loading}>{loading ? 'Sending...' : 'Send Email Reset Link'}</Button>
+                    <form style={formStyles}>
+                        <TextField 
+                            label="Email" 
+                            type="email" 
+                            placeholder="Email" 
+                            required 
+                            sx={{ width: "70%" }} 
+                            value={email} 
+                            onChange={(e) => setEmail(e.target.value)} 
+                        />
+                        <Button 
+                            type="submit" 
+                            variant="contained" 
+                            color="primary" 
+                            sx={{ width: "60%" }}
+                        >
+                            Send Email Reset Link
+                        </Button>
                     </form>
-                    <Typography sx={backLinkStyles} onClick={() => router.push("/contractor/login")}>Back to Login</Typography>
+                    <Typography sx={backLinkStyles} onClick={() => router.push("/contractor/login")}>
+                        Back to Login
+                    </Typography>
                 </Box>
             </Box>
         </>
