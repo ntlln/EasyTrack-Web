@@ -91,86 +91,9 @@ export async function middleware(req) {
       }
     }
 
-    // Check if the request is for the admin section
-    if (req.nextUrl.pathname.startsWith('/egc-admin')) {
-      // Allow access to login and forgot-password pages
-      if (req.nextUrl.pathname === '/egc-admin/login' || req.nextUrl.pathname === '/egc-admin/forgot-password') {
-        // If user is already logged in AND is an admin, redirect to dashboard
-        if (session) {
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('role_id')
-            .eq('id', session.user.id)
-            .single();
-          const { data: adminRole } = await supabase
-            .from('profiles_roles')
-            .select('id')
-            .eq('role_name', 'Administrator')
-            .single();
-          if (profile && adminRole && Number(profile.role_id) === Number(adminRole.id)) {
-            return NextResponse.redirect(new URL('/egc-admin/', req.url));
-          }
-        }
-        return res;
-      }
-      // Always allow access to reset-password, regardless of session
-      if (req.nextUrl.pathname === '/egc-admin/reset-password') {
-        return res;
-      }
-
-      // For all other admin routes, check authentication
-      if (!session) {
-        // Clear any existing cookies before redirecting
-        const response = NextResponse.redirect(new URL('/egc-admin/login', req.url));
-        response.cookies.delete('sb-access-token');
-        response.cookies.delete('sb-refresh-token');
-        return response;
-      }
-
-      // Verify user role
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role_id, user_status_id, profiles_status (status_name)')
-        .eq('id', session.user.id)
-        .single();
-
-      if (!profile) {
-        console.log('MIDDLEWARE: profile not found');
-        const response = NextResponse.redirect(new URL('/egc-admin/login', req.url));
-        response.cookies.delete('sb-access-token');
-        response.cookies.delete('sb-refresh-token');
-        return response;
-      }
-
-      // Check if account is deactivated
-      if (profile.profiles_status?.status_name === 'Deactivated') {
-        console.log('MIDDLEWARE: profile deactivated');
-        const response = NextResponse.redirect(new URL('/egc-admin/login', req.url));
-        response.cookies.delete('sb-access-token');
-        response.cookies.delete('sb-refresh-token');
-        return response;
-      }
-
-      // Get admin role ID (must match 'Administrator' in DB)
-      const { data: adminRole } = await supabase
-        .from('profiles_roles')
-        .select('id')
-        .eq('role_name', 'Administrator')
-        .single();
-
-      // Check if user has admin role
-      if (!adminRole || Number(profile.role_id) !== Number(adminRole.id)) {
-        console.log('MIDDLEWARE: not admin role');
-        const response = NextResponse.redirect(new URL('/egc-admin/login', req.url));
-        response.cookies.delete('sb-access-token');
-        response.cookies.delete('sb-refresh-token');
-        return response;
-      }
-    }
-
     // Always allow and clear cookies for logout
-    if (req.nextUrl.pathname === '/egc-admin/logout' || req.nextUrl.pathname === '/contractor/logout') {
-      const response = NextResponse.redirect(new URL(req.nextUrl.pathname.startsWith('/egc-admin') ? '/egc-admin/login' : '/contractor/login', req.url));
+    if (req.nextUrl.pathname === '/contractor/logout') {
+      const response = NextResponse.redirect(new URL('/contractor/login', req.url));
       response.cookies.delete('sb-access-token');
       response.cookies.delete('sb-refresh-token');
       return response;
@@ -180,7 +103,7 @@ export async function middleware(req) {
   } catch (error) {
     console.error('Middleware error:', error);
     // Clear cookies on error
-    const response = NextResponse.redirect(new URL('/egc-admin/login', req.url));
+    const response = NextResponse.redirect(new URL('/contractor/login', req.url));
     response.cookies.delete('sb-access-token');
     response.cookies.delete('sb-refresh-token');
     return response;
@@ -190,6 +113,5 @@ export async function middleware(req) {
 export const config = {
   matcher: [
     '/contractor/:path*',
-    '/egc-admin/:path*',
   ],
 }; 

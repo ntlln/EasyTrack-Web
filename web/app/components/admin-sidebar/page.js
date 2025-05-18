@@ -2,7 +2,7 @@
 
 import { useState, useContext, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { Box, Divider, List, ListItemButton, ListItemIcon, ListItemText, Collapse, Button, IconButton, useMediaQuery } from "@mui/material";
+import { Box, Divider, List, ListItemButton, ListItemIcon, ListItemText, Collapse, Button, IconButton, useMediaQuery, Typography } from "@mui/material";
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import GroupsIcon from '@mui/icons-material/Groups';
@@ -23,7 +23,13 @@ import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
 export default function Sidebar() {
     // State and context management
-    const [openPages, setOpenPages] = useState(false);
+    const [openPages, setOpenPages] = useState(() => {
+        if (typeof window !== 'undefined') {
+            const savedState = localStorage.getItem('adminSidebarTransactionsOpen');
+            return savedState ? JSON.parse(savedState) : false;
+        }
+        return false;
+    });
     const [isMinimized, setIsMinimized] = useState(true);
     const { mode, toggleMode } = useContext(ColorModeContext);
     const theme = useTheme();
@@ -36,17 +42,39 @@ export default function Sidebar() {
     useEffect(() => {
         const handleClickOutside = (event) => {
             const sidebar = document.querySelector('[data-sidebar]');
-            if (!isMinimized && sidebar && !sidebar.contains(event.target)) setIsMinimized(true);
+            if (!sidebar) return;
+
+            // Check if the click is outside the sidebar
+            const isClickInside = sidebar.contains(event.target);
+            if (!isClickInside) {
+                setIsMinimized(true);
+                // Don't reset openPages state when clicking outside
+            }
         };
+
+        // Add click listener to the entire document
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, [isMinimized]);
+    }, []);
+
+    // Save openPages state to localStorage when it changes
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            localStorage.setItem('adminSidebarTransactionsOpen', JSON.stringify(openPages));
+        }
+    }, [openPages]);
 
     // Navigation and session management
-    const handleClickPages = () => setOpenPages(!openPages);
+    const handleClickPages = () => {
+        if (isMinimized) {
+            setIsMinimized(false);
+        } else {
+            setOpenPages(!openPages);
+        }
+    };
     const handleNavigation = (route) => { router.push(route); setIsMinimized(true); };
     const isActive = (route) => pathname === route;
-    const isDropdownActive = () => openPages || pathname === "/egc-admin/luggage-tracking" || pathname === "/egc-admin/history-and-reports" || pathname === "/egc-admin/statistics";
+    const isDropdownActive = () => openPages || pathname === "/egc-admin/luggage-tracking";
 
     // Auth management
     useEffect(() => {
@@ -65,15 +93,116 @@ export default function Sidebar() {
 
     // Styling constants
     const activeStyles = { backgroundColor: mode === "light" ? "#f0f0f0" : "#333", color: theme.palette.primary.main, borderRadius: 1 };
-    const sidebarStyles = { width: isMinimized ? "80px" : "280px", height: "100vh", bgcolor: "background.paper", display: "flex", flexDirection: "column", borderRight: "1px solid", borderColor: "divider", position: "fixed", dataSidebar: true, overflowY: 'auto', transition: theme.transitions.create('width', { easing: theme.transitions.easing.sharp, duration: theme.transitions.duration.enteringScreen }), zIndex: 1200 };
-    const listItemStyles = (route) => ({ ...(isActive(route) ? activeStyles : {}), justifyContent: isMinimized ? 'center' : 'flex-start', px: isMinimized ? 1 : 2 });
-    const iconStyles = (route) => ({ minWidth: isMinimized ? 'auto' : 40, color: isActive(route) ? theme.palette.primary.main : "primary.main" });
+    const sidebarStyles = {
+        width: isMinimized ? "64px" : "280px",
+        height: "100vh",
+        bgcolor: "background.paper",
+        display: "flex",
+        flexDirection: "column",
+        borderRight: "1px solid",
+        borderColor: "divider",
+        position: "fixed",
+        dataSidebar: true,
+        overflowY: 'auto',
+        overflowX: 'hidden',
+        transition: theme.transitions.create('width', {
+            easing: theme.transitions.easing.sharp,
+            duration: theme.transitions.duration.enteringScreen
+        }),
+        zIndex: 1200,
+        '&::-webkit-scrollbar': {
+            width: '8px',
+            height: '0px'
+        },
+        '&::-webkit-scrollbar-track': {
+            background: 'transparent'
+        },
+        '&::-webkit-scrollbar-thumb': {
+            background: theme.palette.mode === 'light' ? '#ccc' : '#555',
+            borderRadius: '4px'
+        }
+    };
+    const headerStyles = {
+        p: 1,
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        minHeight: "80px",
+        position: "relative"
+    };
+    const logoStyles = {
+        height: 50,
+        width: "auto",
+        cursor: "pointer",
+        display: isMinimized ? "none" : "block",
+        flex: 1,
+        objectFit: "contain"
+    };
+    const menuButtonStyles = {
+        position: isMinimized ? "absolute" : "static",
+        right: isMinimized ? "50%" : "auto",
+        transform: isMinimized ? "translateX(50%)" : "none",
+        top: isMinimized ? 25 : "auto"
+    };
+    const listItemStyles = (route) => ({
+        ...(isActive(route) ? activeStyles : {}),
+        minHeight: 48,
+        px: isMinimized ? 0 : 2,
+        justifyContent: isMinimized ? 'center' : 'flex-start',
+        '& .MuiListItemIcon-root': {
+            minWidth: isMinimized ? 'auto' : 40,
+            justifyContent: 'center'
+        },
+        '& .MuiListItemText-root': {
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            '& .MuiTypography-root': {
+                fontSize: '0.875rem',
+                lineHeight: 1.2
+            }
+        }
+    });
+    const iconStyles = (route) => ({
+        color: isActive(route) ? theme.palette.primary.main : "primary.main",
+        fontSize: 24
+    });
+    const bottomSectionStyles = {
+        p: 1,
+        display: "flex",
+        flexDirection: "column",
+        gap: 1
+    };
+    const buttonStyles = {
+        textTransform: "none",
+        minWidth: isMinimized ? 'auto' : undefined,
+        px: isMinimized ? 1 : 2,
+        justifyContent: isMinimized ? 'center' : 'flex-start',
+        minHeight: 48,
+        '& .MuiButton-startIcon': {
+            margin: isMinimized ? 0 : undefined
+        }
+    };
+    const modeButtonStyles = {
+        ...buttonStyles,
+        '& .MuiTypography-root': {
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            fontSize: '0.875rem',
+            lineHeight: 1.2
+        }
+    };
+    const transactionsButtonStyles = {
+        ...listItemStyles("/egc-admin/transactions"),
+        ...(isDropdownActive() ? activeStyles : {})
+    };
 
     return (
-        <Box sx={sidebarStyles}>
-            <Box p={2} display="flex" justifyContent="space-between" alignItems="center">
-                {!isMinimized && <Box component="img" src="../brand-2.png" alt="EasyTrack Logo" sx={{ height: 50, cursor: "pointer" }} onClick={() => handleNavigation("/egc-admin/")} />}
-                <IconButton onClick={() => setIsMinimized(!isMinimized)} size="small"><MenuIcon /></IconButton>
+        <Box sx={sidebarStyles} data-sidebar="true">
+            <Box sx={headerStyles}>
+                <Box component="img" src="../brand-2.png" alt="EasyTrack Logo" sx={logoStyles} onClick={() => handleNavigation("/egc-admin/")} />
+                <IconButton onClick={() => setIsMinimized(!isMinimized)} size="small" sx={menuButtonStyles}><MenuIcon /></IconButton>
             </Box>
 
             <Divider />
@@ -95,52 +224,76 @@ export default function Sidebar() {
                         {!isMinimized && <ListItemText primary="User Management" />}
                     </ListItemButton>
 
-                    {!isMinimized && (
-                        <>
-                            <ListItemButton onClick={handleClickPages} sx={isDropdownActive() ? activeStyles : {}}>
-                                <ListItemIcon><InventoryIcon sx={{ color: isDropdownActive() ? theme.palette.primary.main : "primary.main" }} /></ListItemIcon>
+                    <ListItemButton onClick={handleClickPages} sx={transactionsButtonStyles}>
+                        <ListItemIcon><InventoryIcon sx={{ color: isDropdownActive() ? theme.palette.primary.main : "primary.main" }} /></ListItemIcon>
+                        {!isMinimized && (
+                            <>
                                 <ListItemText primary="Transactions" />
                                 {openPages ? <ExpandLess /> : <ExpandMore />}
-                            </ListItemButton>
+                            </>
+                        )}
+                    </ListItemButton>
 
-                            <Collapse in={openPages} timeout="auto" unmountOnExit>
-                                <List component="div" disablePadding>
-                                    <ListItemButton sx={{ pl: 4, ...(isActive("/egc-admin/luggage-tracking") ? activeStyles : {}) }} onClick={() => handleNavigation("/egc-admin/luggage-tracking")}>
-                                        <ListItemIcon><MyLocationIcon sx={iconStyles("/egc-admin/luggage-tracking")} /></ListItemIcon>
-                                        <ListItemText primary="Luggage Tracking" />
-                                    </ListItemButton>
-
-                                    <ListItemButton sx={{ pl: 4, ...(isActive("/egc-admin/history-and-reports") ? activeStyles : {}) }} onClick={() => handleNavigation("/egc-admin/history-and-reports")}>
-                                        <ListItemIcon><AssignmentIcon sx={iconStyles("/egc-admin/history-and-reports")} /></ListItemIcon>
-                                        <ListItemText primary="History and Reports" />
-                                    </ListItemButton>
-
-                                    <ListItemButton sx={{ pl: 4, ...(isActive("/egc-admin/statistics") ? activeStyles : {}) }} onClick={() => handleNavigation("/egc-admin/statistics")}>
-                                        <ListItemIcon><BarChartIcon sx={iconStyles("/egc-admin/statistics")} /></ListItemIcon>
-                                        <ListItemText primary="Statistics" />
-                                    </ListItemButton>
-                                </List>
-                            </Collapse>
-                        </>
+                    {!isMinimized && openPages && (
+                        <Collapse in={openPages} timeout="auto" unmountOnExit>
+                            <List component="div" disablePadding sx={{ pl: 2 }}>
+                                <ListItemButton
+                                    sx={{
+                                        pl: 4,
+                                        ...(isActive("/egc-admin/luggage-tracking") ? activeStyles : {}),
+                                        ...listItemStyles("/egc-admin/luggage-tracking")
+                                    }}
+                                    onClick={() => handleNavigation("/egc-admin/luggage-tracking")}
+                                >
+                                    <ListItemIcon><MyLocationIcon sx={iconStyles("/egc-admin/luggage-tracking")} /></ListItemIcon>
+                                    <ListItemText primary="Luggage Tracking" />
+                                </ListItemButton>
+                            </List>
+                        </Collapse>
                     )}
 
                     <ListItemButton onClick={() => handleNavigation("/egc-admin/chat-support")} sx={listItemStyles("/egc-admin/chat-support")}>
                         <ListItemIcon><SupportAgentIcon sx={iconStyles("/egc-admin/chat-support")} /></ListItemIcon>
                         {!isMinimized && <ListItemText primary="Chat Support" />}
                     </ListItemButton>
+
+                    <ListItemButton onClick={() => handleNavigation("/egc-admin/history-and-reports")} sx={listItemStyles("/egc-admin/history-and-reports")}>
+                        <ListItemIcon><AssignmentIcon sx={iconStyles("/egc-admin/history-and-reports")} /></ListItemIcon>
+                        {!isMinimized && <ListItemText primary="History and Reports" />}
+                    </ListItemButton>
+
+                    <ListItemButton onClick={() => handleNavigation("/egc-admin/statistics")} sx={listItemStyles("/egc-admin/statistics")}>
+                        <ListItemIcon><BarChartIcon sx={iconStyles("/egc-admin/statistics")} /></ListItemIcon>
+                        {!isMinimized && <ListItemText primary="Statistics" />}
+                    </ListItemButton>
                 </List>
             </Box>
 
             <Divider />
 
-            <Box p={2} display="flex" flexDirection="column" gap={2}>
-                {!isMinimized && (
-                    <Button variant="contained" startIcon={mode === 'light' ? <DarkModeIcon /> : <LightModeIcon />} onClick={toggleMode} fullWidth sx={{ textTransform: "none" }}>
-                        {mode === 'light' ? 'Dark Mode' : 'Light Mode'}
-                    </Button>
-                )}
+            <Box sx={bottomSectionStyles}>
+                <Button 
+                    variant="contained" 
+                    startIcon={mode === 'light' ? <DarkModeIcon /> : <LightModeIcon />} 
+                    onClick={toggleMode} 
+                    fullWidth 
+                    sx={buttonStyles}
+                >
+                    {!isMinimized && (
+                        <Typography noWrap>
+                            {mode === 'light' ? 'Dark Mode' : 'Light Mode'}
+                        </Typography>
+                    )}
+                </Button>
 
-                <Button variant="contained" color="error" startIcon={<LogoutIcon />} onClick={handleLogout} fullWidth sx={{ textTransform: "none", minWidth: isMinimized ? 'auto' : undefined, px: isMinimized ? 1 : 2 }}>
+                <Button 
+                    variant="contained" 
+                    color="error" 
+                    startIcon={<LogoutIcon />} 
+                    onClick={handleLogout} 
+                    fullWidth 
+                    sx={buttonStyles}
+                >
                     {!isMinimized && "Logout"}
                 </Button>
             </Box>

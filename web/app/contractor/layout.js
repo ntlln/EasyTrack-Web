@@ -5,6 +5,7 @@ import '../globals.css';
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { Box } from "@mui/material";
 
 export default function Layout({ children }) {
   // State and client setup
@@ -38,11 +39,11 @@ export default function Layout({ children }) {
   if (isAuthPage) return <>{children}</>;
 
   return (
-    <div style={{ display: "flex", minHeight: "100vh" }}>
+    <Box sx={{ display: "flex", minHeight: "100vh" }}>
       <Sidebar />
-      <div style={{ flexGrow: 1, padding: "24px", marginLeft: "80px", backgroundColor: "background.default", minHeight: "100vh", transition: "margin-left 0.3s ease" }}>
+      <Box sx={{ flexGrow: 1, p: 4, ml: "64px", minHeight: "100vh", transition: "margin-left 0.3s ease" }}>
         {children}
-      </div>
-    </div>
+      </Box>
+    </Box>
   );
 }

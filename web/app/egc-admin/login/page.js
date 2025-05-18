@@ -1,6 +1,6 @@
 "use client"
 
-import { Box, Typography, Button, TextField, Snackbar, Alert, CircularProgress, Checkbox } from "@mui/material";
+import { Box, Typography, Button, TextField, Snackbar, Alert, CircularProgress } from "@mui/material";
 import { useRouter, usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
@@ -11,7 +11,6 @@ export default function AdminLogin() {
   const supabase = createClientComponentClient();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "error" });
 
@@ -68,7 +67,7 @@ export default function AdminLogin() {
         email, 
         password,
         options: {
-          expiresIn: rememberMe ? 60 * 60 * 24 * 30 : 60 * 60 * 24,
+          expiresIn: 60 * 60 * 24, // 24 hours
         }
       });
       
@@ -161,9 +160,6 @@ export default function AdminLogin() {
   const containerStyles = { display: "flex", width: "100vw", height: "100vh", justifyContent: "center", alignItems: "center", backgroundImage: "url(/login-bg.png)", backgroundSize: "80%", backgroundRepeat: "no-repeat", backgroundPosition: "center", backgroundopacity: "30%", overflow: "hidden", position: "fixed", top: 0, left: 0 };
   const formContainerStyles = { display: "flex", flexDirection: "column", width: "50vh", backgroundColor: "background.default", boxShadow: 5, borderRadius: 3, alignItems: "center", pt: 5, pb: 5, gap: 2 };
   const formStyles = { width: "100%", display: "flex", flexDirection: "column", alignItems: "center", gap: "16px" };
-  const checkboxContainerStyles = { display: "flex", justifyContent: "space-between", alignItems: "center", width: "70%" };
-  const checkboxStyles = { display: "flex", alignItems: "center" };
-  const checkboxLabelStyles = { fontSize: ".85rem", color: "secondary.main" };
   const forgotPasswordStyles = { fontSize: ".85rem", cursor: "pointer", "&:hover": { textDecoration: "underline", color: "primary.main" } };
   const buttonStyles = { width: "40%", minHeight: "36px", position: "relative" };
   const progressStyles = { color: "white", position: "absolute", top: "50%", left: "50%", marginTop: "-12px", marginLeft: "-12px" };
@@ -178,23 +174,7 @@ export default function AdminLogin() {
         <Box component="form" onSubmit={(e) => { e.preventDefault(); handleLogin(); }} sx={formStyles}>
           <TextField label="Email" type="email" placeholder="Enter your email" required sx={{ width: "70%" }} value={email} onChange={e => setEmail(e.target.value)} disabled={loading} onKeyPress={handleKeyPress} />
           <TextField label="Password" type="password" placeholder="Enter your password" required sx={{ width: "70%" }} value={password} onChange={e => setPassword(e.target.value)} disabled={loading} onKeyPress={handleKeyPress} />
-          <Box sx={checkboxContainerStyles}>
-            <Box sx={checkboxStyles}>
-              <Checkbox
-                checked={rememberMe}
-                onChange={(e) => setRememberMe(e.target.checked)}
-                disabled={loading}
-                size="small"
-                sx={{
-                  color: "primary.main",
-                  '&.Mui-checked': {
-                    color: "primary.main",
-                  },
-                  padding: "4px",
-                }}
-              />
-              <Typography sx={checkboxLabelStyles}>Remember me</Typography>
-            </Box>
+          <Box sx={{ width: "70%", display: "flex", justifyContent: "flex-end" }}>
             <Typography 
               color="secondary.main" 
               onClick={() => router.push("./forgot-password")} 
