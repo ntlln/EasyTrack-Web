@@ -9,21 +9,19 @@ import { useRouter } from "next/navigation";
 
 export default function EditProfile() {
   const theme = useTheme();
-  const [form, setForm] = useState({ first_name: "", middle_initial: "", last_name: "", contact_number: "", birth_date: "", emergency_contact_name: "", emergency_contact_number: "", gov_id_number: "", gov_id_proof: "", gov_id_proof_back: "" });
-  const [loading, setLoading] = useState(false);
-  const supabase = createClientComponentClient();
   const router = useRouter();
+  const supabase = createClientComponentClient();
+  const fileInputRef = useRef(null);
+  const fileInputBackRef = useRef(null);
+  const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [original, setOriginal] = useState(null);
   const [govIdTypes, setGovIdTypes] = useState([]);
   const [selectedGovIdType, setSelectedGovIdType] = useState("");
-  const [uploading, setUploading] = useState(false);
-  const fileInputRef = useRef(null);
-  const fileInputBackRef = useRef(null);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState("");
   const [snackbarSeverity, setSnackbarSeverity] = useState("success");
-
-  const menuProps = { PaperProps: { style: { maxHeight: 48 * 5 } } };
+  const [form, setForm] = useState({ first_name: "", middle_initial: "", last_name: "", suffix: "", contact_number: "", birth_date: "", emergency_contact_name: "", emergency_contact_number: "", gov_id_number: "", gov_id_proof: "", gov_id_proof_back: "" });
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -31,9 +29,9 @@ export default function EditProfile() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session || !session.user) { setLoading(false); return; }
       const userEmail = session.user.email;
-      const { data, error } = await supabase.from('profiles').select('first_name, middle_initial, last_name, contact_number, birth_date, emergency_contact_name, emergency_contact_number, gov_id_type, gov_id_number, gov_id_proof, gov_id_proof_back').eq('email', userEmail).single();
+      const { data, error } = await supabase.from('profiles').select('first_name, middle_initial, last_name, suffix, contact_number, birth_date, emergency_contact_name, emergency_contact_number, gov_id_type, gov_id_number, gov_id_proof, gov_id_proof_back').eq('email', userEmail).single();
       if (data) {
-        const cleanData = { first_name: data.first_name || "", middle_initial: data.middle_initial || "", last_name: data.last_name || "", contact_number: data.contact_number || "", birth_date: data.birth_date || "", emergency_contact_name: data.emergency_contact_name || "", emergency_contact_number: data.emergency_contact_number || "", gov_id_number: data.gov_id_number || "", gov_id_proof: data.gov_id_proof || "", gov_id_proof_back: data.gov_id_proof_back || "" };
+        const cleanData = { first_name: data.first_name || "", middle_initial: data.middle_initial || "", last_name: data.last_name || "", suffix: data.suffix || "", contact_number: data.contact_number || "", birth_date: data.birth_date || "", emergency_contact_name: data.emergency_contact_name || "", emergency_contact_number: data.emergency_contact_number || "", gov_id_number: data.gov_id_number || "", gov_id_proof: data.gov_id_proof || "", gov_id_proof_back: data.gov_id_proof_back || "" };
         setForm(cleanData);
         setOriginal(cleanData);
         if (data.gov_id_type) setSelectedGovIdType(String(data.gov_id_type));
@@ -49,6 +47,10 @@ export default function EditProfile() {
   }, []);
 
   const handleChange = (e) => { const { name, value } = e.target; setForm((prev) => ({ ...prev, [name]: value })); };
+  const handleKeyPress = (event) => { if (event.key === 'Enter') handleSave(); };
+  const handleClear = () => window.location.reload();
+  const triggerFileInput = (type) => type === 'front' ? fileInputRef.current?.click() : fileInputBackRef.current?.click();
+
   const handleSave = async () => {
     setLoading(true);
     const { data: { session } } = await supabase.auth.getSession();
@@ -60,12 +62,9 @@ export default function EditProfile() {
     if (Object.keys(updates).length === 0) { setLoading(false); router.push("/contractor/profile"); return; }
     updates.updated_at = new Date().toISOString();
     const { error } = await supabase.from('profiles').update(updates).eq('email', userEmail);
-    console.log('Supabase update error:', error);
     setLoading(false);
     if (!error) router.push("/contractor/profile");
   };
-  const handleClear = () => window.location.reload();
-  const handleKeyPress = (event) => { if (event.key === 'Enter') handleSave(); };
 
   const handleFileUpload = async (event, type) => {
     try {
@@ -103,7 +102,6 @@ export default function EditProfile() {
       setSnackbarSeverity('success');
       setSnackbarOpen(true);
     } catch (error) {
-      console.error('Error uploading file:', error);
       setSnackbarMessage('Error uploading file. Please try again.');
       setSnackbarSeverity('error');
       setSnackbarOpen(true);
@@ -112,12 +110,18 @@ export default function EditProfile() {
     }
   };
 
-  const triggerFileInput = (type) => type === 'front' ? fileInputRef.current?.click() : fileInputBackRef.current?.click();
+  const menuProps = { PaperProps: { style: { maxHeight: 48 * 5 } } };
+  const containerStyles = { p: 4, maxWidth: "1400px", mx: "auto" };
+  const headerStyles = { display: "flex", justifyContent: "space-between", alignItems: "center", mb: 4 };
+  const backButtonStyles = { display: "flex", alignItems: "center", gap: 2 };
+  const formStyles = { minWidth: 300 };
+  const buttonContainerStyles = { mt: 4, display: "flex", justifyContent: "center", gap: 2 };
+  const fileInputStyles = { display: 'none' };
 
   return (
-    <Box p={4} maxWidth="1400px" mx="auto">
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={4}>
-        <Box display="flex" alignItems="center" gap={2}>
+    <Box sx={containerStyles}>
+      <Box sx={headerStyles}>
+        <Box sx={backButtonStyles}>
           <IconButton onClick={() => router.push("/contractor/profile")} sx={{ color: "primary.main" }}><ChevronLeftIcon /></IconButton>
           <Typography variant="h4" fontWeight="bold" color="primary">Edit Profile</Typography>
         </Box>
@@ -126,38 +130,39 @@ export default function EditProfile() {
       <form onSubmit={(e) => { e.preventDefault(); handleSave(); }}>
         <Typography variant="h6" fontWeight="bold" mb={2} color="primary">Personal Information</Typography>
         <Grid container spacing={2} mb={4}>
-          <Grid item xs={12} sm={4}><TextField fullWidth sx={{ minWidth: 300 }} label="First Name" name="first_name" value={form.first_name} onChange={handleChange} required onKeyPress={handleKeyPress} /></Grid>
-          <Grid item xs={12} sm={4}><TextField fullWidth sx={{ minWidth: 300 }} label="Middle Name" name="middle_initial" value={form.middle_initial} onChange={handleChange} required onKeyPress={handleKeyPress} /></Grid>
-          <Grid item xs={12} sm={4}><TextField fullWidth sx={{ minWidth: 300 }} label="Last Name" name="last_name" value={form.last_name} onChange={handleChange} required onKeyPress={handleKeyPress} /></Grid>
-          <Grid item xs={12} sm={6}><TextField fullWidth sx={{ minWidth: 300 }} label="Contact Number" name="contact_number" value={form.contact_number} onChange={handleChange} placeholder="+63 XXX XXX XXXX" required onKeyPress={handleKeyPress} /></Grid>
-          <Grid item xs={12} sm={6}><TextField fullWidth sx={{ minWidth: 300 }} label="Date of Birth" name="birth_date" value={form.birth_date} onChange={handleChange} type="date" InputLabelProps={{ shrink: true }} required onKeyPress={handleKeyPress} /></Grid>
+          <Grid item xs={12} sm={4}><TextField fullWidth sx={formStyles} label="First Name" name="first_name" value={form.first_name} onChange={handleChange} required onKeyPress={handleKeyPress} /></Grid>
+          <Grid item xs={12} sm={4}><TextField fullWidth sx={formStyles} label="Middle Name" name="middle_initial" value={form.middle_initial} onChange={handleChange} required onKeyPress={handleKeyPress} /></Grid>
+          <Grid item xs={12} sm={4}><TextField fullWidth sx={formStyles} label="Last Name" name="last_name" value={form.last_name} onChange={handleChange} required onKeyPress={handleKeyPress} /></Grid>
+          <Grid item xs={12} sm={4}><TextField fullWidth sx={formStyles} label="Suffix" name="suffix" value={form.suffix} onChange={handleChange} placeholder="Jr., Sr., III, etc." onKeyPress={handleKeyPress} /></Grid>
+          <Grid item xs={12} sm={6}><TextField fullWidth sx={formStyles} label="Contact Number" name="contact_number" value={form.contact_number} onChange={handleChange} placeholder="+63 XXX XXX XXXX" required onKeyPress={handleKeyPress} /></Grid>
+          <Grid item xs={12} sm={6}><TextField fullWidth sx={formStyles} label="Date of Birth" name="birth_date" value={form.birth_date} onChange={handleChange} type="date" InputLabelProps={{ shrink: true }} required onKeyPress={handleKeyPress} /></Grid>
         </Grid>
 
         <Typography variant="h6" fontWeight="bold" mb={2} color="primary">Emergency Contact</Typography>
         <Grid container spacing={2} mb={4}>
-          <Grid item xs={12} sm={6}><TextField fullWidth sx={{ minWidth: 300 }} label="Emergency Contact Name" name="emergency_contact_name" value={form.emergency_contact_name} onChange={handleChange} required onKeyPress={handleKeyPress} /></Grid>
-          <Grid item xs={12} sm={6}><TextField fullWidth sx={{ minWidth: 300 }} label="Contact Number" name="emergency_contact_number" value={form.emergency_contact_number} onChange={handleChange} required onKeyPress={handleKeyPress} /></Grid>
+          <Grid item xs={12} sm={6}><TextField fullWidth sx={formStyles} label="Emergency Contact Name" name="emergency_contact_name" value={form.emergency_contact_name} onChange={handleChange} required onKeyPress={handleKeyPress} /></Grid>
+          <Grid item xs={12} sm={6}><TextField fullWidth sx={formStyles} label="Contact Number" name="emergency_contact_number" value={form.emergency_contact_number} onChange={handleChange} required onKeyPress={handleKeyPress} /></Grid>
         </Grid>
 
         <Typography variant="h6" fontWeight="bold" mb={2} color="primary">Identification & Verification</Typography>
         <Grid container spacing={2} mb={4}>
           <Grid item xs={12} sm={6}>
-            <TextField fullWidth sx={{ minWidth: 300 }} label="Government ID Type" select SelectProps={{ MenuProps: menuProps }} value={selectedGovIdType ?? ""} onChange={e => setSelectedGovIdType(e.target.value)} required onKeyPress={handleKeyPress}>
+            <TextField fullWidth sx={formStyles} label="Government ID Type" select SelectProps={{ MenuProps: menuProps }} value={selectedGovIdType ?? ""} onChange={e => setSelectedGovIdType(e.target.value)} required onKeyPress={handleKeyPress}>
               {govIdTypes.map((type) => <MenuItem key={type.id} value={String(type.id)}>{type.id_type_name}</MenuItem>)}
             </TextField>
           </Grid>
-          <Grid item xs={12} sm={6}><TextField fullWidth sx={{ minWidth: 300 }} label="Government ID Number" name="gov_id_number" value={form.gov_id_number} onChange={handleChange} onKeyPress={handleKeyPress} /></Grid>
+          <Grid item xs={12} sm={6}><TextField fullWidth sx={formStyles} label="Government ID Number" name="gov_id_number" value={form.gov_id_number} onChange={handleChange} onKeyPress={handleKeyPress} /></Grid>
           <Grid item xs={12} sm={6}>
-            <input type="file" ref={fileInputRef} onChange={(e) => handleFileUpload(e, 'front')} style={{ display: 'none' }} accept="image/*" />
-            <TextField fullWidth sx={{ minWidth: 300 }} label="Upload Government ID (Front)" value={form.gov_id_proof ? 'Image uploaded' : ''} InputProps={{ endAdornment: <InputAdornment position="end"><IconButton onClick={() => triggerFileInput('front')} disabled={uploading}><UploadIcon /></IconButton></InputAdornment>, readOnly: true }} onKeyPress={handleKeyPress} />
+            <input type="file" ref={fileInputRef} onChange={(e) => handleFileUpload(e, 'front')} style={fileInputStyles} accept="image/*" />
+            <TextField fullWidth sx={formStyles} label="Upload Government ID (Front)" value={form.gov_id_proof ? 'Image uploaded' : ''} InputProps={{ endAdornment: <InputAdornment position="end"><IconButton onClick={() => triggerFileInput('front')} disabled={uploading}><UploadIcon /></IconButton></InputAdornment>, readOnly: true }} onKeyPress={handleKeyPress} />
           </Grid>
           <Grid item xs={12} sm={6}>
-            <input type="file" ref={fileInputBackRef} onChange={(e) => handleFileUpload(e, 'back')} style={{ display: 'none' }} accept="image/*" />
-            <TextField fullWidth sx={{ minWidth: 300 }} label="Upload Government ID (Back)" value={form.gov_id_proof_back ? 'Image uploaded' : ''} InputProps={{ endAdornment: <InputAdornment position="end"><IconButton onClick={() => triggerFileInput('back')} disabled={uploading}><UploadIcon /></IconButton></InputAdornment>, readOnly: true }} onKeyPress={handleKeyPress} />
+            <input type="file" ref={fileInputBackRef} onChange={(e) => handleFileUpload(e, 'back')} style={fileInputStyles} accept="image/*" />
+            <TextField fullWidth sx={formStyles} label="Upload Government ID (Back)" value={form.gov_id_proof_back ? 'Image uploaded' : ''} InputProps={{ endAdornment: <InputAdornment position="end"><IconButton onClick={() => triggerFileInput('back')} disabled={uploading}><UploadIcon /></IconButton></InputAdornment>, readOnly: true }} onKeyPress={handleKeyPress} />
           </Grid>
         </Grid>
 
-        <Box mt={4} display="flex" justifyContent="center" gap={2}>
+        <Box sx={buttonContainerStyles}>
           <Button variant="outlined" color="inherit" onClick={handleClear}>Clear All Fields</Button>
           <Button type="submit" variant="contained" disabled={loading}>{loading ? "Saving..." : "Save Changes"}</Button>
         </Box>

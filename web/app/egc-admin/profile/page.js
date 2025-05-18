@@ -6,6 +6,16 @@ import { useRouter } from 'next/navigation';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useTheme } from '@mui/material/styles';
 import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
+import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
+import dynamic from 'next/dynamic';
+
+// Dynamically import ReactCrop with no SSR
+const ReactCrop = dynamic(() => import('react-image-crop').then(mod => mod.default), {
+    ssr: false
+});
+
+// Import the CSS in a way that works with Next.js
+import 'react-image-crop/dist/ReactCrop.css';
 
 export default function ProfilePage() {
     const router = useRouter();
@@ -37,6 +47,20 @@ export default function ProfilePage() {
     const [newPassword, setNewPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
     const [changePwLoading, setChangePwLoading] = useState(false);
+
+    // Add new states for image cropping
+    const [cropDialogOpen, setCropDialogOpen] = useState(false);
+    const [selectedFile, setSelectedFile] = useState(null);
+    const [crop, setCrop] = useState({
+        unit: '%',
+        width: 90,
+        height: 90,
+        x: 5,
+        y: 5
+    });
+    const [imgSrc, setImgSrc] = useState('');
+    const [imgRef, setImgRef] = useState(null);
+    const [isImageLoaded, setIsImageLoaded] = useState(false);
 
     useEffect(() => { fetchProfile(); }, []);
 
@@ -84,14 +108,162 @@ export default function ProfilePage() {
             return;
         }
 
-        setUploading(true);
-        setUploadError(null);
+        // Reset states before loading new image
+        setImgRef(null);
+        setIsImageLoaded(false);
+        setCrop({
+            unit: '%',
+            width: 90,
+            height: 90,
+            x: 5,
+            y: 5
+        });
 
+        // Read the file and open crop dialog
+        const reader = new FileReader();
+        reader.addEventListener('load', () => {
+            setImgSrc(reader.result);
+            setSelectedFile(file);
+            setCropDialogOpen(true);
+        });
+        reader.readAsDataURL(file);
+    };
+
+    const onImageLoad = async (e) => {
         try {
-            await deleteOldProfileImage();
-            await uploadNewProfileImage(file);
+            const { width, height } = e.currentTarget;
+            const { centerCrop, makeAspectCrop } = await import('react-image-crop');
+            
+            console.log('Image loaded with dimensions:', { width, height });
+            
+            // Set image reference first
+            const imageElement = e.currentTarget;
+            setImgRef(imageElement);
+            setIsImageLoaded(true);
+            
+            // Initialize crop with a centered square
+            const initialCrop = centerCrop(
+                makeAspectCrop(
+                    {
+                        unit: '%',
+                        width: 90,
+                    },
+                    1,
+                    width,
+                    height
+                ),
+                width,
+                height
+            );
+            
+            console.log('Initial crop data:', initialCrop);
+            setCrop(initialCrop);
         } catch (error) {
-            setUploadError(error.message || 'Failed to upload image');
+            console.error('Error in onImageLoad:', error);
+            setUploadError('Failed to initialize image crop');
+            setSnackbarOpen(true);
+        }
+    };
+
+    const getCroppedImg = () => {
+        if (!imgRef || !crop) return null;
+
+        const canvas = document.createElement('canvas');
+        const scaleX = imgRef.naturalWidth / imgRef.width;
+        const scaleY = imgRef.naturalHeight / imgRef.height;
+        
+        // Calculate the actual pixel values
+        const pixelRatio = window.devicePixelRatio;
+        canvas.width = Math.floor(crop.width * scaleX);
+        canvas.height = Math.floor(crop.height * scaleY);
+        
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return null;
+
+        // Set image smoothing
+        ctx.imageSmoothingQuality = 'high';
+        ctx.imageSmoothingEnabled = true;
+
+        // Draw the cropped image
+        ctx.drawImage(
+            imgRef,
+            Math.floor(crop.x * scaleX),
+            Math.floor(crop.y * scaleY),
+            Math.floor(crop.width * scaleX),
+            Math.floor(crop.height * scaleY),
+            0,
+            0,
+            canvas.width,
+            canvas.height
+        );
+
+        return new Promise((resolve) => {
+            canvas.toBlob(
+                (blob) => {
+                    if (!blob) {
+                        console.error('Canvas to Blob conversion failed');
+                        resolve(null);
+                        return;
+                    }
+                    resolve(blob);
+                },
+                'image/jpeg',
+                0.95
+            );
+        });
+    };
+
+    const handleCropComplete = async () => {
+        try {
+            if (!imgRef) {
+                console.error('No image reference available');
+                setUploadError('Please wait for the image to load completely');
+                setSnackbarOpen(true);
+                return;
+            }
+
+            setUploading(true);
+            setUploadError(null);
+
+            console.log('Crop state:', crop);
+            console.log('Image ref:', imgRef);
+
+            // Validate crop data
+            if (!crop || !crop.width || !crop.height) {
+                console.error('Invalid crop data:', crop);
+                throw new Error('Invalid crop data. Please try again.');
+            }
+
+            const croppedImage = await getCroppedImg();
+            if (!croppedImage) {
+                console.error('Failed to generate cropped image');
+                throw new Error('Failed to generate cropped image. Please try again.');
+            }
+
+            // Convert blob to File
+            const croppedFile = new File([croppedImage], selectedFile.name, {
+                type: 'image/jpeg',
+                lastModified: Date.now(),
+            });
+
+            await deleteOldProfileImage();
+            await uploadNewProfileImage(croppedFile);
+            
+            setCropDialogOpen(false);
+            setImgSrc('');
+            setSelectedFile(null);
+            setImgRef(null);
+            setIsImageLoaded(false);
+            setCrop({
+                unit: '%',
+                width: 90,
+                height: 90,
+                x: 5,
+                y: 5
+            });
+        } catch (error) {
+            console.error('Crop error:', error);
+            setUploadError(error.message || 'Failed to process image');
             setSnackbarOpen(true);
         } finally {
             setUploading(false);
@@ -210,10 +382,12 @@ export default function ProfilePage() {
     if (!profile) return <Box p={4}><Typography>No profile found.</Typography></Box>;
 
     const user = {
-        fullName: `${profile.first_name || ''} ${profile.middle_initial || ''} ${profile.last_name || ''}`.replace(/  +/g, ' ').trim(),
+        fullName: `${profile.first_name || ''} ${profile.middle_initial || ''} ${profile.last_name || ''}${profile.suffix ? ` ${profile.suffix}` : ''}`.replace(/  +/g, ' ').trim(),
         employeeId: profile.id || '',
         role: roleName || '',
         dateRegistered: profile.created_at ? new Date(profile.created_at).toLocaleString() : '',
+        lastUpdated: profile.updated_at ? new Date(profile.updated_at).toLocaleString() : 'Never',
+        lastSignIn: profile.last_sign_in_at ? new Date(profile.last_sign_in_at).toLocaleString() : 'Never',
         email: profile.email || '',
         password: '********',
         contactNumber: profile.contact_number || 'Not provided',
@@ -224,7 +398,12 @@ export default function ProfilePage() {
 
     return (
         <Box sx={{ pt: 2, px: 4, display: "flex", flexDirection: "column", gap: 4 }}>
-            <Box sx={{ width: "100%", maxWidth: "1000px" }}><Typography variant="h3" color="primary.main" fontWeight="bold">Profile</Typography></Box>
+            <Box sx={{ width: "100%", maxWidth: "1000px", display: "flex", alignItems: "center", gap: 2 }}>
+                <IconButton onClick={() => router.push("/egc-admin/")} sx={{ color: "primary.main" }}>
+                    <ChevronLeftIcon />
+                </IconButton>
+                <Typography variant="h3" color="primary.main" fontWeight="bold">Profile</Typography>
+            </Box>
 
             <Paper elevation={3} sx={{ borderRadius: 2, background: theme.palette.background.paper }}>
                 <CardContent sx={{ p: 4 }}>
@@ -287,6 +466,8 @@ export default function ProfilePage() {
                                 <Box><Typography color="text.secondary" fontSize="0.9rem">Email Address</Typography><Typography fontWeight="medium">{user.email}</Typography></Box>
                                 <Box><Typography color="text.secondary" fontSize="0.9rem">Role</Typography><Typography fontWeight="medium">{user.role}</Typography></Box>
                                 <Box><Typography color="text.secondary" fontSize="0.9rem">Date of Registration</Typography><Typography fontWeight="medium">{user.dateRegistered}</Typography></Box>
+                                <Box><Typography color="text.secondary" fontSize="0.9rem">Last Updated</Typography><Typography fontWeight="medium">{user.lastUpdated}</Typography></Box>
+                                <Box><Typography color="text.secondary" fontSize="0.9rem">Last Sign In</Typography><Typography fontWeight="medium">{user.lastSignIn}</Typography></Box>
                             </Box>
                         </CardContent>
                     </Paper>
@@ -317,6 +498,99 @@ export default function ProfilePage() {
                         <Button sx={{ width: "70%" }} onClick={() => { setChangePwOpen(false); setCurrentPassword(""); setNewPassword(""); setConfirmPassword(""); }} color="secondary" disabled={changePwLoading}>Cancel</Button>
                     </Box>
                 </DialogContent>
+            </Dialog>
+
+            <Dialog 
+                open={cropDialogOpen} 
+                onClose={() => {
+                    setCropDialogOpen(false);
+                    setImgSrc('');
+                    setSelectedFile(null);
+                    setImgRef(null);
+                    setIsImageLoaded(false);
+                    setCrop({
+                        unit: '%',
+                        width: 90,
+                        height: 90,
+                        x: 5,
+                        y: 5
+                    });
+                }}
+                maxWidth="md"
+                fullWidth
+                PaperProps={{ 
+                    sx: { 
+                        backgroundColor: theme.palette.background.paper,
+                        color: theme.palette.text.primary,
+                        boxShadow: theme.shadows[4]
+                    } 
+                }}
+            >
+                <DialogTitle variant="h5" sx={{ color: theme.palette.text.primary, textAlign: "center" }}>
+                    Crop Profile Picture
+                </DialogTitle>
+                <DialogContent sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2, pt: 2 }}>
+                    {imgSrc && (
+                        <ReactCrop
+                            crop={crop}
+                            onChange={(c) => {
+                                console.log('Crop changed:', c);
+                                setCrop(c);
+                            }}
+                            aspect={1}
+                            circularCrop
+                            keepRatio
+                            minWidth={50}
+                            minHeight={50}
+                        >
+                            <img
+                                src={imgSrc}
+                                onLoad={onImageLoad}
+                                style={{ maxWidth: '100%', maxHeight: '70vh' }}
+                                alt="Crop preview"
+                                crossOrigin="anonymous"
+                                loading="eager"
+                                ref={(el) => {
+                                    if (el) {
+                                        setImgRef(el);
+                                    }
+                                }}
+                            />
+                        </ReactCrop>
+                    )}
+                </DialogContent>
+                <DialogActions sx={{ flexDirection: "column", gap: 1.5, alignItems: "center", justifyContent: "center", pb: 2 }}>
+                    <Button 
+                        sx={{ width: "70%" }} 
+                        variant="contained" 
+                        color="primary" 
+                        onClick={handleCropComplete}
+                        disabled={uploading || !imgRef}
+                    >
+                        {uploading ? "Processing..." : !imgRef ? "Loading..." : "Apply Crop"}
+                    </Button>
+                    <Button 
+                        sx={{ width: "70%" }} 
+                        onClick={() => {
+                            setCropDialogOpen(false);
+                            setImgSrc('');
+                            setSelectedFile(null);
+                            setImgRef(null);
+                            setIsImageLoaded(false);
+                            setCrop({
+                                unit: '%',
+                                width: 90,
+                                height: 90,
+                                x: 5,
+                                y: 5
+                            });
+                        }}
+                        color="secondary"
+                        disabled={uploading}
+                    >
+                        Cancel
+                    </Button>
+                </DialogActions>
             </Dialog>
 
             <Snackbar open={snackbarOpen} autoHideDuration={5000} onClose={(_, reason) => { if (reason !== "clickaway") setSnackbarOpen(false); }} anchorOrigin={{ vertical: "top", horizontal: "center" }}>

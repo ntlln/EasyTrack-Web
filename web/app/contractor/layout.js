@@ -7,17 +7,16 @@ import { useEffect, useState } from "react";
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
 export default function Layout({ children }) {
+  // State and client setup
   const pathname = usePathname();
   const router = useRouter();
   const supabase = createClientComponentClient();
   const [checkingSession, setCheckingSession] = useState(true);
   const isAuthPage = pathname === "/contractor/login" || pathname === "/contractor/forgot-password" || pathname === "/contractor/reset-password";
 
+  // Session management
   useEffect(() => {
-    if (isAuthPage) {
-      setCheckingSession(false);
-      return;
-    }
+    if (isAuthPage) { setCheckingSession(false); return; }
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session || !session.user) {
@@ -41,7 +40,7 @@ export default function Layout({ children }) {
   return (
     <div style={{ display: "flex", minHeight: "100vh" }}>
       <Sidebar />
-      <div style={{ flexGrow: 1, padding: "24px", marginLeft: "280px", backgroundColor: "background.default", minHeight: "100vh" }}>
+      <div style={{ flexGrow: 1, padding: "24px", marginLeft: "80px", backgroundColor: "background.default", minHeight: "100vh", transition: "margin-left 0.3s ease" }}>
         {children}
       </div>
     </div>

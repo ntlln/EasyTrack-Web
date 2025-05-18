@@ -9,6 +9,10 @@ import { useRouter } from "next/navigation";
 
 export default function EditProfile() {
   const theme = useTheme();
+  const router = useRouter();
+  const supabase = createClientComponentClient();
+  const fileInputRef = useRef(null);
+  const fileInputBackRef = useRef(null);
 
   const banks = ["BDO Unibank, Inc. (BDO)",
     "Land Bank of the Philippines (LANDBANK)",
@@ -25,6 +29,7 @@ export default function EditProfile() {
     first_name: "",
     middle_initial: "",
     last_name: "",
+    suffix: "",
     contact_number: "",
     birth_date: "",
     emergency_contact_name: "",
@@ -37,14 +42,10 @@ export default function EditProfile() {
     account_name: ""
   });
   const [loading, setLoading] = useState(false);
-  const supabase = createClientComponentClient();
-  const router = useRouter();
   const [original, setOriginal] = useState(null);
   const [govIdTypes, setGovIdTypes] = useState([]);
   const [selectedGovIdType, setSelectedGovIdType] = useState("");
   const [uploading, setUploading] = useState(false);
-  const fileInputRef = useRef(null);
-  const fileInputBackRef = useRef(null);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState("");
   const [snackbarSeverity, setSnackbarSeverity] = useState("success");
@@ -68,7 +69,7 @@ export default function EditProfile() {
       const userEmail = session.user.email;
       const { data, error } = await supabase
         .from('profiles')
-        .select('first_name, middle_initial, last_name, contact_number, birth_date, emergency_contact_name, emergency_contact_number, gov_id_type, gov_id_number, gov_id_proof, gov_id_proof_back, bank_name, account_number, account_name')
+        .select('first_name, middle_initial, last_name, suffix, contact_number, birth_date, emergency_contact_name, emergency_contact_number, gov_id_type, gov_id_number, gov_id_proof, gov_id_proof_back, bank_name, account_number, account_name')
         .eq('email', userEmail)
         .single();
       if (data) {
@@ -76,6 +77,7 @@ export default function EditProfile() {
           first_name: data.first_name || "",
           middle_initial: data.middle_initial || "",
           last_name: data.last_name || "",
+          suffix: data.suffix || "",
           contact_number: data.contact_number || "",
           birth_date: data.birth_date || "",
           emergency_contact_name: data.emergency_contact_name || "",
@@ -245,146 +247,76 @@ export default function EditProfile() {
     }
   };
 
+  // Styling constants
+  const pageStyles = { p: 4, maxWidth: "1400px", mx: "auto" };
+  const headerStyles = { display: "flex", alignItems: "center", mb: 4 };
+  const backButtonStyles = { mr: 2, color: theme.palette.primary.main };
+  const titleStyles = { variant: "h4", fontWeight: "bold", color: "primary" };
+  const sectionTitleStyles = { variant: "h6", fontWeight: "bold", mb: 2, color: "primary" };
+  const gridStyles = { spacing: 2, mb: 4 };
+  const textFieldStyles = { fullWidth: true, sx: { minWidth: 300 } };
+  const buttonContainerStyles = { mt: 4, display: "flex", justifyContent: "center", gap: 2 };
+  const snackbarStyles = { open: snackbarOpen, autoHideDuration: 4000, onClose: () => setSnackbarOpen(false), anchorOrigin: { vertical: 'top', horizontal: 'center' } };
+
   return (
-    <Box sx={{ p: 4, maxWidth: "1400px", mx: "auto" }}>
-      <Box sx={{ display: "flex", alignItems: "center", mb: 4 }}>
-        <IconButton onClick={() => router.push("/egc-admin/profile")} sx={{ mr: 2, color: theme.palette.primary.main }}>
-          <ChevronLeftIcon />
-        </IconButton>
-        <Typography variant="h4" fontWeight="bold" color="primary">
-          Edit Profile
-        </Typography>
+    <Box sx={pageStyles}>
+      <Box sx={headerStyles}>
+        <IconButton onClick={() => router.push("/egc-admin/profile")} sx={backButtonStyles}><ChevronLeftIcon /></IconButton>
+        <Typography sx={titleStyles}>Edit Profile</Typography>
       </Box>
 
-      {/* Personal Information */}
-      <Typography variant="h6" fontWeight="bold" mb={2} color="primary">Personal Information</Typography>
-      <Grid container spacing={2} mb={4}>
-        <Grid item xs={12} sm={4}> <TextField fullWidth sx={{ minWidth: 300 }} label="First Name" name="first_name" value={form.first_name} onChange={handleChange} required /> </Grid>
-        <Grid item xs={12} sm={4}> <TextField fullWidth sx={{ minWidth: 300 }} label="Middle Name" name="middle_initial" value={form.middle_initial} onChange={handleChange} required /> </Grid>
-        <Grid item xs={12} sm={4}> <TextField fullWidth sx={{ minWidth: 300 }} label="Last Name" name="last_name" value={form.last_name} onChange={handleChange} required /> </Grid>
-        <Grid item xs={12} sm={6}> <TextField fullWidth sx={{ minWidth: 300 }} label="Contact Number" name="contact_number" value={form.contact_number} onChange={handleChange} placeholder="+63 XXX XXX XXXX" required /> </Grid>
-        <Grid item xs={12} sm={6}> <TextField fullWidth sx={{ minWidth: 300 }} label="Date of Birth" name="birth_date" value={form.birth_date} onChange={handleChange} type="date" InputLabelProps={{ shrink: true }} required /> </Grid>
+      <Typography sx={sectionTitleStyles}>Personal Information</Typography>
+      <Grid container sx={gridStyles}>
+        <Grid item xs={12} sm={4}><TextField {...textFieldStyles} label="First Name" name="first_name" value={form.first_name} onChange={handleChange} required /></Grid>
+        <Grid item xs={12} sm={4}><TextField {...textFieldStyles} label="Middle Name" name="middle_initial" value={form.middle_initial} onChange={handleChange} required /></Grid>
+        <Grid item xs={12} sm={4}><TextField {...textFieldStyles} label="Last Name" name="last_name" value={form.last_name} onChange={handleChange} required /></Grid>
+        <Grid item xs={12} sm={4}><TextField {...textFieldStyles} label="Suffix" name="suffix" value={form.suffix} onChange={handleChange} placeholder="Jr., Sr., III, etc." /></Grid>
+        <Grid item xs={12} sm={6}><TextField {...textFieldStyles} label="Contact Number" name="contact_number" value={form.contact_number} onChange={handleChange} placeholder="+63 XXX XXX XXXX" required /></Grid>
+        <Grid item xs={12} sm={6}><TextField {...textFieldStyles} label="Date of Birth" name="birth_date" value={form.birth_date} onChange={handleChange} type="date" InputLabelProps={{ shrink: true }} required /></Grid>
       </Grid>
 
-      {/* Emergency Contact */}
-      <Typography variant="h6" fontWeight="bold" mb={2} color="primary">Emergency Contact</Typography>
-      <Grid container spacing={2} mb={4}>
-        <Grid item xs={12} sm={6}><TextField fullWidth sx={{ minWidth: 300 }} label="Emergency Contact Name" name="emergency_contact_name" value={form.emergency_contact_name} onChange={handleChange} required /></Grid>
-        <Grid item xs={12} sm={6}><TextField fullWidth sx={{ minWidth: 300 }} label="Contact Number" name="emergency_contact_number" value={form.emergency_contact_number} onChange={handleChange} required /></Grid>
+      <Typography sx={sectionTitleStyles}>Emergency Contact</Typography>
+      <Grid container sx={gridStyles}>
+        <Grid item xs={12} sm={6}><TextField {...textFieldStyles} label="Emergency Contact Name" name="emergency_contact_name" value={form.emergency_contact_name} onChange={handleChange} required /></Grid>
+        <Grid item xs={12} sm={6}><TextField {...textFieldStyles} label="Contact Number" name="emergency_contact_number" value={form.emergency_contact_number} onChange={handleChange} required /></Grid>
       </Grid>
 
-      {/* ID & Verification */}
-      <Typography variant="h6" fontWeight="bold" mb={2} color="primary">Identification & Verification</Typography>
-      <Grid container spacing={2} mb={4}>
+      <Typography sx={sectionTitleStyles}>Identification & Verification</Typography>
+      <Grid container sx={gridStyles}>
         <Grid item xs={12} sm={6}>
-          <TextField
-            fullWidth
-            sx={{ minWidth: 300 }}
-            label="Government ID Type"
-            select
-            SelectProps={{ MenuProps: menuProps }}
-            value={selectedGovIdType ?? ""}
-            onChange={e => setSelectedGovIdType(e.target.value)}
-            required
-          >
-            {govIdTypes.map((type) => (
-              <MenuItem key={type.id} value={String(type.id)}>{type.id_type_name}</MenuItem>
-            ))}
+          <TextField {...textFieldStyles} label="Government ID Type" select SelectProps={{ MenuProps: menuProps }} value={selectedGovIdType ?? ""} onChange={e => setSelectedGovIdType(e.target.value)} required>
+            {govIdTypes.map((type) => <MenuItem key={type.id} value={String(type.id)}>{type.id_type_name}</MenuItem>)}
           </TextField>
         </Grid>
-        <Grid item xs={12} sm={6}><TextField fullWidth sx={{ minWidth: 300 }} label="Government ID Number" name="gov_id_number" value={form.gov_id_number} onChange={handleChange} /></Grid>
+        <Grid item xs={12} sm={6}><TextField {...textFieldStyles} label="Government ID Number" name="gov_id_number" value={form.gov_id_number} onChange={handleChange} /></Grid>
         <Grid item xs={12} sm={6}>
-          <input
-            type="file"
-            ref={fileInputRef}
-            onChange={(e) => handleFileUpload(e, 'front')}
-            style={{ display: 'none' }}
-            accept="image/*"
-          />
-          <TextField
-            fullWidth
-            sx={{ minWidth: 300 }}
-            label="Upload Government ID (Front)"
-            value={form.gov_id_proof ? 'Image uploaded' : ''}
-            InputProps={{
-              endAdornment: (
-                <InputAdornment position="end">
-                  <IconButton onClick={() => triggerFileInput('front')} disabled={uploading}>
-                    <UploadIcon />
-                  </IconButton>
-                </InputAdornment>
-              ),
-              readOnly: true
-            }}
-          />
+          <input type="file" ref={fileInputRef} onChange={(e) => handleFileUpload(e, 'front')} style={{ display: 'none' }} accept="image/*" />
+          <TextField {...textFieldStyles} label="Upload Government ID (Front)" value={form.gov_id_proof ? 'Image uploaded' : ''} InputProps={{ endAdornment: <InputAdornment position="end"><IconButton onClick={() => triggerFileInput('front')} disabled={uploading}><UploadIcon /></IconButton></InputAdornment>, readOnly: true }} />
         </Grid>
         <Grid item xs={12} sm={6}>
-          <input
-            type="file"
-            ref={fileInputBackRef}
-            onChange={(e) => handleFileUpload(e, 'back')}
-            style={{ display: 'none' }}
-            accept="image/*"
-          />
-          <TextField
-            fullWidth
-            sx={{ minWidth: 300 }}
-            label="Upload Government ID (Back)"
-            value={form.gov_id_proof_back ? 'Image uploaded' : ''}
-            InputProps={{
-              endAdornment: (
-                <InputAdornment position="end">
-                  <IconButton onClick={() => triggerFileInput('back')} disabled={uploading}>
-                    <UploadIcon />
-                  </IconButton>
-                </InputAdornment>
-              ),
-              readOnly: true
-            }}
-          />
+          <input type="file" ref={fileInputBackRef} onChange={(e) => handleFileUpload(e, 'back')} style={{ display: 'none' }} accept="image/*" />
+          <TextField {...textFieldStyles} label="Upload Government ID (Back)" value={form.gov_id_proof_back ? 'Image uploaded' : ''} InputProps={{ endAdornment: <InputAdornment position="end"><IconButton onClick={() => triggerFileInput('back')} disabled={uploading}><UploadIcon /></IconButton></InputAdornment>, readOnly: true }} />
         </Grid>
-        {/* <Grid item xs={12} sm={6}>
-          <TextField fullWidth sx={{ minWidth: 300 }} label="Selfie with ID" InputProps={{ endAdornment: <InputAdornment position="end"><IconButton><UploadIcon /></IconButton></InputAdornment> }} />
-        </Grid> */}
       </Grid>
 
-      {/* Bank Info */}
-      <Typography variant="h6" fontWeight="bold" mb={2} color="primary">Bank Details (For Salary & Reimbursement)</Typography>
-      <Grid container spacing={2} mb={4}>
+      <Typography sx={sectionTitleStyles}>Bank Details (For Salary & Reimbursement)</Typography>
+      <Grid container sx={gridStyles}>
         <Grid item xs={12} sm={6}>
-          <TextField fullWidth sx={{ minWidth: 300 }} label="Bank Name" select SelectProps={{ MenuProps: menuProps }} name="bank_name" value={form.bank_name} onChange={handleChange}>
-            {banks.map((bank) => (
-              <MenuItem key={bank} value={bank}>{bank}</MenuItem>
-            ))}
+          <TextField {...textFieldStyles} label="Bank Name" select SelectProps={{ MenuProps: menuProps }} name="bank_name" value={form.bank_name} onChange={handleChange}>
+            {banks.map((bank) => <MenuItem key={bank} value={bank}>{bank}</MenuItem>)}
           </TextField>
         </Grid>
-        <Grid item xs={12} sm={6}>
-          <TextField fullWidth sx={{ minWidth: 300 }} label="Account Number" placeholder="e.g., 012345678901" name="account_number" value={form.account_number} onChange={handleChange} />
-        </Grid>
-        <Grid item xs={12}>
-          <TextField fullWidth sx={{ minWidth: 300 }} label="Account Name" placeholder="e.g., Juan D. Santos" name="account_name" value={form.account_name} onChange={handleChange} />
-        </Grid>
+        <Grid item xs={12} sm={6}><TextField {...textFieldStyles} label="Account Number" placeholder="e.g., 012345678901" name="account_number" value={form.account_number} onChange={handleChange} /></Grid>
+        <Grid item xs={12}><TextField {...textFieldStyles} label="Account Name" placeholder="e.g., Juan D. Santos" name="account_name" value={form.account_name} onChange={handleChange} /></Grid>
       </Grid>
 
-      {/* Submit/Reset */}
-      <Box sx={{ mt: 4, display: "flex", justifyContent: "center", gap: 2 }}>
-        <Button variant="outlined" color="inherit" onClick={handleClear}>
-          Clear All Fields
-        </Button>
-        <Button variant="contained" onClick={handleSave} disabled={loading}>
-          {loading ? "Saving..." : "Save Changes"}
-        </Button>
+      <Box sx={buttonContainerStyles}>
+        <Button variant="outlined" color="inherit" onClick={handleClear}>Clear All Fields</Button>
+        <Button variant="contained" onClick={handleSave} disabled={loading}>{loading ? "Saving..." : "Save Changes"}</Button>
       </Box>
 
-      <Snackbar
-        open={snackbarOpen}
-        autoHideDuration={4000}
-        onClose={() => setSnackbarOpen(false)}
-        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
-      >
-        <Alert onClose={() => setSnackbarOpen(false)} severity={snackbarSeverity} sx={{ width: '100%' }}>
-          {snackbarMessage}
-        </Alert>
+      <Snackbar {...snackbarStyles}>
+        <Alert onClose={() => setSnackbarOpen(false)} severity={snackbarSeverity} sx={{ width: '100%' }}>{snackbarMessage}</Alert>
       </Snackbar>
     </Box>
   );

@@ -13,13 +13,17 @@ export default function Page() {
   const supabase = createClientComponentClient();
 
   const cards = [
-    { title: "Contracting", route: "/contractor/contracting" },
+    { title: "Profile", route: "/contractor/profile" },
+    { title: "Create Contract", route: "/contractor/create-contract" },
     { title: "Delivery History & Reports", route: "/contractor/history-and-reports" },
     { title: "Luggage Tracking", route: "/contractor/luggage-tracking" },
     { title: "Statistics", route: "/contractor/statistics" },
     { title: "Message Center", route: "/contractor/chat-support" },
     { title: "Payments", route: "/contractor/payments" },
   ];
+
+  const linkStyles = { mt: 1, color: isDark ? "#fff" : "#000", cursor: "pointer", "&:hover": { color: theme.palette.primary.main, textDecoration: "underline" } };
+  const cardStyles = { height: "100%", width: "35vh" };
 
   return (
     <Box p={4}>
@@ -32,7 +36,7 @@ export default function Page() {
       <Grid container spacing={3}>
         {cards.map((card, index) => (
           <Grid item xs={12} sm={6} md={4} key={index}>
-            <Card sx={{ height: "100%", width: "35vh" }}>
+            <Card sx={cardStyles}>
               <CardContent>
                 <Typography variant="h6" color="primary.main" fontWeight={'bold'}>
                   {card.title}
@@ -41,15 +45,7 @@ export default function Page() {
                 <Link href={card.route} style={{ textDecoration: "none" }}>
                   <Typography
                     variant="body2"
-                    sx={{
-                      mt: 1,
-                      color: isDark ? "#fff" : "#000",
-                      cursor: "pointer",
-                      "&:hover": {
-                        color: theme.palette.primary.main,
-                        textDecoration: "underline",
-                      },
-                    }}
+                    sx={linkStyles}
                   >
                     View Details
                   </Typography>

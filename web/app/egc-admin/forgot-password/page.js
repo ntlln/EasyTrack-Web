@@ -1,6 +1,6 @@
 "use client"
 
-import { Box, Typography, Button, TextField } from "@mui/material";
+import { Box, Typography, Button, TextField, Snackbar, Alert } from "@mui/material";
 import { Global } from '@emotion/react';
 import { useRouter } from 'next/navigation';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
@@ -13,19 +13,27 @@ export default function Page() {
     const [email, setEmail] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
+    const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
 
     // Event handlers
+    const handleCloseSnackbar = () => setSnackbar(prev => ({ ...prev, open: false }));
     const handleKeyPress = (event) => { if (event.key === 'Enter') handleResetPassword(event); };
+
+    // Password reset
     const handleResetPassword = async (e) => {
         e.preventDefault();
         setLoading(true);
         setError(null);
         try {
-            const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/contractor/reset-password` });
+            const origin = window.location.origin;
+            const resetUrl = `${origin}/egc-admin/reset-password`;
+            const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: resetUrl, options: { emailRedirectTo: resetUrl } });
             if (error) throw error;
-            router.push('/contractor/login');
+            setSnackbar({ open: true, message: "Password reset link has been sent to your email.", severity: "success" });
+            setEmail('');
         } catch (error) {
             setError(error.message);
+            setSnackbar({ open: true, message: error.message, severity: "error" });
         } finally {
             setLoading(false);
         }
@@ -46,12 +54,15 @@ export default function Page() {
                     <Typography variant="h3" sx={{ color: "primary.main", fontWeight: "bold" }}>EasyTrack</Typography>
                     <Typography color="secondary.main">Forgot Password</Typography>
                     <form onSubmit={handleResetPassword} style={formStyles}>
-                        <TextField label="Email" type="email" placeholder="Email" required sx={{ width: "70%" }} value={email} onChange={(e) => setEmail(e.target.value)} error={!!error} helperText={error} onKeyPress={handleKeyPress} />
+                        <TextField label="Email" type="email" placeholder="Email" required sx={{ width: "70%" }} value={email} onChange={(e) => setEmail(e.target.value)} error={!!error} helperText={error} onKeyPress={handleKeyPress} disabled={loading} />
                         <Button type="submit" variant="contained" color="primary" sx={{ width: "60%" }} disabled={loading}>{loading ? 'Sending...' : 'Send Email Reset Link'}</Button>
                     </form>
-                    <Typography sx={backLinkStyles} onClick={() => router.push("/contractor/login")}>Back to Login</Typography>
+                    <Typography sx={backLinkStyles} onClick={() => router.push("/egc-admin/login")}>Back to Login</Typography>
                 </Box>
             </Box>
+            <Snackbar open={snackbar.open} autoHideDuration={4000} onClose={handleCloseSnackbar} anchorOrigin={{ vertical: "top", horizontal: "center" }}>
+                <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: "100%" }}>{snackbar.message}</Alert>
+            </Snackbar>
         </>
     );
 }
