@@ -71,11 +71,11 @@ export default function ContractorLogin() {
 
             const userId = data.user.id;
 
-            const { data: airlineStaffRole } = await supabase
+            // Get both role IDs
+            const { data: roles } = await supabase
                 .from("profiles_roles")
-                .select("id")
-                .eq("role_name", "Airline Staff")
-                .single();
+                .select("id, role_name")
+                .in("role_name", ["Airline Staff", "Administrator"]);
 
             const { data: profile } = await supabase
                 .from("profiles")
@@ -83,7 +83,7 @@ export default function ContractorLogin() {
                 .eq("id", userId)
                 .single();
 
-            if (!airlineStaffRole || !profile) {
+            if (!roles || roles.length === 0 || !profile) {
                 await supabase.auth.signOut();
                 throw new Error("User role or profile not found.");
             }
@@ -93,11 +93,12 @@ export default function ContractorLogin() {
                 throw new Error("This account has been deactivated.");
             }
 
-            if (Number(profile.role_id) !== Number(airlineStaffRole.id)) {
+            const allowedRoleIds = roles.map(role => role.id);
+            if (!allowedRoleIds.includes(Number(profile.role_id))) {
                 await supabase.auth.signOut();
                 setSnackbar({ 
                     open: true, 
-                    message: "Access denied: Only airline staff can log in here.", 
+                    message: "Access denied: Only airline staff and administrator can log in here.", 
                     severity: "error" 
                 });
                 // Clear both fields for unauthorized users
@@ -106,6 +107,13 @@ export default function ContractorLogin() {
             }
 
             resetLoginAttempts(email);
+
+            // Update session expiry based on remember me
+            if (rememberMe) {
+                await supabase.auth.updateSession({
+                    expires_in: 60 * 60 * 24 * 30 // 30 days
+                });
+            }
 
             await supabase
                 .from("profiles")
