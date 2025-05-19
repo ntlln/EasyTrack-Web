@@ -38,46 +38,36 @@ export default function AdminLayout({ children }) {
         if (sessionError || !session) {
           if (mounted) {
             setIsLoading(false);
-            router.push("/egc-admin/login");
+            router.replace("/egc-admin/login");
           }
           return;
         }
 
-        // Verify the user's role
-        const { data: profile, error: profileError } = await supabase
+        // Get both role IDs
+        const { data: roles } = await supabase
+          .from("profiles_roles")
+          .select("id, role_name")
+          .in("role_name", ["Airline Staff", "Administrator"]);
+
+        const { data: profile } = await supabase
           .from('profiles')
           .select('role_id')
           .eq('id', session.user.id)
           .single();
 
-        if (profileError) {
+        if (!roles || roles.length === 0 || !profile) {
           if (mounted) {
             setIsLoading(false);
-            router.push("/egc-admin/login");
+            router.replace("/egc-admin/login");
           }
           return;
         }
 
-        // Get admin role ID
-        const { data: adminRole, error: roleError } = await supabase
-          .from('profiles_roles')
-          .select('id')
-          .eq('role_name', 'Administrator')
-          .single();
-
-        if (roleError) {
+        const allowedRoleIds = roles.map(role => role.id);
+        if (!allowedRoleIds.includes(Number(profile.role_id))) {
           if (mounted) {
             setIsLoading(false);
-            router.push("/egc-admin/login");
-          }
-          return;
-        }
-
-        // Check if user has admin role
-        if (!profile || !adminRole || Number(profile.role_id) !== Number(adminRole.id)) {
-          if (mounted) {
-            setIsLoading(false);
-            router.push("/egc-admin/login");
+            router.replace("/egc-admin/login");
           }
           return;
         }
@@ -87,7 +77,7 @@ export default function AdminLayout({ children }) {
           if (event === 'SIGNED_OUT') {
             if (mounted) {
               setIsLoading(false);
-              router.push("/egc-admin/login");
+              router.replace("/egc-admin/login");
             }
           }
         });
@@ -100,9 +90,10 @@ export default function AdminLayout({ children }) {
           subscription?.unsubscribe();
         };
       } catch (error) {
+        console.error('Session check error:', error);
         if (mounted) {
           setIsLoading(false);
-          router.push("/egc-admin/login");
+          router.replace("/egc-admin/login");
         }
       }
     };
@@ -112,7 +103,7 @@ export default function AdminLayout({ children }) {
     return () => {
       mounted = false;
     };
-  }, [pathname, isAuthPage, router]);
+  }, [pathname, isAuthPage, router, supabase.auth]);
 
   // Styling constants
   const containerStyles = {

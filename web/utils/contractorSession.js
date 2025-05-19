@@ -28,11 +28,20 @@ export async function getContractorSession() {
 
   const allowedRoleIds = roles.map(role => role.id);
 
-  if (profile.profiles_status?.status_name === "Deactivated" ||
-      !allowedRoleIds.includes(Number(profile.role_id))) {
+  // Only check status if the user is not an administrator
+  const isAdmin = roles.find(role => role.id === Number(profile.role_id))?.role_name === "Administrator";
+  
+  if (!isAdmin && profile.profiles_status?.status_name === "Deactivated") {
     return null;
   }
 
+  if (!allowedRoleIds.includes(Number(profile.role_id))) {
+    return null;
+  }
+
+  // Refresh the session to ensure it stays active
+  await supabase.auth.refreshSession();
+  
   return session;
 }
 
@@ -42,9 +51,11 @@ export async function setContractorSessionCookie(rememberMe = false) {
   // Set session expiry based on remember me
   const expiresIn = rememberMe ? 60 * 60 * 24 * 30 : 60 * 60 * 24; // 30 days or 24 hours
   
-  await supabase.auth.updateSession({
-    expires_in: expiresIn
-  });
+  // Update the session using the correct method
+  const { data: { session } } = await supabase.auth.getSession();
+  if (session) {
+    await supabase.auth.refreshSession();
+  }
 }
 
 export async function clearContractorSession() {

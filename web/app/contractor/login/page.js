@@ -23,8 +23,28 @@ export default function ContractorLogin() {
 
     useEffect(() => {
         const checkSession = async () => {
-            const { data: { session } } = await supabase.auth.getSession();
-            if (session) router.push("/contractor/");
+            try {
+                const { data: { session } } = await supabase.auth.getSession();
+                if (session) {
+                    const { data: profile } = await supabase
+                        .from('profiles')
+                        .select('role_id')
+                        .eq('id', session.user.id)
+                        .single();
+                    
+                    const { data: contractorRole } = await supabase
+                        .from('profiles_roles')
+                        .select('id')
+                        .eq('role_name', 'Airline Staff')
+                        .single();
+
+                    if (profile && contractorRole && Number(profile.role_id) === Number(contractorRole.id)) {
+                        router.push("/contractor/");
+                    }
+                }
+            } catch (error) {
+                console.error('Session check error:', error);
+            }
         };
         checkSession();
     }, [router, supabase.auth]);

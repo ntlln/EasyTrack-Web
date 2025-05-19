@@ -19,6 +19,7 @@ export async function middleware(req) {
     // If no valid session, redirect to contractor login
     if (!session) {
       const url = new URL('/contractor/login', req.url);
+      url.searchParams.set('redirect', req.nextUrl.pathname);
       return NextResponse.redirect(url);
     }
   }
@@ -35,6 +36,7 @@ export async function middleware(req) {
     // If no valid session, redirect to admin login
     if (!session) {
       const url = new URL('/admin/login', req.url);
+      url.searchParams.set('redirect', req.nextUrl.pathname);
       return NextResponse.redirect(url);
     }
   }

@@ -27,11 +27,31 @@ export default function AdminLogin() {
 
   useEffect(() => {
     const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) router.push("/egc-admin/");
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('role_id')
+            .eq('id', session.user.id)
+            .single();
+          
+          const { data: adminRole } = await supabase
+            .from('profiles_roles')
+            .select('id')
+            .eq('role_name', 'Administrator')
+            .single();
+
+          if (profile && adminRole && Number(profile.role_id) === Number(adminRole.id)) {
+            router.push("/egc-admin/");
+          }
+        }
+      } catch (error) {
+        console.error('Session check error:', error);
+      }
     };
     checkSession();
-  }, []);
+  }, [router, supabase.auth]);
 
   useEffect(() => {
     setLoginStatus(getLoginStatus(email));

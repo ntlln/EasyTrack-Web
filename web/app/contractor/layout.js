@@ -19,18 +19,41 @@ export default function Layout({ children }) {
   useEffect(() => {
     if (isAuthPage) { setCheckingSession(false); return; }
     const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session || !session.user) {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session || !session.user) {
+          router.replace("/contractor/login");
+          return;
+        }
+
+        // Get both role IDs
+        const { data: roles } = await supabase
+          .from("profiles_roles")
+          .select("id, role_name")
+          .in("role_name", ["Airline Staff", "Administrator"]);
+
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role_id')
+          .eq('id', session.user.id)
+          .single();
+
+        if (!roles || roles.length === 0 || !profile) {
+          router.replace("/contractor/login");
+          return;
+        }
+
+        const allowedRoleIds = roles.map(role => role.id);
+        if (!allowedRoleIds.includes(Number(profile.role_id))) {
+          router.replace("/contractor/login");
+          return;
+        }
+
+        setCheckingSession(false);
+      } catch (error) {
+        console.error('Session check error:', error);
         router.replace("/contractor/login");
-        return;
       }
-      const { data: profile } = await supabase.from('profiles').select('role_id').eq('id', session.user.id).single();
-      const { data: contractorRole } = await supabase.from('profiles_roles').select('id').eq('role_name', 'Airline Staff').single();
-      if (!profile || !contractorRole || Number(profile.role_id) !== Number(contractorRole.id)) {
-        router.replace("/contractor/login");
-        return;
-      }
-      setCheckingSession(false);
     };
     checkSession();
   }, [pathname]);
