@@ -51,11 +51,11 @@ export default function ProfilePage() {
     const [cropDialogOpen, setCropDialogOpen] = useState(false);
     const [selectedFile, setSelectedFile] = useState(null);
     const [crop, setCrop] = useState({
-        unit: '%',
-        width: 90,
-        height: 90,
-        x: 5,
-        y: 5
+        unit: 'px',
+        width: 0,
+        height: 0,
+        x: 0,
+        y: 0
     });
     const [imgSrc, setImgSrc] = useState('');
     const [imgRef, setImgRef] = useState(null);
@@ -110,11 +110,11 @@ export default function ProfilePage() {
         setImgRef(null);
         setIsImageLoaded(false);
         setCrop({
-            unit: '%',
-            width: 90,
-            height: 90,
-            x: 5,
-            y: 5
+            unit: 'px',
+            width: 0,
+            height: 0,
+            x: 0,
+            y: 0
         });
 
         // Read the file and open crop dialog
@@ -139,20 +139,21 @@ export default function ProfilePage() {
             setImgRef(imageElement);
             setIsImageLoaded(true);
             
+            // Calculate the size of the crop area (90% of the smaller dimension)
+            const cropSize = Math.min(width, height) * 0.9;
+            
+            // Calculate the position to center the crop
+            const x = (width - cropSize) / 2;
+            const y = (height - cropSize) / 2;
+            
             // Initialize crop with a centered square
-            const initialCrop = centerCrop(
-                makeAspectCrop(
-                    {
-                        unit: '%',
-                        width: 90,
-                    },
-                    1,
-                    width,
-                    height
-                ),
-                width,
-                height
-            );
+            const initialCrop = {
+                unit: 'px',
+                width: cropSize,
+                height: cropSize,
+                x: x,
+                y: y
+            };
             
             console.log('Initial crop data:', initialCrop);
             setCrop(initialCrop);
@@ -253,11 +254,11 @@ export default function ProfilePage() {
             setImgRef(null);
             setIsImageLoaded(false);
             setCrop({
-                unit: '%',
-                width: 90,
-                height: 90,
-                x: 5,
-                y: 5
+                unit: 'px',
+                width: 0,
+                height: 0,
+                x: 0,
+                y: 0
             });
         } catch (error) {
             console.error('Crop error:', error);
@@ -506,11 +507,11 @@ export default function ProfilePage() {
                     setImgRef(null);
                     setIsImageLoaded(false);
                     setCrop({
-                        unit: '%',
-                        width: 90,
-                        height: 90,
-                        x: 5,
-                        y: 5
+                        unit: 'px',
+                        width: 0,
+                        height: 0,
+                        x: 0,
+                        y: 0
                     });
                 }}
                 maxWidth="md"
@@ -575,11 +576,11 @@ export default function ProfilePage() {
                             setImgRef(null);
                             setIsImageLoaded(false);
                             setCrop({
-                                unit: '%',
-                                width: 90,
-                                height: 90,
-                                x: 5,
-                                y: 5
+                                unit: 'px',
+                                width: 0,
+                                height: 0,
+                                x: 0,
+                                y: 0
                             });
                         }}
                         color="secondary"

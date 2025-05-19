@@ -39,7 +39,13 @@ export default function ProfilePage() {
     const [changePwLoading, setChangePwLoading] = useState(false);
     const [cropDialogOpen, setCropDialogOpen] = useState(false);
     const [selectedFile, setSelectedFile] = useState(null);
-    const [crop, setCrop] = useState({ unit: '%', width: 90, height: 90, x: 5, y: 5 });
+    const [crop, setCrop] = useState({
+        unit: 'px',
+        width: 0,
+        height: 0,
+        x: 0,
+        y: 0
+    });
     const [imgSrc, setImgSrc] = useState('');
     const [imgRef, setImgRef] = useState(null);
     const [isImageLoaded, setIsImageLoaded] = useState(false);
@@ -79,7 +85,13 @@ export default function ProfilePage() {
         if (file.size > 5 * 1024 * 1024) { setUploadError('File size should be less than 5MB'); setSnackbarOpen(true); return; }
         setImgRef(null);
         setIsImageLoaded(false);
-        setCrop({ unit: '%', width: 90, height: 90, x: 5, y: 5 });
+        setCrop({
+            unit: 'px',
+            width: 0,
+            height: 0,
+            x: 0,
+            y: 0
+        });
         const reader = new FileReader();
         reader.addEventListener('load', () => { setImgSrc(reader.result); setSelectedFile(file); setCropDialogOpen(true); });
         reader.readAsDataURL(file);
@@ -88,11 +100,27 @@ export default function ProfilePage() {
     const onImageLoad = async (e) => {
         try {
             const { width, height } = e.currentTarget;
-            const { centerCrop, makeAspectCrop } = await import('react-image-crop');
             const imageElement = e.currentTarget;
             setImgRef(imageElement);
             setIsImageLoaded(true);
-            const initialCrop = centerCrop(makeAspectCrop({ unit: '%', width: 90 }, 1, width, height), width, height);
+            
+            // Calculate the size of the crop area (90% of the smaller dimension)
+            const cropSize = Math.min(width, height) * 0.9;
+            
+            // Calculate the position to center the crop
+            const x = (width - cropSize) / 2;
+            const y = (height - cropSize) / 2;
+            
+            // Initialize crop with a centered square
+            const initialCrop = {
+                unit: 'px',
+                width: cropSize,
+                height: cropSize,
+                x: x,
+                y: y
+            };
+            
+            console.log('Initial crop data:', initialCrop);
             setCrop(initialCrop);
         } catch (error) {
             setUploadError('Failed to initialize image crop');
@@ -133,7 +161,13 @@ export default function ProfilePage() {
             setSelectedFile(null);
             setImgRef(null);
             setIsImageLoaded(false);
-            setCrop({ unit: '%', width: 90, height: 90, x: 5, y: 5 });
+            setCrop({
+                unit: 'px',
+                width: 0,
+                height: 0,
+                x: 0,
+                y: 0
+            });
         } catch (error) {
             setUploadError(error.message || 'Failed to process image');
             setSnackbarOpen(true);
@@ -350,7 +384,20 @@ export default function ProfilePage() {
                 </DialogContent>
             </Dialog>
 
-            <Dialog open={cropDialogOpen} onClose={() => { setCropDialogOpen(false); setImgSrc(''); setSelectedFile(null); setImgRef(null); setIsImageLoaded(false); setCrop({ unit: '%', width: 90, height: 90, x: 5, y: 5 }); }} maxWidth="md" fullWidth PaperProps={{ sx: dialogStyles }}>
+            <Dialog open={cropDialogOpen} onClose={() => { 
+                setCropDialogOpen(false); 
+                setImgSrc(''); 
+                setSelectedFile(null); 
+                setImgRef(null); 
+                setIsImageLoaded(false); 
+                setCrop({
+                    unit: 'px',
+                    width: 0,
+                    height: 0,
+                    x: 0,
+                    y: 0
+                }); 
+            }} maxWidth="md" fullWidth PaperProps={{ sx: dialogStyles }}>
                 <DialogTitle variant="h5" sx={dialogTitleStyles}>Crop Profile Picture</DialogTitle>
                 <DialogContent sx={dialogContentStyles}>
                     {imgSrc && (
@@ -361,7 +408,7 @@ export default function ProfilePage() {
                 </DialogContent>
                 <DialogActions sx={dialogActionsStyles}>
                     <Button sx={actionButtonStyles} variant="contained" color="primary" onClick={handleCropComplete} disabled={uploading || !imgRef}>{uploading ? "Processing..." : !imgRef ? "Loading..." : "Apply Crop"}</Button>
-                    <Button sx={actionButtonStyles} onClick={() => { setCropDialogOpen(false); setImgSrc(''); setSelectedFile(null); setImgRef(null); setIsImageLoaded(false); setCrop({ unit: '%', width: 90, height: 90, x: 5, y: 5 }); }} color="secondary" disabled={uploading}>Cancel</Button>
+                    <Button sx={actionButtonStyles} onClick={() => { setCropDialogOpen(false); setImgSrc(''); setSelectedFile(null); setImgRef(null); setIsImageLoaded(false); setCrop({ unit: 'px', width: 0, height: 0, x: 0, y: 0 }); }} color="secondary" disabled={uploading}>Cancel</Button>
                 </DialogActions>
             </Dialog>
 
