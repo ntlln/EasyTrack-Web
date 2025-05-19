@@ -1,9 +1,11 @@
 "use client";
 
-import { Box, Typography, Button, TextField, Checkbox, FormControlLabel, Snackbar, Alert } from "@mui/material";
+
+import { Box, Typography, Button, TextField, Checkbox, FormControlLabel, Snackbar, Alert, CircularProgress } from "@mui/material";
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { getLoginStatus, incrementLoginAttempt, resetLoginAttempts, MAX_ATTEMPTS, COOLDOWN_MINUTES } from '@/utils/auth';
 
 export default function ContractorLogin() {
     const router = useRouter();
@@ -12,16 +14,17 @@ export default function ContractorLogin() {
     const [password, setPassword] = useState("");
     const [rememberMe, setRememberMe] = useState(false);
     const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'error' });
+    const [isLoading, setIsLoading] = useState(false);
+    const [loginStatus, setLoginStatus] = useState({ canAttempt: true, remainingTime: 0, attempts: 0 });
 
-    // Session check for redirect
+    useEffect(() => {
+        setLoginStatus(getLoginStatus());
+    }, []);
+
     useEffect(() => {
         const checkSession = async () => {
-            try {
-                const { data: { session } } = await supabase.auth.getSession();
-                if (session) router.push("/contractor/");
-            } catch (error) {
-                console.error('Session check error:', error);
-            }
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session) router.push("/contractor/");
         };
         checkSession();
     }, [router, supabase.auth]);
@@ -30,70 +33,92 @@ export default function ContractorLogin() {
 
     const handleLogin = async (e) => {
         e.preventDefault();
-        setSnackbar({ open: false, message: '', severity: 'error' });
-        
-        try {
-            const { data, error } = await supabase.auth.signInWithPassword({ 
-                email, 
-                password
+        setIsLoading(true);
+        setSnackbar({ open: false, message: "", severity: "error" });
+
+        const status = getLoginStatus(email);
+        if (!status.canAttempt) {
+            setSnackbar({
+                open: true,
+                message: `Too many failed attempts. Please wait ${status.remainingTime} minutes.`,
+                severity: "error",
             });
-            
+            setEmail(""); setPassword(""); setIsLoading(false);
+            return;
+        }
+
+        try {
+            const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+
             if (error) {
-                setSnackbar({ open: true, message: error.message, severity: 'error' });
+                const attempts = incrementLoginAttempt(email);
+                const remaining = MAX_ATTEMPTS - attempts;
+
+                setSnackbar({
+                    open: true,
+                    message: remaining > 0
+                        ? `Invalid credentials. ${remaining} attempts remaining.`
+                        : `Too many failed attempts. Please wait ${COOLDOWN_MINUTES} minutes.`,
+                    severity: "error",
+                });
+
+                // Only clear password for invalid credentials
+                setPassword("");
+                setIsLoading(false);
+                setLoginStatus(getLoginStatus(email));
                 return;
             }
 
-            // Get user profile and role
             const userId = data.user.id;
-            const { data: profile, error: profileError } = await supabase
-                .from('profiles')
-                .select(`role_id, user_status_id, profiles_status (status_name)`)
-                .eq('id', userId)
+
+            const { data: contractorRole } = await supabase
+                .from("profiles_roles")
+                .select("id")
+                .eq("role_name", "Contractor")
                 .single();
-            
-            if (profileError || !profile) {
-                await supabase.auth.signOut();
-                setSnackbar({ open: true, message: "Unable to fetch user profile.", severity: 'error' });
-                return;
-            }
 
-            // Check if account is deactivated
-            if (profile.profiles_status?.status_name === 'Deactivated') {
-                await supabase.auth.signOut();
-                setSnackbar({ open: true, message: 'This account has been deactivated. Please contact an administrator for assistance.', severity: 'error' });
-                return;
-            }
-
-            // Get contractor role
-            const { data: contractorRole, error: contractorRoleError } = await supabase
-                .from('profiles_roles')
-                .select('id')
-                .eq('role_name', 'Airline Staff')
+            const { data: profile } = await supabase
+                .from("profiles")
+                .select("role_id, profiles_status(status_name)")
+                .eq("id", userId)
                 .single();
-            
-            if (contractorRoleError || !contractorRole) {
+
+            if (!contractorRole || !profile) {
                 await supabase.auth.signOut();
-                setSnackbar({ open: true, message: "Account does not exist.", severity: 'error' });
-                return;
+                throw new Error("User role or profile not found.");
             }
 
-            // Verify user has contractor role
+            if (profile.profiles_status?.status_name === "Deactivated") {
+                await supabase.auth.signOut();
+                throw new Error("This account has been deactivated.");
+            }
+
             if (Number(profile.role_id) !== Number(contractorRole.id)) {
                 await supabase.auth.signOut();
-                setSnackbar({ open: true, message: "Access denied: Only contractors can log in here.", severity: 'error' });
+                setSnackbar({ 
+                    open: true, 
+                    message: "Access denied: Only contractors can log in here.", 
+                    severity: "error" 
+                });
+                // Clear both fields for unauthorized users
+                setEmail(""); setPassword(""); setIsLoading(false);
                 return;
             }
 
-            // Update last sign in
+            resetLoginAttempts(email);
+
             await supabase
-                .from('profiles')
+                .from("profiles")
                 .update({ last_sign_in_at: new Date().toISOString() })
-                .eq('id', userId);
+                .eq("id", userId);
 
             router.push("/contractor/");
         } catch (error) {
-            console.error('Login error:', error);
-            setSnackbar({ open: true, message: "An unexpected error occurred. Please try again.", severity: 'error' });
+            setSnackbar({ open: true, message: error.message || "Login failed", severity: "error" });
+            // Clear both fields for other errors
+            setEmail(""); setPassword("");
+        } finally {
+            setIsLoading(false);
         }
     };
 
@@ -103,7 +128,8 @@ export default function ContractorLogin() {
     const formStyles = { width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' };
     const checkboxStyles = { color: "primary.main", '&.Mui-checked': { color: "primary.main" }, padding: "4px" };
     const forgotPasswordStyles = { fontSize: ".85rem", cursor: "pointer", "&:hover": { textDecoration: "underline", color: "primary.main" } };
-    const buttonStyles = { width: "40%", minHeight: "36px" };
+    const buttonStyles = { width: "40%", minHeight: "36px", position: "relative" };
+    const buttonProgressStyles = { position: "absolute", top: "50%", left: "50%", marginTop: -12, marginLeft: -12 };
     const linkStyles = { fontSize: ".75rem", cursor: "pointer", "&:hover": { textDecoration: "underline", color: "primary.main" } };
 
     return (
@@ -120,6 +146,7 @@ export default function ContractorLogin() {
                         sx={{ width: "70%" }} 
                         value={email} 
                         onChange={e => setEmail(e.target.value)} 
+                        disabled={isLoading || !loginStatus.canAttempt}
                     />
                     <TextField 
                         label="Password" 
@@ -129,6 +156,7 @@ export default function ContractorLogin() {
                         sx={{ width: "70%" }} 
                         value={password} 
                         onChange={e => setPassword(e.target.value)} 
+                        disabled={isLoading || !loginStatus.canAttempt}
                     />
                     <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "70%" }}>
                         <Box sx={{ display: "flex", alignItems: "center" }}>
@@ -137,6 +165,7 @@ export default function ContractorLogin() {
                                 onChange={(e) => setRememberMe(e.target.checked)} 
                                 size="small" 
                                 sx={checkboxStyles} 
+                                disabled={isLoading || !loginStatus.canAttempt}
                             />
                             <Typography sx={{ fontSize: ".85rem", color: "secondary.main" }}>
                                 Remember me
@@ -155,8 +184,16 @@ export default function ContractorLogin() {
                         variant="contained" 
                         color="primary" 
                         sx={buttonStyles}
+                        disabled={isLoading || !loginStatus.canAttempt}
                     >
                         Login
+                        {isLoading && (
+                            <CircularProgress 
+                                size={24} 
+                                sx={buttonProgressStyles}
+                                color="inherit"
+                            />
+                        )}
                     </Button>
                 </form>
                 <Box sx={{ display: "flex", gap: 5 }}>
