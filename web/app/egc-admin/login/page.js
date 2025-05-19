@@ -21,7 +21,6 @@ export default function AdminLogin() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [rememberMe, setRememberMe] = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "error" });
   const [isLoading, setIsLoading] = useState(false);
   const [loginStatus, setLoginStatus] = useState({ canAttempt: true, remainingTime: 0, attempts: 0 });
@@ -216,27 +215,7 @@ export default function AdminLogin() {
             onChange={(e) => setPassword(e.target.value)}
             disabled={isLoading || !loginStatus.canAttempt}
           />
-          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "70%" }}>
-            <Box 
-              sx={{ 
-                display: "flex", 
-                alignItems: "center",
-                cursor: "pointer",
-                ml: -1
-              }}
-              onClick={() => setRememberMe(!rememberMe)}
-            >
-              <Checkbox
-                checked={rememberMe}
-                onChange={(e) => setRememberMe(e.target.checked)}
-                disabled={isLoading || !loginStatus.canAttempt}
-                size="small"
-                sx={checkboxStyles}
-              />
-              <Typography sx={{ fontSize: ".85rem", color: "secondary.main" }}>
-                Remember me
-              </Typography>
-            </Box>
+          <Box sx={{ display: "flex", justifyContent: "flex-end", alignItems: "center", width: "70%" }}>
             <Typography
               color="secondary.main"
               onClick={() => router.push("./forgot-password")}
