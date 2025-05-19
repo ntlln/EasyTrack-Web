@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Box, Grid, CardContent, Typography, Button, Avatar, Paper, IconButton, Alert, CircularProgress, Snackbar, Dialog, DialogTitle, DialogContent, DialogActions, TextField } from '@mui/material';
+import { Box, Grid, CardContent, Typography, Button, Avatar, Paper, IconButton, Alert, CircularProgress, Snackbar, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Tabs, Tab } from '@mui/material';
 import { useRouter } from 'next/navigation';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useTheme } from '@mui/material/styles';
@@ -49,6 +49,8 @@ export default function ProfilePage() {
     const [imgSrc, setImgSrc] = useState('');
     const [imgRef, setImgRef] = useState(null);
     const [isImageLoaded, setIsImageLoaded] = useState(false);
+    const [tabIndex, setTabIndex] = useState(0);
+    const [idTypeName, setIdTypeName] = useState('');
 
     // Data fetching
     useEffect(() => { fetchProfile(); }, []);
@@ -65,6 +67,7 @@ export default function ProfilePage() {
                 setProfile(data);
                 setProfileImage(data.pfp_id || null);
                 await fetchRoleName(data.role_id);
+                await fetchIdTypeName(data.gov_id_type_id);
             }
         } catch (error) {
             console.error('Error fetching profile:', error);
@@ -75,6 +78,12 @@ export default function ProfilePage() {
         if (!roleId) return;
         const { data: roleData } = await supabase.from('profiles_roles').select('role_name').eq('id', roleId).single();
         if (roleData?.role_name) setRoleName(roleData.role_name);
+    };
+
+    const fetchIdTypeName = async (idTypeId) => {
+        if (!idTypeId) return;
+        const { data: idTypeData } = await supabase.from('profiles_id_types').select('type_name').eq('id', idTypeId).single();
+        if (idTypeData?.type_name) setIdTypeName(idTypeData.type_name);
     };
 
     // Image handling
@@ -103,14 +112,14 @@ export default function ProfilePage() {
             const imageElement = e.currentTarget;
             setImgRef(imageElement);
             setIsImageLoaded(true);
-            
+
             // Calculate the size of the crop area (90% of the smaller dimension)
             const cropSize = Math.min(width, height) * 0.9;
-            
+
             // Calculate the position to center the crop
             const x = (width - cropSize) / 2;
             const y = (height - cropSize) / 2;
-            
+
             // Initialize crop with a centered square
             const initialCrop = {
                 unit: 'px',
@@ -119,7 +128,7 @@ export default function ProfilePage() {
                 x: x,
                 y: y
             };
-            
+
             console.log('Initial crop data:', initialCrop);
             setCrop(initialCrop);
         } catch (error) {
@@ -187,7 +196,7 @@ export default function ProfilePage() {
             const filePath = `airlines/${fileName}.${fileExt}`;
             await supabase.storage.from('profile-images').remove([filePath]);
             await supabase.from('profiles').update({ pfp_id: null }).eq('id', profile.id);
-        } catch (error) {}
+        } catch (error) { }
     };
 
     const uploadNewProfileImage = async (file) => {
@@ -286,7 +295,7 @@ export default function ProfilePage() {
         <Box sx={containerStyles}>
             <Box sx={headerStyles}>
                 <IconButton onClick={() => router.push("/contractor/")} sx={{ color: "primary.main" }}><ChevronLeftIcon /></IconButton>
-                <Typography variant="h3" color="primary.main" fontWeight="bold">Profile</Typography>
+                <Typography variant="h4" color="primary.main" fontWeight="bold">Profile</Typography>
             </Box>
 
             <Paper elevation={3} sx={profileCardStyles}>
@@ -315,48 +324,105 @@ export default function ProfilePage() {
                 </CardContent>
             </Paper>
 
-            <Grid container spacing={3}>
-                <Grid item xs={12} md={6}>
-                    <Paper elevation={2} sx={infoCardStyles}>
-                        <CardContent sx={infoContentStyles}>
-                            <Typography variant="h6" sx={sectionTitleStyles}>Personal Information</Typography>
-                            <Box sx={infoBoxStyles}>
-                                <Box><Typography sx={labelStyles}>Employee ID</Typography><Typography fontWeight="medium">{user.employeeId}</Typography></Box>
-                                <Box><Typography sx={labelStyles}>Full Name</Typography><Typography fontWeight="medium">{user.fullName}</Typography></Box>
-                                <Box><Typography sx={labelStyles}>Contact Number</Typography><Typography fontWeight="medium">{user.contactNumber}</Typography></Box>
-                                <Box><Typography sx={labelStyles}>Birth Date</Typography><Typography fontWeight="medium">{user.birthDate}</Typography></Box>
+            {/* Tabs for info sections */}
+            <Paper elevation={2} sx={{ borderRadius: 2, background: theme.palette.background.paper }}>
+                <Tabs value={tabIndex} onChange={(_, v) => setTabIndex(v)} aria-label="profile info tabs" sx={{ borderBottom: 1, borderColor: 'divider', px: 2 }}>
+                    <Tab label="Personal Information" />
+                    <Tab label="Image Requirements" />
+                    <Tab label="Emergency Contact" />
+                </Tabs>
+                <Box sx={{ p: 3 }}>
+                    {tabIndex === 0 && (
+                        <Box sx={{ display: 'flex', flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
+                            <Box sx={{ flex: 1, minWidth: 280 }}>
+                                <Typography variant="h6" mb={3} color="primary.main" sx={{ borderBottom: "2px solid", borderColor: "primary.light", pb: 1 }}>Personal Information</Typography>
+                                <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                        <Typography color="text.secondary" fontSize="0.9rem" sx={{ minWidth: 130 }}>Employee ID:</Typography>
+                                        <Typography fontWeight="medium">{user.employeeId}</Typography>
+                                    </Box>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                        <Typography color="text.secondary" fontSize="0.9rem" sx={{ minWidth: 130 }}>Full Name:</Typography>
+                                        <Typography fontWeight="medium">{user.fullName}</Typography>
+                                    </Box>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                        <Typography color="text.secondary" fontSize="0.9rem" sx={{ minWidth: 130 }}>Contact Number:</Typography>
+                                        <Typography fontWeight="medium">{user.contactNumber}</Typography>
+                                    </Box>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                        <Typography color="text.secondary" fontSize="0.9rem" sx={{ minWidth: 130 }}>Birth Date:</Typography>
+                                        <Typography fontWeight="medium">{user.birthDate}</Typography>
+                                    </Box>
+                                </Box>
                             </Box>
-                        </CardContent>
-                    </Paper>
-                </Grid>
-
-                <Grid item xs={12} md={6}>
-                    <Paper elevation={2} sx={infoCardStyles}>
-                        <CardContent sx={infoContentStyles}>
-                            <Typography variant="h6" sx={sectionTitleStyles}>Emergency Contact Information</Typography>
-                            <Box sx={infoBoxStyles}>
-                                <Box><Typography sx={labelStyles}>Emergency Contact Name</Typography><Typography fontWeight="medium">{user.emergencyContact}</Typography></Box>
-                                <Box><Typography sx={labelStyles}>Emergency Contact Number</Typography><Typography fontWeight="medium">{user.emergencyContactNumber}</Typography></Box>
+                            <Box sx={{ flex: 1, minWidth: 280 }}>
+                                <Typography variant="h6" mb={3} color="primary.main" sx={{ borderBottom: "2px solid", borderColor: "primary.light", pb: 1 }}>Account Information</Typography>
+                                <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                        <Typography color="text.secondary" fontSize="0.9rem" sx={{ minWidth: 130 }}>Email Address:</Typography>
+                                        <Typography fontWeight="medium">{user.email}</Typography>
+                                    </Box>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                        <Typography color="text.secondary" fontSize="0.9rem" sx={{ minWidth: 130 }}>Role:</Typography>
+                                        <Typography fontWeight="medium">{user.role}</Typography>
+                                    </Box>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                        <Typography color="text.secondary" fontSize="0.9rem" sx={{ minWidth: 130 }}>Date of Registration:</Typography>
+                                        <Typography fontWeight="medium">{user.dateRegistered}</Typography>
+                                    </Box>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                        <Typography color="text.secondary" fontSize="0.9rem" sx={{ minWidth: 130 }}>Last Updated:</Typography>
+                                        <Typography fontWeight="medium">{user.lastUpdated}</Typography>
+                                    </Box>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                        <Typography color="text.secondary" fontSize="0.9rem" sx={{ minWidth: 130 }}>Last Sign In:</Typography>
+                                        <Typography fontWeight="medium">{user.lastSignIn}</Typography>
+                                    </Box>
+                                </Box>
                             </Box>
-                        </CardContent>
-                    </Paper>
-                </Grid>
-
-                <Grid item xs={12} md={6}>
-                    <Paper elevation={2} sx={infoCardStyles}>
-                        <CardContent sx={infoContentStyles}>
-                            <Typography variant="h6" sx={sectionTitleStyles}>Account Information</Typography>
-                            <Box sx={infoBoxStyles}>
-                                <Box><Typography sx={labelStyles}>Email Address</Typography><Typography fontWeight="medium">{user.email}</Typography></Box>
-                                <Box><Typography sx={labelStyles}>Role</Typography><Typography fontWeight="medium">{user.role}</Typography></Box>
-                                <Box><Typography sx={labelStyles}>Date of Registration</Typography><Typography fontWeight="medium">{user.dateRegistered}</Typography></Box>
-                                <Box><Typography sx={labelStyles}>Last Updated</Typography><Typography fontWeight="medium">{user.lastUpdated}</Typography></Box>
-                                <Box><Typography sx={labelStyles}>Last Sign In</Typography><Typography fontWeight="medium">{user.lastSignIn}</Typography></Box>
+                        </Box>
+                    )}
+                    {tabIndex === 1 && (
+                        <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, alignItems: { md: 'flex-start', xs: 'center' }, justifyContent: 'center' }}>
+                            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, flex: 1 }}>
+                                <Typography variant="subtitle1" fontWeight="bold" color="primary.main" mb={1}>
+                                    {idTypeName ? `${idTypeName} (Front)` : 'ID Type (Front)'}
+                                </Typography>
+                                {profile?.gov_id_proof ? (
+                                    <img src={profile.gov_id_proof} alt="ID Front" style={{ maxWidth: 450, maxHeight: 320, borderRadius: 10, border: '2px solid #ccc' }} />
+                                ) : (
+                                    <Typography color="text.secondary">No image uploaded</Typography>
+                                )}
                             </Box>
-                        </CardContent>
-                    </Paper>
-                </Grid>
-            </Grid>
+                            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, flex: 1 }}>
+                                <Typography variant="subtitle1" fontWeight="bold" color="primary.main" mb={1}>
+                                    {idTypeName ? `${idTypeName} (Back)` : 'ID Type (Back)'}
+                                </Typography>
+                                {profile?.gov_id_proof_back ? (
+                                    <img src={profile.gov_id_proof_back} alt="ID Back" style={{ maxWidth: 450, maxHeight: 320, borderRadius: 10, border: '2px solid #ccc' }} />
+                                ) : (
+                                    <Typography color="text.secondary">No image uploaded</Typography>
+                                )}
+                            </Box>
+                        </Box>
+                    )}
+                    {tabIndex === 2 && (
+                        <Box sx={{ flex: 1, minWidth: 280 }}>
+                            <Typography variant="h6" mb={3} color="primary.main" sx={{ borderBottom: "2px solid", borderColor: "primary.light", pb: 1, width: '100%' }}>Emergency Contact</Typography>
+                            <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                    <Typography color="text.secondary" fontSize="0.9rem" sx={{ minWidth: 130 }}>Contact Name:</Typography>
+                                    <Typography fontWeight="medium">{user.emergencyContact}</Typography>
+                                </Box>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                    <Typography color="text.secondary" fontSize="0.9rem" sx={{ minWidth: 130 }}>Contact Number:</Typography>
+                                    <Typography fontWeight="medium">{user.emergencyContactNumber}</Typography>
+                                </Box>
+                            </Box>
+                        </Box>
+                    )}
+                </Box>
+            </Paper>
 
             <Dialog open={resetOpen} onClose={() => { setResetOpen(false); setResetStatus({ message: '', severity: '' }); setResetEmail(''); }} PaperProps={{ sx: dialogStyles }}>
                 <DialogTitle variant="h5" sx={dialogTitleStyles}>Change Password</DialogTitle>
@@ -384,19 +450,19 @@ export default function ProfilePage() {
                 </DialogContent>
             </Dialog>
 
-            <Dialog open={cropDialogOpen} onClose={() => { 
-                setCropDialogOpen(false); 
-                setImgSrc(''); 
-                setSelectedFile(null); 
-                setImgRef(null); 
-                setIsImageLoaded(false); 
+            <Dialog open={cropDialogOpen} onClose={() => {
+                setCropDialogOpen(false);
+                setImgSrc('');
+                setSelectedFile(null);
+                setImgRef(null);
+                setIsImageLoaded(false);
                 setCrop({
                     unit: 'px',
                     width: 0,
                     height: 0,
                     x: 0,
                     y: 0
-                }); 
+                });
             }} maxWidth="md" fullWidth PaperProps={{ sx: dialogStyles }}>
                 <DialogTitle variant="h5" sx={dialogTitleStyles}>Crop Profile Picture</DialogTitle>
                 <DialogContent sx={dialogContentStyles}>
