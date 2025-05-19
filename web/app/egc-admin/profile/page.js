@@ -29,8 +29,7 @@ export default function ProfilePage() {
     const [roleName, setRoleName] = useState('');
     const [userEmail, setUserEmail] = useState('');
 
-    // Loading states
-    const [loading, setLoading] = useState(true);
+    // UI states
     const [uploading, setUploading] = useState(false);
     const [resetLoading, setResetLoading] = useState(false);
 
@@ -80,9 +79,8 @@ export default function ProfilePage() {
                 setProfileImage(data.pfp_id || null);
                 await fetchRoleName(data.role_id);
             }
-            setLoading(false);
         } catch (error) {
-            setLoading(false);
+            console.error('Error fetching profile:', error);
         }
     };
 
@@ -378,7 +376,6 @@ export default function ProfilePage() {
         }
     };
 
-    if (loading) return <Box display="flex" justifyContent="center" alignItems="center" minHeight="100vh"><CircularProgress color="primary" /></Box>;
     if (!profile) return <Box p={4}><Typography>No profile found.</Typography></Box>;
 
     const user = {

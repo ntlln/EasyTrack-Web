@@ -19,12 +19,12 @@ export default function Page() {
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        setSnackbar({ 
-          open: true, 
-          message: 'Invalid or expired reset link. Please request a new password reset.', 
-          severity: 'error' 
+        setSnackbar({
+          open: true,
+          message: 'Invalid or expired reset link. Please request a new password reset.',
+          severity: 'error'
         });
-        setTimeout(() => router.push('/contractor/forgot-password'), 3000);
+        setTimeout(() => router.push('/contractor/login'), 3000);
       } else {
         setIsValidSession(true);
       }
@@ -40,20 +40,20 @@ export default function Page() {
     setIsLoading(true);
 
     if (password !== confirmPassword) {
-      setSnackbar({ 
-        open: true, 
-        message: 'Passwords do not match.', 
-        severity: 'error' 
+      setSnackbar({
+        open: true,
+        message: 'Passwords do not match.',
+        severity: 'error'
       });
       setIsLoading(false);
       return;
     }
 
     if (password.length < 6) {
-      setSnackbar({ 
-        open: true, 
-        message: 'Password must be at least 6 characters long.', 
-        severity: 'error' 
+      setSnackbar({
+        open: true,
+        message: 'Password must be at least 6 characters long.',
+        severity: 'error'
       });
       setIsLoading(false);
       return;
@@ -69,23 +69,23 @@ export default function Page() {
         return;
       }
 
-      setSnackbar({ 
-        open: true, 
-        message: 'Password has been reset successfully. Redirecting to login...', 
-        severity: 'success' 
+      setSnackbar({
+        open: true,
+        message: 'Password has been reset successfully. Redirecting to login...',
+        severity: 'success'
       });
 
       // Sign out the user after successful password reset
       await supabase.auth.signOut();
-      
+
       // Redirect to login page after 2 seconds
       setTimeout(() => router.push('/contractor/login'), 2000);
     } catch (error) {
       console.error('Reset password error:', error);
-      setSnackbar({ 
-        open: true, 
-        message: 'An unexpected error occurred. Please try again.', 
-        severity: 'error' 
+      setSnackbar({
+        open: true,
+        message: 'An unexpected error occurred. Please try again.',
+        severity: 'error'
       });
     } finally {
       setIsLoading(false);
@@ -114,10 +114,10 @@ export default function Page() {
             </Typography>
           </Box>
         </Box>
-        <Snackbar 
-          open={snackbar.open} 
-          autoHideDuration={4000} 
-          onClose={handleCloseSnackbar} 
+        <Snackbar
+          open={snackbar.open}
+          autoHideDuration={4000}
+          onClose={handleCloseSnackbar}
           anchorOrigin={{ vertical: "top", horizontal: "center" }}
         >
           <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: '100%' }}>
@@ -136,55 +136,49 @@ export default function Page() {
           <Typography variant="h3" sx={{ color: "primary.main", fontWeight: "bold" }}>EasyTrack</Typography>
           <Typography color="secondary.main">Reset Password</Typography>
           <form onSubmit={handleSubmit} style={formStyles}>
-            <TextField 
-              label="New Password" 
-              type="password" 
-              placeholder="Enter new password" 
-              required 
-              sx={{ width: "70%" }} 
-              value={password} 
-              onChange={(e) => setPassword(e.target.value)} 
+            <TextField
+              label="New Password"
+              type="password"
+              placeholder="Enter new password"
+              required
+              sx={{ width: "70%" }}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
               disabled={isLoading}
             />
-            <TextField 
-              label="Confirm Password" 
-              type="password" 
-              placeholder="Confirm new password" 
-              required 
-              sx={{ width: "70%" }} 
-              value={confirmPassword} 
-              onChange={(e) => setConfirmPassword(e.target.value)} 
+            <TextField
+              label="Confirm Password"
+              type="password"
+              placeholder="Confirm new password"
+              required
+              sx={{ width: "70%" }}
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
               disabled={isLoading}
             />
-            <Button 
-              type="submit" 
-              variant="contained" 
-              color="primary" 
+            <Button
+              type="submit"
+              variant="contained"
+              color="primary"
               sx={buttonStyles}
               disabled={isLoading}
             >
-              Reset Password
-              {isLoading && (
-                <CircularProgress 
-                  size={24} 
-                  sx={buttonProgressStyles}
-                  color="inherit"
+              {!isLoading ? "Reset Password" : (
+                <CircularProgress
+                  size={24}
+                  sx={{
+                    color: "primary.main"
+                  }}
                 />
               )}
             </Button>
           </form>
-          <Typography 
-            sx={backLinkStyles} 
-            onClick={() => router.push("/contractor/login")}
-          >
-            Back to Login
-          </Typography>
         </Box>
       </Box>
-      <Snackbar 
-        open={snackbar.open} 
-        autoHideDuration={4000} 
-        onClose={handleCloseSnackbar} 
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4000}
+        onClose={handleCloseSnackbar}
         anchorOrigin={{ vertical: "top", horizontal: "center" }}
       >
         <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: '100%' }}>

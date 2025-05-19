@@ -24,5 +24,12 @@ export const getTheme = (mode) => createTheme({
         },
       },
     },
+    MuiCircularProgress: {
+      styleOverrides: {
+        root: {
+          color: "#5D8736",
+        },
+      },
+    },
   },
 });

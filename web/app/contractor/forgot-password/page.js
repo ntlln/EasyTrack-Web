@@ -81,12 +81,12 @@ export default function Page() {
                             sx={buttonStyles}
                             disabled={isLoading}
                         >
-                            Send Email Reset Link
-                            {isLoading && (
+                            {!isLoading ? "Send Email Reset Link" : (
                                 <CircularProgress 
-                                    size={24} 
-                                    sx={buttonProgressStyles}
-                                    color="inherit"
+                                    size={24}
+                                    sx={{
+                                        color: "primary.main"
+                                    }}
                                 />
                             )}
                         </Button>

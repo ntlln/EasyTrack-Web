@@ -71,10 +71,10 @@ export default function ContractorLogin() {
 
             const userId = data.user.id;
 
-            const { data: contractorRole } = await supabase
+            const { data: airlineStaffRole } = await supabase
                 .from("profiles_roles")
                 .select("id")
-                .eq("role_name", "Contractor")
+                .eq("role_name", "Airline Staff")
                 .single();
 
             const { data: profile } = await supabase
@@ -83,7 +83,7 @@ export default function ContractorLogin() {
                 .eq("id", userId)
                 .single();
 
-            if (!contractorRole || !profile) {
+            if (!airlineStaffRole || !profile) {
                 await supabase.auth.signOut();
                 throw new Error("User role or profile not found.");
             }
@@ -93,11 +93,11 @@ export default function ContractorLogin() {
                 throw new Error("This account has been deactivated.");
             }
 
-            if (Number(profile.role_id) !== Number(contractorRole.id)) {
+            if (Number(profile.role_id) !== Number(airlineStaffRole.id)) {
                 await supabase.auth.signOut();
                 setSnackbar({ 
                     open: true, 
-                    message: "Access denied: Only contractors can log in here.", 
+                    message: "Access denied: Only airline staff can log in here.", 
                     severity: "error" 
                 });
                 // Clear both fields for unauthorized users
@@ -159,7 +159,7 @@ export default function ContractorLogin() {
                         disabled={isLoading || !loginStatus.canAttempt}
                     />
                     <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "70%" }}>
-                        <Box sx={{ display: "flex", alignItems: "center" }}>
+                        <Box sx={{ display: "flex", alignItems: "center", ml: -1 }}>
                             <Checkbox 
                                 checked={rememberMe} 
                                 onChange={(e) => setRememberMe(e.target.checked)} 
@@ -186,12 +186,12 @@ export default function ContractorLogin() {
                         sx={buttonStyles}
                         disabled={isLoading || !loginStatus.canAttempt}
                     >
-                        Login
-                        {isLoading && (
+                        {!isLoading ? "Login" : (
                             <CircularProgress 
-                                size={24} 
-                                sx={buttonProgressStyles}
-                                color="inherit"
+                                size={24}
+                                sx={{
+                                    color: "primary.main"
+                                }}
                             />
                         )}
                     </Button>

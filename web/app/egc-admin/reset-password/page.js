@@ -24,7 +24,7 @@ export default function Page() {
           message: 'Invalid or expired reset link. Please request a new password reset.', 
           severity: 'error' 
         });
-        setTimeout(() => router.push('/egc-admin/forgot-password'), 3000);
+        setTimeout(() => router.push('/egc-admin/login'), 3000);
       } else {
         setIsValidSession(true);
       }
@@ -163,22 +163,16 @@ export default function Page() {
               sx={buttonStyles}
               disabled={isLoading}
             >
-              Reset Password
-              {isLoading && (
+              {!isLoading ? "Reset Password" : (
                 <CircularProgress 
-                  size={24} 
-                  sx={buttonProgressStyles}
-                  color="inherit"
+                  size={24}
+                  sx={{
+                    color: "primary.main"
+                  }}
                 />
               )}
             </Button>
           </form>
-          <Typography 
-            sx={backLinkStyles} 
-            onClick={() => router.push("/egc-admin/login")}
-          >
-            Back to Login
-          </Typography>
         </Box>
       </Box>
       <Snackbar 

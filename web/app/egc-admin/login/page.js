@@ -129,16 +129,64 @@ export default function AdminLogin() {
     }
   };
 
-  const containerStyles = {
-    display: "flex", height: "100vh", justifyContent: "center", alignItems: "center",
-    backgroundImage: "url(/login-bg.png)", backgroundSize: "80%", backgroundRepeat: "no-repeat", backgroundPosition: "center"
+  // Styling constants
+  const containerStyles = { 
+    display: "flex", 
+    width: "auto", 
+    height: "100vh", 
+    justifyContent: "center", 
+    alignItems: "center", 
+    backgroundImage: "url(/login-bg.png)", 
+    backgroundSize: "80%", 
+    backgroundRepeat: "no-repeat", 
+    backgroundPosition: "center", 
+    backgroundopacity: "30%" 
   };
-  const formContainerStyles = {
-    display: "flex", flexDirection: "column", width: "50vh",
-    backgroundColor: "background.default", boxShadow: 5, borderRadius: 3, alignItems: "center", pt: 5, pb: 5, gap: 2
+  const formContainerStyles = { 
+    display: "flex", 
+    flexDirection: "column", 
+    width: "50vh", 
+    backgroundColor: "background.default", 
+    boxShadow: 5, 
+    borderRadius: 3, 
+    alignItems: "center", 
+    pt: 5, 
+    pb: 5, 
+    gap: 2 
   };
-  const formStyles = {
-    width: "100%", display: "flex", flexDirection: "column", alignItems: "center", gap: "16px"
+  const formStyles = { 
+    width: '100%', 
+    display: 'flex', 
+    flexDirection: 'column', 
+    alignItems: 'center', 
+    gap: '16px' 
+  };
+  const checkboxStyles = { 
+    color: "primary.main", 
+    '&.Mui-checked': { color: "primary.main" }, 
+    padding: "4px" 
+  };
+  const forgotPasswordStyles = { 
+    fontSize: ".85rem", 
+    cursor: "pointer", 
+    "&:hover": { textDecoration: "underline", color: "primary.main" } 
+  };
+  const buttonStyles = { 
+    width: "40%", 
+    minHeight: "36px", 
+    position: "relative" 
+  };
+  const buttonProgressStyles = { 
+    position: "absolute", 
+    top: "50%", 
+    left: "50%", 
+    marginTop: -12, 
+    marginLeft: -12 
+  };
+  const linkStyles = { 
+    fontSize: ".75rem", 
+    cursor: "pointer", 
+    "&:hover": { textDecoration: "underline", color: "primary.main" } 
   };
 
   return (
@@ -149,23 +197,41 @@ export default function AdminLogin() {
 
         <form onSubmit={handleLogin} style={formStyles}>
           <TextField
-            label="Email" type="email" required fullWidth
-            value={email} onChange={(e) => setEmail(e.target.value)}
-            disabled={isLoading}
+            label="Email"
+            type="email"
+            placeholder="Enter your email"
+            required
             sx={{ width: "70%" }}
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            disabled={isLoading || !loginStatus.canAttempt}
           />
           <TextField
-            label="Password" type="password" required fullWidth
-            value={password} onChange={(e) => setPassword(e.target.value)}
-            disabled={isLoading || !loginStatus.canAttempt}
+            label="Password"
+            type="password"
+            placeholder="Enter your password"
+            required
             sx={{ width: "70%" }}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            disabled={isLoading || !loginStatus.canAttempt}
           />
-          <Box sx={{ display: "flex", justifyContent: "space-between", width: "70%" }}>
-            <Box sx={{ display: "flex", alignItems: "center" }}>
+          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "70%" }}>
+            <Box 
+              sx={{ 
+                display: "flex", 
+                alignItems: "center",
+                cursor: "pointer",
+                ml: -1
+              }}
+              onClick={() => setRememberMe(!rememberMe)}
+            >
               <Checkbox
                 checked={rememberMe}
                 onChange={(e) => setRememberMe(e.target.checked)}
-                disabled={isLoading}
+                disabled={isLoading || !loginStatus.canAttempt}
+                size="small"
+                sx={checkboxStyles}
               />
               <Typography sx={{ fontSize: ".85rem", color: "secondary.main" }}>
                 Remember me
@@ -174,7 +240,7 @@ export default function AdminLogin() {
             <Typography
               color="secondary.main"
               onClick={() => router.push("./forgot-password")}
-              sx={{ fontSize: ".85rem", cursor: "pointer", "&:hover": { textDecoration: "underline" } }}
+              sx={forgotPasswordStyles}
             >
               Forgot Password?
             </Typography>
@@ -185,16 +251,34 @@ export default function AdminLogin() {
             variant="contained"
             color="primary"
             disabled={isLoading || !loginStatus.canAttempt}
-            sx={{ width: "40%", position: "relative" }}
+            sx={buttonStyles}
           >
-            Login
-            {isLoading && <CircularProgress size={24} sx={{ position: "absolute", top: "50%", left: "50%", marginTop: -12, marginLeft: -12 }} />}
+            {!isLoading ? "Login" : (
+              <CircularProgress
+                size={24}
+                sx={{
+                  color: "primary.main"
+                }}
+              />
+            )}
           </Button>
         </form>
 
         <Box sx={{ display: "flex", gap: 5 }}>
-          <Typography sx={{ fontSize: ".75rem", cursor: "pointer", "&:hover": { textDecoration: "underline" } }}>Terms</Typography>
-          <Typography sx={{ fontSize: ".75rem", cursor: "pointer", "&:hover": { textDecoration: "underline" } }}>Privacy</Typography>
+          <Typography 
+            onClick={() => router.push("/terms-and-conditions")}
+            color="secondary.main" 
+            sx={linkStyles}
+          >
+            Terms and Conditions
+          </Typography>
+          <Typography 
+            onClick={() => router.push("/privacy-policy")}
+            color="secondary.main" 
+            sx={linkStyles}
+          >
+            Privacy Policy
+          </Typography>
         </Box>
       </Box>
 
@@ -204,7 +288,7 @@ export default function AdminLogin() {
         onClose={handleCloseSnackbar}
         anchorOrigin={{ vertical: "top", horizontal: "center" }}
       >
-        <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: "100%" }}>
+        <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: '100%' }}>
           {snackbar.message}
         </Alert>
       </Snackbar>

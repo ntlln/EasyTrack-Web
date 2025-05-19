@@ -23,7 +23,6 @@ export default function ProfilePage() {
     const [profileImage, setProfileImage] = useState(null);
     const [roleName, setRoleName] = useState('');
     const [userEmail, setUserEmail] = useState('');
-    const [loading, setLoading] = useState(true);
     const [uploading, setUploading] = useState(false);
     const [resetLoading, setResetLoading] = useState(false);
     const [resetOpen, setResetOpen] = useState(false);
@@ -61,9 +60,8 @@ export default function ProfilePage() {
                 setProfileImage(data.pfp_id || null);
                 await fetchRoleName(data.role_id);
             }
-            setLoading(false);
         } catch (error) {
-            setLoading(false);
+            console.error('Error fetching profile:', error);
         }
     };
 
@@ -233,7 +231,6 @@ export default function ProfilePage() {
     const dialogActionsStyles = { display: 'flex', flexDirection: 'column', gap: 1.5, alignItems: 'center', justifyContent: 'center', width: '100%', pb: 2, mt: 2 };
     const actionButtonStyles = { width: '70%' };
 
-    if (loading) return <Box display="flex" justifyContent="center" alignItems="center" minHeight="100vh"><CircularProgress color="primary" /></Box>;
     if (!profile) return <Box p={4}><Typography>No profile found.</Typography></Box>;
 
     const user = {
