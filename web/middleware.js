@@ -10,7 +10,8 @@ export async function middleware(req) {
   if (req.nextUrl.pathname.startsWith('/contractor')) {
     // Allow access to login page without authentication
     if (req.nextUrl.pathname === '/contractor/login' || 
-        req.nextUrl.pathname === '/contractor/forgot-password') {
+        req.nextUrl.pathname === '/contractor/forgot-password' ||
+        req.nextUrl.pathname === '/contractor/reset-password') {
       return res;
     }
 
