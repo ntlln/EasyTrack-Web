@@ -6,7 +6,7 @@ import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useRouter } from 'next/navigation';
 import { createUser } from './actions';
 
-export default function CreateAccount() {
+export default function Page() {
     const router = useRouter();
     const supabase = createClientComponentClient();
     const [roles, setRoles] = useState([]);

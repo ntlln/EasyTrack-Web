@@ -7,7 +7,7 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import SearchIcon from '@mui/icons-material/Search';
 import PaymentIcon from '@mui/icons-material/Payment';
 
-export default function PaymentsPage() {
+export default function Page() {
     const [page, setPage] = useState(0);
     const router = useRouter();
     const rowsPerPage = 5;

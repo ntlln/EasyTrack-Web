@@ -5,7 +5,7 @@ import AddIcon from "@mui/icons-material/Add";
 import CancelIcon from "@mui/icons-material/Close";
 import PaymentIcon from "@mui/icons-material/Payment";
 
-export default function PaymentFrame() {
+export default function Page() {
     const theme = useTheme();
 
     return (

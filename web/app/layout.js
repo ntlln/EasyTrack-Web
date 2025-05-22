@@ -9,7 +9,7 @@ import './globals.css'
 
 export const ColorModeContext = createContext({ toggleMode: () => {}, mode: "light" });
 
-export default function RootLayout({ children }) {
+export default function Layout({ children }) {
   const [mode, setMode] = useState("light");
   const [isLoading, setIsLoading] = useState(false);
   const pathname = usePathname();

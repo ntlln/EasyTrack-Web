@@ -24,7 +24,7 @@ const fuelData = [
     { month: 'Mar', spending: 350, allocation: 250 },
 ];
 
-export default function StatisticsPage() {
+export default function Page() {
     return (
         <Box p={3}>
             <Typography variant="h3" mb={3} color='primary.main' fontWeight={'bold'}>Statistics</Typography>

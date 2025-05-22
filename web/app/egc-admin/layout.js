@@ -8,7 +8,7 @@ import { ColorModeContext } from "../layout";
 import { useTheme } from "@mui/material/styles";
 import AdminSidebar from "../components/admin-sidebar/page";
 
-export default function AdminLayout({ children }) {
+export default function Layout({ children }) {
   const [isLoading, setIsLoading] = useState(true);
   const { mode } = useContext(ColorModeContext);
   const theme = useTheme();

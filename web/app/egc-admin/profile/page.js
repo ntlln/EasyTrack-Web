@@ -17,7 +17,7 @@ const ReactCrop = dynamic(() => import('react-image-crop').then(mod => mod.defau
 // Import the CSS in a way that works with Next.js
 import 'react-image-crop/dist/ReactCrop.css';
 
-export default function ProfilePage() {
+export default function Page() {
     const router = useRouter();
     const supabase = createClientComponentClient();
     const theme = useTheme();

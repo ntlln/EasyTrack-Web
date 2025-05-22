@@ -7,7 +7,7 @@ import { useState, useEffect } from "react";
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { getLoginStatus, incrementLoginAttempt, resetLoginAttempts, MAX_ATTEMPTS, COOLDOWN_MINUTES } from '@/utils/auth';
 
-export default function ContractorLogin() {
+export default function Page() {
     const router = useRouter();
     const supabase = createClientComponentClient();
     const [email, setEmail] = useState("");

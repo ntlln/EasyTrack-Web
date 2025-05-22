@@ -6,7 +6,7 @@ import { Box, MenuItem, TextField, Typography, Button, TableContainer, Table, Ta
 import { MoreVert as MoreVertIcon, Edit as EditIcon, Delete as DeleteIcon, LockReset as LockResetIcon } from "@mui/icons-material";
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
-export default function UserManagement() {
+export default function Page() {
   const router = useRouter();
   const supabase = createClientComponentClient();
   const [page, setPage] = useState(0);

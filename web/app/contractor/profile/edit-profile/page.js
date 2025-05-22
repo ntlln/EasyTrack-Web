@@ -7,7 +7,7 @@ import { useState, useEffect, useRef } from "react";
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useRouter } from "next/navigation";
 
-export default function EditProfile() {
+export default function Page() {
   const theme = useTheme();
   const router = useRouter();
   const supabase = createClientComponentClient();

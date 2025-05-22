@@ -5,7 +5,7 @@ import { Box, Typography, TextField, Button, Paper, useTheme, IconButton } from 
 import CloseIcon from "@mui/icons-material/Close";
 import Image from "next/image";
 
-export default function ContractingPage() {
+export default function Page() {
     const theme = useTheme();
     const [itemCount, setItemCount] = useState(null);
     const [inputValue, setInputValue] = useState("");

@@ -22,7 +22,7 @@ import { ColorModeContext } from "../../layout";
 import { useTheme } from "@mui/material/styles";
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
-export default function Sidebar() {
+export default function Page() {
     // State and context management
     const [openPages, setOpenPages] = useState(() => {
         if (typeof window !== 'undefined') {

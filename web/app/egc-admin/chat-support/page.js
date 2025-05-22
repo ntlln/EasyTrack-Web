@@ -6,7 +6,7 @@ import SearchIcon from '@mui/icons-material/Search';
 import SendIcon from '@mui/icons-material/Send';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 
-export default function ChatSupportPage() {
+export default function Page() {
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
   const [message, setMessage] = useState("");

@@ -15,7 +15,7 @@ import {
   COOLDOWN_MINUTES
 } from "@/utils/auth";
 
-export default function AdminLogin() {
+export default function Page() {
   const router = useRouter();
   const supabase = createClientComponentClient();
 

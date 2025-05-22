@@ -12,7 +12,7 @@ import 'react-image-crop/dist/ReactCrop.css';
 
 const ReactCrop = dynamic(() => import('react-image-crop').then(mod => mod.default), { ssr: false });
 
-export default function ProfilePage() {
+export default function Page() {
     // State and client setup
     const router = useRouter();
     const supabase = createClientComponentClient();
