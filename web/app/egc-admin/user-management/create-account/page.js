@@ -10,7 +10,7 @@ export default function CreateAccount() {
     const router = useRouter();
     const supabase = createClientComponentClient();
     const [roles, setRoles] = useState([]);
-    const [formData, setFormData] = useState({ email: "", password: "", confirmPassword: "", role_id: "" });
+    const [formData, setFormData] = useState({ email: "", role_id: "" });
     const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
     const [loading, setLoading] = useState(false);
 
@@ -29,22 +29,16 @@ export default function CreateAccount() {
         e.preventDefault();
         setLoading(true);
 
-        if (!formData.email || !formData.password || !formData.role_id) {
+        if (!formData.email || !formData.role_id) {
             setSnackbar({ open: true, message: "Please fill in all required fields", severity: 'error' });
-            setLoading(false);
-            return;
-        }
-
-        if (formData.password !== formData.confirmPassword) {
-            setSnackbar({ open: true, message: "Passwords do not match", severity: 'error' });
             setLoading(false);
             return;
         }
 
         try {
             await createUser(formData);
-            setSnackbar({ open: true, message: "Account created successfully!", severity: 'success' });
-            setFormData({ email: "", password: "", confirmPassword: "", role_id: "" });
+            setSnackbar({ open: true, message: "Account created successfully! Login credentials have been sent to the user's email.", severity: 'success' });
+            setFormData({ email: "", role_id: "" });
             setTimeout(() => router.push('/egc-admin/user-management'), 1500);
         } catch (error) {
             setSnackbar({ open: true, message: error.message || "An error occurred during signup", severity: 'error' });
@@ -63,12 +57,6 @@ export default function CreateAccount() {
                             <TextField fullWidth label="Email Address" name="email" type="email" value={formData.email} onChange={handleChange} required />
                         </Grid>
                         <Grid item xs={12} sx={{ width: '70%' }}>
-                            <TextField fullWidth label="Password" name="password" type="password" value={formData.password} onChange={handleChange} required />
-                        </Grid>
-                        <Grid item xs={12} sx={{ width: '70%' }}>
-                            <TextField fullWidth label="Confirm Password" name="confirmPassword" type="password" value={formData.confirmPassword} onChange={handleChange} required />
-                        </Grid>
-                        <Grid item xs={12} sx={{ width: '70%' }}>
                             <TextField fullWidth select placeholder="Select Role" label="Role" name="role_id" value={formData.role_id} onChange={handleChange} required>
                                 <MenuItem value="" disabled>Select a role</MenuItem>
                                 {roles.map((role) => (
@@ -78,7 +66,7 @@ export default function CreateAccount() {
                         </Grid>
                         <Grid item xs={12} sx={{ width: '70%' }}>
                             <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2, mt: 2 }}>
-                                <Button variant="outlined" onClick={() => setFormData({ email: "", password: "", confirmPassword: "", role_id: "" })} fullWidth sx={{ height: "50px" }} disabled={loading}>Clear</Button>
+                                <Button variant="outlined" onClick={() => setFormData({ email: "", role_id: "" })} fullWidth sx={{ height: "50px" }} disabled={loading}>Clear</Button>
                                 <Button type="submit" variant="contained" color="primary" fullWidth sx={{ height: "50px" }} disabled={loading}>
                                     {loading ? "Creating Account..." : "Create Account"}
                                 </Button>
