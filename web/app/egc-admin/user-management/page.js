@@ -7,8 +7,11 @@ import { MoreVert as MoreVertIcon, Edit as EditIcon, Delete as DeleteIcon, LockR
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
 export default function Page() {
+  // Client setup
   const router = useRouter();
   const supabase = createClientComponentClient();
+
+  // State setup
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(5);
   const [anchorEl, setAnchorEl] = useState(null);
@@ -28,12 +31,8 @@ export default function Page() {
   const [deleteDialog, setDeleteDialog] = useState({ open: false, userId: null });
   const [editForm, setEditForm] = useState({ role_id: '', user_status_id: '' });
 
-  useEffect(() => {
-    fetchAccounts();
-    fetchStatusOptions();
-    fetchUsers();
-    fetchRoles();
-  }, []);
+  // Data fetching
+  useEffect(() => { fetchAccounts(); fetchStatusOptions(); fetchUsers(); fetchRoles(); }, []);
 
   const fetchAccounts = async () => {
     try {
@@ -84,6 +83,7 @@ export default function Page() {
     }
   };
 
+  // Data filtering and sorting
   const filteredAccounts = accounts.filter(account => {
     const matchesSearch = account.name.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesDepartment = selectedDepartment === 'All Departments' || account.role === selectedDepartment;
@@ -93,14 +93,8 @@ export default function Page() {
   const handleRequestSort = (property) => {
     if (orderBy === property) {
       if (order === 'asc') setOrder('desc');
-      else if (order === 'desc') {
-        setOrderBy(null);
-        setOrder('asc');
-      }
-    } else {
-      setOrderBy(property);
-      setOrder('asc');
-    }
+      else if (order === 'desc') { setOrderBy(null); setOrder('asc'); }
+    } else { setOrderBy(property); setOrder('asc'); }
   };
 
   const sortAccounts = (accounts) => {
@@ -117,24 +111,12 @@ export default function Page() {
     });
   };
 
-  const filteredAndSortedAccounts = sortAccounts(filteredAccounts);
+  // Event handlers
   const handleChangePage = (event, newPage) => setPage(newPage - 1);
-  const handleChangeRowsPerPage = (event) => {
-    setRowsPerPage(parseInt(event.target.value, 10));
-    setPage(0);
-  };
-  const handleOpenMenu = (event, account) => {
-    setAnchorEl(event.currentTarget);
-    setSelectedAccount(account);
-  };
-  const handleCloseMenu = () => {
-    setAnchorEl(null);
-    setSelectedAccount(null);
-  };
-  const handleEdit = () => {
-    if (selectedAccount) router.push(`/egc-admin/user-management/edit-account/${selectedAccount.id}`);
-    handleCloseMenu();
-  };
+  const handleChangeRowsPerPage = (event) => { setRowsPerPage(parseInt(event.target.value, 10)); setPage(0); };
+  const handleOpenMenu = (event, account) => { setAnchorEl(event.currentTarget); setSelectedAccount(account); };
+  const handleCloseMenu = () => { setAnchorEl(null); setSelectedAccount(null); };
+  const handleEdit = () => { if (selectedAccount) router.push(`/egc-admin/user-management/edit-account/${selectedAccount.id}`); handleCloseMenu(); };
   const handleDelete = async () => {
     if (selectedAccount) {
       try {
@@ -150,28 +132,15 @@ export default function Page() {
   };
   const handleCreateAccount = () => router.push("/egc-admin/user-management/create-account");
   const handleRefresh = () => fetchAccounts();
-  const handleSearchChange = (event) => {
-    setSearchQuery(event.target.value);
-    setPage(0);
-  };
-  const handleDepartmentChange = (event) => {
-    setSelectedDepartment(event.target.value);
-    setPage(0);
-  };
-  const totalPages = Math.ceil(filteredAndSortedAccounts.length / rowsPerPage);
-  const handleMenuClick = (event, user) => {
-    setAnchorEl(event.currentTarget);
-    setSelectedAccount(user);
-  };
+  const handleSearchChange = (event) => { setSearchQuery(event.target.value); setPage(0); };
+  const handleDepartmentChange = (event) => { setSelectedDepartment(event.target.value); setPage(0); };
+  const handleMenuClick = (event, user) => { setAnchorEl(event.currentTarget); setSelectedAccount(user); };
   const handleEditClick = () => {
     setEditDialog({ open: true, user: selectedAccount });
     setEditForm({ role_id: selectedAccount.role_id, user_status_id: selectedAccount.user_status_id });
     handleCloseMenu();
   };
-  const handleDeleteClick = () => {
-    setDeleteDialog({ open: true, userId: selectedAccount.id });
-    handleCloseMenu();
-  };
+  const handleDeleteClick = () => { setDeleteDialog({ open: true, userId: selectedAccount.id }); handleCloseMenu(); };
   const handleEditSubmit = async () => {
     try {
       const { error } = await supabase.from('profiles').update({ role_id: editForm.role_id, user_status_id: editForm.user_status_id }).eq('id', editDialog.user.id);
@@ -200,17 +169,36 @@ export default function Page() {
   };
   const handleSnackbarClose = () => setSnackbar(prev => ({ ...prev, open: false }));
 
+  // Styles
+  const containerStyles = { p: 4, display: "flex", flexDirection: "column", gap: 4 };
+  const titleStyles = { color: "primary.main", fontWeight: "bold" };
+  const searchContainerStyles = { display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" };
+  const searchBoxStyles = { display: "flex", gap: 2 };
+  const buttonContainerStyles = { display: "flex", gap: 2, ml: "auto" };
+  const buttonStyles = { height: "50px", width: "170px" };
+  const refreshButtonStyles = { height: "50px", width: "150px" };
+  const searchFieldStyles = { width: "250px" };
+  const departmentFieldStyles = { width: "200px" };
+  const paginationContainerStyles = { display: "flex", justifyContent: "space-between", alignItems: "center", p: 2 };
+  const rowsPerPageStyles = { width: "120px" };
+  const iconStyles = { mr: 1 };
+  const dialogFieldStyles = { mt: 2 };
+  const alertStyles = { width: '100%' };
+
   if (loading) return <Box p={4} display="flex" justifyContent="center" alignItems="center"><Typography>Loading...</Typography></Box>;
   if (error) return <Box p={4} display="flex" justifyContent="center" alignItems="center"><Typography color="error">{error}</Typography></Box>;
 
-  return (
-    <Box p={4} display="flex" flexDirection="column" gap={4}>
-      <Box><Typography variant="h3" color="primary.main" fontWeight="bold">User Management</Typography></Box>
+  const filteredAndSortedAccounts = sortAccounts(filteredAccounts);
+  const totalPages = Math.ceil(filteredAndSortedAccounts.length / rowsPerPage);
 
-      <Box display="flex" alignItems="center" gap={2} flexWrap="wrap">
-        <Box display="flex" gap={2}>
-          <TextField label="Search" sx={{ width: "250px" }} value={searchQuery} onChange={handleSearchChange} placeholder="Search by name..." />
-          <TextField label="All Departments" sx={{ width: "200px" }} select value={selectedDepartment} onChange={handleDepartmentChange}>
+  return (
+    <Box sx={containerStyles}>
+      <Box><Typography variant="h3" sx={titleStyles}>User Management</Typography></Box>
+
+      <Box sx={searchContainerStyles}>
+        <Box sx={searchBoxStyles}>
+          <TextField label="Search" sx={searchFieldStyles} value={searchQuery} onChange={handleSearchChange} placeholder="Search by name..." />
+          <TextField label="All Departments" sx={departmentFieldStyles} select value={selectedDepartment} onChange={handleDepartmentChange}>
             <MenuItem value="All Departments">All Departments</MenuItem>
             <MenuItem value="Administrator">Administrator</MenuItem>
             <MenuItem value="Contractor">Contractor</MenuItem>
@@ -218,9 +206,9 @@ export default function Page() {
           </TextField>
         </Box>
 
-        <Box display="flex" gap={2} ml="auto">
-          <Button variant="contained" sx={{ height: "50px", width: "170px" }} onClick={handleCreateAccount}>Create Account</Button>
-          <Button variant="outlined" sx={{ height: "50px", width: "150px" }} onClick={handleRefresh}>Refresh</Button>
+        <Box sx={buttonContainerStyles}>
+          <Button variant="contained" sx={buttonStyles} onClick={handleCreateAccount}>Create Account</Button>
+          <Button variant="outlined" sx={refreshButtonStyles} onClick={handleRefresh}>Refresh</Button>
         </Box>
       </Box>
 
@@ -251,8 +239,8 @@ export default function Page() {
             </TableBody>
           </Table>
 
-          <Box display="flex" justifyContent="space-between" alignItems="center" p={2}>
-            <TextField select label="Rows per page" value={rowsPerPage} onChange={handleChangeRowsPerPage} size="small" sx={{ width: "120px" }}>
+          <Box sx={paginationContainerStyles}>
+            <TextField select label="Rows per page" value={rowsPerPage} onChange={handleChangeRowsPerPage} size="small" sx={rowsPerPageStyles}>
               {[5, 10, 15].map((rows) => <MenuItem key={rows} value={rows}>{rows}</MenuItem>)}
             </TextField>
             <Pagination count={totalPages} page={page + 1} onChange={handleChangePage} color="primary" shape="rounded" showFirstButton showLastButton />
@@ -261,18 +249,18 @@ export default function Page() {
       </Box>
 
       <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleCloseMenu} anchorOrigin={{ vertical: "top", horizontal: "left" }} transformOrigin={{ vertical: "top", horizontal: "left" }}>
-        <MenuItem onClick={handleEditClick}><EditIcon fontSize="small" sx={{ mr: 1 }} /> Edit</MenuItem>
-        <MenuItem onClick={handleDeleteClick}><DeleteIcon fontSize="small" sx={{ mr: 1 }} /> Delete</MenuItem>
-        <MenuItem><LockResetIcon fontSize="small" sx={{ mr: 1 }} /> Reset Password</MenuItem>
+        <MenuItem onClick={handleEditClick}><EditIcon fontSize="small" sx={iconStyles} /> Edit</MenuItem>
+        <MenuItem onClick={handleDeleteClick}><DeleteIcon fontSize="small" sx={iconStyles} /> Delete</MenuItem>
+        <MenuItem><LockResetIcon fontSize="small" sx={iconStyles} /> Reset Password</MenuItem>
       </Menu>
 
       <Dialog open={editDialog.open} onClose={() => setEditDialog({ open: false, user: null })}>
         <DialogTitle>Edit User</DialogTitle>
         <DialogContent>
-          <TextField select fullWidth label="Role" value={editForm.role_id} onChange={(e) => setEditForm(prev => ({ ...prev, role_id: e.target.value }))} sx={{ mt: 2 }}>
+          <TextField select fullWidth label="Role" value={editForm.role_id} onChange={(e) => setEditForm(prev => ({ ...prev, role_id: e.target.value }))} sx={dialogFieldStyles}>
             {roles.map((role) => <MenuItem key={role.id} value={role.id}>{role.role_name}</MenuItem>)}
           </TextField>
-          <TextField select fullWidth label="Status" value={editForm.user_status_id} onChange={(e) => setEditForm(prev => ({ ...prev, user_status_id: e.target.value }))} sx={{ mt: 2 }}>
+          <TextField select fullWidth label="Status" value={editForm.user_status_id} onChange={(e) => setEditForm(prev => ({ ...prev, user_status_id: e.target.value }))} sx={dialogFieldStyles}>
             {statusOptions.map((status) => <MenuItem key={status.id} value={status.id}>{status.status_name}</MenuItem>)}
           </TextField>
         </DialogContent>
@@ -292,7 +280,7 @@ export default function Page() {
       </Dialog>
 
       <Snackbar open={snackbar.open} autoHideDuration={6000} onClose={handleSnackbarClose} anchorOrigin={{ vertical: 'top', horizontal: 'center' }}>
-        <Alert onClose={handleSnackbarClose} severity={snackbar.severity} sx={{ width: '100%' }}>{snackbar.message}</Alert>
+        <Alert onClose={handleSnackbarClose} severity={snackbar.severity} sx={alertStyles}>{snackbar.message}</Alert>
       </Snackbar>
     </Box>
   );

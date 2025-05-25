@@ -6,63 +6,43 @@ import MoreVertIcon from '@mui/icons-material/MoreVert';
 import RefreshIcon from '@mui/icons-material/Refresh';
 
 export default function Page() {
+  // State setup
   const [page, setPage] = useState(0);
   const [rowsPerPage] = useState(5);
   const [anchorEl, setAnchorEl] = useState(null);
   const [selectedAccount, setSelectedAccount] = useState(null);
 
+  // Mock data
   const deliveries = Array.from({ length: 100 }, (_, i) => ({
-    id: i + 1,
-    passengerName: "placeholder",
-    passengerContact: "placeholder",
-    deliveryAddress: "placeholder",
-    airportLocation: "placeholder",
-    luggageType: "placeholder",
-    luggageQuantity: "placeholder",
-    assignedPersonnel: "placeholder",
-    vehicleDetails: "placeholder",
-    pickupTime: "placeholder",
-    estimatedDeliveryTime: "placeholder",
-    currentStatus: "placeholder",
+    id: i + 1, passengerName: "placeholder", passengerContact: "placeholder", deliveryAddress: "placeholder",
+    airportLocation: "placeholder", luggageType: "placeholder", luggageQuantity: "placeholder",
+    assignedPersonnel: "placeholder", vehicleDetails: "placeholder", pickupTime: "placeholder",
+    estimatedDeliveryTime: "placeholder", currentStatus: "placeholder"
   }));
 
-  const handleChangePage = (event, newPage) => {
-    setPage(newPage - 1);
-  };
-
-  const handleOpenMenu = (event, account) => {
-    setAnchorEl(event.currentTarget);
-    setSelectedAccount(account);
-  };
-
-  const handleCloseMenu = () => {
-    setAnchorEl(null);
-    setSelectedAccount(null);
-  };
-
-  const handleTrack = () => {
-    console.log("Track", selectedAccount);
-    handleCloseMenu();
-  };
-
-  const handleContact = () => {
-    console.log("Contact", selectedAccount);
-    handleCloseMenu();
-  };
-
-  const handleRefresh = () => {
-    console.log("Refreshed!");
-  };
+  // Event handlers
+  const handleChangePage = (event, newPage) => { setPage(newPage - 1); };
+  const handleOpenMenu = (event, account) => { setAnchorEl(event.currentTarget); setSelectedAccount(account); };
+  const handleCloseMenu = () => { setAnchorEl(null); setSelectedAccount(null); };
+  const handleTrack = () => { handleCloseMenu(); };
+  const handleContact = () => { handleCloseMenu(); };
+  const handleRefresh = () => { };
 
   const totalPages = Math.ceil(deliveries.length / rowsPerPage);
 
+  // Styles
+  const containerStyles = { p: 4, display: "flex", flexDirection: "column", gap: 4 };
+  const headerStyles = { display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 2 };
+  const searchFieldStyles = { width: "250px" };
+  const paginationContainerStyles = { display: "flex", justifyContent: "space-between", alignItems: "center", p: 2, flexWrap: "wrap" };
+
   return (
-    <Box sx={{ p: 4, display: "flex", flexDirection: "column", gap: 4 }}>
+    <Box sx={containerStyles}>
       <Box><Typography variant="h3" color="primary.main" fontWeight="bold">Luggage Tracking</Typography></Box>
 
-      <Box sx={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 2 }}>
+      <Box sx={headerStyles}>
         <Button variant="outlined" startIcon={<RefreshIcon />} onClick={handleRefresh}>Refresh</Button>
-        <TextField label="Search" size="small" sx={{ width: "250px" }} />
+        <TextField label="Search" size="small" sx={searchFieldStyles} />
       </Box>
 
       <Box>
@@ -107,7 +87,7 @@ export default function Page() {
             </TableBody>
           </Table>
 
-          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", p: 2, flexWrap: "wrap" }}>
+          <Box sx={paginationContainerStyles}>
             <Typography variant="body2">Showing {page * rowsPerPage + 1} - {Math.min((page + 1) * rowsPerPage, deliveries.length)} of {deliveries.length} ongoing deliveries</Typography>
             <Pagination count={totalPages} page={page + 1} onChange={handleChangePage} color="primary" shape="rounded" siblingCount={1} boundaryCount={2} showFirstButton showLastButton />
           </Box>

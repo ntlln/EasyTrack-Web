@@ -4,6 +4,7 @@ import React from 'react';
 import { Box, Typography, Card, CardContent, Grid, Tabs, Tab, Table, TableHead, TableRow, TableCell, TableBody, Divider } from '@mui/material';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, BarChart, Bar, ResponsiveContainer } from 'recharts';
 
+// Mock data
 const shipmentData = [
     { id: '#12345', status: 'In Transit', origin: 'Lagos, Nig.', destination: 'Accra, Ghana', priority: 'High', type: 'Perishable Goods', etd: '12 Dec 2024' },
     { id: '#67810', status: 'Delayed', origin: 'Nairobi', destination: 'Kampala, Uga.', priority: 'Low', type: 'Electronics', etd: '14 Dec 2024' },

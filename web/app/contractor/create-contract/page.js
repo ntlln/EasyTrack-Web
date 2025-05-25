@@ -6,11 +6,13 @@ import CloseIcon from "@mui/icons-material/Close";
 import Image from "next/image";
 
 export default function Page() {
+    // Theme and state setup
     const theme = useTheme();
     const [itemCount, setItemCount] = useState(null);
     const [inputValue, setInputValue] = useState("");
     const [contracts, setContracts] = useState([]);
 
+    // Contract handlers
     const handleCountSubmit = () => {
         const count = parseInt(inputValue);
         if (!isNaN(count) && count > 0) {
@@ -48,16 +50,25 @@ export default function Page() {
         setItemCount(contracts.length + 1);
     };
 
-    const handleSubmit = () => {
-        console.log(contracts);
-    };
+    const handleSubmit = () => { console.log(contracts); };
+
+    // Styles
+    const pageContainerStyles = { minHeight: "100vh", bgcolor: theme.palette.background.default, color: theme.palette.text.primary, p: 2 };
+    const initialFormStyles = { maxWidth: 400, mx: "auto", p: 4, borderRadius: 3, backgroundColor: theme.palette.background.paper, textAlign: "center" };
+    const contractFormStyles = { maxWidth: 700, mx: "auto", mt: 4, p: 4, pt: 2, borderRadius: 3, backgroundColor: theme.palette.background.paper, position: "relative" };
+    const deleteButtonStyles = { position: "absolute", top: 8, right: 8, color: theme.palette.grey[600] };
+    const clearButtonStyles = { bgcolor: "#4a4a4a", color: "#fff", "&:hover": { bgcolor: "#333" } };
+    const formContainerStyles = { display: "flex", flexDirection: "column", gap: 2, mb: 2 };
+    const buttonContainerStyles = { display: "flex", justifyContent: "center", mt: 2 };
+    const bottomButtonContainerStyles = { display: "flex", justifyContent: "center", mt: 4, gap: 2 };
+    const brandContainerStyles = { display: "flex", justifyContent: "center", gap: 4, mt: 2 };
 
     return (
-        <Box sx={{ minHeight: "100vh", bgcolor: theme.palette.background.default, color: theme.palette.text.primary, p: 2 }}>
+        <Box sx={pageContainerStyles}>
             <Typography variant="h3" fontWeight="bold" color="primary.main" mb={2}>Contracting</Typography>
 
             {!itemCount ? (
-                <Paper elevation={3} sx={{ maxWidth: 400, mx: "auto", p: 4, borderRadius: 3, backgroundColor: theme.palette.background.paper, textAlign: "center" }}>
+                <Paper elevation={3} sx={initialFormStyles}>
                     <Typography variant="h6" mb={2}>How many items do you want to contract?</Typography>
                     <TextField type="number" value={inputValue} onChange={(e) => setInputValue(e.target.value)} fullWidth size="small" sx={{ mb: 2 }} />
                     <Button variant="contained" onClick={handleCountSubmit}>Proceed</Button>
@@ -65,14 +76,11 @@ export default function Page() {
             ) : (
                 <Box>
                     {contracts.map((contract, index) => (
-                        <Paper key={index} elevation={3} sx={{ maxWidth: 700, mx: "auto", mt: 4, p: 4, pt: 2, borderRadius: 3, backgroundColor: theme.palette.background.paper, position: "relative" }}>
-                            <IconButton size="small" onClick={() => deleteContract(index)} sx={{ position: "absolute", top: 8, right: 8, color: theme.palette.grey[600] }} aria-label="delete form">
-                                <CloseIcon />
-                            </IconButton>
-
+                        <Paper key={index} elevation={3} sx={contractFormStyles}>
+                            <IconButton size="small" onClick={() => deleteContract(index)} sx={deleteButtonStyles} aria-label="delete form"><CloseIcon /></IconButton>
                             <Typography variant="h6" fontWeight="bold" align="center" mb={3}>Delivery Information {index + 1}</Typography>
 
-                            <Box display="flex" flexDirection="column" gap={2} mb={2}>
+                            <Box sx={formContainerStyles}>
                                 <TextField label="Name" fullWidth size="small" value={contract.name} onChange={(e) => handleInputChange(index, "name", e.target.value)} />
                                 <TextField label="Contact" fullWidth size="small" value={contract.contact} onChange={(e) => handleInputChange(index, "contact", e.target.value)} />
                                 <TextField label="Luggage Information" fullWidth size="small" value={contract.luggage} onChange={(e) => handleInputChange(index, "luggage", e.target.value)} />
@@ -84,13 +92,13 @@ export default function Page() {
                                 </Box>
                             </Box>
 
-                            <Box display="flex" justifyContent="center" mt={2}>
-                                <Button variant="contained" size="small" sx={{ bgcolor: "#4a4a4a", color: "#fff", "&:hover": { bgcolor: "#333" } }} onClick={() => clearSingleContract(index)}>Clear Contract</Button>
+                            <Box sx={buttonContainerStyles}>
+                                <Button variant="contained" size="small" sx={clearButtonStyles} onClick={() => clearSingleContract(index)}>Clear Contract</Button>
                             </Box>
                         </Paper>
                     ))}
 
-                    <Box display="flex" justifyContent="center" mt={4} gap={2}>
+                    <Box sx={bottomButtonContainerStyles}>
                         <Button variant="outlined" onClick={addContract}>Add Another Form</Button>
                         <Button variant="contained" onClick={handleSubmit}>Send Contract</Button>
                     </Box>
@@ -99,7 +107,7 @@ export default function Page() {
 
             <Box textAlign="center" mt={6}>
                 <Typography variant="h6" fontWeight="bold">Contracting as:</Typography>
-                <Box display="flex" justifyContent="center" gap={4} mt={2}>
+                <Box sx={brandContainerStyles}>
                     <Image src="/brand-3.png" alt="AirAsia" width={60} height={60} />
                     <Image src="/brand-4.png" alt="Philippine Airlines" width={60} height={60} />
                     <Image src="/brand-5.png" alt="Cebu Pacific" width={60} height={60} />

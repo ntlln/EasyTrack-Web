@@ -7,11 +7,13 @@ import { useRouter } from "next/navigation";
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
 export default function Page() {
+  // Theme and client setup
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
   const router = useRouter();
   const supabase = createClientComponentClient();
 
+  // Dashboard cards configuration
   const cards = [
     { title: "Profile", route: "/contractor/profile" },
     { title: "Create Contract", route: "/contractor/create-contract" },
@@ -22,6 +24,7 @@ export default function Page() {
     { title: "Payments", route: "/contractor/payments" },
   ];
 
+  // Styles
   const linkStyles = { mt: 1, color: isDark ? "#fff" : "#000", cursor: "pointer", "&:hover": { color: theme.palette.primary.main, textDecoration: "underline" } };
   const cardStyles = { height: "100%", width: "35vh" };
 

@@ -7,6 +7,7 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import SearchIcon from '@mui/icons-material/Search';
 
 export default function Page() {
+    // State setup
     const [page, setPage] = useState(0);
     const [rowsPerPage] = useState(5);
     const [anchorEl, setAnchorEl] = useState(null);
@@ -17,6 +18,7 @@ export default function Page() {
 
     useEffect(() => { setMounted(true); }, []);
 
+    // Mock data
     const transactions = Array.from({ length: 100 }, (_, i) => ({
         id: i + 1, passengerName: "placeholder", passengerContact: "placeholder", deliveryAddress: "placeholder",
         airportLocation: "placeholder", luggageType: "placeholder", luggageQuantity: "placeholder",
@@ -25,11 +27,13 @@ export default function Page() {
         deliveryIssuesReported: "placeholder", resolutionStatus: "placeholder"
     }));
 
+    // Transaction counts
     const totalTransactions = transactions.length;
     const completedCount = transactions.filter(t => t.deliveryStatus === "Completed").length;
     const pendingCount = transactions.filter(t => t.deliveryStatus === "Pending").length;
     const failedCount = transactions.filter(t => t.deliveryStatus === "Failed").length;
 
+    // Event handlers
     const handleChangePage = (event, newPage) => { setPage(newPage - 1); };
     const handleOpenMenu = (event, account) => { setAnchorEl(event.currentTarget); setSelectedAccount(account); };
     const handleCloseMenu = () => { setAnchorEl(null); setSelectedAccount(null); };
@@ -39,44 +43,42 @@ export default function Page() {
 
     const totalPages = Math.ceil(transactions.length / rowsPerPage);
 
+    // Styles
+    const statusBoxStyle = { px: 2, py: 1, borderRadius: 2, border: "1px solid #ccc", minWidth: "120px", textAlign: "center" };
+    const pageContainerStyles = { pt: 4, display: "flex", flexDirection: "column", gap: 4, overflowX: 'hidden' };
+    const searchFieldStyles = { flex: "1", minWidth: "250px" };
+    const dateFieldStyles = { minWidth: "150px" };
+    const refreshButtonStyles = { border: "1px solid #ccc", borderRadius: 2, p: 1 };
+    const tableContainerStyles = { width: '100%', overflowX: 'auto' };
+    const tableStyles = { maxWidth: '100vw' };
+    const paginationContainerStyles = { display: "flex", justifyContent: "space-between", alignItems: "center", p: 2, flexWrap: "wrap", gap: 2 };
+
     return (
-        <Box pt={4} display="flex" flexDirection="column" gap={4} sx={{ overflowX: 'hidden' }}>
+        <Box sx={pageContainerStyles}>
             <Box>
                 <Typography variant="h3" color="primary.main" fontWeight="bold">History & Reports</Typography>
             </Box>
 
             <Box display="flex" flexWrap="wrap" gap={2} alignItems="center">
-                <TextField placeholder="Search for transaction" size="small" InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon /></InputAdornment> }} sx={{ flex: "1", minWidth: "250px" }} />
+                <TextField placeholder="Search for transaction" size="small" InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon /></InputAdornment> }} sx={searchFieldStyles} />
 
-                <Box sx={statusBoxStyle}>
-                    <Typography variant="body2" fontWeight="bold">Total</Typography>
-                    <Typography>{totalTransactions.toLocaleString()}</Typography>
-                </Box>
-                <Box sx={statusBoxStyle}>
-                    <Typography variant="body2" fontWeight="bold">Completed</Typography>
-                    <Typography>{completedCount.toLocaleString()}</Typography>
-                </Box>
-                <Box sx={statusBoxStyle}>
-                    <Typography variant="body2" fontWeight="bold">Pending</Typography>
-                    <Typography>{pendingCount.toLocaleString()}</Typography>
-                </Box>
-                <Box sx={statusBoxStyle}>
-                    <Typography variant="body2" fontWeight="bold">Failed</Typography>
-                    <Typography>{failedCount.toLocaleString()}</Typography>
-                </Box>
+                <Box sx={statusBoxStyle}><Typography variant="body2" fontWeight="bold">Total</Typography><Typography>{totalTransactions.toLocaleString()}</Typography></Box>
+                <Box sx={statusBoxStyle}><Typography variant="body2" fontWeight="bold">Completed</Typography><Typography>{completedCount.toLocaleString()}</Typography></Box>
+                <Box sx={statusBoxStyle}><Typography variant="body2" fontWeight="bold">Pending</Typography><Typography>{pendingCount.toLocaleString()}</Typography></Box>
+                <Box sx={statusBoxStyle}><Typography variant="body2" fontWeight="bold">Failed</Typography><Typography>{failedCount.toLocaleString()}</Typography></Box>
 
                 {mounted && (
                     <>
-                        <TextField size="small" label="From Date" type="date" InputLabelProps={{ shrink: true }} sx={{ minWidth: "150px" }} value={fromDate || ""} onChange={(e) => setFromDate(e.target.value)} />
-                        <TextField size="small" label="To Date" type="date" InputLabelProps={{ shrink: true }} sx={{ minWidth: "150px" }} value={toDate || ""} onChange={(e) => setToDate(e.target.value)} />
+                        <TextField size="small" label="From Date" type="date" InputLabelProps={{ shrink: true }} sx={dateFieldStyles} value={fromDate || ""} onChange={(e) => setFromDate(e.target.value)} />
+                        <TextField size="small" label="To Date" type="date" InputLabelProps={{ shrink: true }} sx={dateFieldStyles} value={toDate || ""} onChange={(e) => setToDate(e.target.value)} />
                     </>
                 )}
 
-                <IconButton onClick={handleRefresh} sx={{ border: "1px solid #ccc", borderRadius: 2, p: 1 }}><RefreshIcon /></IconButton>
+                <IconButton onClick={handleRefresh} sx={refreshButtonStyles}><RefreshIcon /></IconButton>
             </Box>
 
-            <Box sx={{ width: '100%', overflowX: 'auto' }}>
-                <TableContainer component={Paper} sx={{ maxWidth: '100vw' }}>
+            <Box sx={tableContainerStyles}>
+                <TableContainer component={Paper} sx={tableStyles}>
                     <Table sx={{ width: '100%' }}>
                         <TableHead>
                             <TableRow>
@@ -114,15 +116,13 @@ export default function Page() {
                                     <TableCell>{transaction.deliveryStatus}</TableCell>
                                     <TableCell>{transaction.deliveryIssuesReported}</TableCell>
                                     <TableCell>{transaction.resolutionStatus}</TableCell>
-                                    <TableCell>
-                                        <IconButton onClick={(event) => handleOpenMenu(event, transaction)}><MoreVertIcon /></IconButton>
-                                    </TableCell>
+                                    <TableCell><IconButton onClick={(event) => handleOpenMenu(event, transaction)}><MoreVertIcon /></IconButton></TableCell>
                                 </TableRow>
                             ))}
                         </TableBody>
                     </Table>
 
-                    <Box display="flex" justifyContent="space-between" alignItems="center" p={2} flexWrap="wrap" gap={2}>
+                    <Box sx={paginationContainerStyles}>
                         <Typography variant="body2">Showing {page * rowsPerPage + 1} - {Math.min((page + 1) * rowsPerPage, transactions.length)} of {transactions.length} transactions</Typography>
                         <Pagination count={totalPages} page={page + 1} onChange={handleChangePage} color="primary" shape="rounded" siblingCount={1} boundaryCount={2} showFirstButton showLastButton />
                     </Box>
@@ -136,5 +136,3 @@ export default function Page() {
         </Box>
     );
 }
-
-const statusBoxStyle = { px: 2, py: 1, borderRadius: 2, border: "1px solid #ccc", minWidth: "120px", textAlign: "center" };

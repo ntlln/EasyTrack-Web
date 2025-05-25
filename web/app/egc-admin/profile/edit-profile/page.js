@@ -8,39 +8,18 @@ import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useRouter } from "next/navigation";
 
 export default function Page() {
+  // Client and refs setup
   const theme = useTheme();
   const router = useRouter();
   const supabase = createClientComponentClient();
   const fileInputRef = useRef(null);
   const fileInputBackRef = useRef(null);
 
-  const banks = ["BDO Unibank, Inc. (BDO)",
-    "Land Bank of the Philippines (LANDBANK)",
-    "Metropolitan Bank and Trust Company (Metrobank)",
-    "Bank of the Philippine Islands (BPI)",
-    "China Banking Corporation (Chinabank)",
-    "Rizal Commercial Banking Corporation (RCBC)",
-    "Philippine National Bank (PNB)",
-    "Security Bank Corporation",
-    "Union Bank of the Philippines (UnionBank)",
-    "Development Bank of the Philippines (DBP)"];
+  // Bank list
+  const banks = ["BDO Unibank, Inc. (BDO)", "Land Bank of the Philippines (LANDBANK)", "Metropolitan Bank and Trust Company (Metrobank)", "Bank of the Philippine Islands (BPI)", "China Banking Corporation (Chinabank)", "Rizal Commercial Banking Corporation (RCBC)", "Philippine National Bank (PNB)", "Security Bank Corporation", "Union Bank of the Philippines (UnionBank)", "Development Bank of the Philippines (DBP)"];
 
-  const [form, setForm] = useState({
-    first_name: "",
-    middle_initial: "",
-    last_name: "",
-    suffix: "",
-    contact_number: "",
-    birth_date: "",
-    emergency_contact_name: "",
-    emergency_contact_number: "",
-    gov_id_number: "",
-    gov_id_proof: "",
-    gov_id_proof_back: "",
-    bank_name: "",
-    account_number: "",
-    account_name: ""
-  });
+  // State setup
+  const [form, setForm] = useState({ first_name: "", middle_initial: "", last_name: "", suffix: "", contact_number: "", birth_date: "", emergency_contact_name: "", emergency_contact_number: "", gov_id_number: "", gov_id_proof: "", gov_id_proof_back: "", bank_name: "", account_number: "", account_name: "" });
   const [loading, setLoading] = useState(false);
   const [original, setOriginal] = useState(null);
   const [govIdTypes, setGovIdTypes] = useState([]);
@@ -50,45 +29,17 @@ export default function Page() {
   const [snackbarMessage, setSnackbarMessage] = useState("");
   const [snackbarSeverity, setSnackbarSeverity] = useState("success");
 
-  const menuProps = {
-    PaperProps: {
-      style: {
-        maxHeight: 48 * 5, // 5 items at 48px each
-      },
-    },
-  };
+  const menuProps = { PaperProps: { style: { maxHeight: 48 * 5 } } };
 
+  // Data fetching
   useEffect(() => {
     const fetchProfile = async () => {
       setLoading(true);
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session || !session.user) {
-        setLoading(false);
-        return;
-      }
-      const userEmail = session.user.email;
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('first_name, middle_initial, last_name, suffix, contact_number, birth_date, emergency_contact_name, emergency_contact_number, gov_id_type, gov_id_number, gov_id_proof, gov_id_proof_back, bank_name, account_number, account_name')
-        .eq('email', userEmail)
-        .single();
+      if (!session?.user) { setLoading(false); return; }
+      const { data } = await supabase.from('profiles').select('first_name, middle_initial, last_name, suffix, contact_number, birth_date, emergency_contact_name, emergency_contact_number, gov_id_type, gov_id_number, gov_id_proof, gov_id_proof_back, bank_name, account_number, account_name').eq('email', session.user.email).single();
       if (data) {
-        const cleanData = {
-          first_name: data.first_name || "",
-          middle_initial: data.middle_initial || "",
-          last_name: data.last_name || "",
-          suffix: data.suffix || "",
-          contact_number: data.contact_number || "",
-          birth_date: data.birth_date || "",
-          emergency_contact_name: data.emergency_contact_name || "",
-          emergency_contact_number: data.emergency_contact_number || "",
-          gov_id_number: data.gov_id_number || "",
-          gov_id_proof: data.gov_id_proof || "",
-          gov_id_proof_back: data.gov_id_proof_back || "",
-          bank_name: data.bank_name || "",
-          account_number: data.account_number || "",
-          account_name: data.account_name || ""
-        };
+        const cleanData = { first_name: data.first_name || "", middle_initial: data.middle_initial || "", last_name: data.last_name || "", suffix: data.suffix || "", contact_number: data.contact_number || "", birth_date: data.birth_date || "", emergency_contact_name: data.emergency_contact_name || "", emergency_contact_number: data.emergency_contact_number || "", gov_id_number: data.gov_id_number || "", gov_id_proof: data.gov_id_proof || "", gov_id_proof_back: data.gov_id_proof_back || "", bank_name: data.bank_name || "", account_number: data.account_number || "", account_name: data.account_name || "" };
         setForm(cleanData);
         setOriginal(cleanData);
         if (data.gov_id_type) setSelectedGovIdType(String(data.gov_id_type));
@@ -96,164 +47,74 @@ export default function Page() {
       setLoading(false);
     };
     const fetchGovIdTypes = async () => {
-      const { data, error } = await supabase
-        .from('verify_info_type')
-        .select('id, id_type_name');
+      const { data } = await supabase.from('verify_info_type').select('id, id_type_name');
       if (data) setGovIdTypes(data);
     };
     fetchProfile();
     fetchGovIdTypes();
   }, []);
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
-  };
-
+  // Event handlers
+  const handleChange = (e) => { const { name, value } = e.target; setForm(prev => ({ ...prev, [name]: value })); };
   const handleSave = async () => {
     setLoading(true);
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session || !session.user) return;
-    const userEmail = session.user.email;
-    // Only update changed fields
+    if (!session?.user) return;
     const updates = {};
-    Object.keys(form).forEach(key => {
-      if (form[key] !== (original ? original[key] : "")) {
-        updates[key] = form[key];
-      }
-    });
-    if (selectedGovIdType) {
-      updates.gov_id_type = selectedGovIdType;
-    }
-    if (Object.keys(updates).length === 0) {
-      setLoading(false);
-      router.push("/egc-admin/profile");
-      return;
-    }
-    // Add updated_at timestamp
+    Object.keys(form).forEach(key => { if (form[key] !== (original?.[key] ?? "")) updates[key] = form[key]; });
+    if (selectedGovIdType) updates.gov_id_type = selectedGovIdType;
+    if (Object.keys(updates).length === 0) { setLoading(false); router.push("/egc-admin/profile"); return; }
     updates.updated_at = new Date().toISOString();
-    
-    const { error } = await supabase
-      .from('profiles')
-      .update(updates)
-      .eq('email', userEmail);
-    console.log('Supabase update error:', error);
+    const { error } = await supabase.from('profiles').update(updates).eq('email', session.user.email);
     setLoading(false);
     if (!error) router.push("/egc-admin/profile");
   };
-
-  const handleClear = () => {
-    window.location.reload();
-  };
-
+  const handleClear = () => { window.location.reload(); };
   const handleFileUpload = async (event, type) => {
     try {
       setUploading(true);
       const file = event.target.files[0];
       if (!file) return;
-
-      // Get user session
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session || !session.user) return;
-
-      // Get user's profile to get their UUID and current image URLs
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('id, gov_id_proof, gov_id_proof_back')
-        .eq('email', session.user.email)
-        .single();
-
-      if (profileError || !profileData) {
-        throw new Error('Failed to get user profile');
-      }
-
-      // Delete old image if exists
+      if (!session?.user) return;
+      const { data: profileData } = await supabase.from('profiles').select('id, gov_id_proof, gov_id_proof_back').eq('email', session.user.email).single();
+      if (!profileData) throw new Error('Failed to get user profile');
       const oldUrl = type === 'front' ? profileData.gov_id_proof : profileData.gov_id_proof_back;
       if (oldUrl) {
         try {
           const url = new URL(oldUrl);
           const pathMatch = url.pathname.match(/admin\/([^.]+_[^./]+)\.(\w+)/);
-          if (pathMatch) {
-            const fileName = pathMatch[1];
-            const fileExt = pathMatch[2];
-            const filePath = `admin/${fileName}.${fileExt}`;
-            await supabase.storage.from('gov-id').remove([filePath]);
-          }
-        } catch (e) {
-          // Ignore errors in deleting old file
-        }
+          if (pathMatch) await supabase.storage.from('gov-id').remove([`admin/${pathMatch[1]}.${pathMatch[2]}`]);
+        } catch (e) { }
       }
-
-      // Get file extension
       const fileExt = file.name.split('.').pop();
-      const fileName = `${profileData.id}_${type}.${fileExt}`;
-      const filePath = `admin/${fileName}`;
-
-      // Upload file to Supabase Storage
-      const { error: uploadError } = await supabase.storage
-        .from('gov-id')
-        .upload(filePath, file, { upsert: true });
-
-      if (uploadError) {
-        throw uploadError;
-      }
-
-      // Get signed URL for the uploaded file
-      const { data: { signedUrl } } = await supabase.storage
-        .from('gov-id')
-        .createSignedUrl(filePath, 31536000); // URL valid for 1 year
-
-      if (!signedUrl) {
-        throw new Error('Failed to get signed URL');
-      }
-
-      // Update profile with the signed URL
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update({ 
-          [type === 'front' ? 'gov_id_proof' : 'gov_id_proof_back']: signedUrl 
-        })
-        .eq('email', session.user.email);
-
-      if (updateError) {
-        throw updateError;
-      }
-
-      // Update form state to reflect the new URL
-      setForm(prev => ({
-        ...prev,
-        [type === 'front' ? 'gov_id_proof' : 'gov_id_proof_back']: signedUrl
-      }));
-
+      const filePath = `admin/${profileData.id}_${type}.${fileExt}`;
+      const { error: uploadError } = await supabase.storage.from('gov-id').upload(filePath, file, { upsert: true });
+      if (uploadError) throw uploadError;
+      const { data: { signedUrl } } = await supabase.storage.from('gov-id').createSignedUrl(filePath, 31536000);
+      if (!signedUrl) throw new Error('Failed to get signed URL');
+      const { error: updateError } = await supabase.from('profiles').update({ [type === 'front' ? 'gov_id_proof' : 'gov_id_proof_back']: signedUrl }).eq('email', session.user.email);
+      if (updateError) throw updateError;
+      setForm(prev => ({ ...prev, [type === 'front' ? 'gov_id_proof' : 'gov_id_proof_back']: signedUrl }));
       setSnackbarMessage('Image uploaded successfully!');
       setSnackbarSeverity('success');
       setSnackbarOpen(true);
-
     } catch (error) {
-      console.error('Error uploading file:', error);
       setSnackbarMessage('Error uploading file. Please try again.');
       setSnackbarSeverity('error');
       setSnackbarOpen(true);
-    } finally {
-      setUploading(false);
-    }
+    } finally { setUploading(false); }
   };
+  const triggerFileInput = (type) => { (type === 'front' ? fileInputRef : fileInputBackRef).current?.click(); };
 
-  const triggerFileInput = (type) => {
-    if (type === 'front') {
-      fileInputRef.current?.click();
-    } else {
-      fileInputBackRef.current?.click();
-    }
-  };
-
-  // Styling constants
+  // Styles
   const pageStyles = { p: 4, maxWidth: "1400px", mx: "auto" };
   const headerStyles = { display: "flex", justifyContent: "space-between", alignItems: "center", mb: 4 };
   const backButtonStyles = { display: "flex", alignItems: "center", gap: 2 };
   const formStyles = { minWidth: 300 };
   const buttonContainerStyles = { mt: 4, display: "flex", justifyContent: "center", gap: 2 };
   const fileInputStyles = { display: 'none' };
+  const alertStyles = { width: '100%' };
 
   return (
     <Box sx={pageStyles}>
@@ -317,7 +178,7 @@ export default function Page() {
       </form>
 
       <Snackbar open={snackbarOpen} autoHideDuration={4000} onClose={() => setSnackbarOpen(false)} anchorOrigin={{ vertical: 'top', horizontal: 'center' }}>
-        <Alert onClose={() => setSnackbarOpen(false)} severity={snackbarSeverity} sx={{ width: '100%' }}>{snackbarMessage}</Alert>
+        <Alert onClose={() => setSnackbarOpen(false)} severity={snackbarSeverity} sx={alertStyles}>{snackbarMessage}</Alert>
       </Snackbar>
     </Box>
   );

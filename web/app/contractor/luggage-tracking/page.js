@@ -56,15 +56,21 @@ export default function Page() {
 
   const totalPages = Math.ceil(deliveries.length / rowsPerPage);
 
+  const pageContainerStyles = { p: 4, display: "flex", flexDirection: "column", gap: 4 };
+  const headerContainerStyles = { display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 2 };
+  const searchFieldStyles = { width: "250px" };
+  const tableContainerStyles = { width: '100%', overflowX: 'auto' };
+  const paginationContainerStyles = { display: "flex", justifyContent: "space-between", alignItems: "center", p: 2, flexWrap: "wrap" };
+
   return (
-    <Box p={4} display="flex" flexDirection="column" gap={4}>
+    <Box sx={pageContainerStyles}>
       <Box>
         <Typography variant="h3" color="primary.main" fontWeight="bold">
           Luggage Tracking
         </Typography>
       </Box>
 
-      <Box display="flex" justifyContent="flex-end" alignItems="center" gap={2}>
+      <Box sx={headerContainerStyles}>
         <Button
           variant="outlined"
           startIcon={<RefreshIcon />}
@@ -72,10 +78,10 @@ export default function Page() {
         >
           Refresh
         </Button>
-        <TextField label="Search" size="small" sx={{ width: "250px" }} />
+        <TextField label="Search" size="small" sx={searchFieldStyles} />
       </Box>
 
-      <Box>
+      <Box sx={tableContainerStyles}>
         <TableContainer component={Paper}>
           <Table>
             <TableHead>
@@ -123,7 +129,7 @@ export default function Page() {
             </TableBody>
           </Table>
 
-          <Box display="flex" justifyContent="space-between" alignItems="center" p={2} flexWrap="wrap">
+          <Box sx={paginationContainerStyles}>
             <Typography variant="body2">
               Showing {page * rowsPerPage + 1} - {Math.min((page + 1) * rowsPerPage, deliveries.length)} of {deliveries.length} ongoing deliveries
             </Typography>

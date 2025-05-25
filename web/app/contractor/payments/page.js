@@ -8,43 +8,46 @@ import SearchIcon from '@mui/icons-material/Search';
 import PaymentIcon from '@mui/icons-material/Payment';
 
 export default function Page() {
+    // State and router setup
     const [page, setPage] = useState(0);
     const router = useRouter();
     const rowsPerPage = 5;
 
+    // Mock data
     const transactions = Array.from({ length: 100 }, (_, i) => ({
-        id: i + 1,
-        passengerName: "placeholder",
-        passengerContact: "placeholder",
-        deliveryAddress: "placeholder",
-        airportLocation: "placeholder",
-        luggageType: "placeholder",
-        luggageQuantity: "placeholder",
-        assignedPersonnel: "placeholder",
-        pickupTime: "placeholder",
-        deliveryTime: "placeholder",
-        totalTransitTime: "placeholder",
-        deliveryStatus: "Completed",
-        deliveryIssuesReported: "placeholder",
+        id: i + 1, passengerName: "placeholder", passengerContact: "placeholder", deliveryAddress: "placeholder",
+        airportLocation: "placeholder", luggageType: "placeholder", luggageQuantity: "placeholder",
+        assignedPersonnel: "placeholder", pickupTime: "placeholder", deliveryTime: "placeholder",
+        totalTransitTime: "placeholder", deliveryStatus: "Completed", deliveryIssuesReported: "placeholder",
         resolutionStatus: "placeholder"
     }));
 
-    const totalPages = Math.ceil(transactions.length / rowsPerPage);
-
+    // Event handlers
     const handleChangePage = (event, newPage) => setPage(newPage - 1);
     const handleRefresh = () => console.log("Refreshed!");
     const handlePay = () => router.push("/contractor/payments/payment-frame");
 
+    const totalPages = Math.ceil(transactions.length / rowsPerPage);
+
+    // Styles
+    const pageContainerStyles = { p: 0 };
+    const headerContainerStyles = { display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 };
+    const searchFieldStyles = { borderRadius: "10px", width: 320, boxShadow: 1 };
+    const buttonContainerStyles = { display: "flex", gap: 2 };
+    const payButtonStyles = { textTransform: "none", px: 2, py: 1, fontSize: 14 };
+    const refreshButtonStyles = { bgcolor: "#4a4a4a", color: "#fff", borderRadius: "5px", px: 2, py: 1, fontSize: 14, "&:hover": { bgcolor: "#333" } };
+    const paginationContainerStyles = { display: "flex", justifyContent: "space-between", alignItems: "center", px: 1, py: 3 };
+
     return (
-        <Box p={0}>
+        <Box sx={pageContainerStyles}>
             <Typography variant="h3" fontWeight="bold" color="primary.main" mb={3}>Payments</Typography>
 
-            <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-                <TextField size="small" placeholder="Search for transaction" InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon /></InputAdornment> }} sx={{ borderRadius: "10px", width: 320, boxShadow: 1 }} />
+            <Box sx={headerContainerStyles}>
+                <TextField size="small" placeholder="Search for transaction" InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon /></InputAdornment> }} sx={searchFieldStyles} />
 
-                <Box display="flex" gap={2}>
-                    <Button variant="contained" startIcon={<PaymentIcon />} onClick={handlePay} sx={{ textTransform: "none", px: 2, py: 1, fontSize: 14 }}>Pay</Button>
-                    <IconButton onClick={handleRefresh} sx={{ bgcolor: "#4a4a4a", color: "#fff", borderRadius: "5px", px: 2, py: 1, fontSize: 14, "&:hover": { bgcolor: "#333" } }}><RefreshIcon sx={{ mr: 1 }} /> Refresh</IconButton>
+                <Box sx={buttonContainerStyles}>
+                    <Button variant="contained" startIcon={<PaymentIcon />} onClick={handlePay} sx={payButtonStyles}>Pay</Button>
+                    <IconButton onClick={handleRefresh} sx={refreshButtonStyles}><RefreshIcon sx={{ mr: 1 }} /> Refresh</IconButton>
                 </Box>
             </Box>
 
@@ -92,7 +95,7 @@ export default function Page() {
                 </Table>
             </TableContainer>
 
-            <Box display="flex" justifyContent="space-between" alignItems="center" px={1} py={3}>
+            <Box sx={paginationContainerStyles}>
                 <Typography variant="body2">Showing {page * rowsPerPage + 1} - {Math.min((page + 1) * rowsPerPage, transactions.length)} of {transactions.length} completed deliveries</Typography>
                 <Pagination count={totalPages} page={page + 1} onChange={handleChangePage} color="primary" shape="rounded" showFirstButton showLastButton />
             </Box>

@@ -4,6 +4,7 @@ import React from 'react';
 import { Box, Typography, Card, CardContent, Grid, Tabs, Tab, Table, TableHead, TableRow, TableCell, TableBody, Divider } from '@mui/material';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, BarChart, Bar, ResponsiveContainer } from 'recharts';
 
+// Mock data
 const shipmentData = [
     { id: '#12345', status: 'In Transit', origin: 'Lagos, Nig.', destination: 'Accra, Ghana', priority: 'High', type: 'Perishable Goods', etd: '12 Dec 2024' },
     { id: '#67810', status: 'Delayed', origin: 'Nairobi', destination: 'Kampala, Uga.', priority: 'Low', type: 'Electronics', etd: '14 Dec 2024' },
@@ -22,29 +23,42 @@ const fuelData = [
 ];
 
 export default function Page() {
-    return (
-        <Box p={3}>
-            <Typography variant="h3" mb={3} color="primary.main" fontWeight="bold">Statistics</Typography>
+    // Styles
+    const containerStyles = { p: 3 };
+    const titleStyles = { mb: 3, color: "primary.main", fontWeight: "bold" };
+    const cardStyles = { height: "100%" };
+    const chartContainerStyles = { width: "100%", height: 200 };
+    const dividerStyles = { my: 1 };
+    const gridContainerStyles = { spacing: 2 };
+    const gridItemStyles = { xs: 12, md: 4 };
+    const gridItemLargeStyles = { xs: 12, md: 8 };
+    const gridItemHalfStyles = { xs: 12, md: 6 };
+    const gridItemFullStyles = { xs: 12 };
+    const gridMarginStyles = { mt: 2 };
 
-            <Grid container spacing={2}>
-                <Grid item xs={12} md={4}>
-                    <Card>
+    return (
+        <Box sx={containerStyles}>
+            <Typography variant="h3" sx={titleStyles}>Statistics</Typography>
+
+            <Grid container sx={gridContainerStyles}>
+                <Grid item sx={gridItemStyles}>
+                    <Card sx={cardStyles}>
                         <CardContent>
                             <Typography variant="subtitle2">Shipment Track</Typography>
                             <Typography variant="h5">4,425</Typography>
                         </CardContent>
                     </Card>
                 </Grid>
-                <Grid item xs={12} md={4}>
-                    <Card>
+                <Grid item sx={gridItemStyles}>
+                    <Card sx={cardStyles}>
                         <CardContent>
                             <Typography variant="subtitle2">Fleet Performance</Typography>
                             <Typography variant="h5">134</Typography>
                         </CardContent>
                     </Card>
                 </Grid>
-                <Grid item xs={12} md={4}>
-                    <Card>
+                <Grid item sx={gridItemStyles}>
+                    <Card sx={cardStyles}>
                         <CardContent>
                             <Typography variant="subtitle2">Delivery Status</Typography>
                             <Typography variant="h5">2,562</Typography>
@@ -53,8 +67,8 @@ export default function Page() {
                 </Grid>
             </Grid>
 
-            <Grid container spacing={2} mt={2}>
-                <Grid item xs={12} md={8}>
+            <Grid container sx={{ ...gridContainerStyles, ...gridMarginStyles }}>
+                <Grid item sx={gridItemLargeStyles}>
                     <Card>
                         <CardContent>
                             <Tabs value={0}>
@@ -92,11 +106,11 @@ export default function Page() {
                     </Card>
                 </Grid>
 
-                <Grid item xs={12} md={4}>
+                <Grid item sx={gridItemStyles}>
                     <Card>
                         <CardContent>
                             <Typography variant="h6">Performance Metrics</Typography>
-                            <Divider sx={{ my: 1 }} />
+                            <Divider sx={dividerStyles} />
                             <Typography variant="body2">Delivery Success Rate: 80%</Typography>
                             <Typography variant="body2">Average Shipment Time: 3.5 Days</Typography>
                             <Typography variant="body2">Fuel Efficiency: 18 MPG</Typography>
@@ -106,12 +120,12 @@ export default function Page() {
                 </Grid>
             </Grid>
 
-            <Grid container spacing={2} mt={2}>
-                <Grid item xs={12} md={6}>
+            <Grid container sx={{ ...gridContainerStyles, ...gridMarginStyles }}>
+                <Grid item sx={gridItemHalfStyles}>
                     <Card>
                         <CardContent>
                             <Typography variant="h6">Fleet Performance</Typography>
-                            <ResponsiveContainer width="100%" height={200}>
+                            <ResponsiveContainer sx={chartContainerStyles}>
                                 <LineChart data={fleetData}>
                                     <CartesianGrid strokeDasharray="3 3" />
                                     <XAxis dataKey="date" />
@@ -124,11 +138,11 @@ export default function Page() {
                     </Card>
                 </Grid>
 
-                <Grid item xs={12} md={6}>
+                <Grid item sx={gridItemHalfStyles}>
                     <Card>
                         <CardContent>
                             <Typography variant="h6">Fuel Analysis</Typography>
-                            <ResponsiveContainer width="100%" height={200}>
+                            <ResponsiveContainer sx={chartContainerStyles}>
                                 <BarChart data={fuelData}>
                                     <CartesianGrid strokeDasharray="3 3" />
                                     <XAxis dataKey="month" />
@@ -143,12 +157,12 @@ export default function Page() {
                 </Grid>
             </Grid>
 
-            <Grid container spacing={2} mt={2}>
-                <Grid item xs={12}>
+            <Grid container sx={{ ...gridContainerStyles, ...gridMarginStyles }}>
+                <Grid item sx={gridItemFullStyles}>
                     <Card>
                         <CardContent>
                             <Typography variant="h6">Weekly Overview</Typography>
-                            <ResponsiveContainer width="100%" height={200}>
+                            <ResponsiveContainer sx={chartContainerStyles}>
                                 <BarChart data={fleetData}>
                                     <CartesianGrid strokeDasharray="3 3" />
                                     <XAxis dataKey="date" />
