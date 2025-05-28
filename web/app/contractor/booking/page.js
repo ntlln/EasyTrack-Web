@@ -55,7 +55,8 @@ export default function Page() {
     const updateTimeoutRef = useRef(null);
     const [mounted, setMounted] = useState(false);
     const [isFormMounted, setIsFormMounted] = useState(false);
-    const [activeTab, setActiveTab] = useState(1); // Set default to Booking tab (index 1)
+    const [activeTab, setActiveTab] = useState(0); // Set default to Contract List tab (index 0)
+    const [isGoogleMapsReady, setIsGoogleMapsReady] = useState(false);
     const [contracts, setContracts] = useState([{
         name: "",
         caseNumber: "",
@@ -91,20 +92,67 @@ export default function Page() {
         setIsFormMounted(true);
     }, []);
 
-    // Initialize map when component mounts and script is loaded
+    // Handle Google Maps script loading only when Booking tab is active
     useEffect(() => {
-        if (mounted && isScriptLoaded && !map) {
-            initMap();
-        }
-    }, [mounted, isScriptLoaded]);
+        if (mounted && !isScriptLoaded && activeTab === 1) {
+            const script = document.createElement('script');
+            script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places,marker`;
+            script.async = true;
+            script.defer = true;
+            
+            script.onload = () => {
+                console.log('Google Maps script loaded successfully');
+                setIsScriptLoaded(true);
+                setIsGoogleMapsReady(true);
+            };
+            
+            script.onerror = (e) => {
+                console.error('Error loading Google Maps script:', e);
+                setMapError('Failed to load Google Maps');
+            };
 
-    // Initialize AutocompleteService and PlacesService when map is ready
-    useEffect(() => {
-        if (window.google && map) {
-            autocompleteServiceRef.current = new window.google.maps.places.AutocompleteService();
-            placesServiceRef.current = new window.google.maps.places.PlacesService(map);
+            document.head.appendChild(script);
+
+            return () => {
+                if (document.head.contains(script)) {
+                    document.head.removeChild(script);
+                }
+            };
         }
-    }, [map]);
+    }, [mounted, activeTab]);
+
+    // Initialize map when Booking tab is active and script is loaded
+    useEffect(() => {
+        if (mounted && isGoogleMapsReady && !map && activeTab === 1) {
+            const timer = setTimeout(() => {
+                initMap();
+            }, 100);
+            return () => clearTimeout(timer);
+        }
+    }, [mounted, isGoogleMapsReady, activeTab]);
+
+    // Initialize AutocompleteService and PlacesService when map is ready and Booking tab is active
+    useEffect(() => {
+        if (window.google && map && activeTab === 1) {
+            try {
+                autocompleteServiceRef.current = new window.google.maps.places.AutocompleteService();
+                placesServiceRef.current = new window.google.maps.places.PlacesService(map);
+            } catch (error) {
+                console.error('Error initializing Google services:', error);
+            }
+        }
+    }, [map, activeTab]);
+
+    // Cleanup map when switching away from Booking tab
+    useEffect(() => {
+        if (activeTab !== 1 && map) {
+            if (markerRef.current) {
+                markerRef.current.map = null;
+                markerRef.current = null;
+            }
+            setMap(null);
+        }
+    }, [activeTab]);
 
     const initMap = () => {
         if (!window.google || !mapRef.current) {
@@ -523,19 +571,6 @@ export default function Page() {
         }}>
             {mounted && (
                 <>
-                    <Script
-                        src={`https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places,marker`}
-                        strategy="afterInteractive"
-                        onLoad={() => {
-                            console.log('Google Maps script loaded successfully');
-                            setIsScriptLoaded(true);
-                        }}
-                        onError={(e) => {
-                            console.error('Error loading Google Maps script:', e);
-                            setMapError('Failed to load Google Maps');
-                        }}
-                    />
-
                     <Box sx={{ display: 'flex', justifyContent: 'center', mb: 4 }}>
                         <Tabs 
                             value={activeTab} 
