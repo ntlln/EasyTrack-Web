@@ -141,9 +141,22 @@ export default function Page() {
             // Add dragend listener to marker
             markerRef.current.addListener('dragend', () => {
                 const position = markerRef.current.getPosition();
-                updateMarkerAndAddress({
-                    lat: position.lat(),
-                    lng: position.lng()
+                const lat = position.lat();
+                const lng = position.lng();
+
+                // Update address
+                const geocoder = new window.google.maps.Geocoder();
+                geocoder.geocode({ 
+                    location: { lat, lng }
+                }, (results, status) => {
+                    if (status === 'OK' && results[0]) {
+                        setDropoffAddress(prev => ({
+                            ...prev,
+                            location: results[0].formatted_address,
+                            lat: lat,
+                            lng: lng
+                        }));
+                    }
                 });
             });
 
@@ -182,10 +195,7 @@ export default function Page() {
         // Reverse geocode to get address
         const geocoder = new window.google.maps.Geocoder();
         geocoder.geocode({ 
-            location: position,
-            componentRestrictions: {
-                country: 'ph'
-            }
+            location: position
         }, (results, status) => {
             if (status === 'OK' && results[0]) {
                 const formattedAddress = results[0].formatted_address;
@@ -261,10 +271,7 @@ export default function Page() {
         if (window.google && map && !autocompleteRef.current?.getPlace()) {
             const geocoder = new window.google.maps.Geocoder();
             geocoder.geocode({
-                address: newAddress,
-                componentRestrictions: {
-                    country: 'ph'
-                }
+                address: newAddress
             }, (results, status) => {
                 if (status === 'OK' && results[0]) {
                     const location = results[0].geometry.location;
@@ -296,7 +303,6 @@ export default function Page() {
             // Initialize Places Autocomplete
             autocompleteRef.current = new window.google.maps.places.Autocomplete(inputRef.current, {
                 types: ['geocode', 'establishment'],
-                componentRestrictions: { country: 'ph' },
                 fields: ['formatted_address', 'geometry', 'name', 'place_id', 'types']
             });
 
