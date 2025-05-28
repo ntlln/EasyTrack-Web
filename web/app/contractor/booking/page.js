@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Box, Typography, TextField, Button, Paper, useTheme, IconButton, Grid, Select, MenuItem, FormControl, InputLabel } from "@mui/material";
+import { Box, Typography, TextField, Button, Paper, useTheme, IconButton, Grid, Select, MenuItem, FormControl, InputLabel, Tabs, Tab } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import Image from "next/image";
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
@@ -55,6 +55,7 @@ export default function Page() {
     const updateTimeoutRef = useRef(null);
     const [mounted, setMounted] = useState(false);
     const [isFormMounted, setIsFormMounted] = useState(false);
+    const [activeTab, setActiveTab] = useState(1); // Set default to Booking tab (index 1)
     const [contracts, setContracts] = useState([{
         name: "",
         caseNumber: "",
@@ -446,15 +447,29 @@ export default function Page() {
             // Calculate total luggage quantity
             const totalLuggageQuantity = contracts.reduce((sum, contract) => sum + Number(contract.quantity || 0), 0);
 
+            // Log the coordinates for debugging
+            console.log('Drop-off coordinates:', {
+                lat: dropoffAddress.lat,
+                lng: dropoffAddress.lng
+            });
+
             // First, insert into contract table
-            const { data: contractData, error: contractError } = await supabase
+            const contractData = {
+                luggage_quantity: totalLuggageQuantity,
+                airline_id: user.id,
+                pickup_location: pickupAddress.location,
+                drop_off_location: dropoffAddress.location,
+                drop_off_location_geo: {
+                    type: 'Point',
+                    coordinates: [dropoffAddress.lng, dropoffAddress.lat]
+                }
+            };
+
+            console.log('Contract data to be inserted:', contractData);
+
+            const { data: insertedContract, error: contractError } = await supabase
                 .from('contract')
-                .insert({
-                    luggage_quantity: totalLuggageQuantity,
-                    airline_id: user.id,
-                    pickup_location: pickupAddress.location,
-                    drop_off_location: dropoffAddress.location
-                })
+                .insert(contractData)
                 .select()
                 .single();
 
@@ -462,6 +477,8 @@ export default function Page() {
                 console.error('Error inserting contract:', contractError);
                 return;
             }
+
+            console.log('Contract inserted successfully:', insertedContract);
 
             // Transform the contracts data to match the database schema
             const formattedData = contracts.map(contract => ({
@@ -471,7 +488,7 @@ export default function Page() {
                 item_description: contract.itemDescription,
                 weight: contract.weight,
                 quantity: contract.quantity,
-                contract_id: contractData.id // Link to the contract
+                contract_id: insertedContract.id // Link to the contract
             }));
 
             // Insert the luggage information
@@ -491,6 +508,10 @@ export default function Page() {
             console.error('Error submitting form:', error);
             // You might want to show an error message to the user here
         }
+    };
+
+    const handleTabChange = (event, newValue) => {
+        setActiveTab(newValue);
     };
 
     return (
@@ -514,88 +535,38 @@ export default function Page() {
                             setMapError('Failed to load Google Maps');
                         }}
                     />
-                    <Typography variant="h4" fontWeight="bold" color="primary.main" mb={2}>Booking</Typography>
 
-                    <Box>
-                        <Paper elevation={3} sx={{
-                            maxWidth: 700,
-                            mx: "auto",
-                            mt: 4,
-                            p: 4,
-                            pt: 2,
-                            borderRadius: 3,
-                            backgroundColor: theme.palette.background.paper,
-                            position: "relative"
-                        }}>
-                            <Typography variant="h6" fontWeight="bold" align="center" mb={3}>Pickup Location</Typography>
-                            <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mb: 2 }}>
-                                <FormControl fullWidth size="small">
-                                    <InputLabel>Pickup Location</InputLabel>
-                                    <Select
-                                        value={pickupAddress.location}
-                                        label="Pickup Location"
-                                        onChange={(e) => handlePickupAddressChange("location", e.target.value)}
-                                    >
-                                        {[...Array(12)].map((_, i) => (
-                                            <MenuItem key={i+1} value={`Terminal 3, Bay ${i+1}`}>{`Terminal 3, Bay ${i+1}`}</MenuItem>
-                                        ))}
-                                    </Select>
-                                </FormControl>
-                            </Box>
-                        </Paper>
+                    <Box sx={{ display: 'flex', justifyContent: 'center', mb: 4 }}>
+                        <Tabs 
+                            value={activeTab} 
+                            onChange={handleTabChange}
+                            sx={{
+                                '& .MuiTabs-indicator': {
+                                    backgroundColor: theme.palette.primary.main,
+                                },
+                                '& .MuiTab-root': {
+                                    color: theme.palette.text.primary,
+                                    '&.Mui-selected': {
+                                        color: theme.palette.primary.main,
+                                    },
+                                },
+                            }}
+                        >
+                            <Tab label="Contract List" />
+                            <Tab label="Booking" />
+                        </Tabs>
+                    </Box>
 
-                        <Paper elevation={3} sx={{
-                            maxWidth: 700,
-                            mx: "auto",
-                            mt: 3,
-                            p: 4,
-                            pt: 2,
-                            borderRadius: 3,
-                            backgroundColor: theme.palette.background.paper,
-                            position: "relative"
-                        }}>
-                            <Typography variant="h6" fontWeight="bold" align="center" mb={3}>Drop-off Location</Typography>
-                            <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mb: 2 }}>
-                                {isFormMounted && (
-                                    <Box>
-                                        <Autocomplete
-                                            freeSolo
-                                            filterOptions={(x) => x}
-                                            options={placeOptions}
-                                            getOptionLabel={(option) => option.description || ''}
-                                            loading={placeLoading}
-                                            inputValue={dropoffAddress.location}
-                                            onInputChange={handleDropoffInputChange}
-                                            onChange={handleDropoffSelect}
-                                            renderInput={(params) => (
-                                                <TextField
-                                                    {...params}
-                                                    label="Drop-off Location"
-                                                    fullWidth
-                                                    size="small"
-                                                    placeholder="Search for a location"
-                                                    InputProps={{
-                                                        ...params.InputProps,
-                                                        endAdornment: (
-                                                            <>
-                                                                {placeLoading ? <CircularProgress color="inherit" size={20} /> : null}
-                                                                {params.InputProps.endAdornment}
-                                                            </>
-                                                        ),
-                                                        autoComplete: 'off',
-                                                    }}
-                                                    sx={{ mb: 1 }}
-                                                />
-                                            )}
-                                        />
-                                    </Box>
-                                )}
-                                {mounted && <MapComponent mapRef={mapRef} mapError={mapError} />}
-                            </Box>
-                        </Paper>
+                    {activeTab === 0 && (
+                        <Box>
+                            {/* Contract List content will go here */}
+                            <Typography variant="h6" align="center">Contract List</Typography>
+                        </Box>
+                    )}
 
-                        {contracts.map((contract, index) => (
-                            <Paper key={index} elevation={3} sx={{
+                    {activeTab === 1 && (
+                        <Box>
+                            <Paper elevation={3} sx={{
                                 maxWidth: 700,
                                 mx: "auto",
                                 mt: 4,
@@ -605,92 +576,179 @@ export default function Page() {
                                 backgroundColor: theme.palette.background.paper,
                                 position: "relative"
                             }}>
-                                <IconButton
-                                    size="small"
-                                    onClick={() => deleteContract(index)}
-                                    sx={{ position: "absolute", top: 8, right: 8, color: theme.palette.grey[600] }}
-                                    aria-label="delete form"
-                                >
-                                    <CloseIcon />
-                                </IconButton>
-                                <Typography variant="h6" fontWeight="bold" align="center" mb={3}>
-                                    Delivery Information {index + 1}
-                                </Typography>
-
+                                <Typography variant="h6" fontWeight="bold" align="center" mb={3}>Pickup Location</Typography>
                                 <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mb: 2 }}>
-                                    <TextField
-                                        label="Case Number"
-                                        fullWidth
-                                        size="small"
-                                        value={contract.caseNumber}
-                                        onChange={(e) => handleInputChange(index, "caseNumber", e.target.value)}
-                                    />
-                                    <TextField
-                                        label="Name"
-                                        fullWidth
-                                        size="small"
-                                        value={contract.name}
-                                        onChange={(e) => handleInputChange(index, "name", e.target.value)}
-                                    />
-                                    <TextField
-                                        label="Item Description"
-                                        fullWidth
-                                        size="small"
-                                        value={contract.itemDescription}
-                                        onChange={(e) => handleInputChange(index, "itemDescription", e.target.value)}
-                                    />
-                                    <Box sx={{ display: 'flex', gap: 2, width: '100%' }}>
-                                        <TextField
-                                            label="Contact Number"
-                                            fullWidth
-                                            size="small"
-                                            value={contract.contact}
-                                            onChange={(e) => handleInputChange(index, "contact", e.target.value)}
-                                        />
-                                        <TextField
-                                            label="Weight (kg)"
-                                            fullWidth
-                                            size="small"
-                                            type="number"
-                                            value={contract.weight}
-                                            onChange={(e) => handleInputChange(index, "weight", e.target.value)}
-                                        />
-                                        <TextField
-                                            label="Luggage Quantity"
-                                            fullWidth
-                                            size="small"
-                                            type="number"
-                                            value={contract.quantity}
-                                            onChange={(e) => handleInputChange(index, "quantity", e.target.value)}
-                                        />
-                                    </Box>
-                                </Box>
-
-                                <Box sx={{ display: "flex", justifyContent: "center", mt: 2 }}>
-                                    <Button
-                                        variant="contained"
-                                        size="small"
-                                        sx={{ bgcolor: "#4a4a4a", color: "#fff", "&:hover": { bgcolor: "#333" } }}
-                                        onClick={() => clearSingleContract(index)}
-                                    >
-                                        Clear Contract
-                                    </Button>
+                                    <FormControl fullWidth size="small" required>
+                                        <InputLabel>Pickup Location</InputLabel>
+                                        <Select
+                                            value={pickupAddress.location}
+                                            label="Pickup Location"
+                                            onChange={(e) => handlePickupAddressChange("location", e.target.value)}
+                                            required
+                                        >
+                                            {[...Array(12)].map((_, i) => (
+                                                <MenuItem key={i+1} value={`Terminal 3, Bay ${i+1}`}>{`Terminal 3, Bay ${i+1}`}</MenuItem>
+                                            ))}
+                                        </Select>
+                                    </FormControl>
                                 </Box>
                             </Paper>
-                        ))}
 
-                        <Box sx={{ display: "flex", justifyContent: "center", mt: 4, gap: 2 }}>
-                            <Button variant="outlined" onClick={addContract}>Add Another Form</Button>
-                            <Button variant="contained" onClick={handleSubmit}>Send Contract</Button>
-                        </Box>
-                    </Box>
+                            <Paper elevation={3} sx={{
+                                maxWidth: 700,
+                                mx: "auto",
+                                mt: 3,
+                                p: 4,
+                                pt: 2,
+                                borderRadius: 3,
+                                backgroundColor: theme.palette.background.paper,
+                                position: "relative"
+                            }}>
+                                <Typography variant="h6" fontWeight="bold" align="center" mb={3}>Drop-off Location</Typography>
+                                <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mb: 2 }}>
+                                    {isFormMounted && (
+                                        <Box>
+                                            <Autocomplete
+                                                freeSolo
+                                                filterOptions={(x) => x}
+                                                options={placeOptions}
+                                                getOptionLabel={(option) => option.description || ''}
+                                                loading={placeLoading}
+                                                inputValue={dropoffAddress.location}
+                                                onInputChange={handleDropoffInputChange}
+                                                onChange={handleDropoffSelect}
+                                                renderInput={(params) => (
+                                                    <TextField
+                                                        {...params}
+                                                        label="Drop-off Location"
+                                                        fullWidth
+                                                        size="small"
+                                                        placeholder="Search for a location"
+                                                        required
+                                                        InputProps={{
+                                                            ...params.InputProps,
+                                                            endAdornment: (
+                                                                <>
+                                                                    {placeLoading ? <CircularProgress color="inherit" size={20} /> : null}
+                                                                    {params.InputProps.endAdornment}
+                                                                </>
+                                                            ),
+                                                            autoComplete: 'off',
+                                                        }}
+                                                        sx={{ mb: 1 }}
+                                                    />
+                                                )}
+                                            />
+                                        </Box>
+                                    )}
+                                    {mounted && <MapComponent mapRef={mapRef} mapError={mapError} />}
+                                </Box>
+                            </Paper>
 
-                    <Box sx={{ textAlign: "center", mt: 6 }}>
-                        <Typography variant="h6" fontWeight="bold">Partnered with:</Typography>
-                        <Box sx={{ display: "flex", justifyContent: "center", gap: 4, mt: 2 }}>
-                            <Image src="/brand-3.png" alt="AirAsia" width={60} height={60} />
+                            {contracts.map((contract, index) => (
+                                <Paper key={index} elevation={3} sx={{
+                                    maxWidth: 700,
+                                    mx: "auto",
+                                    mt: 4,
+                                    p: 4,
+                                    pt: 2,
+                                    borderRadius: 3,
+                                    backgroundColor: theme.palette.background.paper,
+                                    position: "relative"
+                                }}>
+                                    <IconButton
+                                        size="small"
+                                        onClick={() => deleteContract(index)}
+                                        sx={{ position: "absolute", top: 8, right: 8, color: theme.palette.grey[600] }}
+                                        aria-label="delete form"
+                                    >
+                                        <CloseIcon />
+                                    </IconButton>
+                                    <Typography variant="h6" fontWeight="bold" align="center" mb={3}>
+                                        Delivery Information {index + 1}
+                                    </Typography>
+
+                                    <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mb: 2 }}>
+                                        <TextField
+                                            label="Case Number"
+                                            fullWidth
+                                            size="small"
+                                            value={contract.caseNumber}
+                                            onChange={(e) => handleInputChange(index, "caseNumber", e.target.value)}
+                                            required
+                                        />
+                                        <TextField
+                                            label="Name"
+                                            fullWidth
+                                            size="small"
+                                            value={contract.name}
+                                            onChange={(e) => handleInputChange(index, "name", e.target.value)}
+                                            required
+                                        />
+                                        <TextField
+                                            label="Item Description"
+                                            fullWidth
+                                            size="small"
+                                            value={contract.itemDescription}
+                                            onChange={(e) => handleInputChange(index, "itemDescription", e.target.value)}
+                                            required
+                                        />
+                                        <Box sx={{ display: 'flex', gap: 2, width: '100%' }}>
+                                            <TextField
+                                                label="Contact Number"
+                                                fullWidth
+                                                size="small"
+                                                value={contract.contact}
+                                                onChange={(e) => handleInputChange(index, "contact", e.target.value)}
+                                                required
+                                            />
+                                            <TextField
+                                                label="Weight (kg)"
+                                                fullWidth
+                                                size="small"
+                                                type="number"
+                                                value={contract.weight}
+                                                onChange={(e) => handleInputChange(index, "weight", e.target.value)}
+                                                required
+                                            />
+                                            <TextField
+                                                label="Luggage Quantity"
+                                                fullWidth
+                                                size="small"
+                                                type="number"
+                                                value={contract.quantity}
+                                                onChange={(e) => handleInputChange(index, "quantity", e.target.value)}
+                                                required
+                                            />
+                                        </Box>
+                                    </Box>
+
+                                    <Box sx={{ display: "flex", justifyContent: "center", mt: 2 }}>
+                                        <Button
+                                            variant="contained"
+                                            size="small"
+                                            sx={{ bgcolor: "#4a4a4a", color: "#fff", "&:hover": { bgcolor: "#333" } }}
+                                            onClick={() => clearSingleContract(index)}
+                                        >
+                                            Clear Contract
+                                        </Button>
+                                    </Box>
+                                </Paper>
+                            ))}
+
+                            <Box sx={{ display: "flex", justifyContent: "center", mt: 4, gap: 2 }}>
+                                <Button variant="outlined" onClick={addContract}>Add Another Form</Button>
+                                <Button variant="contained" onClick={handleSubmit}>Send Contract</Button>
+                            </Box>
+
+                            <Box sx={{ textAlign: "center", mt: 6 }}>
+                                <Typography variant="h6" fontWeight="bold">Partnered with:</Typography>
+                                <Box sx={{ display: "flex", justifyContent: "center", gap: 4, mt: 2 }}>
+                                    <Image src="/brand-3.png" alt="AirAsia" width={60} height={60} />
+                                </Box>
+                            </Box>
                         </Box>
-                    </Box>
+                    )}
 
                     <Snackbar
                         open={snackbarOpen}
