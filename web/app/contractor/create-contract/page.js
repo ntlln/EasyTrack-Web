@@ -7,6 +7,8 @@ import Image from "next/image";
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import Script from 'next/script';
 import dynamic from 'next/dynamic';
+import Autocomplete from '@mui/material/Autocomplete';
+import CircularProgress from '@mui/material/CircularProgress';
 
 // Dynamically import the map component to avoid hydration issues
 const MapComponent = dynamic(() => Promise.resolve(({ mapRef, mapError }) => (
@@ -51,6 +53,7 @@ export default function Page() {
     const [mapError, setMapError] = useState(null);
     const updateTimeoutRef = useRef(null);
     const [mounted, setMounted] = useState(false);
+    const [isFormMounted, setIsFormMounted] = useState(false);
     const [contracts, setContracts] = useState([{ 
         name: "", 
         caseNumber: "",
@@ -73,24 +76,32 @@ export default function Page() {
         lng: null
     });
 
-    // Initialize map when component mounts
+    // State for Google Places Autocomplete
+    const [placeOptions, setPlaceOptions] = useState([]);
+    const [placeLoading, setPlaceLoading] = useState(false);
+    const autocompleteServiceRef = useRef(null);
+    const placesServiceRef = useRef(null);
+
+    // Initialize component mount state
     useEffect(() => {
         setMounted(true);
+        setIsFormMounted(true);
     }, []);
 
-    // Initialize map when script is loaded
+    // Initialize map when component mounts and script is loaded
     useEffect(() => {
         if (mounted && isScriptLoaded && !map) {
             initMap();
         }
     }, [mounted, isScriptLoaded]);
 
-    // Initialize autocomplete when map is ready
+    // Initialize AutocompleteService and PlacesService when map is ready
     useEffect(() => {
-        if (mounted && map && !autocompleteRef.current) {
-            initAutocomplete();
+        if (window.google && map) {
+            autocompleteServiceRef.current = new window.google.maps.places.AutocompleteService();
+            placesServiceRef.current = new window.google.maps.places.PlacesService(map);
         }
-    }, [mounted, map]);
+    }, [map]);
 
     const initMap = () => {
         if (!window.google || !mapRef.current) {
@@ -108,19 +119,29 @@ export default function Page() {
                 mapTypeControl: false,
                 streetViewControl: false,
                 fullscreenControl: false,
-                mapTypeId: 'roadmap'
+                mapTypeId: 'roadmap',
+                mapId: process.env.NEXT_PUBLIC_GOOGLE_MAPS_ID
             };
 
             const newMap = new window.google.maps.Map(mapRef.current, mapOptions);
             setMap(newMap);
 
-            // Add default marker for SM Mall of Asia
-            markerRef.current = new window.google.maps.Marker({
-                position: defaultLocation,
+            // Create marker content element
+            const markerView = new window.google.maps.marker.PinElement({
+                scale: 1,
+                background: theme.palette.primary.main,
+                borderColor: theme.palette.primary.dark,
+                glyphColor: '#FFFFFF'
+            });
+
+            // Add default marker for SM Mall of Asia with improved draggable behavior
+            markerRef.current = new window.google.maps.marker.AdvancedMarkerElement({
                 map: newMap,
+                position: defaultLocation,
                 title: 'SM Mall of Asia',
-                animation: window.google.maps.Animation.DROP,
-                draggable: true
+                content: markerView.element,
+                gmpDraggable: true,
+                collisionBehavior: window.google.maps.CollisionBehavior.OPTIONAL_AND_HIDES_LOWER_PRIORITY
             });
 
             // Set initial address
@@ -129,6 +150,31 @@ export default function Page() {
                 location: initialAddress,
                 lat: defaultLocation.lat,
                 lng: defaultLocation.lng
+            });
+
+            let isDragging = false;
+
+            // Add dragstart listener
+            newMap.addListener('dragstart', () => {
+                isDragging = true;
+            });
+
+            // Add dragend listener
+            newMap.addListener('dragend', () => {
+                isDragging = false;
+                const center = newMap.getCenter();
+                if (markerRef.current) {
+                    markerRef.current.position = center;
+                    updateAddressFromPosition(center);
+                }
+            });
+
+            // Add zoom_changed listener to keep marker centered
+            newMap.addListener('zoom_changed', () => {
+                if (markerRef.current) {
+                    const markerPosition = markerRef.current.position;
+                    newMap.panTo(markerPosition);
+                }
             });
 
             // Add click listener to the map
@@ -140,24 +186,8 @@ export default function Page() {
 
             // Add dragend listener to marker
             markerRef.current.addListener('dragend', () => {
-                const position = markerRef.current.getPosition();
-                const lat = position.lat();
-                const lng = position.lng();
-
-                // Update address
-                const geocoder = new window.google.maps.Geocoder();
-                geocoder.geocode({ 
-                    location: { lat, lng }
-                }, (results, status) => {
-                    if (status === 'OK' && results[0]) {
-                        setDropoffAddress(prev => ({
-                            ...prev,
-                            location: results[0].formatted_address,
-                            lat: lat,
-                            lng: lng
-                        }));
-                    }
-                });
+                const position = markerRef.current.position;
+                updateAddressFromPosition(position);
             });
 
             console.log('Map initialized successfully');
@@ -167,32 +197,54 @@ export default function Page() {
         }
     };
 
-    const debouncedUpdateAddress = useCallback((position) => {
-        if (updateTimeoutRef.current) {
-            clearTimeout(updateTimeoutRef.current);
-        }
+    const updateAddressFromPosition = (position) => {
+        const lat = position.lat();
+        const lng = position.lng();
 
-        updateTimeoutRef.current = setTimeout(() => {
-            updateMarkerAndAddress(position);
-        }, 300);
-    }, []);
+        // Update address
+        const geocoder = new window.google.maps.Geocoder();
+        geocoder.geocode({ 
+            location: { lat, lng }
+        }, (results, status) => {
+            if (status === 'OK' && results[0]) {
+                setDropoffAddress(prev => ({
+                    ...prev,
+                    location: results[0].formatted_address,
+                    lat: lat,
+                    lng: lng
+                }));
+            }
+        });
+    };
 
     const updateMarkerAndAddress = (position) => {
         if (!window.google || !map) return;
 
+        // Create marker content element
+        const markerView = new window.google.maps.marker.PinElement({
+            scale: 1,
+            background: theme.palette.primary.main,
+            borderColor: theme.palette.primary.dark,
+            glyphColor: '#FFFFFF'
+        });
+
         // Update marker position
         if (markerRef.current) {
-            markerRef.current.setPosition(position);
+            markerRef.current.position = position;
         } else {
-            markerRef.current = new window.google.maps.Marker({
-                position: position,
+            markerRef.current = new window.google.maps.marker.AdvancedMarkerElement({
                 map: map,
-                animation: window.google.maps.Animation.DROP,
-                draggable: true
+                position: position,
+                content: markerView.element,
+                gmpDraggable: true,
+                collisionBehavior: window.google.maps.CollisionBehavior.OPTIONAL_AND_HIDES_LOWER_PRIORITY
             });
         }
 
-        // Reverse geocode to get address
+        // Center map on marker
+        map.panTo(position);
+
+        // Update address
         const geocoder = new window.google.maps.Geocoder();
         geocoder.geocode({ 
             location: position
@@ -212,18 +264,27 @@ export default function Page() {
     const updateMapLocation = useCallback((position, address) => {
         if (!window.google || !map) return;
 
+        // Create marker content element
+        const markerView = new window.google.maps.marker.PinElement({
+            scale: 1,
+            background: theme.palette.primary.main,
+            borderColor: theme.palette.primary.dark,
+            glyphColor: '#FFFFFF'
+        });
+
         // Remove existing marker
         if (markerRef.current) {
-            markerRef.current.setMap(null);
+            markerRef.current.map = null;
         }
 
         // Create new marker
-        markerRef.current = new window.google.maps.Marker({
-            position: position,
+        markerRef.current = new window.google.maps.marker.AdvancedMarkerElement({
             map: map,
+            position: position,
             title: address,
-            animation: window.google.maps.Animation.DROP,
-            draggable: true
+            content: markerView.element,
+            gmpDraggable: true,
+            collisionBehavior: window.google.maps.CollisionBehavior.OPTIONAL_AND_HIDES_LOWER_PRIORITY
         });
 
         // Update map position
@@ -232,9 +293,9 @@ export default function Page() {
 
         // Add dragend listener
         markerRef.current.addListener('dragend', () => {
-            const newPosition = markerRef.current.getPosition();
-            const lat = newPosition.lat();
-            const lng = newPosition.lng();
+            const newPosition = markerRef.current.position;
+            const lat = newPosition.lat;
+            const lng = newPosition.lng;
 
             // Reverse geocode to get address
             const geocoder = new window.google.maps.Geocoder();
@@ -262,84 +323,54 @@ export default function Page() {
         }, 100);
     }, [map]);
 
-    const handleAddressChange = (e) => {
-        const newAddress = e.target.value;
-        setDropoffAddress(prev => ({ ...prev, location: newAddress }));
-
-        // If the address is selected from autocomplete, the place_changed event will handle the update
-        // If it's manually typed, we'll geocode it
-        if (window.google && map && !autocompleteRef.current?.getPlace()) {
-            const geocoder = new window.google.maps.Geocoder();
-            geocoder.geocode({
-                address: newAddress
-            }, (results, status) => {
-                if (status === 'OK' && results[0]) {
-                    const location = results[0].geometry.location;
-                    const newPosition = {
-                        lat: location.lat(),
-                        lng: location.lng()
-                    };
-
-                    updateMapLocation(newPosition, results[0].formatted_address);
-
-                    // Update state with coordinates
-                    setDropoffAddress(prev => ({
-                        ...prev,
-                        lat: location.lat(),
-                        lng: location.lng()
-                    }));
-                }
-            });
-        }
-    };
-
-    const initAutocomplete = () => {
-        if (!window.google || !inputRef.current) {
-            console.log('Google Maps not loaded or input not ready');
+    // Fetch Google Places suggestions using AutocompleteService
+    const fetchPlaceSuggestions = (input) => {
+        if (!input || !autocompleteServiceRef.current) {
+            setPlaceOptions([]);
             return;
         }
-
-        try {
-            // Initialize Places Autocomplete
-            autocompleteRef.current = new window.google.maps.places.Autocomplete(inputRef.current, {
+        setPlaceLoading(true);
+        autocompleteServiceRef.current.getPlacePredictions(
+            {
+                input,
                 types: ['geocode', 'establishment'],
-                fields: ['formatted_address', 'geometry', 'name', 'place_id', 'types']
-            });
-
-            // Handle place selection
-            autocompleteRef.current.addListener('place_changed', () => {
-                const place = autocompleteRef.current.getPlace();
-                
-                if (!place.geometry) {
-                    console.log("No geometry found for the selected place");
-                    return;
+                componentRestrictions: { country: 'ph' }
+            },
+            (predictions, status) => {
+                if (status === window.google.maps.places.PlacesServiceStatus.OK && predictions) {
+                    setPlaceOptions(predictions);
+                } else {
+                    setPlaceOptions([]);
                 }
+                setPlaceLoading(false);
+            }
+        );
+    };
 
-                const newPosition = {
-                    lat: place.geometry.location.lat(),
-                    lng: place.geometry.location.lng()
-                };
+    // Handle input change for Autocomplete
+    const handleDropoffInputChange = (event, value) => {
+        setDropoffAddress(prev => ({ ...prev, location: value }));
+        fetchPlaceSuggestions(value);
+    };
 
-                // Update state with selected place
-                setDropoffAddress({
-                    location: place.formatted_address || place.name,
+    // Handle selection from Autocomplete
+    const handleDropoffSelect = (event, value) => {
+        if (!value || !placesServiceRef.current) return;
+        setDropoffAddress(prev => ({ ...prev, location: value.description }));
+        // Fetch place details
+        placesServiceRef.current.getDetails({ placeId: value.place_id }, (data, status) => {
+            if (status === window.google.maps.places.PlacesServiceStatus.OK && data && data.geometry) {
+                const loc = data.geometry.location;
+                const newPosition = { lat: loc.lat(), lng: loc.lng() };
+                updateMapLocation(newPosition, data.formatted_address || value.description);
+                setDropoffAddress(prev => ({
+                    ...prev,
+                    location: data.formatted_address || value.description,
                     lat: newPosition.lat,
                     lng: newPosition.lng
-                });
-
-                // Update map with new location
-                updateMapLocation(newPosition, place.formatted_address || place.name);
-
-                // Set appropriate zoom level based on place type
-                const zoomLevel = place.types && place.types.includes('establishment') ? 17 : 15;
-                map.setZoom(zoomLevel);
-            });
-
-            console.log('Autocomplete initialized successfully');
-        } catch (error) {
-            console.error('Autocomplete initialization error:', error);
-            setMapError(error.message);
-        }
+                }));
+            }
+        });
     };
 
     // Contract handlers
@@ -451,22 +482,17 @@ export default function Page() {
         }
     };
 
-    // Styles
-    const pageContainerStyles = { minHeight: "100vh", bgcolor: theme.palette.background.default, color: theme.palette.text.primary, p: 2 };
-    const contractFormStyles = { maxWidth: 700, mx: "auto", mt: 4, p: 4, pt: 2, borderRadius: 3, backgroundColor: theme.palette.background.paper, position: "relative" };
-    const deleteButtonStyles = { position: "absolute", top: 8, right: 8, color: theme.palette.grey[600] };
-    const clearButtonStyles = { bgcolor: "#4a4a4a", color: "#fff", "&:hover": { bgcolor: "#333" } };
-    const formContainerStyles = { display: "flex", flexDirection: "column", gap: 2, mb: 2 };
-    const buttonContainerStyles = { display: "flex", justifyContent: "center", mt: 2 };
-    const bottomButtonContainerStyles = { display: "flex", justifyContent: "center", mt: 4, gap: 2 };
-    const brandContainerStyles = { display: "flex", justifyContent: "center", gap: 4, mt: 2 };
-
     return (
-        <Box sx={pageContainerStyles}>
+        <Box sx={{ 
+            minHeight: "100vh", 
+            bgcolor: theme.palette.background.default, 
+            color: theme.palette.text.primary, 
+            p: 2 
+        }}>
             {mounted && (
                 <>
                     <Script
-                        src={`https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places`}
+                        src={`https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places,marker`}
                         strategy="afterInteractive"
                         onLoad={() => {
                             console.log('Google Maps script loaded successfully');
@@ -480,9 +506,18 @@ export default function Page() {
                     <Typography variant="h4" fontWeight="bold" color="primary.main" mb={2}>Booking</Typography>
 
                     <Box>
-                        <Paper elevation={3} sx={contractFormStyles}>
+                        <Paper elevation={3} sx={{ 
+                            maxWidth: 700, 
+                            mx: "auto", 
+                            mt: 4, 
+                            p: 4, 
+                            pt: 2, 
+                            borderRadius: 3, 
+                            backgroundColor: theme.palette.background.paper, 
+                            position: "relative" 
+                        }}>
                             <Typography variant="h6" fontWeight="bold" align="center" mb={3}>Pickup Location</Typography>
-                            <Box sx={formContainerStyles}>
+                            <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mb: 2 }}>
                                 <FormControl fullWidth size="small">
                                     <InputLabel>Pickup Location</InputLabel>
                                     <Select
@@ -498,96 +533,129 @@ export default function Page() {
                                 {pickupAddress.location === "custom" && (
                                     <Grid container spacing={2}>
                                         <Grid item xs={12}>
-                                            <TextField
-                                                label="Address Line 1"
-                                                fullWidth
-                                                size="small"
-                                                value={pickupAddress.addressLine1}
-                                                onChange={(e) => handlePickupAddressChange("addressLine1", e.target.value)}
-                                            />
+                            <TextField
+                                label="Address Line 1"
+                                fullWidth
+                                size="small"
+                                value={pickupAddress.addressLine1}
+                                onChange={(e) => handlePickupAddressChange("addressLine1", e.target.value)}
+                            />
                                         </Grid>
                                         <Grid item xs={12}>
-                                            <TextField
-                                                label="Address Line 2"
-                                                fullWidth
-                                                size="small"
-                                                value={pickupAddress.addressLine2}
-                                                onChange={(e) => handlePickupAddressChange("addressLine2", e.target.value)}
-                                            />
+                            <TextField
+                                label="Address Line 2"
+                                fullWidth
+                                size="small"
+                                value={pickupAddress.addressLine2}
+                                onChange={(e) => handlePickupAddressChange("addressLine2", e.target.value)}
+                            />
                                         </Grid>
                                         <Grid item xs={12} sm={6}>
-                                            <TextField
-                                                label="Province"
-                                                fullWidth
-                                                size="small"
-                                                value={pickupAddress.province}
-                                                onChange={(e) => handlePickupAddressChange("province", e.target.value)}
-                                            />
+                                    <TextField
+                                        label="Province"
+                                        fullWidth
+                                        size="small"
+                                        value={pickupAddress.province}
+                                        onChange={(e) => handlePickupAddressChange("province", e.target.value)}
+                                    />
                                         </Grid>
                                         <Grid item xs={12} sm={6}>
-                                            <TextField
-                                                label="City"
-                                                fullWidth
-                                                size="small"
-                                                value={pickupAddress.city}
-                                                onChange={(e) => handlePickupAddressChange("city", e.target.value)}
-                                            />
+                                    <TextField
+                                        label="City"
+                                        fullWidth
+                                        size="small"
+                                        value={pickupAddress.city}
+                                        onChange={(e) => handlePickupAddressChange("city", e.target.value)}
+                                    />
                                         </Grid>
                                         <Grid item xs={12} sm={6}>
-                                            <TextField
-                                                label="Barangay"
-                                                fullWidth
-                                                size="small"
-                                                value={pickupAddress.barangay}
-                                                onChange={(e) => handlePickupAddressChange("barangay", e.target.value)}
-                                            />
+                                    <TextField
+                                        label="Barangay"
+                                        fullWidth
+                                        size="small"
+                                        value={pickupAddress.barangay}
+                                        onChange={(e) => handlePickupAddressChange("barangay", e.target.value)}
+                                    />
                                         </Grid>
                                         <Grid item xs={12} sm={6}>
-                                            <TextField
-                                                label="Postal Code"
-                                                fullWidth
-                                                size="small"
-                                                value={pickupAddress.postalCode}
-                                                onChange={(e) => handlePickupAddressChange("postalCode", e.target.value)}
-                                            />
+                                    <TextField
+                                        label="Postal Code"
+                                        fullWidth
+                                        size="small"
+                                        value={pickupAddress.postalCode}
+                                        onChange={(e) => handlePickupAddressChange("postalCode", e.target.value)}
+                                    />
                                         </Grid>
                                     </Grid>
                                 )}
-                            </Box>
-                        </Paper>
+                        </Box>
+                    </Paper>
 
-                        <Paper elevation={3} sx={{ ...contractFormStyles, mt: 3 }}>
+                        <Paper elevation={3} sx={{ 
+                            maxWidth: 700, 
+                            mx: "auto", 
+                            mt: 3, 
+                            p: 4, 
+                            pt: 2, 
+                            borderRadius: 3, 
+                            backgroundColor: theme.palette.background.paper, 
+                            position: "relative" 
+                        }}>
                             <Typography variant="h6" fontWeight="bold" align="center" mb={3}>Drop-off Location</Typography>
-                            <Box sx={formContainerStyles}>
-                                <TextField
-                                    inputRef={inputRef}
-                                    label="Drop-off Location"
-                                    fullWidth
-                                    size="small"
-                                    placeholder="Search for a location"
-                                    value={dropoffAddress.location}
-                                    onChange={handleAddressChange}
-                                    InputProps={{
-                                        autoComplete: 'off',
-                                        sx: {
-                                            '& .MuiOutlinedInput-root': {
-                                                '&.Mui-focused fieldset': {
-                                                    borderColor: 'primary.main',
-                                                },
-                                            },
-                                        }
-                                    }}
-                                />
-                                <MapComponent mapRef={mapRef} mapError={mapError} />
-                            </Box>
-                        </Paper>
+                            <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mb: 2 }}>
+                                {isFormMounted && (
+                                    <Box>
+                                        <Autocomplete
+                                            freeSolo
+                                            filterOptions={(x) => x}
+                                            options={placeOptions}
+                                            getOptionLabel={(option) => option.description || ''}
+                                            loading={placeLoading}
+                                            inputValue={dropoffAddress.location}
+                                            onInputChange={handleDropoffInputChange}
+                                            onChange={handleDropoffSelect}
+                                            renderInput={(params) => (
+                            <TextField
+                                                    {...params}
+                                                    label="Drop-off Location"
+                                fullWidth
+                                size="small"
+                                                    placeholder="Search for a location"
+                                                    InputProps={{
+                                                        ...params.InputProps,
+                                                        endAdornment: (
+                                                            <>
+                                                                {placeLoading ? <CircularProgress color="inherit" size={20} /> : null}
+                                                                {params.InputProps.endAdornment}
+                                                            </>
+                                                        ),
+                                                        autoComplete: 'off',
+                                                    }}
+                                                    sx={{ mb: 1 }}
+                                                />
+                                            )}
+                                    />
+                                </Box>
+                                )}
+                                {mounted && <MapComponent mapRef={mapRef} mapError={mapError} />}
+                        </Box>
+                    </Paper>
 
-                        {contracts.map((contract, index) => (
-                            <Paper key={index} elevation={3} sx={contractFormStyles}>
+                    {contracts.map((contract, index) => (
+                            <Paper key={index} elevation={3} sx={{ 
+                                maxWidth: 700, 
+                                mx: "auto", 
+                                mt: 4, 
+                                p: 4, 
+                                pt: 2, 
+                                borderRadius: 3, 
+                                backgroundColor: theme.palette.background.paper, 
+                                position: "relative" 
+                            }}>
                                 <IconButton 
                                     size="small" 
                                     onClick={() => deleteContract(index)} 
-                                    sx={deleteButtonStyles} 
+                                    sx={{ position: "absolute", top: 8, right: 8, color: theme.palette.grey[600] }} 
                                     aria-label="delete form"
                                 >
                                     <CloseIcon />
@@ -596,81 +664,81 @@ export default function Page() {
                                     Delivery Information {index + 1}
                                 </Typography>
 
-                                <Box sx={formContainerStyles}>
+                                <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mb: 2 }}>
                                     <Grid container spacing={2}>
                                         <Grid item xs={12}>
-                                            <TextField 
-                                                label="Case Number" 
-                                                fullWidth 
-                                                size="small" 
-                                                value={contract.caseNumber} 
-                                                onChange={(e) => handleInputChange(index, "caseNumber", e.target.value)} 
-                                            />
+                                <TextField 
+                                    label="Case Number" 
+                                    fullWidth 
+                                    size="small" 
+                                    value={contract.caseNumber} 
+                                    onChange={(e) => handleInputChange(index, "caseNumber", e.target.value)} 
+                                />
                                         </Grid>
                                         <Grid item xs={12}>
-                                            <TextField 
-                                                label="Name" 
-                                                fullWidth 
-                                                size="small" 
-                                                value={contract.name} 
-                                                onChange={(e) => handleInputChange(index, "name", e.target.value)} 
-                                            />
+                                <TextField 
+                                    label="Name" 
+                                    fullWidth 
+                                    size="small" 
+                                    value={contract.name} 
+                                    onChange={(e) => handleInputChange(index, "name", e.target.value)} 
+                                />
                                         </Grid>
                                         <Grid item xs={12}>
-                                            <TextField 
-                                                label="Item Description" 
-                                                fullWidth 
-                                                size="small" 
-                                                value={contract.itemDescription} 
-                                                onChange={(e) => handleInputChange(index, "itemDescription", e.target.value)} 
-                                            />
+                                <TextField 
+                                    label="Item Description" 
+                                    fullWidth 
+                                    size="small" 
+                                    value={contract.itemDescription} 
+                                    onChange={(e) => handleInputChange(index, "itemDescription", e.target.value)} 
+                                />
                                         </Grid>
                                         <Grid item xs={12} sm={6}>
-                                            <TextField 
-                                                label="Contact Number" 
-                                                fullWidth 
-                                                size="small" 
-                                                value={contract.contact} 
-                                                onChange={(e) => handleInputChange(index, "contact", e.target.value)} 
-                                            />
+                                        <TextField 
+                                            label="Contact Number" 
+                                            fullWidth 
+                                            size="small" 
+                                            value={contract.contact} 
+                                            onChange={(e) => handleInputChange(index, "contact", e.target.value)} 
+                                        />
                                         </Grid>
                                         <Grid item xs={12} sm={6}>
-                                            <TextField 
-                                                label="Weight (kg)" 
-                                                fullWidth 
-                                                size="small" 
-                                                value={contract.weight} 
-                                                onChange={(e) => handleInputChange(index, "weight", e.target.value)} 
-                                            />
+                                        <TextField 
+                                            label="Weight (kg)" 
+                                            fullWidth 
+                                            size="small" 
+                                            value={contract.weight} 
+                                            onChange={(e) => handleInputChange(index, "weight", e.target.value)} 
+                                        />
                                         </Grid>
                                     </Grid>
-                                </Box>
+                            </Box>
 
-                                <Box sx={buttonContainerStyles}>
+                                <Box sx={{ display: "flex", justifyContent: "center", mt: 2 }}>
                                     <Button 
                                         variant="contained" 
                                         size="small" 
-                                        sx={clearButtonStyles} 
+                                        sx={{ bgcolor: "#4a4a4a", color: "#fff", "&:hover": { bgcolor: "#333" } }} 
                                         onClick={() => clearSingleContract(index)}
                                     >
                                         Clear Contract
                                     </Button>
-                                </Box>
-                            </Paper>
-                        ))}
+                            </Box>
+                        </Paper>
+                    ))}
 
-                        <Box sx={bottomButtonContainerStyles}>
-                            <Button variant="outlined" onClick={addContract}>Add Another Form</Button>
-                            <Button variant="contained" onClick={handleSubmit}>Send Contract</Button>
-                        </Box>
+                        <Box sx={{ display: "flex", justifyContent: "center", mt: 4, gap: 2 }}>
+                        <Button variant="outlined" onClick={addContract}>Add Another Form</Button>
+                        <Button variant="contained" onClick={handleSubmit}>Send Contract</Button>
                     </Box>
+                </Box>
 
-                    <Box textAlign="center" mt={6}>
+                    <Box sx={{ textAlign: "center", mt: 6 }}>
                         <Typography variant="h6" fontWeight="bold">Partnered with:</Typography>
-                        <Box sx={brandContainerStyles}>
-                            <Image src="/brand-3.png" alt="AirAsia" width={60} height={60} />
-                        </Box>
-                    </Box>
+                        <Box sx={{ display: "flex", justifyContent: "center", gap: 4, mt: 2 }}>
+                    <Image src="/brand-3.png" alt="AirAsia" width={60} height={60} />
+                </Box>
+            </Box>
                 </>
             )}
         </Box>
