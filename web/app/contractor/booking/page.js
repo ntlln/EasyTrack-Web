@@ -9,6 +9,7 @@ import Script from 'next/script';
 import dynamic from 'next/dynamic';
 import Autocomplete from '@mui/material/Autocomplete';
 import CircularProgress from '@mui/material/CircularProgress';
+import Snackbar from '@mui/material/Snackbar';
 
 // Dynamically import the map component to avoid hydration issues
 const MapComponent = dynamic(() => Promise.resolve(({ mapRef, mapError }) => (
@@ -430,6 +431,8 @@ export default function Page() {
         }]);
     };
 
+    const [snackbarOpen, setSnackbarOpen] = useState(false);
+
     const handleSubmit = async () => {
         try {
             // Get the current user's ID
@@ -440,12 +443,17 @@ export default function Page() {
                 return;
             }
 
+            // Calculate total luggage quantity
+            const totalLuggageQuantity = contracts.reduce((sum, contract) => sum + Number(contract.quantity || 0), 0);
+
             // First, insert into contract table
             const { data: contractData, error: contractError } = await supabase
                 .from('contract')
                 .insert({
-                    luggage_quantity: contracts.length,
-                    airline_id: user.id
+                    luggage_quantity: totalLuggageQuantity,
+                    airline_id: user.id,
+                    pickup_location: pickupAddress.location,
+                    drop_off_location: dropoffAddress.location
                 })
                 .select()
                 .single();
@@ -462,6 +470,7 @@ export default function Page() {
                 contact_number: contract.contact,
                 item_description: contract.itemDescription,
                 weight: contract.weight,
+                quantity: contract.quantity,
                 contract_id: contractData.id // Link to the contract
             }));
 
@@ -476,8 +485,7 @@ export default function Page() {
             }
 
             console.log('Data inserted successfully:', data);
-            // You might want to show a success message to the user here
-            // and possibly redirect them to another page
+            setSnackbarOpen(true);
 
         } catch (error) {
             console.error('Error submitting form:', error);
@@ -529,7 +537,7 @@ export default function Page() {
                                         onChange={(e) => handlePickupAddressChange("location", e.target.value)}
                                     >
                                         {[...Array(12)].map((_, i) => (
-                                            <MenuItem key={i+1} value={`terminal3_bay${i+1}`}>{`Terminal 3, Bay ${i+1}`}</MenuItem>
+                                            <MenuItem key={i+1} value={`Terminal 3, Bay ${i+1}`}>{`Terminal 3, Bay ${i+1}`}</MenuItem>
                                         ))}
                                     </Select>
                                 </FormControl>
@@ -643,6 +651,7 @@ export default function Page() {
                                             label="Weight (kg)"
                                             fullWidth
                                             size="small"
+                                            type="number"
                                             value={contract.weight}
                                             onChange={(e) => handleInputChange(index, "weight", e.target.value)}
                                         />
@@ -682,6 +691,14 @@ export default function Page() {
                             <Image src="/brand-3.png" alt="AirAsia" width={60} height={60} />
                         </Box>
                     </Box>
+
+                    <Snackbar
+                        open={snackbarOpen}
+                        autoHideDuration={4000}
+                        onClose={() => setSnackbarOpen(false)}
+                        message="Booking Complete"
+                        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+                    />
                 </>
             )}
         </Box>

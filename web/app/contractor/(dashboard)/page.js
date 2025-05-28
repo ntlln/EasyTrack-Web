@@ -16,7 +16,7 @@ export default function Page() {
   // Dashboard cards configuration
   const cards = [
     { title: "Profile", route: "/contractor/profile" },
-    { title: "Create Contract", route: "/contractor/create-contract" },
+    { title: "Booking", route: "/contractor/booking" },
     { title: "Delivery History & Reports", route: "/contractor/history-and-reports" },
     { title: "Luggage Tracking", route: "/contractor/luggage-tracking" },
     { title: "Statistics", route: "/contractor/statistics" },

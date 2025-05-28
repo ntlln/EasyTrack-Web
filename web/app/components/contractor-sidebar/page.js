@@ -106,9 +106,9 @@ export default function Page() {
                     {!isMinimized && openPages && (
                         <Collapse in={openPages} timeout="auto" unmountOnExit>
                             <List component="div" disablePadding sx={{ pl: 2 }}>
-                                <ListItemButton sx={{ pl: 4, ...(isActive("/contractor/create-contract") ? activeStyles : {}), ...listItemStyles("/contractor/create-contract") }} onClick={() => handleNavigation("/contractor/create-contract")}>
-                                    <ListItemIcon><ArticleIcon sx={iconStyles("/contractor/create-contract")} /></ListItemIcon>
-                                    <ListItemText primary="Create Contract" />
+                                <ListItemButton sx={{ pl: 4, ...(isActive("/contractor/booking") ? activeStyles : {}), ...listItemStyles("/contractor/booking") }} onClick={() => handleNavigation("/contractor/booking")}>
+                                    <ListItemIcon><ArticleIcon sx={iconStyles("/contractor/booking")} /></ListItemIcon>
+                                    <ListItemText primary="Booking" />
                                 </ListItemButton>
 
                                 <ListItemButton sx={{ pl: 4, ...(isActive("/contractor/luggage-tracking") ? activeStyles : {}), ...listItemStyles("/contractor/luggage-tracking") }} onClick={() => handleNavigation("/contractor/luggage-tracking")}>
