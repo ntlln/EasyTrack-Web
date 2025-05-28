@@ -12,11 +12,11 @@ import CircularProgress from '@mui/material/CircularProgress';
 
 // Dynamically import the map component to avoid hydration issues
 const MapComponent = dynamic(() => Promise.resolve(({ mapRef, mapError }) => (
-    <Box 
-        ref={mapRef} 
-        sx={{ 
-            width: '100%', 
-            height: '300px', 
+    <Box
+        ref={mapRef}
+        sx={{
+            width: '100%',
+            height: '300px',
             mt: 2,
             borderRadius: 1,
             overflow: 'hidden',
@@ -24,13 +24,13 @@ const MapComponent = dynamic(() => Promise.resolve(({ mapRef, mapError }) => (
             borderColor: 'divider',
             position: 'relative',
             bgcolor: 'background.default'
-        }} 
+        }}
     >
         {mapError && (
-            <Box sx={{ 
-                position: 'absolute', 
-                top: '50%', 
-                left: '50%', 
+            <Box sx={{
+                position: 'absolute',
+                top: '50%',
+                left: '50%',
                 transform: 'translate(-50%, -50%)',
                 textAlign: 'center',
                 color: 'error.main'
@@ -54,12 +54,13 @@ export default function Page() {
     const updateTimeoutRef = useRef(null);
     const [mounted, setMounted] = useState(false);
     const [isFormMounted, setIsFormMounted] = useState(false);
-    const [contracts, setContracts] = useState([{ 
-        name: "", 
+    const [contracts, setContracts] = useState([{
+        name: "",
         caseNumber: "",
-        itemDescription: "", 
+        itemDescription: "",
         contact: "",
-        weight: ""
+        weight: "",
+        quantity: ""
     }]);
     const [pickupAddress, setPickupAddress] = useState({
         location: "",
@@ -112,7 +113,7 @@ export default function Page() {
         try {
             // SM Mall of Asia coordinates
             const defaultLocation = { lat: 14.5350, lng: 120.9821 };
-            
+
             const mapOptions = {
                 center: defaultLocation,
                 zoom: 15,
@@ -203,7 +204,7 @@ export default function Page() {
 
         // Update address
         const geocoder = new window.google.maps.Geocoder();
-        geocoder.geocode({ 
+        geocoder.geocode({
             location: { lat, lng }
         }, (results, status) => {
             if (status === 'OK' && results[0]) {
@@ -246,7 +247,7 @@ export default function Page() {
 
         // Update address
         const geocoder = new window.google.maps.Geocoder();
-        geocoder.geocode({ 
+        geocoder.geocode({
             location: position
         }, (results, status) => {
             if (status === 'OK' && results[0]) {
@@ -299,7 +300,7 @@ export default function Page() {
 
             // Reverse geocode to get address
             const geocoder = new window.google.maps.Geocoder();
-            geocoder.geocode({ 
+            geocoder.geocode({
                 location: { lat, lng },
                 componentRestrictions: {
                     country: 'ph'
@@ -402,12 +403,13 @@ export default function Page() {
 
     const clearSingleContract = (index) => {
         const updatedContracts = [...contracts];
-        updatedContracts[index] = { 
-            name: "", 
+        updatedContracts[index] = {
+            name: "",
             caseNumber: "",
-            itemDescription: "", 
+            itemDescription: "",
             contact: "",
-            weight: ""
+            weight: "",
+            quantity: ""
         };
         setContracts(updatedContracts);
     };
@@ -418,12 +420,13 @@ export default function Page() {
     };
 
     const addContract = () => {
-        setContracts([...contracts, { 
-            name: "", 
+        setContracts([...contracts, {
+            name: "",
             caseNumber: "",
-            itemDescription: "", 
+            itemDescription: "",
             contact: "",
-            weight: ""
+            weight: "",
+            quantity: ""
         }]);
     };
 
@@ -431,7 +434,7 @@ export default function Page() {
         try {
             // Get the current user's ID
             const { data: { user }, error: userError } = await supabase.auth.getUser();
-            
+
             if (userError) {
                 console.error('Error getting user:', userError);
                 return;
@@ -483,11 +486,11 @@ export default function Page() {
     };
 
     return (
-        <Box sx={{ 
-            minHeight: "100vh", 
-            bgcolor: theme.palette.background.default, 
-            color: theme.palette.text.primary, 
-            p: 2 
+        <Box sx={{
+            minHeight: "100vh",
+            bgcolor: theme.palette.background.default,
+            color: theme.palette.text.primary,
+            p: 2
         }}>
             {mounted && (
                 <>
@@ -506,15 +509,15 @@ export default function Page() {
                     <Typography variant="h4" fontWeight="bold" color="primary.main" mb={2}>Booking</Typography>
 
                     <Box>
-                        <Paper elevation={3} sx={{ 
-                            maxWidth: 700, 
-                            mx: "auto", 
-                            mt: 4, 
-                            p: 4, 
-                            pt: 2, 
-                            borderRadius: 3, 
-                            backgroundColor: theme.palette.background.paper, 
-                            position: "relative" 
+                        <Paper elevation={3} sx={{
+                            maxWidth: 700,
+                            mx: "auto",
+                            mt: 4,
+                            p: 4,
+                            pt: 2,
+                            borderRadius: 3,
+                            backgroundColor: theme.palette.background.paper,
+                            position: "relative"
                         }}>
                             <Typography variant="h6" fontWeight="bold" align="center" mb={3}>Pickup Location</Typography>
                             <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mb: 2 }}>
@@ -525,81 +528,23 @@ export default function Page() {
                                         label="Pickup Location"
                                         onChange={(e) => handlePickupAddressChange("location", e.target.value)}
                                     >
-                                        <MenuItem value="terminal3_bay10">Terminal 3, Bay 10</MenuItem>
-                                        <MenuItem value="custom">Custom Location</MenuItem>
+                                        {[...Array(12)].map((_, i) => (
+                                            <MenuItem key={i+1} value={`terminal3_bay${i+1}`}>{`Terminal 3, Bay ${i+1}`}</MenuItem>
+                                        ))}
                                     </Select>
                                 </FormControl>
+                            </Box>
+                        </Paper>
 
-                                {pickupAddress.location === "custom" && (
-                                    <Grid container spacing={2}>
-                                        <Grid item xs={12}>
-                            <TextField
-                                label="Address Line 1"
-                                fullWidth
-                                size="small"
-                                value={pickupAddress.addressLine1}
-                                onChange={(e) => handlePickupAddressChange("addressLine1", e.target.value)}
-                            />
-                                        </Grid>
-                                        <Grid item xs={12}>
-                            <TextField
-                                label="Address Line 2"
-                                fullWidth
-                                size="small"
-                                value={pickupAddress.addressLine2}
-                                onChange={(e) => handlePickupAddressChange("addressLine2", e.target.value)}
-                            />
-                                        </Grid>
-                                        <Grid item xs={12} sm={6}>
-                                    <TextField
-                                        label="Province"
-                                        fullWidth
-                                        size="small"
-                                        value={pickupAddress.province}
-                                        onChange={(e) => handlePickupAddressChange("province", e.target.value)}
-                                    />
-                                        </Grid>
-                                        <Grid item xs={12} sm={6}>
-                                    <TextField
-                                        label="City"
-                                        fullWidth
-                                        size="small"
-                                        value={pickupAddress.city}
-                                        onChange={(e) => handlePickupAddressChange("city", e.target.value)}
-                                    />
-                                        </Grid>
-                                        <Grid item xs={12} sm={6}>
-                                    <TextField
-                                        label="Barangay"
-                                        fullWidth
-                                        size="small"
-                                        value={pickupAddress.barangay}
-                                        onChange={(e) => handlePickupAddressChange("barangay", e.target.value)}
-                                    />
-                                        </Grid>
-                                        <Grid item xs={12} sm={6}>
-                                    <TextField
-                                        label="Postal Code"
-                                        fullWidth
-                                        size="small"
-                                        value={pickupAddress.postalCode}
-                                        onChange={(e) => handlePickupAddressChange("postalCode", e.target.value)}
-                                    />
-                                        </Grid>
-                                    </Grid>
-                                )}
-                        </Box>
-                    </Paper>
-
-                        <Paper elevation={3} sx={{ 
-                            maxWidth: 700, 
-                            mx: "auto", 
-                            mt: 3, 
-                            p: 4, 
-                            pt: 2, 
-                            borderRadius: 3, 
-                            backgroundColor: theme.palette.background.paper, 
-                            position: "relative" 
+                        <Paper elevation={3} sx={{
+                            maxWidth: 700,
+                            mx: "auto",
+                            mt: 3,
+                            p: 4,
+                            pt: 2,
+                            borderRadius: 3,
+                            backgroundColor: theme.palette.background.paper,
+                            position: "relative"
                         }}>
                             <Typography variant="h6" fontWeight="bold" align="center" mb={3}>Drop-off Location</Typography>
                             <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mb: 2 }}>
@@ -615,11 +560,11 @@ export default function Page() {
                                             onInputChange={handleDropoffInputChange}
                                             onChange={handleDropoffSelect}
                                             renderInput={(params) => (
-                            <TextField
+                                                <TextField
                                                     {...params}
                                                     label="Drop-off Location"
-                                fullWidth
-                                size="small"
+                                                    fullWidth
+                                                    size="small"
                                                     placeholder="Search for a location"
                                                     InputProps={{
                                                         ...params.InputProps,
@@ -634,28 +579,28 @@ export default function Page() {
                                                     sx={{ mb: 1 }}
                                                 />
                                             )}
-                                    />
-                                </Box>
+                                        />
+                                    </Box>
                                 )}
                                 {mounted && <MapComponent mapRef={mapRef} mapError={mapError} />}
-                        </Box>
-                    </Paper>
+                            </Box>
+                        </Paper>
 
-                    {contracts.map((contract, index) => (
-                            <Paper key={index} elevation={3} sx={{ 
-                                maxWidth: 700, 
-                                mx: "auto", 
-                                mt: 4, 
-                                p: 4, 
-                                pt: 2, 
-                                borderRadius: 3, 
-                                backgroundColor: theme.palette.background.paper, 
-                                position: "relative" 
+                        {contracts.map((contract, index) => (
+                            <Paper key={index} elevation={3} sx={{
+                                maxWidth: 700,
+                                mx: "auto",
+                                mt: 4,
+                                p: 4,
+                                pt: 2,
+                                borderRadius: 3,
+                                backgroundColor: theme.palette.background.paper,
+                                position: "relative"
                             }}>
-                                <IconButton 
-                                    size="small" 
-                                    onClick={() => deleteContract(index)} 
-                                    sx={{ position: "absolute", top: 8, right: 8, color: theme.palette.grey[600] }} 
+                                <IconButton
+                                    size="small"
+                                    onClick={() => deleteContract(index)}
+                                    sx={{ position: "absolute", top: 8, right: 8, color: theme.palette.grey[600] }}
                                     aria-label="delete form"
                                 >
                                     <CloseIcon />
@@ -665,80 +610,78 @@ export default function Page() {
                                 </Typography>
 
                                 <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mb: 2 }}>
-                                    <Grid container spacing={2}>
-                                        <Grid item xs={12}>
-                                <TextField 
-                                    label="Case Number" 
-                                    fullWidth 
-                                    size="small" 
-                                    value={contract.caseNumber} 
-                                    onChange={(e) => handleInputChange(index, "caseNumber", e.target.value)} 
-                                />
-                                        </Grid>
-                                        <Grid item xs={12}>
-                                <TextField 
-                                    label="Name" 
-                                    fullWidth 
-                                    size="small" 
-                                    value={contract.name} 
-                                    onChange={(e) => handleInputChange(index, "name", e.target.value)} 
-                                />
-                                        </Grid>
-                                        <Grid item xs={12}>
-                                <TextField 
-                                    label="Item Description" 
-                                    fullWidth 
-                                    size="small" 
-                                    value={contract.itemDescription} 
-                                    onChange={(e) => handleInputChange(index, "itemDescription", e.target.value)} 
-                                />
-                                        </Grid>
-                                        <Grid item xs={12} sm={6}>
-                                        <TextField 
-                                            label="Contact Number" 
-                                            fullWidth 
-                                            size="small" 
-                                            value={contract.contact} 
-                                            onChange={(e) => handleInputChange(index, "contact", e.target.value)} 
+                                    <TextField
+                                        label="Case Number"
+                                        fullWidth
+                                        size="small"
+                                        value={contract.caseNumber}
+                                        onChange={(e) => handleInputChange(index, "caseNumber", e.target.value)}
+                                    />
+                                    <TextField
+                                        label="Name"
+                                        fullWidth
+                                        size="small"
+                                        value={contract.name}
+                                        onChange={(e) => handleInputChange(index, "name", e.target.value)}
+                                    />
+                                    <TextField
+                                        label="Item Description"
+                                        fullWidth
+                                        size="small"
+                                        value={contract.itemDescription}
+                                        onChange={(e) => handleInputChange(index, "itemDescription", e.target.value)}
+                                    />
+                                    <Box sx={{ display: 'flex', gap: 2, width: '100%' }}>
+                                        <TextField
+                                            label="Contact Number"
+                                            fullWidth
+                                            size="small"
+                                            value={contract.contact}
+                                            onChange={(e) => handleInputChange(index, "contact", e.target.value)}
                                         />
-                                        </Grid>
-                                        <Grid item xs={12} sm={6}>
-                                        <TextField 
-                                            label="Weight (kg)" 
-                                            fullWidth 
-                                            size="small" 
-                                            value={contract.weight} 
-                                            onChange={(e) => handleInputChange(index, "weight", e.target.value)} 
+                                        <TextField
+                                            label="Weight (kg)"
+                                            fullWidth
+                                            size="small"
+                                            value={contract.weight}
+                                            onChange={(e) => handleInputChange(index, "weight", e.target.value)}
                                         />
-                                        </Grid>
-                                    </Grid>
-                            </Box>
+                                        <TextField
+                                            label="Luggage Quantity"
+                                            fullWidth
+                                            size="small"
+                                            type="number"
+                                            value={contract.quantity}
+                                            onChange={(e) => handleInputChange(index, "quantity", e.target.value)}
+                                        />
+                                    </Box>
+                                </Box>
 
                                 <Box sx={{ display: "flex", justifyContent: "center", mt: 2 }}>
-                                    <Button 
-                                        variant="contained" 
-                                        size="small" 
-                                        sx={{ bgcolor: "#4a4a4a", color: "#fff", "&:hover": { bgcolor: "#333" } }} 
+                                    <Button
+                                        variant="contained"
+                                        size="small"
+                                        sx={{ bgcolor: "#4a4a4a", color: "#fff", "&:hover": { bgcolor: "#333" } }}
                                         onClick={() => clearSingleContract(index)}
                                     >
                                         Clear Contract
                                     </Button>
-                            </Box>
-                        </Paper>
-                    ))}
+                                </Box>
+                            </Paper>
+                        ))}
 
                         <Box sx={{ display: "flex", justifyContent: "center", mt: 4, gap: 2 }}>
-                        <Button variant="outlined" onClick={addContract}>Add Another Form</Button>
-                        <Button variant="contained" onClick={handleSubmit}>Send Contract</Button>
+                            <Button variant="outlined" onClick={addContract}>Add Another Form</Button>
+                            <Button variant="contained" onClick={handleSubmit}>Send Contract</Button>
+                        </Box>
                     </Box>
-                </Box>
 
                     <Box sx={{ textAlign: "center", mt: 6 }}>
                         <Typography variant="h6" fontWeight="bold">Partnered with:</Typography>
                         <Box sx={{ display: "flex", justifyContent: "center", gap: 4, mt: 2 }}>
-                    <Image src="/brand-3.png" alt="AirAsia" width={60} height={60} />
-                </Box>
-            </Box>
+                            <Image src="/brand-3.png" alt="AirAsia" width={60} height={60} />
+                        </Box>
+                    </Box>
                 </>
             )}
         </Box>
