@@ -86,8 +86,43 @@ export default function Page() {
   };
 
   // Styles
-  const containerStyles = { display: "flex", width: "auto", height: "100vh", justifyContent: "center", alignItems: "center", backgroundImage: "url(/login-bg.png)", backgroundSize: "80%", backgroundRepeat: "no-repeat", backgroundPosition: "center", backgroundopacity: "30%" };
-  const formContainerStyles = { display: "flex", flexDirection: "column", width: "50vh", backgroundColor: "background.default", boxShadow: 5, borderRadius: 3, alignItems: "center", pt: 5, pb: 5, gap: 2 };
+  const containerStyles = {
+    display: "flex",
+    width: "100%",
+    height: "100vh",
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "background.default",
+    position: "relative"
+  };
+
+  const backgroundStyles = {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundImage: "url(/login-bg.png)",
+    backgroundSize: "80%",
+    backgroundRepeat: "no-repeat",
+    backgroundPosition: "center",
+    zIndex: 0
+  };
+
+  const formContainerStyles = {
+    display: "flex",
+    flexDirection: "column",
+    width: "50vh",
+    backgroundColor: "background.default",
+    boxShadow: 5,
+    borderRadius: 3,
+    alignItems: "center",
+    pt: 5,
+    pb: 5,
+    gap: 2,
+    position: "relative",
+    zIndex: 1
+  };
   const formStyles = { width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' };
   const textFieldStyles = { width: "70%" };
   const forgotPasswordStyles = { fontSize: ".85rem", cursor: "pointer", "&:hover": { textDecoration: "underline", color: "primary.main" } };
@@ -99,6 +134,7 @@ export default function Page() {
 
   return (
     <Box sx={containerStyles}>
+      <Box sx={backgroundStyles} />
       <Box sx={formContainerStyles}>
         <Typography variant="h3" sx={{ color: "primary.main", fontWeight: "bold" }}>EasyTrack</Typography>
         <Typography color="secondary.main">Login to EasyTrack</Typography>

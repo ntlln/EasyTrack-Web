@@ -98,7 +98,27 @@ export default function Page() {
     };
 
     // Styles
-    const containerStyles = { display: "flex", width: "auto", height: "100vh", justifyContent: "center", alignItems: "center", backgroundImage: "url(/login-bg.png)", backgroundSize: "80%", backgroundRepeat: "no-repeat", backgroundPosition: "center", backgroundopacity: "30%" };
+    const containerStyles = { 
+        display: "flex", 
+        width: "auto", 
+        height: "100vh", 
+        justifyContent: "center", 
+        alignItems: "center",
+        backgroundColor: "background.default"
+    };
+
+    useEffect(() => {
+        // Set background image after component mounts
+        const container = document.querySelector('.login-container');
+        if (container) {
+            container.style.backgroundImage = "url(/login-bg.png)";
+            container.style.backgroundSize = "80%";
+            container.style.backgroundRepeat = "no-repeat";
+            container.style.backgroundPosition = "center";
+            container.style.backgroundOpacity = "30%";
+        }
+    }, []);
+
     const formContainerStyles = { display: "flex", flexDirection: "column", width: "50vh", backgroundColor: "background.default", boxShadow: 5, borderRadius: 3, alignItems: "center", pt: 5, pb: 5, gap: 2 };
     const formStyles = { width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' };
     const inputFieldStyles = { width: "70%" };
@@ -112,7 +132,7 @@ export default function Page() {
     const linkStyles = { fontSize: ".75rem", cursor: "pointer", "&:hover": { textDecoration: "underline", color: "primary.main" } };
 
     return (
-        <Box sx={containerStyles}>
+        <Box sx={containerStyles} className="login-container">
             <Box sx={formContainerStyles}>
                 <Typography variant="h3" sx={{ color: "primary.main", fontWeight: "bold" }}>EasyTrack</Typography>
                 <Typography color="secondary.main">Login to EasyTrack</Typography>

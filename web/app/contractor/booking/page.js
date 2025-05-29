@@ -98,76 +98,192 @@ export default function Page() {
                     {contractListLoading && (<Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}><CircularProgress /></Box>)}
                     {contractListError && (<Typography color="error" align="center">{contractListError}</Typography>)}
                     {!contractListLoading && !contractListError && contractList.length === 0 && (<Typography align="center">No contracts found.</Typography>)}
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4, maxWidth: '800px', mx: 'auto', width: '100%' }}>
                         {contractList.map((contract, idx) => (
-                            <Paper key={`contract-${contract.id}`} elevation={3} sx={{ p: 3, borderRadius: 3, background: theme.palette.background.paper, color: theme.palette.text.primary, boxShadow: '0 2px 12px 0 rgba(0,0,0,0.12)', mb: 2, position: 'relative', overflow: 'hidden', border: `1px solid ${theme.palette.divider}` }}>
-                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                                    <Box>
-                                        <Typography variant="subtitle1" sx={{ color: theme.palette.primary.main, fontWeight: 700, mb: 1, letterSpacing: 0.5 }}>Contract ID: <span style={{ color: '#bdbdbd', fontWeight: 400 }}>{contract.id}</span></Typography>
-                                        <Divider sx={{ my: 1, bgcolor: theme.palette.primary.main }} />
-                                        <Typography variant="subtitle2" sx={{ color: theme.palette.primary.main, fontWeight: 700, mb: 1 }}>Location Information</Typography>
+                            <Paper key={`contract-${contract.id}`} elevation={3} sx={{ p: 3, borderRadius: 3, mb: 2, width: '100%' }}>
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', position: 'relative' }}>
+                                    <Box sx={{ flex: 1 }}>
+                                        <Typography variant="subtitle1" sx={{ color: 'primary.main', fontWeight: 700, mb: 1 }}>
+                                            Contract ID: <span style={{ color: '#bdbdbd', fontWeight: 400 }}>{contract.id}</span>
+                                        </Typography>
+                                        <Divider sx={{ my: 1 }} />
+                                        <Typography variant="subtitle2" sx={{ color: 'primary.main', fontWeight: 700, mb: 1 }}>
+                                            Location Information
+                                        </Typography>
                                         <Box sx={{ ml: 1, mb: 1 }}>
-                                            <Typography variant="body2" sx={{ color: '#bdbdbd' }}><b>Pickup:</b> <span style={{ color: theme.palette.text.primary }}>{contract.pickup_location || 'N/A'}</span></Typography>
-                                            {contract.pickup_location_geo && (<Typography variant="body2" sx={{ color: '#bdbdbd' }}><b>Pickup Coordinates:</b> <span style={{ color: theme.palette.text.primary }}>{contract.pickup_location_geo.coordinates[1].toFixed(6)}, {contract.pickup_location_geo.coordinates[0].toFixed(6)}</span></Typography>)}
-                                            <Typography variant="body2" sx={{ color: '#bdbdbd' }}><b>Drop-off:</b> <span style={{ color: theme.palette.text.primary }}>{contract.drop_off_location || 'N/A'}</span></Typography>
-                                            {contract.drop_off_location_geo && (<Typography variant="body2" sx={{ color: '#bdbdbd' }}><b>Drop-off Coordinates:</b> <span style={{ color: theme.palette.text.primary }}>{contract.drop_off_location_geo.coordinates[1].toFixed(6)}, {contract.drop_off_location_geo.coordinates[0].toFixed(6)}</span></Typography>)}
+                                            <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                                                <b>Pickup:</b> <span style={{ color: 'text.primary' }}>{contract.pickup_location || 'N/A'}</span>
+                                            </Typography>
+                                            {contract.pickup_location_geo && (
+                                                <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                                                    <b>Pickup Coordinates:</b>{' '}
+                                                    <span style={{ color: 'text.primary' }}>
+                                                        {contract.pickup_location_geo.coordinates[1].toFixed(6)}, {contract.pickup_location_geo.coordinates[0].toFixed(6)}
+                                                    </span>
+                                                </Typography>
+                                            )}
+                                            <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                                                <b>Drop-off:</b> <span style={{ color: 'text.primary' }}>{contract.drop_off_location || 'N/A'}</span>
+                                            </Typography>
+                                            {contract.drop_off_location_geo && (
+                                                <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                                                    <b>Drop-off Coordinates:</b>{' '}
+                                                    <span style={{ color: 'text.primary' }}>
+                                                        {contract.drop_off_location_geo.coordinates[1].toFixed(6)}, {contract.drop_off_location_geo.coordinates[0].toFixed(6)}
+                                                    </span>
+                                                </Typography>
+                                            )}
                                         </Box>
                                     </Box>
-                                    <Button
-                                        variant="contained"
-                                        startIcon={<LocationOnIcon />}
-                                        onClick={() => handleTrackContract(contract.id)}
-                                        sx={{
-                                            bgcolor: theme.palette.primary.main,
-                                            '&:hover': {
-                                                bgcolor: theme.palette.primary.dark,
-                                            },
-                                        }}
-                                    >
-                                        Track
-                                    </Button>
-                                </Box>
-                                <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2, position: 'relative', minHeight: 40 }}>
-                                    {!expandedContracts.includes(contract.id) && (<IconButton onClick={() => handleExpandClick(contract.id)} aria-expanded={expandedContracts.includes(contract.id)} aria-label="show more" sx={{ background: 'none', color: theme.palette.primary.main, borderRadius: 2, '&:hover': { color: theme.palette.primary.dark, background: 'none' } }}><ExpandMoreIcon /></IconButton>)}
+                                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', ml: 2 }}>
+                                        <Button
+                                            variant="contained"
+                                            startIcon={<LocationOnIcon />}
+                                            onClick={() => handleTrackContract(contract.id)}
+                                            sx={{ mb: 1 }}
+                                        >
+                                            Track
+                                        </Button>
+                                        <IconButton
+                                            onClick={() => handleExpandClick(contract.id)}
+                                            aria-expanded={expandedContracts.includes(contract.id)}
+                                            aria-label="show more"
+                                            size="small"
+                                            sx={{ 
+                                                transform: expandedContracts.includes(contract.id) ? 'rotate(180deg)' : 'rotate(0deg)',
+                                                transition: 'transform 0.3s',
+                                                color: 'primary.main',
+                                                '&:hover': {
+                                                    color: 'primary.dark'
+                                                },
+                                                mt: 5
+                                            }}
+                                        >
+                                            <ExpandMoreIcon />
+                                        </IconButton>
+                                    </Box>
                                 </Box>
                                 <Collapse in={expandedContracts.includes(contract.id)} timeout="auto" unmountOnExit>
-                                    <Divider sx={{ my: 2, bgcolor: theme.palette.primary.main }} />
-                                    <Typography variant="subtitle2" sx={{ color: theme.palette.primary.main, fontWeight: 700, mb: 1 }}>Contractor Information</Typography>
+                                    <Divider sx={{ my: 2 }} />
+                                    <Typography variant="subtitle2" sx={{ color: 'primary.main', fontWeight: 700, mb: 1 }}>
+                                        Contractor Information
+                                    </Typography>
                                     <Box sx={{ ml: 1, mb: 1 }}>
-                                        <Typography variant="body2" sx={{ color: '#bdbdbd' }}><b>Contractor Name:</b> <span style={{ color: theme.palette.text.primary }}>{contract.airline ? `${contract.airline.first_name || ''} ${contract.airline.middle_initial || ''} ${contract.airline.last_name || ''}${contract.airline.suffix ? ` ${contract.airline.suffix}` : ''}`.replace(/  +/g, ' ').trim() : 'N/A'}</span></Typography>
-                                        <Typography variant="body2" sx={{ color: '#bdbdbd' }}><b>Contractor Email:</b> <span style={{ color: theme.palette.text.primary }}>{contract.airline?.email || 'N/A'}</span></Typography>
-                                        <Typography variant="body2" sx={{ color: '#bdbdbd' }}><b>Contractor Contact:</b> <span style={{ color: theme.palette.text.primary }}>{contract.airline?.contact_number || 'N/A'}</span></Typography>
-                                        <Typography variant="body2" sx={{ color: '#bdbdbd' }}><b>Subcontractor Name:</b> <span style={{ color: theme.palette.text.primary }}>{contract.delivery ? `${contract.delivery.first_name || ''} ${contract.delivery.middle_initial || ''} ${contract.delivery.last_name || ''}${contract.delivery.suffix ? ` ${contract.delivery.suffix}` : ''}`.replace(/  +/g, ' ').trim() : 'N/A'}</span></Typography>
-                                        <Typography variant="body2" sx={{ color: '#bdbdbd' }}><b>Subcontractor Email:</b> <span style={{ color: theme.palette.text.primary }}>{contract.delivery?.email || 'N/A'}</span></Typography>
-                                        <Typography variant="body2" sx={{ color: '#bdbdbd' }}><b>Subcontractor Contact:</b> <span style={{ color: theme.palette.text.primary }}>{contract.delivery?.contact_number || 'N/A'}</span></Typography>
-                                        <Typography variant="body2" sx={{ color: '#bdbdbd' }}><b>Status:</b> <span style={{ color: theme.palette.primary.main, fontWeight: 700 }}>{contract.contract_status?.status_name || 'N/A'}</span></Typography>
+                                        <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                                            <b>Contractor Name:</b>{' '}
+                                            <span style={{ color: 'text.primary' }}>
+                                                {contract.airline
+                                                    ? `${contract.airline.first_name || ''} ${contract.airline.middle_initial || ''} ${
+                                                        contract.airline.last_name || ''
+                                                    }${contract.airline.suffix ? ` ${contract.airline.suffix}` : ''}`
+                                                        .replace(/  +/g, ' ')
+                                                        .trim()
+                                                    : 'N/A'}
+                                            </span>
+                                        </Typography>
+                                        <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                                            <b>Contractor Email:</b>{' '}
+                                            <span style={{ color: 'text.primary' }}>{contract.airline?.email || 'N/A'}</span>
+                                        </Typography>
+                                        <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                                            <b>Contractor Contact:</b>{' '}
+                                            <span style={{ color: 'text.primary' }}>{contract.airline?.contact_number || 'N/A'}</span>
+                                        </Typography>
+                                        <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                                            <b>Subcontractor Name:</b>{' '}
+                                            <span style={{ color: 'text.primary' }}>
+                                                {contract.delivery
+                                                    ? `${contract.delivery.first_name || ''} ${contract.delivery.middle_initial || ''} ${
+                                                        contract.delivery.last_name || ''
+                                                    }${contract.delivery.suffix ? ` ${contract.delivery.suffix}` : ''}`
+                                                        .replace(/  +/g, ' ')
+                                                        .trim()
+                                                    : 'N/A'}
+                                            </span>
+                                        </Typography>
+                                        <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                                            <b>Subcontractor Email:</b>{' '}
+                                            <span style={{ color: 'text.primary' }}>{contract.delivery?.email || 'N/A'}</span>
+                                        </Typography>
+                                        <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                                            <b>Subcontractor Contact:</b>{' '}
+                                            <span style={{ color: 'text.primary' }}>{contract.delivery?.contact_number || 'N/A'}</span>
+                                        </Typography>
+                                        <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                                            <b>Status:</b>{' '}
+                                            <span style={{ color: 'primary.main', fontWeight: 700 }}>
+                                                {contract.contract_status?.status_name || 'N/A'}
+                                            </span>
+                                        </Typography>
                                     </Box>
-                                    <Divider sx={{ my: 2, bgcolor: theme.palette.primary.main }} />
-                                    <Typography variant="subtitle2" sx={{ color: theme.palette.primary.main, fontWeight: 700, mb: 1 }}>Luggage Information</Typography>
+                                    <Divider sx={{ my: 2 }} />
+                                    <Typography variant="subtitle2" sx={{ color: 'primary.main', fontWeight: 700, mb: 1 }}>
+                                        Luggage Information
+                                    </Typography>
                                     <Box sx={{ ml: 1, mb: 1 }}>
-                                        {contract.luggage.length === 0 && <Typography variant="body2" sx={{ color: '#bdbdbd' }}>No luggage info.</Typography>}
+                                        {contract.luggage.length === 0 && (
+                                            <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                                                No luggage info.
+                                            </Typography>
+                                        )}
                                         {contract.luggage.map((l, lidx) => (
                                             <Box key={`luggage-${contract.id}-${lidx}`} sx={{ mb: 2, pl: 1 }}>
-                                                <Typography variant="subtitle2" sx={{ color: theme.palette.primary.main, fontWeight: 700 }}>Luggage {lidx + 1}</Typography>
-                                                <Typography variant="body2" sx={{ color: '#bdbdbd' }}>Owner: <span style={{ color: theme.palette.text.primary }}>{l.luggage_owner || 'N/A'}</span></Typography>
-                                                <Typography variant="body2" sx={{ color: '#bdbdbd' }}>Case Number: <span style={{ color: theme.palette.text.primary }}>{l.case_number || 'N/A'}</span></Typography>
-                                                <Typography variant="body2" sx={{ color: '#bdbdbd' }}>Description: <span style={{ color: theme.palette.text.primary }}>{l.item_description || 'N/A'}</span></Typography>
-                                                <Typography variant="body2" sx={{ color: '#bdbdbd' }}>Weight: <span style={{ color: theme.palette.text.primary }}>{l.weight ? `${l.weight} kg` : 'N/A'}</span></Typography>
-                                                <Typography variant="body2" sx={{ color: '#bdbdbd' }}>Contact: <span style={{ color: theme.palette.text.primary }}>{l.contact_number || 'N/A'}</span></Typography>
+                                                <Typography variant="subtitle2" sx={{ color: 'primary.main', fontWeight: 700 }}>
+                                                    Luggage {lidx + 1}
+                                                </Typography>
+                                                <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                                                    Owner: <span style={{ color: 'text.primary' }}>{l.luggage_owner || 'N/A'}</span>
+                                                </Typography>
+                                                <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                                                    Case Number: <span style={{ color: 'text.primary' }}>{l.case_number || 'N/A'}</span>
+                                                </Typography>
+                                                <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                                                    Description: <span style={{ color: 'text.primary' }}>{l.item_description || 'N/A'}</span>
+                                                </Typography>
+                                                <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                                                    Weight: <span style={{ color: 'text.primary' }}>{l.weight ? `${l.weight} kg` : 'N/A'}</span>
+                                                </Typography>
+                                                <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                                                    Contact: <span style={{ color: 'text.primary' }}>{l.contact_number || 'N/A'}</span>
+                                                </Typography>
                                             </Box>
                                         ))}
                                     </Box>
-                                    <Divider sx={{ my: 2, bgcolor: theme.palette.primary.main }} />
-                                    <Typography variant="subtitle2" sx={{ color: theme.palette.primary.main, fontWeight: 700, mb: 1 }}>Timeline</Typography>
+                                    <Divider sx={{ my: 2 }} />
+                                    <Typography variant="subtitle2" sx={{ color: 'primary.main', fontWeight: 700, mb: 1 }}>
+                                        Timeline
+                                    </Typography>
                                     <Box sx={{ ml: 1, mb: 1 }}>
-                                        <Typography variant="body2" sx={{ color: '#bdbdbd' }}><b>Created:</b> <span style={{ color: theme.palette.text.primary }}>{contract.created_at ? new Date(contract.created_at).toLocaleString() : 'N/A'}</span></Typography>
-                                        <Typography variant="body2" sx={{ color: '#bdbdbd' }}><b>Accepted:</b> <span style={{ color: theme.palette.text.primary }}>{contract.accepted_at ? new Date(contract.accepted_at).toLocaleString() : 'N/A'}</span></Typography>
-                                        <Typography variant="body2" sx={{ color: '#bdbdbd' }}><b>Pickup:</b> <span style={{ color: theme.palette.text.primary }}>{contract.pickup_at ? new Date(contract.pickup_at).toLocaleString() : 'N/A'}</span></Typography>
-                                        <Typography variant="body2" sx={{ color: '#bdbdbd' }}><b>Delivered:</b> <span style={{ color: theme.palette.text.primary }}>{contract.delivered_at ? new Date(contract.delivered_at).toLocaleString() : 'N/A'}</span></Typography>
-                                        <Typography variant="body2" sx={{ color: '#bdbdbd' }}><b>Cancelled:</b> <span style={{ color: theme.palette.text.primary }}>{contract.cancelled_at ? new Date(contract.cancelled_at).toLocaleString() : 'N/A'}</span></Typography>
-                                    </Box>
-                                    <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
-                                        <IconButton onClick={() => handleExpandClick(contract.id)} aria-expanded={expandedContracts.includes(contract.id)} aria-label="show less" sx={{ background: 'none', color: theme.palette.primary.main, borderRadius: 2, '&:hover': { color: theme.palette.primary.dark, background: 'none' } }}><ExpandMoreIcon /></IconButton>
+                                        <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                                            <b>Created:</b>{' '}
+                                            <span style={{ color: 'text.primary' }}>
+                                                {contract.created_at ? new Date(contract.created_at).toLocaleString() : 'N/A'}
+                                            </span>
+                                        </Typography>
+                                        <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                                            <b>Accepted:</b>{' '}
+                                            <span style={{ color: 'text.primary' }}>
+                                                {contract.accepted_at ? new Date(contract.accepted_at).toLocaleString() : 'N/A'}
+                                            </span>
+                                        </Typography>
+                                        <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                                            <b>Pickup:</b>{' '}
+                                            <span style={{ color: 'text.primary' }}>
+                                                {contract.pickup_at ? new Date(contract.pickup_at).toLocaleString() : 'N/A'}
+                                            </span>
+                                        </Typography>
+                                        <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                                            <b>Delivered:</b>{' '}
+                                            <span style={{ color: 'text.primary' }}>
+                                                {contract.delivered_at ? new Date(contract.delivered_at).toLocaleString() : 'N/A'}
+                                            </span>
+                                        </Typography>
+                                        <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                                            <b>Cancelled:</b>{' '}
+                                            <span style={{ color: 'text.primary' }}>
+                                                {contract.cancelled_at ? new Date(contract.cancelled_at).toLocaleString() : 'N/A'}
+                                            </span>
+                                        </Typography>
                                     </Box>
                                 </Collapse>
                             </Paper>
