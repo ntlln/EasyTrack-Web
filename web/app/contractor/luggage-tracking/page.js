@@ -1,148 +1,264 @@
 "use client";
 
-import { useState } from "react";
-import { Box, MenuItem, TextField, Typography, Button, TableContainer, Table, TableHead, TableRow, TableCell, TableBody, Paper, IconButton, Menu, Pagination } from "@mui/material";
-import MoreVertIcon from '@mui/icons-material/MoreVert';
-import RefreshIcon from '@mui/icons-material/Refresh';
+import { useState, useEffect } from "react";
+import { Box, Typography, TextField, Paper, Divider, IconButton, Collapse, CircularProgress } from "@mui/material";
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
 export default function Page() {
-  const [page, setPage] = useState(0);
-  const [rowsPerPage] = useState(5);
-  const [anchorEl, setAnchorEl] = useState(null);
-  const [selectedAccount, setSelectedAccount] = useState(null);
+  const [contractId, setContractId] = useState("");
+  const [contract, setContract] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [expanded, setExpanded] = useState(false);
+  const supabase = createClientComponentClient();
 
-  const deliveries = Array.from({ length: 100 }, (_, i) => ({
-    id: i + 1,
-    passengerName: "placeholder",
-    passengerContact: "placeholder",
-    deliveryAddress: "placeholder",
-    airportLocation: "placeholder",
-    luggageType: "placeholder",
-    luggageQuantity: "placeholder",
-    assignedPersonnel: "placeholder",
-    vehicleDetails: "placeholder",
-    pickupTime: "placeholder",
-    estimatedDeliveryTime: "placeholder",
-    currentStatus: "placeholder",
-  }));
+  const handleSearch = async () => {
+    if (!contractId.trim()) return;
+    
+    setLoading(true);
+    setError(null);
+    setContract(null);
 
-  const handleChangePage = (event, newPage) => {
-    setPage(newPage - 1);
+    try {
+      const { data: contracts, error: contractError } = await supabase
+        .from('contract')
+        .select(`
+          id, 
+          created_at, 
+          accepted_at, 
+          pickup_at, 
+          delivered_at, 
+          cancelled_at, 
+          pickup_location, 
+          pickup_location_geo, 
+          drop_off_location, 
+          drop_off_location_geo, 
+          contract_status_id, 
+          contract_status(status_name), 
+          airline_id, 
+          delivery_id, 
+          airline:airline_id (*), 
+          delivery:delivery_id (*)
+        `)
+        .eq('id', contractId)
+        .single();
+
+      if (contractError) throw contractError;
+
+      if (contracts) {
+        const { data: luggage, error: luggageError } = await supabase
+          .from('contract_luggage_information')
+          .select('*')
+          .eq('contract_id', contracts.id);
+
+        if (luggageError) throw luggageError;
+
+        setContract({
+          ...contracts,
+          luggage: luggage || []
+        });
+      }
+    } catch (err) {
+      setError(err.message || 'Failed to fetch contract');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleOpenMenu = (event, account) => {
-    setAnchorEl(event.currentTarget);
-    setSelectedAccount(account);
+  const handleExpandClick = () => {
+    setExpanded(!expanded);
   };
-
-  const handleCloseMenu = () => {
-    setAnchorEl(null);
-    setSelectedAccount(null);
-  };
-
-  const handleTrack = () => {
-    console.log("Track", selectedAccount);
-    handleCloseMenu();
-  };
-
-  const handleContact = () => {
-    console.log("Contact", selectedAccount);
-    handleCloseMenu();
-  };
-
-  const handleRefresh = () => {
-    console.log("Refreshed!");
-  };
-
-  const totalPages = Math.ceil(deliveries.length / rowsPerPage);
-
-  const pageContainerStyles = { p: 4, display: "flex", flexDirection: "column", gap: 4 };
-  const headerContainerStyles = { display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 2 };
-  const searchFieldStyles = { width: "250px" };
-  const tableContainerStyles = { width: '100%', overflowX: 'auto' };
-  const paginationContainerStyles = { display: "flex", justifyContent: "space-between", alignItems: "center", p: 2, flexWrap: "wrap" };
 
   return (
-    <Box sx={pageContainerStyles}>
+    <Box sx={{ p: 2, display: "flex", flexDirection: "column", gap: 4 }}>
       <Box>
-        <Typography variant="h3" color="primary.main" fontWeight="bold">
+        <Typography variant="h4" color="primary.main" fontWeight="bold">
           Luggage Tracking
         </Typography>
       </Box>
 
-      <Box sx={headerContainerStyles}>
-        <Button
+      <Box sx={{ display: "flex", gap: 2, alignItems: "center" }}>
+        <TextField
+          label="Track Luggage"
           variant="outlined"
-          startIcon={<RefreshIcon />}
-          onClick={handleRefresh}
-        >
-          Refresh
-        </Button>
-        <TextField label="Search" size="small" sx={searchFieldStyles} />
+          size="small"
+          value={contractId}
+          onChange={(e) => setContractId(e.target.value)}
+          onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+          sx={{ width: "300px" }}
+        />
       </Box>
 
-      <Box sx={tableContainerStyles}>
-        <TableContainer component={Paper}>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>Tracking ID</TableCell>
-                <TableCell>Passenger Name</TableCell>
-                <TableCell>Passenger Contact Number</TableCell>
-                <TableCell>Delivery Address</TableCell>
-                <TableCell>Airport Location</TableCell>
-                <TableCell>Luggage Type</TableCell>
-                <TableCell>Luggage Quantity</TableCell>
-                <TableCell>Assigned Delivery Personnel</TableCell>
-                <TableCell>Delivery Vehicle Details</TableCell>
-                <TableCell>Pickup Time</TableCell>
-                <TableCell>Estimated Delivery Time</TableCell>
-                <TableCell>Current Status</TableCell>
-                <TableCell>Actions</TableCell>
-              </TableRow>
-            </TableHead>
+      {loading && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
+          <CircularProgress />
+        </Box>
+      )}
 
-            <TableBody>
-              {deliveries
-                .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-                .map((delivery) => (
-                  <TableRow key={delivery.id}>
-                    <TableCell>{delivery.id}</TableCell>
-                    <TableCell>{delivery.passengerName}</TableCell>
-                    <TableCell>{delivery.passengerContact}</TableCell>
-                    <TableCell>{delivery.deliveryAddress}</TableCell>
-                    <TableCell>{delivery.airportLocation}</TableCell>
-                    <TableCell>{delivery.luggageType}</TableCell>
-                    <TableCell>{delivery.luggageQuantity}</TableCell>
-                    <TableCell>{delivery.assignedPersonnel}</TableCell>
-                    <TableCell>{delivery.vehicleDetails}</TableCell>
-                    <TableCell>{delivery.pickupTime}</TableCell>
-                    <TableCell>{delivery.estimatedDeliveryTime}</TableCell>
-                    <TableCell>{delivery.currentStatus}</TableCell>
-                    <TableCell>
-                      <IconButton onClick={(event) => handleOpenMenu(event, delivery)}>
-                        <MoreVertIcon />
-                      </IconButton>
-                    </TableCell>
-                  </TableRow>
-                ))}
-            </TableBody>
-          </Table>
+      {error && (
+        <Typography color="error" align="center">
+          {error}
+        </Typography>
+      )}
 
-          <Box sx={paginationContainerStyles}>
-            <Typography variant="body2">
-              Showing {page * rowsPerPage + 1} - {Math.min((page + 1) * rowsPerPage, deliveries.length)} of {deliveries.length} ongoing deliveries
+      {contract && (
+        <Paper elevation={3} sx={{ p: 3, borderRadius: 3, position: 'relative', overflow: 'hidden', border: '1px solid', borderColor: 'divider' }}>
+          <Box>
+            <Typography variant="subtitle1" sx={{ color: 'primary.main', fontWeight: 700, mb: 1, letterSpacing: 0.5 }}>
+              Contract ID: <span style={{ color: '#bdbdbd', fontWeight: 400 }}>{contract.id}</span>
             </Typography>
-
-            <Pagination count={totalPages} page={page + 1} onChange={handleChangePage} color="primary" shape="rounded" siblingCount={1} boundaryCount={2} showFirstButton showLastButton />
+            <Divider sx={{ my: 1, bgcolor: 'primary.main' }} />
+            <Typography variant="subtitle2" sx={{ color: 'primary.main', fontWeight: 700, mb: 1 }}>
+              Location Information
+            </Typography>
+            <Box sx={{ ml: 1, mb: 1 }}>
+              <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                <b>Pickup:</b> <span style={{ color: 'text.primary' }}>{contract.pickup_location || 'N/A'}</span>
+              </Typography>
+              {contract.pickup_location_geo && (
+                <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                  <b>Pickup Coordinates:</b> <span style={{ color: 'text.primary' }}>
+                    {contract.pickup_location_geo.coordinates[1].toFixed(6)}, {contract.pickup_location_geo.coordinates[0].toFixed(6)}
+                  </span>
+                </Typography>
+              )}
+              <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                <b>Drop-off:</b> <span style={{ color: 'text.primary' }}>{contract.drop_off_location || 'N/A'}</span>
+              </Typography>
+              {contract.drop_off_location_geo && (
+                <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                  <b>Drop-off Coordinates:</b> <span style={{ color: 'text.primary' }}>
+                    {contract.drop_off_location_geo.coordinates[1].toFixed(6)}, {contract.drop_off_location_geo.coordinates[0].toFixed(6)}
+                  </span>
+                </Typography>
+              )}
+            </Box>
           </Box>
-        </TableContainer>
-      </Box>
 
-      <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleCloseMenu} anchorOrigin={{ vertical: "top", horizontal: "left" }} transformOrigin={{ vertical: "top", horizontal: "left" }}>
-        <MenuItem onClick={handleTrack}>Track</MenuItem>
-        <MenuItem onClick={handleContact}>Contact</MenuItem>
-      </Menu>
+          <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2, position: 'relative', minHeight: 40 }}>
+            {!expanded && (
+              <IconButton
+                onClick={handleExpandClick}
+                aria-expanded={expanded}
+                aria-label="show more"
+                sx={{
+                  background: 'none',
+                  color: 'primary.main',
+                  borderRadius: 2,
+                  '&:hover': { color: 'primary.dark', background: 'none' }
+                }}
+              >
+                <ExpandMoreIcon />
+              </IconButton>
+            )}
+          </Box>
+
+          <Collapse in={expanded} timeout="auto" unmountOnExit>
+            <Divider sx={{ my: 2, bgcolor: 'primary.main' }} />
+            <Typography variant="subtitle2" sx={{ color: 'primary.main', fontWeight: 700, mb: 1 }}>
+              Contractor Information
+            </Typography>
+            <Box sx={{ ml: 1, mb: 1 }}>
+              <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                <b>Contractor Name:</b> <span style={{ color: 'text.primary' }}>
+                  {contract.airline ? `${contract.airline.first_name || ''} ${contract.airline.middle_initial || ''} ${contract.airline.last_name || ''}${contract.airline.suffix ? ` ${contract.airline.suffix}` : ''}`.replace(/  +/g, ' ').trim() : 'N/A'}
+                </span>
+              </Typography>
+              <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                <b>Contractor Email:</b> <span style={{ color: 'text.primary' }}>{contract.airline?.email || 'N/A'}</span>
+              </Typography>
+              <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                <b>Contractor Contact:</b> <span style={{ color: 'text.primary' }}>{contract.airline?.contact_number || 'N/A'}</span>
+              </Typography>
+              <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                <b>Subcontractor Name:</b> <span style={{ color: 'text.primary' }}>
+                  {contract.delivery ? `${contract.delivery.first_name || ''} ${contract.delivery.middle_initial || ''} ${contract.delivery.last_name || ''}${contract.delivery.suffix ? ` ${contract.delivery.suffix}` : ''}`.replace(/  +/g, ' ').trim() : 'N/A'}
+                </span>
+              </Typography>
+              <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                <b>Subcontractor Email:</b> <span style={{ color: 'text.primary' }}>{contract.delivery?.email || 'N/A'}</span>
+              </Typography>
+              <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                <b>Subcontractor Contact:</b> <span style={{ color: 'text.primary' }}>{contract.delivery?.contact_number || 'N/A'}</span>
+              </Typography>
+              <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                <b>Status:</b> <span style={{ color: 'primary.main', fontWeight: 700 }}>{contract.contract_status?.status_name || 'N/A'}</span>
+              </Typography>
+            </Box>
+
+            <Divider sx={{ my: 2, bgcolor: 'primary.main' }} />
+            <Typography variant="subtitle2" sx={{ color: 'primary.main', fontWeight: 700, mb: 1 }}>
+              Luggage Information
+            </Typography>
+            <Box sx={{ ml: 1, mb: 1 }}>
+              {contract.luggage.length === 0 && (
+                <Typography variant="body2" sx={{ color: '#bdbdbd' }}>No luggage info.</Typography>
+              )}
+              {contract.luggage.map((l, lidx) => (
+                <Box key={l.id} sx={{ mb: 2, pl: 1 }}>
+                  <Typography variant="subtitle2" sx={{ color: 'primary.main', fontWeight: 700 }}>
+                    Luggage {lidx + 1}
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                    Owner: <span style={{ color: 'text.primary' }}>{l.luggage_owner || 'N/A'}</span>
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                    Case Number: <span style={{ color: 'text.primary' }}>{l.case_number || 'N/A'}</span>
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                    Description: <span style={{ color: 'text.primary' }}>{l.item_description || 'N/A'}</span>
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                    Weight: <span style={{ color: 'text.primary' }}>{l.weight ? `${l.weight} kg` : 'N/A'}</span>
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                    Contact: <span style={{ color: 'text.primary' }}>{l.contact_number || 'N/A'}</span>
+                  </Typography>
+                </Box>
+              ))}
+            </Box>
+
+            <Divider sx={{ my: 2, bgcolor: 'primary.main' }} />
+            <Typography variant="subtitle2" sx={{ color: 'primary.main', fontWeight: 700, mb: 1 }}>
+              Timeline
+            </Typography>
+            <Box sx={{ ml: 1, mb: 1 }}>
+              <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                <b>Created:</b> <span style={{ color: 'text.primary' }}>{contract.created_at ? new Date(contract.created_at).toLocaleString() : 'N/A'}</span>
+              </Typography>
+              <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                <b>Accepted:</b> <span style={{ color: 'text.primary' }}>{contract.accepted_at ? new Date(contract.accepted_at).toLocaleString() : 'N/A'}</span>
+              </Typography>
+              <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                <b>Pickup:</b> <span style={{ color: 'text.primary' }}>{contract.pickup_at ? new Date(contract.pickup_at).toLocaleString() : 'N/A'}</span>
+              </Typography>
+              <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                <b>Delivered:</b> <span style={{ color: 'text.primary' }}>{contract.delivered_at ? new Date(contract.delivered_at).toLocaleString() : 'N/A'}</span>
+              </Typography>
+              <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                <b>Cancelled:</b> <span style={{ color: 'text.primary' }}>{contract.cancelled_at ? new Date(contract.cancelled_at).toLocaleString() : 'N/A'}</span>
+              </Typography>
+            </Box>
+
+            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
+              <IconButton
+                onClick={handleExpandClick}
+                aria-expanded={expanded}
+                aria-label="show less"
+                sx={{
+                  background: 'none',
+                  color: 'primary.main',
+                  borderRadius: 2,
+                  '&:hover': { color: 'primary.dark', background: 'none' }
+                }}
+              >
+                <ExpandMoreIcon />
+              </IconButton>
+            </Box>
+          </Collapse>
+        </Paper>
+      )}
     </Box>
   );
 }

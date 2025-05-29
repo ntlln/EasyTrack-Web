@@ -72,7 +72,7 @@ export default function Page() {
     const handleTabChange = (event, newValue) => { setActiveTab(newValue); };
 
     // Fetch contract list
-    useEffect(() => { const fetchContracts = async () => { setContractListLoading(true); setContractListError(null); try { const { data: contracts, error: contractError } = await supabase.from('contract').select(`id, created_at, accepted_at, pickup_at, delivered_at, cancelled_at, pickup_location, pickup_location_geo, drop_off_location, drop_off_location_geo, contract_status_id, contract_status(status_name), airline_id, delivery_id, airline:airline_id (*), delivery:delivery_id (*)`).order('created_at', { ascending: false }); if (contractError) throw contractError; const contractUuids = contracts.map(c => c.uuid); const { data: luggage, error: luggageError } = await supabase.from('contract_luggage_information').select('*').in('contract_id', contractUuids); if (luggageError) throw luggageError; const luggageByContract = {}; luggage.forEach(l => { if (!luggageByContract[l.contract_id]) luggageByContract[l.contract_id] = []; luggageByContract[l.contract_id].push(l); }); const contractsWithLuggage = contracts.map(c => ({ ...c, luggage: luggageByContract[c.uuid] || [] })); setContractList(contractsWithLuggage); } catch (err) { setContractListError(err.message || 'Failed to fetch contracts'); } finally { setContractListLoading(false); } }; if (activeTab === 0) fetchContracts(); }, [activeTab]);
+    useEffect(() => { const fetchContracts = async () => { setContractListLoading(true); setContractListError(null); try { const { data: contracts, error: contractError } = await supabase.from('contract').select(`id, created_at, accepted_at, pickup_at, delivered_at, cancelled_at, pickup_location, pickup_location_geo, drop_off_location, drop_off_location_geo, contract_status_id, contract_status(status_name), airline_id, delivery_id, airline:airline_id (*), delivery:delivery_id (*)`).order('created_at', { ascending: false }); if (contractError) throw contractError; if (!contracts || contracts.length === 0) { setContractList([]); return; } const contractIds = contracts.map(c => c.id); const { data: luggage, error: luggageError } = await supabase.from('contract_luggage_information').select('*').in('contract_id', contractIds); if (luggageError) throw luggageError; const luggageByContract = {}; luggage.forEach(l => { if (!luggageByContract[l.contract_id]) luggageByContract[l.contract_id] = []; luggageByContract[l.contract_id].push(l); }); const contractsWithLuggage = contracts.map(c => ({ ...c, luggage: luggageByContract[c.id] || [] })); setContractList(contractsWithLuggage); } catch (err) { setContractListError(err.message || 'Failed to fetch contracts'); } finally { setContractListLoading(false); } }; if (activeTab === 0) fetchContracts(); }, [activeTab]);
 
     // Expand/collapse
     const handleExpandClick = (contractId) => { setExpandedContracts((prev) => prev.includes(contractId) ? prev.filter((id) => id !== contractId) : [...prev, contractId]); };
@@ -94,9 +94,9 @@ export default function Page() {
                     {!contractListLoading && !contractListError && contractList.length === 0 && (<Typography align="center">No contracts found.</Typography>)}
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                         {contractList.map((contract, idx) => (
-                            <Paper key={contract.uuid} elevation={3} sx={{ p: 3, borderRadius: 3, background: theme.palette.background.paper, color: theme.palette.text.primary, boxShadow: '0 2px 12px 0 rgba(0,0,0,0.12)', mb: 2, position: 'relative', overflow: 'hidden', border: `1px solid ${theme.palette.divider}` }}>
+                            <Paper key={`contract-${contract.id}`} elevation={3} sx={{ p: 3, borderRadius: 3, background: theme.palette.background.paper, color: theme.palette.text.primary, boxShadow: '0 2px 12px 0 rgba(0,0,0,0.12)', mb: 2, position: 'relative', overflow: 'hidden', border: `1px solid ${theme.palette.divider}` }}>
                                 <Box>
-                                    <Typography variant="subtitle1" sx={{ color: theme.palette.primary.main, fontWeight: 700, mb: 1, letterSpacing: 0.5 }}>Contract ID: <span style={{ color: '#bdbdbd', fontWeight: 400 }}>{contract.uuid}</span></Typography>
+                                    <Typography variant="subtitle1" sx={{ color: theme.palette.primary.main, fontWeight: 700, mb: 1, letterSpacing: 0.5 }}>Contract ID: <span style={{ color: '#bdbdbd', fontWeight: 400 }}>{contract.id}</span></Typography>
                                     <Divider sx={{ my: 1, bgcolor: theme.palette.primary.main }} />
                                     <Typography variant="subtitle2" sx={{ color: theme.palette.primary.main, fontWeight: 700, mb: 1 }}>Location Information</Typography>
                                     <Box sx={{ ml: 1, mb: 1 }}>
@@ -107,9 +107,9 @@ export default function Page() {
                                     </Box>
                                 </Box>
                                 <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2, position: 'relative', minHeight: 40 }}>
-                                    {!expandedContracts.includes(contract.uuid) && (<IconButton onClick={() => handleExpandClick(contract.uuid)} aria-expanded={expandedContracts.includes(contract.uuid)} aria-label="show more" sx={{ background: 'none', color: theme.palette.primary.main, borderRadius: 2, '&:hover': { color: theme.palette.primary.dark, background: 'none' } }}><ExpandMoreIcon /></IconButton>)}
+                                    {!expandedContracts.includes(contract.id) && (<IconButton onClick={() => handleExpandClick(contract.id)} aria-expanded={expandedContracts.includes(contract.id)} aria-label="show more" sx={{ background: 'none', color: theme.palette.primary.main, borderRadius: 2, '&:hover': { color: theme.palette.primary.dark, background: 'none' } }}><ExpandMoreIcon /></IconButton>)}
                                 </Box>
-                                <Collapse in={expandedContracts.includes(contract.uuid)} timeout="auto" unmountOnExit>
+                                <Collapse in={expandedContracts.includes(contract.id)} timeout="auto" unmountOnExit>
                                     <Divider sx={{ my: 2, bgcolor: theme.palette.primary.main }} />
                                     <Typography variant="subtitle2" sx={{ color: theme.palette.primary.main, fontWeight: 700, mb: 1 }}>Contractor Information</Typography>
                                     <Box sx={{ ml: 1, mb: 1 }}>
@@ -125,7 +125,16 @@ export default function Page() {
                                     <Typography variant="subtitle2" sx={{ color: theme.palette.primary.main, fontWeight: 700, mb: 1 }}>Luggage Information</Typography>
                                     <Box sx={{ ml: 1, mb: 1 }}>
                                         {contract.luggage.length === 0 && <Typography variant="body2" sx={{ color: '#bdbdbd' }}>No luggage info.</Typography>}
-                                        {contract.luggage.map((l, lidx) => (<Box key={l.id} sx={{ mb: 2, pl: 1 }}><Typography variant="subtitle2" sx={{ color: theme.palette.primary.main, fontWeight: 700 }}>Luggage {lidx + 1}</Typography><Typography variant="body2" sx={{ color: '#bdbdbd' }}>Owner: <span style={{ color: theme.palette.text.primary }}>{l.luggage_owner || 'N/A'}</span></Typography><Typography variant="body2" sx={{ color: '#bdbdbd' }}>Case Number: <span style={{ color: theme.palette.text.primary }}>{l.case_number || 'N/A'}</span></Typography><Typography variant="body2" sx={{ color: '#bdbdbd' }}>Description: <span style={{ color: theme.palette.text.primary }}>{l.item_description || 'N/A'}</span></Typography><Typography variant="body2" sx={{ color: '#bdbdbd' }}>Weight: <span style={{ color: theme.palette.text.primary }}>{l.weight ? `${l.weight} kg` : 'N/A'}</span></Typography><Typography variant="body2" sx={{ color: '#bdbdbd' }}>Contact: <span style={{ color: theme.palette.text.primary }}>{l.contact_number || 'N/A'}</span></Typography></Box>))}
+                                        {contract.luggage.map((l, lidx) => (
+                                            <Box key={`luggage-${contract.id}-${lidx}`} sx={{ mb: 2, pl: 1 }}>
+                                                <Typography variant="subtitle2" sx={{ color: theme.palette.primary.main, fontWeight: 700 }}>Luggage {lidx + 1}</Typography>
+                                                <Typography variant="body2" sx={{ color: '#bdbdbd' }}>Owner: <span style={{ color: theme.palette.text.primary }}>{l.luggage_owner || 'N/A'}</span></Typography>
+                                                <Typography variant="body2" sx={{ color: '#bdbdbd' }}>Case Number: <span style={{ color: theme.palette.text.primary }}>{l.case_number || 'N/A'}</span></Typography>
+                                                <Typography variant="body2" sx={{ color: '#bdbdbd' }}>Description: <span style={{ color: theme.palette.text.primary }}>{l.item_description || 'N/A'}</span></Typography>
+                                                <Typography variant="body2" sx={{ color: '#bdbdbd' }}>Weight: <span style={{ color: theme.palette.text.primary }}>{l.weight ? `${l.weight} kg` : 'N/A'}</span></Typography>
+                                                <Typography variant="body2" sx={{ color: '#bdbdbd' }}>Contact: <span style={{ color: theme.palette.text.primary }}>{l.contact_number || 'N/A'}</span></Typography>
+                                            </Box>
+                                        ))}
                                     </Box>
                                     <Divider sx={{ my: 2, bgcolor: theme.palette.primary.main }} />
                                     <Typography variant="subtitle2" sx={{ color: theme.palette.primary.main, fontWeight: 700, mb: 1 }}>Timeline</Typography>
@@ -137,7 +146,7 @@ export default function Page() {
                                         <Typography variant="body2" sx={{ color: '#bdbdbd' }}><b>Cancelled:</b> <span style={{ color: theme.palette.text.primary }}>{contract.cancelled_at ? new Date(contract.cancelled_at).toLocaleString() : 'N/A'}</span></Typography>
                                     </Box>
                                     <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
-                                        <IconButton onClick={() => handleExpandClick(contract.uuid)} aria-expanded={expandedContracts.includes(contract.uuid)} aria-label="show less" sx={{ background: 'none', color: theme.palette.primary.main, borderRadius: 2, '&:hover': { color: theme.palette.primary.dark, background: 'none' } }}><ExpandMoreIcon /></IconButton>
+                                        <IconButton onClick={() => handleExpandClick(contract.id)} aria-expanded={expandedContracts.includes(contract.id)} aria-label="show less" sx={{ background: 'none', color: theme.palette.primary.main, borderRadius: 2, '&:hover': { color: theme.palette.primary.dark, background: 'none' } }}><ExpandMoreIcon /></IconButton>
                                     </Box>
                                 </Collapse>
                             </Paper>
@@ -151,7 +160,7 @@ export default function Page() {
                             <FormControl fullWidth size="small" required>
                                 <InputLabel>Pickup Location</InputLabel>
                                 <Select value={pickupAddress.location} label="Pickup Location" onChange={(e) => handlePickupAddressChange("location", e.target.value)} required>
-                                    {[...Array(12)].map((_, i) => (<MenuItem key={i+1} value={`Terminal 3, Bay ${i+1}`}>{`Terminal 3, Bay ${i+1}`}</MenuItem>))}
+                                    {[...Array(12)].map((_, i) => (<MenuItem key={`terminal-${i+1}`} value={`Terminal 3, Bay ${i+1}`}>{`Terminal 3, Bay ${i+1}`}</MenuItem>))}
                                 </Select>
                             </FormControl>
                         </Box>
@@ -163,7 +172,27 @@ export default function Page() {
                             {mounted && <MapComponent mapRef={mapRef} mapError={mapError} />}
                         </Box>
                     </Paper>
-                    {contracts.map((contract, index) => (<Paper key={index} elevation={3} sx={{ maxWidth: 700, mx: "auto", mt: 4, p: 4, pt: 2, borderRadius: 3, backgroundColor: theme.palette.background.paper, position: "relative" }}><IconButton size="small" onClick={() => deleteContract(index)} sx={{ position: "absolute", top: 8, right: 8, color: theme.palette.grey[600] }} aria-label="delete form"><CloseIcon /></IconButton><Typography variant="h6" fontWeight="bold" align="center" mb={3}>Delivery Information {index + 1}</Typography><Box sx={{ display: "flex", flexDirection: "column", gap: 2, mb: 2 }}><TextField label="Case Number" fullWidth size="small" value={contract.caseNumber} onChange={(e) => handleInputChange(index, "caseNumber", e.target.value)} required /><TextField label="Name" fullWidth size="small" value={contract.name} onChange={(e) => handleInputChange(index, "name", e.target.value)} required /><TextField label="Item Description" fullWidth size="small" value={contract.itemDescription} onChange={(e) => handleInputChange(index, "itemDescription", e.target.value)} required /><Box sx={{ display: 'flex', gap: 2, width: '100%' }}><TextField label="Contact Number" fullWidth size="small" value={contract.contact} onChange={(e) => handleInputChange(index, "contact", e.target.value)} required /><TextField label="Weight (kg)" fullWidth size="small" type="number" value={contract.weight} onChange={(e) => handleInputChange(index, "weight", e.target.value)} required /><TextField label="Luggage Quantity" fullWidth size="small" type="number" value={contract.quantity} onChange={(e) => handleInputChange(index, "quantity", e.target.value)} required /></Box></Box><Box sx={{ display: "flex", justifyContent: "center", mt: 2 }}><Button variant="contained" size="small" sx={{ bgcolor: "#4a4a4a", color: "#fff", "&:hover": { bgcolor: "#333" } }} onClick={() => clearSingleContract(index)}>Clear Contract</Button></Box></Paper>))}
+                    {contracts.map((contract, index) => (
+                        <Paper key={`contract-form-${index}`} elevation={3} sx={{ maxWidth: 700, mx: "auto", mt: 4, p: 4, pt: 2, borderRadius: 3, backgroundColor: theme.palette.background.paper, position: "relative" }}>
+                            <IconButton size="small" onClick={() => deleteContract(index)} sx={{ position: "absolute", top: 8, right: 8, color: theme.palette.grey[600] }} aria-label="delete form">
+                                <CloseIcon />
+                            </IconButton>
+                            <Typography variant="h6" fontWeight="bold" align="center" mb={3}>Delivery Information {index + 1}</Typography>
+                            <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mb: 2 }}>
+                                <TextField label="Case Number" fullWidth size="small" value={contract.caseNumber} onChange={(e) => handleInputChange(index, "caseNumber", e.target.value)} required />
+                                <TextField label="Name" fullWidth size="small" value={contract.name} onChange={(e) => handleInputChange(index, "name", e.target.value)} required />
+                                <TextField label="Item Description" fullWidth size="small" value={contract.itemDescription} onChange={(e) => handleInputChange(index, "itemDescription", e.target.value)} required />
+                                <Box sx={{ display: 'flex', gap: 2, width: '100%' }}>
+                                    <TextField label="Contact Number" fullWidth size="small" value={contract.contact} onChange={(e) => handleInputChange(index, "contact", e.target.value)} required />
+                                    <TextField label="Weight (kg)" fullWidth size="small" type="number" value={contract.weight} onChange={(e) => handleInputChange(index, "weight", e.target.value)} required />
+                                    <TextField label="Luggage Quantity" fullWidth size="small" type="number" value={contract.quantity} onChange={(e) => handleInputChange(index, "quantity", e.target.value)} required />
+                                </Box>
+                            </Box>
+                            <Box sx={{ display: "flex", justifyContent: "center", mt: 2 }}>
+                                <Button variant="contained" size="small" sx={{ bgcolor: "#4a4a4a", color: "#fff", "&:hover": { bgcolor: "#333" } }} onClick={() => clearSingleContract(index)}>Clear Contract</Button>
+                            </Box>
+                        </Paper>
+                    ))}
                     <Box sx={{ display: "flex", justifyContent: "center", mt: 4, gap: 2 }}><Button variant="outlined" onClick={addContract}>Add Another Form</Button><Button variant="contained" onClick={handleSubmit}>Send Contract</Button></Box>
                     <Box sx={{ textAlign: "center", mt: 6 }}><Typography variant="h6" fontWeight="bold">Partnered with:</Typography><Box sx={{ display: "flex", justifyContent: "center", gap: 4, mt: 2 }}><Image src="/brand-3.png" alt="AirAsia" width={60} height={60} /></Box></Box>
                 </Box>)}
