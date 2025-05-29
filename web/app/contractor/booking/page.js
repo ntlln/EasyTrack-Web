@@ -72,7 +72,7 @@ export default function Page() {
     const handleTabChange = (event, newValue) => { setActiveTab(newValue); };
 
     // Fetch contract list
-    useEffect(() => { const fetchContracts = async () => { setContractListLoading(true); setContractListError(null); try { const { data: contracts, error: contractError } = await supabase.from('contract').select(`id, created_at, accepted_at, pickup_at, delivered_at, cancelled_at, pickup_location, pickup_location_geo, drop_off_location, drop_off_location_geo, contract_status_id, contract_status(status_name), airline_id, delivery_id, airline:airline_id (*), delivery:delivery_id (*)`).order('created_at', { ascending: false }); if (contractError) throw contractError; const contractIds = contracts.map(c => c.id); const { data: luggage, error: luggageError } = await supabase.from('contract_luggage_information').select('*').in('contract_id', contractIds); if (luggageError) throw luggageError; const luggageByContract = {}; luggage.forEach(l => { if (!luggageByContract[l.contract_id]) luggageByContract[l.contract_id] = []; luggageByContract[l.contract_id].push(l); }); const contractsWithLuggage = contracts.map(c => ({ ...c, luggage: luggageByContract[c.id] || [] })); setContractList(contractsWithLuggage); } catch (err) { setContractListError(err.message || 'Failed to fetch contracts'); } finally { setContractListLoading(false); } }; if (activeTab === 0) fetchContracts(); }, [activeTab]);
+    useEffect(() => { const fetchContracts = async () => { setContractListLoading(true); setContractListError(null); try { const { data: contracts, error: contractError } = await supabase.from('contract').select(`id, created_at, accepted_at, pickup_at, delivered_at, cancelled_at, pickup_location, pickup_location_geo, drop_off_location, drop_off_location_geo, contract_status_id, contract_status(status_name), airline_id, delivery_id, airline:airline_id (*), delivery:delivery_id (*)`).order('created_at', { ascending: false }); if (contractError) throw contractError; const contractUuids = contracts.map(c => c.uuid); const { data: luggage, error: luggageError } = await supabase.from('contract_luggage_information').select('*').in('contract_id', contractUuids); if (luggageError) throw luggageError; const luggageByContract = {}; luggage.forEach(l => { if (!luggageByContract[l.contract_id]) luggageByContract[l.contract_id] = []; luggageByContract[l.contract_id].push(l); }); const contractsWithLuggage = contracts.map(c => ({ ...c, luggage: luggageByContract[c.uuid] || [] })); setContractList(contractsWithLuggage); } catch (err) { setContractListError(err.message || 'Failed to fetch contracts'); } finally { setContractListLoading(false); } }; if (activeTab === 0) fetchContracts(); }, [activeTab]);
 
     // Expand/collapse
     const handleExpandClick = (contractId) => { setExpandedContracts((prev) => prev.includes(contractId) ? prev.filter((id) => id !== contractId) : [...prev, contractId]); };
@@ -94,9 +94,9 @@ export default function Page() {
                     {!contractListLoading && !contractListError && contractList.length === 0 && (<Typography align="center">No contracts found.</Typography>)}
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                         {contractList.map((contract, idx) => (
-                            <Paper key={contract.id} elevation={3} sx={{ p: 3, borderRadius: 3, background: theme.palette.background.paper, color: theme.palette.text.primary, boxShadow: '0 2px 12px 0 rgba(0,0,0,0.12)', mb: 2, position: 'relative', overflow: 'hidden', border: `1px solid ${theme.palette.divider}` }}>
+                            <Paper key={contract.uuid} elevation={3} sx={{ p: 3, borderRadius: 3, background: theme.palette.background.paper, color: theme.palette.text.primary, boxShadow: '0 2px 12px 0 rgba(0,0,0,0.12)', mb: 2, position: 'relative', overflow: 'hidden', border: `1px solid ${theme.palette.divider}` }}>
                                 <Box>
-                                    <Typography variant="subtitle1" sx={{ color: theme.palette.primary.main, fontWeight: 700, mb: 1, letterSpacing: 0.5 }}>Contract ID: <span style={{ color: '#bdbdbd', fontWeight: 400 }}>{contract.id}</span></Typography>
+                                    <Typography variant="subtitle1" sx={{ color: theme.palette.primary.main, fontWeight: 700, mb: 1, letterSpacing: 0.5 }}>Contract ID: <span style={{ color: '#bdbdbd', fontWeight: 400 }}>{contract.uuid}</span></Typography>
                                     <Divider sx={{ my: 1, bgcolor: theme.palette.primary.main }} />
                                     <Typography variant="subtitle2" sx={{ color: theme.palette.primary.main, fontWeight: 700, mb: 1 }}>Location Information</Typography>
                                     <Box sx={{ ml: 1, mb: 1 }}>
@@ -107,9 +107,9 @@ export default function Page() {
                                     </Box>
                                 </Box>
                                 <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2, position: 'relative', minHeight: 40 }}>
-                                    {!expandedContracts.includes(contract.id) && (<IconButton onClick={() => handleExpandClick(contract.id)} aria-expanded={expandedContracts.includes(contract.id)} aria-label="show more" sx={{ background: 'none', color: theme.palette.primary.main, borderRadius: 2, '&:hover': { color: theme.palette.primary.dark, background: 'none' } }}><ExpandMoreIcon /></IconButton>)}
+                                    {!expandedContracts.includes(contract.uuid) && (<IconButton onClick={() => handleExpandClick(contract.uuid)} aria-expanded={expandedContracts.includes(contract.uuid)} aria-label="show more" sx={{ background: 'none', color: theme.palette.primary.main, borderRadius: 2, '&:hover': { color: theme.palette.primary.dark, background: 'none' } }}><ExpandMoreIcon /></IconButton>)}
                                 </Box>
-                                <Collapse in={expandedContracts.includes(contract.id)} timeout="auto" unmountOnExit>
+                                <Collapse in={expandedContracts.includes(contract.uuid)} timeout="auto" unmountOnExit>
                                     <Divider sx={{ my: 2, bgcolor: theme.palette.primary.main }} />
                                     <Typography variant="subtitle2" sx={{ color: theme.palette.primary.main, fontWeight: 700, mb: 1 }}>Contractor Information</Typography>
                                     <Box sx={{ ml: 1, mb: 1 }}>
@@ -137,7 +137,7 @@ export default function Page() {
                                         <Typography variant="body2" sx={{ color: '#bdbdbd' }}><b>Cancelled:</b> <span style={{ color: theme.palette.text.primary }}>{contract.cancelled_at ? new Date(contract.cancelled_at).toLocaleString() : 'N/A'}</span></Typography>
                                     </Box>
                                     <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
-                                        <IconButton onClick={() => handleExpandClick(contract.id)} aria-expanded={expandedContracts.includes(contract.id)} aria-label="show less" sx={{ background: 'none', color: theme.palette.primary.main, borderRadius: 2, '&:hover': { color: theme.palette.primary.dark, background: 'none' } }}><ExpandMoreIcon /></IconButton>
+                                        <IconButton onClick={() => handleExpandClick(contract.uuid)} aria-expanded={expandedContracts.includes(contract.uuid)} aria-label="show less" sx={{ background: 'none', color: theme.palette.primary.main, borderRadius: 2, '&:hover': { color: theme.palette.primary.dark, background: 'none' } }}><ExpandMoreIcon /></IconButton>
                                     </Box>
                                 </Collapse>
                             </Paper>
