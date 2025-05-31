@@ -36,6 +36,7 @@ export default function Page() {
     const [placeOptions, setPlaceOptions] = useState([]); const [placeLoading, setPlaceLoading] = useState(false); const autocompleteServiceRef = useRef(null); const placesServiceRef = useRef(null);
     const [contractList, setContractList] = useState([]); const [contractListLoading, setContractListLoading] = useState(false); const [contractListError, setContractListError] = useState(null); const [expandedContracts, setExpandedContracts] = useState([]);
     const [snackbarOpen, setSnackbarOpen] = useState(false);
+    const [statusFilter, setStatusFilter] = useState('all');
 
     // Mount
     useEffect(() => { setMounted(true); setIsFormMounted(true); }, []);
@@ -75,7 +76,7 @@ export default function Page() {
     const handleTabChange = (event, newValue) => { setActiveTab(newValue); };
 
     // Fetch contract list
-    useEffect(() => { const fetchContracts = async () => { setContractListLoading(true); setContractListError(null); try { const { data: contracts, error: contractError } = await supabase.from('contract').select(`id, created_at, accepted_at, pickup_at, delivered_at, cancelled_at, pickup_location, pickup_location_geo, drop_off_location, drop_off_location_geo, contract_status_id, contract_status(status_name), airline_id, delivery_id, airline:airline_id (*), delivery:delivery_id (*)`).order('created_at', { ascending: false }); if (contractError) throw contractError; if (!contracts || contracts.length === 0) { setContractList([]); return; } const contractIds = contracts.map(c => c.id); const { data: luggage, error: luggageError } = await supabase.from('contract_luggage_information').select('*').in('contract_id', contractIds); if (luggageError) throw luggageError; const luggageByContract = {}; luggage.forEach(l => { if (!luggageByContract[l.contract_id]) luggageByContract[l.contract_id] = []; luggageByContract[l.contract_id].push(l); }); const contractsWithLuggage = contracts.map(c => ({ ...c, luggage: luggageByContract[c.id] || [] })); setContractList(contractsWithLuggage); } catch (err) { setContractListError(err.message || 'Failed to fetch contracts'); } finally { setContractListLoading(false); } }; if (activeTab === 0) fetchContracts(); }, [activeTab]);
+    useEffect(() => { const fetchContracts = async () => { setContractListLoading(true); setContractListError(null); try { const { data: contracts, error: contractError } = await supabase.from('contract').select(`id, created_at, accepted_at, pickup_at, delivered_at, cancelled_at, pickup_location, pickup_location_geo, drop_off_location, drop_off_location_geo, contract_status_id, contract_status(status_name), airline_id, delivery_id, airline:airline_id (*), delivery:delivery_id (*)`).order('created_at', { ascending: false }); if (contractError) throw contractError; if (!contracts || contracts.length === 0) { setContractList([]); return; } console.log('Contract statuses:', contracts.map(c => c.contract_status?.status_name)); const contractIds = contracts.map(c => c.id); const { data: luggage, error: luggageError } = await supabase.from('contract_luggage_information').select('*').in('contract_id', contractIds); if (luggageError) throw luggageError; const luggageByContract = {}; luggage.forEach(l => { if (!luggageByContract[l.contract_id]) luggageByContract[l.contract_id] = []; luggageByContract[l.contract_id].push(l); }); const contractsWithLuggage = contracts.map(c => ({ ...c, luggage: luggageByContract[c.id] || [] })); setContractList(contractsWithLuggage); } catch (err) { setContractListError(err.message || 'Failed to fetch contracts'); } finally { setContractListLoading(false); } }; if (activeTab === 0) fetchContracts(); }, [activeTab]);
 
     // Expand/collapse
     const handleExpandClick = (contractId) => { setExpandedContracts((prev) => prev.includes(contractId) ? prev.filter((id) => id !== contractId) : [...prev, contractId]); };
@@ -84,22 +85,78 @@ export default function Page() {
         router.push(`/contractor/luggage-tracking?contractId=${contractId}`);
     };
 
+    // Filter contracts based on status
+    const filteredContracts = contractList.filter(contract => {
+        if (statusFilter === 'all') return true;
+        const status = contract.contract_status?.status_name?.toLowerCase();
+        switch (statusFilter) {
+            case 'available':
+                return status === 'available for pickup';
+            case 'accepted':
+                return status === 'accepted - awaiting pickup';
+            case 'transit':
+                return status === 'in transit';
+            case 'delivered':
+                return status === 'delivered';
+            case 'failed':
+                return status === 'delivery failed';
+            case 'cancelled':
+                return status === 'cancelled';
+            default:
+                return false;
+        }
+    });
+
+    const filterOptions = [
+        { value: 'all', label: 'All' },
+        { value: 'available', label: 'Available' },
+        { value: 'accepted', label: 'Accepted' },
+        { value: 'transit', label: 'Transit' },
+        { value: 'delivered', label: 'Delivered' },
+        { value: 'failed', label: 'Failed' },
+        { value: 'cancelled', label: 'Cancelled' }
+    ];
+
     // Render
     return (
         <Box sx={{ minHeight: "100vh", bgcolor: theme.palette.background.default, color: theme.palette.text.primary, p: 2 }}>
             {mounted && (<>
                 <Box sx={{ display: 'flex', justifyContent: 'center', mb: 4 }}>
                     <Tabs value={activeTab} onChange={handleTabChange} sx={{ '& .MuiTabs-indicator': { backgroundColor: theme.palette.primary.main }, '& .MuiTab-root': { color: theme.palette.text.primary, '&.Mui-selected': { color: theme.palette.primary.main } } }}>
-                        <Tab label="Contract List" />
-                        <Tab label="Booking" />
+                        <Tab label="Contract List" /><Tab label="Booking" />
                     </Tabs>
                 </Box>
                 {activeTab === 0 && (<Box>
                     {contractListLoading && (<Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}><CircularProgress /></Box>)}
                     {contractListError && (<Typography color="error" align="center">{contractListError}</Typography>)}
                     {!contractListLoading && !contractListError && contractList.length === 0 && (<Typography align="center">No contracts found.</Typography>)}
+                    <Box sx={{ maxWidth: '800px', mx: 'auto', width: '100%', mb: 3, overflowX: 'auto' }}>
+                        <Box sx={{ display: 'flex', gap: 1, p: 1, minWidth: 'max-content', justifyContent: 'center' }}>
+                            {filterOptions.map((option) => (
+                                <Button
+                                    key={option.value}
+                                    variant={statusFilter === option.value ? "contained" : "outlined"}
+                                    onClick={() => setStatusFilter(option.value)}
+                                    sx={{
+                                        borderRadius: '20px',
+                                        textTransform: 'none',
+                                        px: 2,
+                                        whiteSpace: 'nowrap',
+                                        minWidth: '100px',
+                                        borderColor: statusFilter === option.value ? 'primary.main' : 'divider',
+                                        '&:hover': {
+                                            borderColor: 'primary.main',
+                                            bgcolor: statusFilter === option.value ? 'primary.main' : 'transparent'
+                                        }
+                                    }}
+                                >
+                                    {option.label}
+                                </Button>
+                            ))}
+                        </Box>
+                    </Box>
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4, maxWidth: '800px', mx: 'auto', width: '100%' }}>
-                        {contractList.map((contract, idx) => (
+                        {filteredContracts.map((contract, idx) => (
                             <Paper key={`contract-${contract.id}`} elevation={3} sx={{ p: 3, borderRadius: 3, mb: 2, width: '100%' }}>
                                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', position: 'relative' }}>
                                     <Box sx={{ flex: 1 }}>

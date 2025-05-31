@@ -29,7 +29,41 @@ const ContractList = () => {
   const [mounted, setMounted] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeSearch, setActiveSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
   const router = useRouter();
+
+  // Filter options
+  const filterOptions = [
+    { value: 'all', label: 'All' },
+    { value: 'available', label: 'Available' },
+    { value: 'accepted', label: 'Accepted' },
+    { value: 'transit', label: 'Transit' },
+    { value: 'delivered', label: 'Delivered' },
+    { value: 'failed', label: 'Failed' },
+    { value: 'cancelled', label: 'Cancelled' }
+  ];
+
+  // Filter contracts based on status
+  const filteredContracts = contractList.filter(contract => {
+    if (statusFilter === 'all') return true;
+    const status = contract.contract_status?.status_name?.toLowerCase();
+    switch (statusFilter) {
+      case 'available':
+        return status === 'available for pickup';
+      case 'accepted':
+        return status === 'accepted - awaiting pickup';
+      case 'transit':
+        return status === 'in transit';
+      case 'delivered':
+        return status === 'delivered';
+      case 'failed':
+        return status === 'delivery failed';
+      case 'cancelled':
+        return status === 'cancelled';
+      default:
+        return false;
+    }
+  });
 
   useEffect(() => {
     setMounted(true);
@@ -118,6 +152,33 @@ const ContractList = () => {
           }}
         />
       </Box>
+
+      <Box sx={{ maxWidth: '800px', mx: 'auto', width: '100%', mb: 3, overflowX: 'auto' }}>
+        <Box sx={{ display: 'flex', gap: 1, p: 1, minWidth: 'max-content', justifyContent: 'center' }}>
+          {filterOptions.map((option) => (
+            <Button
+              key={option.value}
+              variant={statusFilter === option.value ? "contained" : "outlined"}
+              onClick={() => setStatusFilter(option.value)}
+              sx={{
+                borderRadius: '20px',
+                textTransform: 'none',
+                px: 2,
+                whiteSpace: 'nowrap',
+                minWidth: '100px',
+                borderColor: statusFilter === option.value ? 'primary.main' : 'divider',
+                '&:hover': {
+                  borderColor: 'primary.main',
+                  bgcolor: statusFilter === option.value ? 'primary.main' : 'transparent'
+                }
+              }}
+            >
+              {option.label}
+            </Button>
+          ))}
+        </Box>
+      </Box>
+
       {contractListLoading && (
         <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
           <CircularProgress />
@@ -130,7 +191,7 @@ const ContractList = () => {
         <Typography align="center">No contracts found.</Typography>
       )}
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4, maxWidth: '800px', mx: 'auto', width: '100%' }}>
-        {contractList
+        {filteredContracts
           .filter(contract => 
             !activeSearch || 
             String(contract.id).toLowerCase().includes(activeSearch.toLowerCase())
