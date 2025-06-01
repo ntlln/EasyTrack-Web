@@ -75,16 +75,51 @@ export default function Page() {
         try { 
             const { data: { user }, error: userError } = await supabase.auth.getUser(); 
             if (userError) return; 
+
+            // Step 1: Determine the city from coordinates
+            let city = null;
+            if (dropoffAddress.lat && dropoffAddress.lng) {
+                city = await getCityFromCoordinates(dropoffAddress.lat, dropoffAddress.lng);
+                console.log('Determined city:', city);
+            }
+
+            // Step 2: Fetch price for the determined city
+            let deliveryCharge = null;
+            if (city) {
+                const normalizedCity = normalizeCityName(city);
+                deliveryCharge = pricingData[normalizedCity] || null;
+                console.log('Fetched price for city:', normalizedCity, 'Price:', deliveryCharge);
+            }
+
+            // Step 3: Calculate total delivery charge based on number of forms
+            const numberOfForms = contracts.length;
+            const totalDeliveryCharge = deliveryCharge ? deliveryCharge * numberOfForms : null;
+            console.log('Number of forms:', numberOfForms, 'Total delivery charge:', totalDeliveryCharge);
+
+            // Step 4: Prepare contract data with the total delivery charge
             const totalLuggageQuantity = contracts.reduce((sum, contract) => sum + Number(contract.quantity || 0), 0); 
             const contractData = { 
                 luggage_quantity: totalLuggageQuantity, 
                 airline_id: user.id, 
                 pickup_location: pickupAddress.location, 
                 drop_off_location: dropoffAddress.location, 
-                drop_off_location_geo: { type: 'Point', coordinates: [dropoffAddress.lng, dropoffAddress.lat] } 
+                drop_off_location_geo: { type: 'Point', coordinates: [dropoffAddress.lng, dropoffAddress.lat] },
+                delivery_charge: totalDeliveryCharge
             }; 
-            const { data: insertedContract, error: contractError } = await supabase.from('contract').insert(contractData).select().single(); 
-            if (contractError) return; 
+
+            // Step 5: Insert contract data
+            const { data: insertedContract, error: contractError } = await supabase
+                .from('contract')
+                .insert(contractData)
+                .select()
+                .single(); 
+
+            if (contractError) {
+                console.error('Error inserting contract:', contractError);
+                return;
+            }
+
+            // Step 6: Insert luggage information
             const formattedData = contracts.map(contract => ({ 
                 case_number: contract.caseNumber, 
                 luggage_owner: contract.name, 
@@ -94,8 +129,16 @@ export default function Page() {
                 quantity: contract.quantity, 
                 contract_id: insertedContract.id 
             })); 
-            const { data, error } = await supabase.from('contract_luggage_information').insert(formattedData); 
-            if (error) return; 
+
+            const { data, error } = await supabase
+                .from('contract_luggage_information')
+                .insert(formattedData); 
+
+            if (error) {
+                console.error('Error inserting luggage information:', error);
+                return;
+            }
+
             setSnackbarOpen(true);
             // Reset form
             setContracts([{ name: "", caseNumber: "", itemDescription: "", contact: "", weight: "", quantity: "" }]);
@@ -181,7 +224,7 @@ export default function Page() {
             try {
                 const { data: contracts, error: contractError } = await supabase
                     .from('contract')
-                    .select(`id, created_at, accepted_at, pickup_at, delivered_at, cancelled_at, pickup_location, pickup_location_geo, drop_off_location, drop_off_location_geo, contract_status_id, contract_status(status_name), airline_id, delivery_id, airline:airline_id (*), delivery:delivery_id (*)`)
+                    .select(`id, created_at, accepted_at, pickup_at, delivered_at, cancelled_at, pickup_location, pickup_location_geo, drop_off_location, drop_off_location_geo, contract_status_id, contract_status(status_name), airline_id, delivery_id, delivery_charge, airline:airline_id (*), delivery:delivery_id (*)`)
                     .order('created_at', { ascending: false });
 
                 if (contractError) throw contractError;
@@ -191,30 +234,8 @@ export default function Page() {
                     return;
                 }
 
-                // Process contracts to include city and price
-                const processedContracts = await Promise.all(contracts.map(async (contract) => {
-                    let city = null;
-                    let price = null;
-
-                    if (contract.drop_off_location_geo) {
-                        const { coordinates } = contract.drop_off_location_geo;
-                        city = await getCityFromCoordinates(coordinates[1], coordinates[0]);
-                        console.log('Found city:', city);
-                        if (city) {
-                            const normalizedCity = normalizeCityName(city);
-                            price = pricingData[normalizedCity] || null;
-                            console.log('Found price for city:', normalizedCity, price);
-                        }
-                    }
-
-                    return {
-                        ...contract,
-                        city,
-                        price
-                    };
-                }));
-
-                const contractIds = processedContracts.map(c => c.id);
+                // Process contracts to include luggage information
+                const contractIds = contracts.map(c => c.id);
                 const { data: luggage, error: luggageError } = await supabase
                     .from('contract_luggage_information')
                     .select('*')
@@ -228,7 +249,7 @@ export default function Page() {
                     luggageByContract[l.contract_id].push(l);
                 });
 
-                const contractsWithLuggage = processedContracts.map(c => ({
+                const contractsWithLuggage = contracts.map(c => ({
                     ...c,
                     luggage: luggageByContract[c.id] || []
                 }));
@@ -241,10 +262,10 @@ export default function Page() {
             }
         };
 
-        if (activeTab === 0 && Object.keys(pricingData).length > 0) {
+        if (activeTab === 0) {
             fetchContracts();
         }
-    }, [activeTab, pricingData]);
+    }, [activeTab]);
 
     // Expand/collapse
     const handleExpandClick = (contractId) => { setExpandedContracts((prev) => prev.includes(contractId) ? prev.filter((id) => id !== contractId) : [...prev, contractId]); };
@@ -359,7 +380,7 @@ export default function Page() {
                                                     )}
                                                     {contract.price !== null && (
                                                         <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
-                                                            <b>Price:</b> <span style={{ color: 'text.primary' }}>₱{Number(contract.price).toLocaleString()}</span>
+                                                            <b>Price:</b> <span style={{ color: 'text.primary' }}>₱{Number(contract.delivery_charge).toLocaleString()}</span>
                                                         </Typography>
                                                     )}
                                                     {contract.drop_off_location_geo && (

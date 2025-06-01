@@ -21,7 +21,7 @@ const MapComponent = dynamic(() => Promise.resolve(({ mapRef, mapError }) => (
 )), { ssr: false });
 
 // Contract List Component
-const ContractList = () => {
+const ContractList = ({ onTrackContract }) => {
   const [contractList, setContractList] = useState([]);
   const [contractListLoading, setContractListLoading] = useState(false);
   const [contractListError, setContractListError] = useState(null);
@@ -30,10 +30,8 @@ const ContractList = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeSearch, setActiveSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [pricingData, setPricingData] = useState({});
   const supabase = createClientComponentClient();
   const router = useRouter();
-  const [isGoogleMapsReady, setIsGoogleMapsReady] = useState(false);
 
   // Filter options
   const filterOptions = [
@@ -86,26 +84,73 @@ const ContractList = () => {
     }
   };
 
-  // Fetch pricing data
   useEffect(() => {
-    const fetchPricingData = async () => {
+    setMounted(true);
+  }, []);
+
+  // Fetch contract list
+  useEffect(() => {
+    if (!mounted) return;
+
+    const fetchContracts = async () => {
+      setContractListLoading(true);
+      setContractListError(null);
       try {
-        const { data: pricing, error } = await supabase
-          .from('pricing')
-          .select('city, price');
-        if (error) throw error;
-        const pricingMap = {};
-        pricing.forEach(item => {
-          const normalized = normalizeCityName(item.city);
-          pricingMap[normalized] = item.price;
+        console.log('Starting contract fetch...');
+        const response = await fetch('/api/admin/contracts');
+        const result = await response.json();
+
+        if (!response.ok) {
+          throw new Error(result.error || 'Failed to fetch contracts');
+        }
+
+        console.log('Contracts fetched:', result.data);
+        // Add debug logging for delivery_charge
+        result.data.forEach(contract => {
+          console.log(`Contract ${contract.id} delivery_charge:`, contract.delivery_charge);
         });
-        setPricingData(pricingMap);
-      } catch (error) {
-        console.error('Error fetching pricing data:', error);
+        setContractList(result.data || []);
+      } catch (err) {
+        console.error('Error in fetchContracts:', err);
+        setContractListError(err.message || 'Failed to fetch contracts');
+      } finally {
+        setContractListLoading(false);
       }
     };
-    fetchPricingData();
-  }, []);
+
+    fetchContracts();
+  }, [mounted]);
+
+  const handleTabChange = (event, newValue) => {
+    setSelectedTab(newValue);
+    // Reset search state when switching tabs
+    if (newValue === 0) {
+      setSearchQuery('');
+      setActiveSearch('');
+    }
+  };
+
+  const handleExpandClick = (contractId) => {
+    setExpandedContracts((prev) =>
+      prev.includes(contractId)
+        ? prev.filter((id) => id !== contractId)
+        : [...prev, contractId]
+    );
+  };
+
+  const handleSearch = () => {
+    if (!searchQuery.trim()) {
+      setActiveSearch('');
+      return;
+    }
+    setActiveSearch(searchQuery);
+  };
+
+  const handleKeyPress = (event) => {
+    if (event.key === 'Enter') {
+      handleSearch();
+    }
+  };
 
   // Filter contracts based on status
   const filteredContracts = contractList.filter(contract => {
@@ -129,110 +174,8 @@ const ContractList = () => {
     }
   });
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  // Fetch contract list
-  useEffect(() => {
-    if (!mounted) return;
-
-    const fetchContracts = async () => {
-      setContractListLoading(true);
-      setContractListError(null);
-      try {
-        console.log('Starting contract fetch...');
-        const response = await fetch('/api/admin/contracts');
-        const result = await response.json();
-
-        if (!response.ok) {
-          throw new Error(result.error || 'Failed to fetch contracts');
-        }
-
-        console.log('Contracts fetched:', result.data);
-        setContractList(result.data || []);
-      } catch (err) {
-        console.error('Error in fetchContracts:', err);
-        setContractListError(err.message || 'Failed to fetch contracts');
-      } finally {
-        setContractListLoading(false);
-      }
-    };
-
-    fetchContracts();
-  }, [mounted]);
-
-  // Load Google Maps script
-  useEffect(() => {
-    if (window.google) {
-      setIsGoogleMapsReady(true);
-      return;
-    }
-    const script = document.createElement('script');
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places,marker`;
-    script.async = true;
-    script.defer = true;
-    script.onload = () => setIsGoogleMapsReady(true);
-    document.head.appendChild(script);
-    return () => {
-      if (document.head.contains(script)) document.head.removeChild(script);
-    };
-  }, []);
-
-  // Only run geocoding/price logic after isGoogleMapsReady is true
-  useEffect(() => {
-    if (!isGoogleMapsReady || !Object.keys(pricingData).length || !contractList.length) return;
-    const addCityAndPrice = async () => {
-      const updatedContracts = await Promise.all(contractList.map(async (contract) => {
-        let city = null;
-        let price = null;
-        if (contract.drop_off_location_geo && window.google) {
-          const { coordinates } = contract.drop_off_location_geo;
-          city = await getCityFromCoordinates(coordinates[1], coordinates[0]);
-          if (city) {
-            const normalizedCity = normalizeCityName(city);
-            price = pricingData[normalizedCity] || null;
-            if (!price) {
-              // Fallback: partial match
-              const partialKey = Object.keys(pricingData).find(key => normalizedCity.includes(key) || key.includes(normalizedCity));
-              if (partialKey) {
-                price = pricingData[partialKey];
-              }
-            }
-          }
-        }
-        return { ...contract, city, price };
-      }));
-      setContractList(updatedContracts);
-    };
-    addCityAndPrice();
-  }, [isGoogleMapsReady, pricingData, contractList]);
-
-  // Expand/collapse handler
-  const handleExpandClick = (contractId) => {
-    setExpandedContracts((prev) =>
-      prev.includes(contractId)
-        ? prev.filter((id) => id !== contractId)
-        : [...prev, contractId]
-    );
-  };
-
   const handleTrackContract = (contractId) => {
-    router.push(`/egc-admin/luggage-tracking?contractId=${contractId}`);
-  };
-
-  const handleSearch = () => {
-    if (!searchQuery.trim()) {
-      setActiveSearch('');
-      return;
-    }
-    setActiveSearch(searchQuery);
-  };
-
-  const handleKeyPress = (event) => {
-    if (event.key === 'Enter') {
-      handleSearch();
-    }
+    onTrackContract(contractId);
   };
 
   return (
@@ -336,14 +279,9 @@ const ContractList = () => {
                       </span>
                     </Typography>
                   )}
-                  {contract.city && (
+                  {contract.delivery_charge !== null && !isNaN(Number(contract.delivery_charge)) ? (
                     <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
-                      <b>City:</b> <span style={{ color: 'text.primary' }}>{contract.city}</span>
-                    </Typography>
-                  )}
-                  {contract.price !== null && !isNaN(Number(contract.price)) ? (
-                    <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
-                      <b>Price:</b> <span style={{ color: 'text.primary' }}>₱{Number(contract.price).toLocaleString()}</span>
+                      <b>Price:</b> <span style={{ color: 'text.primary' }}>₱{Number(contract.delivery_charge).toLocaleString()}</span>
                     </Typography>
                   ) : (
                     <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
@@ -528,6 +466,7 @@ const Page = () => {
   const currentLocationMarkerRef = useRef(null);
   const supabase = createClientComponentClient();
   const [isGoogleMapsReady, setIsGoogleMapsReady] = useState(false);
+  const [statusFilter, setStatusFilter] = useState('all');
 
   useEffect(() => {
     setMounted(true);
@@ -550,6 +489,10 @@ const Page = () => {
         }
 
         console.log('Contracts fetched:', result.data);
+        // Add debug logging for delivery_charge
+        result.data.forEach(contract => {
+          console.log(`Contract ${contract.id} delivery_charge:`, contract.delivery_charge);
+        });
         setContractList(result.data || []);
       } catch (err) {
         console.error('Error in fetchContracts:', err);
@@ -564,30 +507,42 @@ const Page = () => {
 
   // Load Google Maps script
   useEffect(() => {
+    if (selectedTab !== 1) return; // Only load when luggage tracking tab is selected
     if (window.google) {
       setIsGoogleMapsReady(true);
+      setIsScriptLoaded(true);
       return;
     }
     const script = document.createElement('script');
     script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places,marker`;
     script.async = true;
     script.defer = true;
-    script.onload = () => setIsGoogleMapsReady(true);
+    script.onload = () => {
+      setIsGoogleMapsReady(true);
+      setIsScriptLoaded(true);
+    };
     document.head.appendChild(script);
     return () => {
       if (document.head.contains(script)) document.head.removeChild(script);
     };
-  }, []);
+  }, [selectedTab]);
 
   // Initialize map
   useEffect(() => {
-    if (isScriptLoaded && contractList.length > 0 && !map && mapRef.current) {
+    if (selectedTab !== 1) return; // Only initialize map when luggage tracking tab is selected
+    if (!isScriptLoaded || !contractList.length || !mapRef.current) return;
+    
+    // Small delay to ensure DOM is ready
+    const timer = setTimeout(() => {
       initMap();
-    }
-  }, [isScriptLoaded, contractList, map]);
+    }, 100);
+
+    return () => clearTimeout(timer);
+  }, [isScriptLoaded, contractList, selectedTab, activeSearch]);
 
   // Poll for current location updates
   useEffect(() => {
+    if (selectedTab !== 1) return; // Only poll when luggage tracking tab is selected
     let intervalId;
     let isPolling = false;
 
@@ -878,6 +833,14 @@ const Page = () => {
     }
   };
 
+  const handleTrackContract = (contractId) => {
+    setSelectedTab(1); // Switch to luggage tracking tab
+    setSearchQuery(contractId.toString());
+    setActiveSearch(contractId.toString());
+    // Reset map state to force reinitialization
+    setMap(null);
+  };
+
   if (!mounted) {
     return null; // Prevent hydration errors: only render on client
   }
@@ -909,7 +872,7 @@ const Page = () => {
         <Tab label="Luggage Tracking" />
       </Tabs>
 
-      {selectedTab === 0 && <ContractList />}
+      {selectedTab === 0 && <ContractList onTrackContract={handleTrackContract} />}
       {selectedTab === 1 && (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           <Box sx={{ display: 'flex', justifyContent: 'center', mb: 4 }}>
@@ -1000,14 +963,9 @@ const Page = () => {
                                     </span>
                                   </Typography>
                                 )}
-                                {contract.city && (
+                                {contract.delivery_charge !== null && !isNaN(Number(contract.delivery_charge)) ? (
                                   <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
-                                    <b>City:</b> <span style={{ color: 'text.primary' }}>{contract.city}</span>
-                                  </Typography>
-                                )}
-                                {contract.price !== null && !isNaN(Number(contract.price)) ? (
-                                  <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
-                                    <b>Price:</b> <span style={{ color: 'text.primary' }}>₱{Number(contract.price).toLocaleString()}</span>
+                                    <b>Price:</b> <span style={{ color: 'text.primary' }}>₱{Number(contract.delivery_charge).toLocaleString()}</span>
                                   </Typography>
                                 ) : (
                                   <Typography variant="body2" sx={{ color: '#bdbdbd' }}>

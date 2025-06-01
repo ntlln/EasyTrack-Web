@@ -20,7 +20,7 @@ export async function GET() {
         id, created_at, accepted_at, pickup_at, delivered_at, cancelled_at,
         pickup_location, pickup_location_geo, drop_off_location, drop_off_location_geo,
         contract_status_id, contract_status(status_name),
-        airline_id, delivery_id,
+        airline_id, delivery_id, delivery_charge,
         airline:airline_id (*),
         delivery:delivery_id (*)
       `)
