@@ -122,6 +122,10 @@ export default function Page() {
                                     <ListItemIcon><MyLocationIcon sx={iconStyles("/egc-admin/luggage-tracking")} /></ListItemIcon>
                                     <ListItemText primary="Luggage Tracking" />
                                 </ListItemButton>
+                                <ListItemButton sx={{ pl: 4, ...(isActive("/egc-admin/transaction-management") ? activeStyles : {}), ...listItemStyles("/egc-admin/transaction-management") }} onClick={() => handleNavigation("/egc-admin/transaction-management")}>
+                                    <ListItemIcon><AssignmentIcon sx={iconStyles("/egc-admin/transaction-management")} /></ListItemIcon>
+                                    <ListItemText primary="Transaction Management" />
+                                </ListItemButton>
                             </List>
                         </Collapse>
                     )}
