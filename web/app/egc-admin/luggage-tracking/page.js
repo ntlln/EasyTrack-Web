@@ -30,7 +30,10 @@ const ContractList = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeSearch, setActiveSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [pricingData, setPricingData] = useState({});
+  const supabase = createClientComponentClient();
   const router = useRouter();
+  const [isGoogleMapsReady, setIsGoogleMapsReady] = useState(false);
 
   // Filter options
   const filterOptions = [
@@ -42,6 +45,67 @@ const ContractList = () => {
     { value: 'failed', label: 'Failed' },
     { value: 'cancelled', label: 'Cancelled' }
   ];
+
+  // Utility to normalize city names for matching
+  function normalizeCityName(name) {
+    if (!name) return '';
+    // Remove ' city' at the end, trim whitespace, and lowercase
+    return name.toLowerCase().replace(/ city$/, '').trim();
+  }
+
+  // Function to get city from coordinates (enhanced, with debug logs and fallback)
+  const getCityFromCoordinates = async (lat, lng) => {
+    if (!window.google) return null;
+    try {
+      const geocoder = new window.google.maps.Geocoder();
+      const response = await new Promise((resolve, reject) => {
+        geocoder.geocode(
+          { location: { lat, lng } },
+          (results, status) => {
+            if (status === 'OK') resolve(results);
+            else reject(status);
+          }
+        );
+      });
+      if (response && response[0]) {
+        const addressComponents = response[0].address_components;
+        // Try locality first
+        let cityComponent = addressComponents.find(c => c.types.includes('locality'));
+        // Fallback to admin area level 2
+        if (!cityComponent) cityComponent = addressComponents.find(c => c.types.includes('administrative_area_level_2'));
+        // Fallback to admin area level 1
+        if (!cityComponent) cityComponent = addressComponents.find(c => c.types.includes('administrative_area_level_1'));
+        // Fallback to postal_town (for some countries)
+        if (!cityComponent) cityComponent = addressComponents.find(c => c.types.includes('postal_town'));
+        return cityComponent ? cityComponent.long_name : null;
+      }
+      return null;
+    } catch (error) {
+      console.error('Error getting city from coordinates:', error);
+      return null;
+    }
+  };
+
+  // Fetch pricing data
+  useEffect(() => {
+    const fetchPricingData = async () => {
+      try {
+        const { data: pricing, error } = await supabase
+          .from('pricing')
+          .select('city, price');
+        if (error) throw error;
+        const pricingMap = {};
+        pricing.forEach(item => {
+          const normalized = normalizeCityName(item.city);
+          pricingMap[normalized] = item.price;
+        });
+        setPricingData(pricingMap);
+      } catch (error) {
+        console.error('Error fetching pricing data:', error);
+      }
+    };
+    fetchPricingData();
+  }, []);
 
   // Filter contracts based on status
   const filteredContracts = contractList.filter(contract => {
@@ -98,9 +162,51 @@ const ContractList = () => {
     fetchContracts();
   }, [mounted]);
 
-  if (!mounted) {
-    return null; // Return null instead of loading state to prevent hydration mismatch
-  }
+  // Load Google Maps script
+  useEffect(() => {
+    if (window.google) {
+      setIsGoogleMapsReady(true);
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places,marker`;
+    script.async = true;
+    script.defer = true;
+    script.onload = () => setIsGoogleMapsReady(true);
+    document.head.appendChild(script);
+    return () => {
+      if (document.head.contains(script)) document.head.removeChild(script);
+    };
+  }, []);
+
+  // Only run geocoding/price logic after isGoogleMapsReady is true
+  useEffect(() => {
+    if (!isGoogleMapsReady || !Object.keys(pricingData).length || !contractList.length) return;
+    const addCityAndPrice = async () => {
+      const updatedContracts = await Promise.all(contractList.map(async (contract) => {
+        let city = null;
+        let price = null;
+        if (contract.drop_off_location_geo && window.google) {
+          const { coordinates } = contract.drop_off_location_geo;
+          city = await getCityFromCoordinates(coordinates[1], coordinates[0]);
+          if (city) {
+            const normalizedCity = normalizeCityName(city);
+            price = pricingData[normalizedCity] || null;
+            if (!price) {
+              // Fallback: partial match
+              const partialKey = Object.keys(pricingData).find(key => normalizedCity.includes(key) || key.includes(normalizedCity));
+              if (partialKey) {
+                price = pricingData[partialKey];
+              }
+            }
+          }
+        }
+        return { ...contract, city, price };
+      }));
+      setContractList(updatedContracts);
+    };
+    addCityAndPrice();
+  }, [isGoogleMapsReady, pricingData, contractList]);
 
   // Expand/collapse handler
   const handleExpandClick = (contractId) => {
@@ -228,6 +334,20 @@ const ContractList = () => {
                       <span style={{ color: 'text.primary' }}>
                         {contract.drop_off_location_geo.coordinates[1].toFixed(6)}, {contract.drop_off_location_geo.coordinates[0].toFixed(6)}
                       </span>
+                    </Typography>
+                  )}
+                  {contract.city && (
+                    <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                      <b>City:</b> <span style={{ color: 'text.primary' }}>{contract.city}</span>
+                    </Typography>
+                  )}
+                  {contract.price !== null && !isNaN(Number(contract.price)) ? (
+                    <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                      <b>Price:</b> <span style={{ color: 'text.primary' }}>₱{Number(contract.price).toLocaleString()}</span>
+                    </Typography>
+                  ) : (
+                    <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                      <b>Price:</b> <span style={{ color: 'text.primary' }}>N/A</span>
                     </Typography>
                   )}
                 </Box>
@@ -407,6 +527,7 @@ const Page = () => {
   const markerRef = useRef(null);
   const currentLocationMarkerRef = useRef(null);
   const supabase = createClientComponentClient();
+  const [isGoogleMapsReady, setIsGoogleMapsReady] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -441,19 +562,22 @@ const Page = () => {
     fetchContracts();
   }, [mounted]);
 
-  // Google Maps script loader
+  // Load Google Maps script
   useEffect(() => {
-    if (activeSearch && contractList.length > 0 && !isScriptLoaded && !window.google) {
-      const script = document.createElement('script');
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places,marker`;
-      script.async = true;
-      script.defer = true;
-      script.onload = () => { setIsScriptLoaded(true); };
-      script.onerror = () => { setMapError('Failed to load Google Maps'); };
-      document.head.appendChild(script);
-      return () => { if (document.head.contains(script)) document.head.removeChild(script); };
+    if (window.google) {
+      setIsGoogleMapsReady(true);
+      return;
     }
-  }, [activeSearch, contractList, isScriptLoaded]);
+    const script = document.createElement('script');
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places,marker`;
+    script.async = true;
+    script.defer = true;
+    script.onload = () => setIsGoogleMapsReady(true);
+    document.head.appendChild(script);
+    return () => {
+      if (document.head.contains(script)) document.head.removeChild(script);
+    };
+  }, []);
 
   // Initialize map
   useEffect(() => {
@@ -755,7 +879,7 @@ const Page = () => {
   };
 
   if (!mounted) {
-    return null; // Return null instead of loading state to prevent hydration mismatch
+    return null; // Prevent hydration errors: only render on client
   }
 
   // Format date helper function
@@ -874,6 +998,20 @@ const Page = () => {
                                     <span style={{ color: 'text.primary' }}>
                                       {contract.drop_off_location_geo.coordinates[1].toFixed(6)}, {contract.drop_off_location_geo.coordinates[0].toFixed(6)}
                                     </span>
+                                  </Typography>
+                                )}
+                                {contract.city && (
+                                  <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                                    <b>City:</b> <span style={{ color: 'text.primary' }}>{contract.city}</span>
+                                  </Typography>
+                                )}
+                                {contract.price !== null && !isNaN(Number(contract.price)) ? (
+                                  <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                                    <b>Price:</b> <span style={{ color: 'text.primary' }}>₱{Number(contract.price).toLocaleString()}</span>
+                                  </Typography>
+                                ) : (
+                                  <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                                    <b>Price:</b> <span style={{ color: 'text.primary' }}>N/A</span>
                                   </Typography>
                                 )}
                               </Box>
