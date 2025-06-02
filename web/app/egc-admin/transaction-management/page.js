@@ -292,7 +292,10 @@ const TransactionManagement = () => {
                                 }
                                 const deliveryName = row.delivery ? `${row.delivery.first_name || ''} ${row.delivery.last_name || ''}`.trim() : row.delivery_id || '';
                                 const status = row.contract_status?.status_name || row.contract_status_id || '';
-                                const total = (row.delivery_charge || 0) + (row.surcharge || 0) - (row.discount || 0);
+                                const delivery_charge = Number(row.delivery_charge) || 0;
+                                const surcharge = Number(row.surcharge) || 0;
+                                const discount = Number(row.discount) || 0;
+                                const total = (delivery_charge + surcharge) * (1 - discount / 100);
                                 return (
                                     <TableRow key={row.id} selected={isRowSelected(row.id)}>
                                         <TableCell padding="checkbox">
@@ -308,9 +311,9 @@ const TransactionManagement = () => {
                                         <TableCell>{row.drop_off_location}</TableCell>
                                         <TableCell>{airlineName}</TableCell>
                                         <TableCell>{deliveryName}</TableCell>
-                                        <TableCell>${row.delivery_charge || 0}</TableCell>
-                                        <TableCell>${row.surcharge || 0}</TableCell>
-                                        <TableCell>{row.discount !== undefined ? `${row.discount}%` : '0%'}</TableCell>
+                                        <TableCell>${delivery_charge}</TableCell>
+                                        <TableCell>${surcharge}</TableCell>
+                                        <TableCell>{discount !== undefined ? `${discount}%` : '0%'}</TableCell>
                                         <TableCell>${total}</TableCell>
                                         <TableCell>{formatDate(row.created_at)}</TableCell>
                                         <TableCell>
@@ -508,7 +511,7 @@ const TransactionManagement = () => {
                     <Typography gutterBottom>Enter the surcharge amount for contract <b>{surchargeContract?.id}</b>:</Typography>
                     <TextField
                         label="Surcharge"
-                        type="number"
+                        type="text"
                         value={surchargeValue}
                         onChange={e => setSurchargeValue(e.target.value)}
                         fullWidth
@@ -532,7 +535,7 @@ const TransactionManagement = () => {
                     <Typography gutterBottom>Enter the discount percentage for contract <b>{discountContract?.id}</b>:</Typography>
                     <TextField
                         label="Discount (%)"
-                        type="number"
+                        type="text"
                         value={discountValue}
                         onChange={e => setDiscountValue(e.target.value)}
                         fullWidth
