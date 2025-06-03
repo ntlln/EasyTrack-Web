@@ -2,71 +2,18 @@
 
 import React, { useState, useEffect } from 'react';
 import { Box, Typography, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, TablePagination, IconButton, Menu, MenuItem, CircularProgress, Checkbox, Dialog, DialogTitle, DialogContent, DialogActions, Button, Divider, Collapse, TextField } from '@mui/material';
-import { useRouter } from 'next/navigation';
 
 import MoreVertIcon from '@mui/icons-material/MoreVert';
-import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import { PDFDownloadLink, Document, Page as PDFPage, Text, View, Font } from '@react-pdf/renderer';
-import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
-import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
-import { DatePicker } from '@mui/x-date-pickers/DatePicker';
-import { format, startOfMonth, endOfMonth } from 'date-fns';
-
-// Register fonts from local public/fonts directory
-Font.register({
-    family: 'Roboto',
-    fonts: [
-        {
-            src: '/fonts/Roboto-VariableFont_wdth,wght.ttf',
-            fontWeight: 'normal',
-            fontStyle: 'normal',
-        },
-        {
-            src: '/fonts/Roboto-VariableFont_wdth,wght.ttf',
-            fontWeight: 'bold',
-            fontStyle: 'normal',
-        },
-        {
-            src: '/fonts/Roboto-Italic-VariableFont_wdth,wght.ttf',
-            fontWeight: 'normal',
-            fontStyle: 'italic',
-        },
-        {
-            src: '/fonts/Roboto-Italic-VariableFont_wdth,wght.ttf',
-            fontWeight: 'bold',
-            fontStyle: 'italic',
-        },
-    ],
-});
-Font.register({
-    family: 'NotoSans',
-    src: 'https://fonts.gstatic.com/s/notosans/v27/o-0IIpQlx3QUlC5A4PNb4g.woff2',
-});
 
 // Utility: format date for table
 const formatDate = (date) => date ? new Date(date).toISOString().split('T')[0] : '';
 
 // PDF Receipt component
-const ReceiptPDF = ({ contracts = [], dateRange }) => {
-    // Ensure contracts is always an array and has valid data
-    const safeContracts = React.useMemo(() => {
-        if (!Array.isArray(contracts)) return [];
-        return contracts.filter(c => c && typeof c === 'object');
-    }, [contracts]);
-
-    // If no valid contracts, return empty document
-    if (safeContracts.length === 0) {
-        return (
-            <Document>
-                <PDFPage size="A4" style={{ padding: 24, fontSize: 10, fontFamily: 'Roboto' }}>
-                    <View style={{ alignItems: 'center', marginBottom: 8 }}>
-                        <Text style={{ fontSize: 16, fontWeight: 'bold' }}>No contracts selected</Text>
-                    </View>
-                </PDFPage>
-            </Document>
-        );
-    }
-
+const ReceiptPDF = ({ contracts, dateRange }) => {
+    React.useEffect(() => {
+        Font.register({ family: 'Roboto', src: '/fonts/Roboto-VariableFont_wdth,wght.ttf' });
+    }, []);
     const formatDate = (dateString) => {
         if (!dateString) return 'N/A';
         try {
@@ -74,27 +21,22 @@ const ReceiptPDF = ({ contracts = [], dateRange }) => {
             return date.toLocaleString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
         } catch { return 'N/A'; }
     };
-
-    // Calculate totals safely
-    const subtotal = safeContracts.reduce((sum, c) => sum + (Number(c.delivery_charge) || 0), 0);
-    const surchargeTotal = safeContracts.reduce((sum, c) => sum + (Number(c.surcharge) || 0), 0);
-    const discountAvg = safeContracts.length > 0 
-        ? safeContracts.reduce((sum, c) => sum + (Number(c.discount) || 0), 0) / safeContracts.length 
-        : 0;
+    const subtotal = contracts.reduce((sum, c) => sum + (Number(c.delivery_charge) || 0), 0);
+    const surchargeTotal = contracts.reduce((sum, c) => sum + (Number(c.surcharge) || 0), 0);
+    const discountAvg = contracts.length > 0 ? contracts.reduce((sum, c) => sum + (Number(c.discount) || 0), 0) / contracts.length : 0;
     const getRowAmount = (c) => (Number(c.delivery_charge) || 0) + (Number(c.surcharge) || 0);
-    const totalAmount = safeContracts.reduce((sum, c) => {
+    const totalAmount = contracts.reduce((sum, c) => {
         const delivery_charge = Number(c.delivery_charge) || 0;
         const surcharge = Number(c.surcharge) || 0;
         const discount = Number(c.discount) || 0;
         return sum + (delivery_charge + surcharge) * (1 - discount / 100);
     }, 0);
-
     return (
         <Document>
             <PDFPage size="A4" style={{ padding: 24, fontSize: 10, fontFamily: 'Roboto' }}>
                 <View style={{ alignItems: 'center', marginBottom: 8 }}>
                     <Text style={{ fontSize: 16, fontWeight: 'bold' }}>GHE TRANSMITTAL - AIRPORT CLIENTS PROPERTY IRREGULARITY SUMMARY REPORT</Text>
-                    <Text style={{ fontSize: 14, marginTop: 4 }}>{dateRange || 'No date range specified'}</Text>
+                    <Text style={{ fontSize: 14, marginTop: 4 }}>{dateRange}</Text>
                 </View>
                 <View style={{ borderWidth: 1, borderColor: '#000', marginBottom: 8 }}>
                     <View style={{ flexDirection: 'row', backgroundColor: '#eee', borderBottomWidth: 1, borderColor: '#000' }}>
@@ -107,36 +49,36 @@ const ReceiptPDF = ({ contracts = [], dateRange }) => {
                         <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 4 }}>AMOUNT</Text>
                         <Text style={{ flex: 1, fontWeight: 'bold', padding: 4 }}>REMARKS</Text>
                     </View>
-                    {safeContracts.map((c, idx) => (
-                        <View key={c.id || idx} style={{ flexDirection: 'row', borderBottomWidth: 1, borderColor: '#000' }}>
+                    {contracts.map((c, idx) => (
+                        <View key={c.id} style={{ flexDirection: 'row', borderBottomWidth: 1, borderColor: '#000' }}>
                             <Text style={{ flex: 0.5, padding: 4 }}>{idx + 1}</Text>
                             <Text style={{ flex: 2, padding: 4 }}>{c.luggage?.[0]?.luggage_owner || c.airline?.first_name || 'N/A'}</Text>
                             <Text style={{ flex: 1, padding: 4 }}>{c.luggage?.[0]?.flight_number || 'N/A'}</Text>
                             <Text style={{ flex: 3, padding: 4 }}>{c.luggage?.[0]?.address || c.drop_off_location || 'N/A'}</Text>
                             <Text style={{ flex: 2, padding: 4 }}>{formatDate(c.delivered_at || c.created_at)}</Text>
                             <Text style={{ flex: 1.5, padding: 4 }}>{c.contract_status?.status_name || 'N/A'}</Text>
-                            <Text style={{ flex: 1.5, padding: 4, fontFamily: 'Roboto' }}>{'\u20B1\u00A0'}{getRowAmount(c).toFixed(2)}</Text>
+                            <Text style={{ flex: 1.5, padding: 4 }}>₱{getRowAmount(c).toFixed(2)}</Text>
                             <Text style={{ flex: 1, padding: 4 }}>{c.contract_status?.status_name === 'Delivery Failed' ? 'Delivery Failed' : ''}</Text>
                         </View>
                     ))}
                     <View style={{ flexDirection: 'row', borderTopWidth: 1, borderColor: '#000', backgroundColor: '#f7f7f7' }}>
                         <Text style={{ flex: 7.5, fontWeight: 'bold', padding: 4, textAlign: 'right' }}>Subtotal:</Text>
-                        <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 4, fontFamily: 'Roboto' }}>{'\u20B1\u00A0'}{subtotal.toFixed(2)}</Text>
+                        <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 4 }}>₱{subtotal.toFixed(2)}</Text>
                         <Text style={{ flex: 2 }}></Text>
                     </View>
                     <View style={{ flexDirection: 'row', borderTopWidth: 1, borderColor: '#000', backgroundColor: '#f7f7f7' }}>
                         <Text style={{ flex: 7.5, fontWeight: 'bold', padding: 4, textAlign: 'right' }}>Surcharge Total:</Text>
-                        <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 4, fontFamily: 'Roboto' }}>{'\u20B1\u00A0'}{surchargeTotal.toFixed(2)}</Text>
+                        <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 4 }}>₱{surchargeTotal.toFixed(2)}</Text>
                         <Text style={{ flex: 2 }}></Text>
                     </View>
                     <View style={{ flexDirection: 'row', borderTopWidth: 1, borderColor: '#000', backgroundColor: '#f7f7f7' }}>
                         <Text style={{ flex: 7.5, fontWeight: 'bold', padding: 4, textAlign: 'right' }}>Discount (Average):</Text>
-                        <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 4, fontFamily: 'Roboto' }}>{discountAvg.toFixed(2)}%</Text>
+                        <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 4 }}>{discountAvg.toFixed(2)}%</Text>
                         <Text style={{ flex: 2 }}></Text>
                     </View>
                     <View style={{ flexDirection: 'row', borderTopWidth: 2, borderColor: '#000', backgroundColor: '#eee' }}>
                         <Text style={{ flex: 9.5, fontWeight: 'bold', padding: 4, textAlign: 'right' }}>TOTAL</Text>
-                        <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 4, fontFamily: 'Roboto' }}>{'\u20B1\u00A0'}{totalAmount.toFixed(2)}</Text>
+                        <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 4 }}>₱{totalAmount.toFixed(2)}</Text>
                     </View>
                 </View>
                 <View style={{ flexDirection: 'row', marginTop: 24, justifyContent: 'space-between' }}>
@@ -147,7 +89,7 @@ const ReceiptPDF = ({ contracts = [], dateRange }) => {
                     <View style={{ alignItems: 'flex-end' }}>
                         <Text>GENERATED ON: {formatDate(new Date().toISOString())}</Text>
                         <Text>*************SUBMITTED ALL ORIGINAL SIGNED PIR*****</Text>
-                        <Text>Total PIR submitted: {safeContracts.length}</Text>
+                        <Text>Total PIR submitted: {contracts.length}</Text>
                     </View>
                 </View>
             </PDFPage>
@@ -157,10 +99,8 @@ const ReceiptPDF = ({ contracts = [], dateRange }) => {
 
 // Transaction management main logic
 const TransactionManagement = () => {
-    const router = useRouter();
     const [page, setPage] = useState(0);
     const [rowsPerPage, setRowsPerPage] = useState(10);
-    const [selectedMonth, setSelectedMonth] = useState(new Date());
     const [anchorEl, setAnchorEl] = useState(null);
     const [selectedRow, setSelectedRow] = useState(null);
     const [data, setData] = useState([]);
@@ -179,7 +119,6 @@ const TransactionManagement = () => {
     const [discountLoading, setDiscountLoading] = useState(false);
     const [discountError, setDiscountError] = useState('');
     const [discountContract, setDiscountContract] = useState(null);
-    const [shouldRenderPDF, setShouldRenderPDF] = useState(false);
 
     // Data fetching
     useEffect(() => {
@@ -198,16 +137,6 @@ const TransactionManagement = () => {
         };
         fetchData();
     }, []);
-
-    // Filter data based on selected month
-    const filteredData = React.useMemo(() => {
-        const monthStart = startOfMonth(selectedMonth);
-        const monthEnd = endOfMonth(selectedMonth);
-        return data.filter(contract => {
-            const contractDate = new Date(contract.created_at);
-            return contractDate >= monthStart && contractDate <= monthEnd;
-        });
-    }, [data, selectedMonth]);
 
     // Table and dialog handlers
     const handleChangePage = (event, newPage) => setPage(newPage);
@@ -250,39 +179,19 @@ const TransactionManagement = () => {
         } catch (err) { setDiscountError(err.message || 'Failed to update discount'); } finally { setDiscountLoading(false); }
     };
     const isRowSelected = (id) => selectedRows.includes(id);
-    const handleSelectRow = (id) => {
-        setSelectedRows((prev) => {
-            const newSelection = prev.includes(id) 
-                ? prev.filter((rowId) => rowId !== id)
-                : [...prev, id];
-            setShouldRenderPDF(false);
-            return newSelection;
-        });
-    };
+    const handleSelectRow = (id) => setSelectedRows((prev) => prev.includes(id) ? prev.filter((rowId) => rowId !== id) : [...prev, id]);
     const handleSelectAll = (event) => {
         if (event.target.checked) {
-            const allIds = filteredData.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((row) => row.id);
+            const allIds = data.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((row) => row.id);
             setSelectedRows((prev) => Array.from(new Set([...prev, ...allIds])));
         } else {
-            const pageIds = filteredData.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((row) => row.id);
+            const pageIds = data.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((row) => row.id);
             setSelectedRows((prev) => prev.filter((id) => !pageIds.includes(id)));
         }
-        setShouldRenderPDF(false);
     };
-    const allPageRowsSelected = filteredData.length > 0 && filteredData.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).every((row) => selectedRows.includes(row.id));
-    const somePageRowsSelected = filteredData.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).some((row) => selectedRows.includes(row.id));
-    const getSelectedContracts = () => {
-        try {
-            const selectedContracts = data.filter(row => selectedRows.includes(row.id));
-            return selectedContracts.filter(contract => {
-                const status = contract.contract_status?.status_name?.toLowerCase() || '';
-                return ['delivered', 'failed', 'cancelled'].includes(status);
-            });
-        } catch (error) {
-            console.error('Error getting selected contracts:', error);
-            return [];
-        }
-    };
+    const allPageRowsSelected = data.length > 0 && data.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).every((row) => selectedRows.includes(row.id));
+    const somePageRowsSelected = data.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).some((row) => selectedRows.includes(row.id));
+    const getSelectedContracts = () => data.filter(row => selectedRows.includes(row.id));
     const handleGeneratePDF = () => {
         const contracts = getSelectedContracts();
         if (contracts.length > 0) {
@@ -294,122 +203,25 @@ const TransactionManagement = () => {
         }
     };
 
-    const handleMonthChange = (newDate) => {
-        setSelectedMonth(newDate);
-        setSelectedRows([]); // Reset selection when month changes
-    };
-
     // Render
     if (loading) return (<Box sx={{ p: 3, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '300px' }}><CircularProgress /><Typography sx={{ mt: 2 }}>Loading...</Typography></Box>);
     if (error) return (<Box sx={{ p: 3 }}><Typography color="error">{error}</Typography></Box>);
     return (
         <Box sx={{ p: 3 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                    <IconButton 
-                        onClick={() => router.push('/egc-admin')} 
-                        sx={{ 
-                            color: 'primary.main',
-                            mr: 2,
-                            '&:hover': {
-                                backgroundColor: 'rgba(93, 135, 54, 0.1)'
-                            }
-                        }}
-                    >
-                        <ChevronLeftIcon />
-                    </IconButton>
-                    <Typography variant="h4" color="primary.main">Transaction Management</Typography>
-                </Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                    <LocalizationProvider dateAdapter={AdapterDateFns}>
-                        <DatePicker
-                            views={['month', 'year']}
-                            value={selectedMonth}
-                            onChange={handleMonthChange}
-                            slotProps={{
-                                textField: {
-                                    variant: 'outlined',
-                                    size: 'small',
-                                    sx: { width: 200 }
-                                }
-                            }}
-                        />
-                    </LocalizationProvider>
-                    {shouldRenderPDF ? (
-                        <PDFDownloadLink 
-                            document={<ReceiptPDF contracts={getSelectedContracts()} dateRange={handleGeneratePDF()} />}
-                            fileName={`GHE-Transmittal-Report-${format(selectedMonth, 'MMMM-yyyy')}.pdf`}
-                        >
-                            {({ loading, error }) => (
-                                <Button 
-                                    variant="contained" 
-                                    color="secondary" 
-                                    disabled={loading || error}
-                                    sx={{ 
-                                        position: 'relative',
-                                        '&::after': {
-                                            content: `"${getSelectedContracts().length}"`,
-                                            position: 'absolute',
-                                            top: -8,
-                                            right: -8,
-                                            backgroundColor: 'primary.main',
-                                            color: 'white',
-                                            borderRadius: '50%',
-                                            width: 20,
-                                            height: 20,
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            fontSize: '0.75rem',
-                                            fontWeight: 'bold'
-                                        }
-                                    }}
-                                >
-                                    {loading ? 'Generating PDF...' : error ? 'Error generating PDF' : 'Generate PDF Receipt'}
-                                </Button>
-                            )}
-                        </PDFDownloadLink>
-                    ) : (
-                        <Button 
-                            variant="contained" 
-                            color="secondary"
-                            onClick={() => setShouldRenderPDF(true)}
-                            sx={{ 
-                                position: 'relative',
-                                '&::after': {
-                                    content: `"${getSelectedContracts().length}"`,
-                                    position: 'absolute',
-                                    top: -8,
-                                    right: -8,
-                                    backgroundColor: 'primary.main',
-                                    color: 'white',
-                                    borderRadius: '50%',
-                                    width: 20,
-                                    height: 20,
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    fontSize: '0.75rem',
-                                    fontWeight: 'bold'
-                                }
-                            }}
-                        >
-                            Generate PDF Receipt
-                        </Button>
-                    )}
-                </Box>
+            <Typography variant="h4" color="primary.main" sx={{ mb: 3 }}>Transaction Management</Typography>
+            <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
+                {getSelectedContracts().length > 0 && (
+                    <PDFDownloadLink document={<ReceiptPDF contracts={getSelectedContracts()} dateRange={handleGeneratePDF()} />} fileName={`GHE-Transmittal-Report.pdf`}>
+                        {({ loading }) => (<Button variant="contained" color="secondary" disabled={loading}>{loading ? 'Generating PDF...' : 'Generate PDF Receipt'}</Button>)}
+                    </PDFDownloadLink>
+                )}
             </Box>
             <TableContainer component={Paper}>
                 <Table>
                     <TableHead>
                         <TableRow>
                             <TableCell padding="checkbox">
-                                <Checkbox 
-                                    indeterminate={somePageRowsSelected && !allPageRowsSelected} 
-                                    checked={allPageRowsSelected} 
-                                    onChange={handleSelectAll} 
-                                    inputProps={{ 'aria-label': 'select all contracts' }} 
-                                />
+                                <Checkbox indeterminate={somePageRowsSelected && !allPageRowsSelected} checked={allPageRowsSelected} onChange={handleSelectAll} inputProps={{ 'aria-label': 'select all contracts' }} />
                             </TableCell>
                             <TableCell>Contract ID</TableCell>
                             <TableCell>Status</TableCell>
@@ -426,7 +238,7 @@ const TransactionManagement = () => {
                         </TableRow>
                     </TableHead>
                     <TableBody>
-                        {filteredData.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((row) => {
+                        {data.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((row) => {
                             let airlineName = row.airline_id || '';
                             if (row.airline) {
                                 const { first_name, middle_initial, last_name, suffix } = row.airline;
@@ -450,10 +262,10 @@ const TransactionManagement = () => {
                                     <TableCell>{row.drop_off_location}</TableCell>
                                     <TableCell>{airlineName}</TableCell>
                                     <TableCell>{deliveryName}</TableCell>
-                                    <TableCell>₱{delivery_charge.toFixed(2)}</TableCell>
-                                    <TableCell>₱{surcharge.toFixed(2)}</TableCell>
+                                    <TableCell>{delivery_charge}</TableCell>
+                                    <TableCell>{surcharge}</TableCell>
                                     <TableCell>{discount !== undefined ? `${discount}%` : '0%'}</TableCell>
-                                    <TableCell>₱{total.toFixed(2)}</TableCell>
+                                    <TableCell>{total}</TableCell>
                                     <TableCell>{formatDate(row.created_at)}</TableCell>
                                     <TableCell>
                                         <IconButton size="small" onClick={(e) => handleMenuClick(e, row)}><MoreVertIcon /></IconButton>
@@ -463,15 +275,7 @@ const TransactionManagement = () => {
                         })}
                     </TableBody>
                 </Table>
-                <TablePagination 
-                    rowsPerPageOptions={[10]} 
-                    component="div" 
-                    count={filteredData.length} 
-                    rowsPerPage={rowsPerPage} 
-                    page={page} 
-                    onPageChange={handleChangePage} 
-                    onRowsPerPageChange={handleChangeRowsPerPage} 
-                />
+                <TablePagination rowsPerPageOptions={[10]} component="div" count={data.length} rowsPerPage={rowsPerPage} page={page} onPageChange={handleChangePage} onRowsPerPageChange={handleChangeRowsPerPage} />
             </TableContainer>
             <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleMenuClose}>
                 <MenuItem onClick={() => handleAction('view')}>View Details</MenuItem>

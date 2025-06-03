@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Box, MenuItem, TextField, Typography, Button, TableContainer, Table, TableHead, TableRow, TableCell, TableBody, Paper, IconButton, Menu, Pagination, TableSortLabel, Snackbar, Alert, Dialog, DialogTitle, DialogContent, DialogActions } from "@mui/material";
-import { MoreVert as MoreVertIcon, Edit as EditIcon, Delete as DeleteIcon, LockReset as LockResetIcon } from "@mui/icons-material";
+import { MoreVert as MoreVertIcon, Edit as EditIcon, Delete as DeleteIcon, LockReset as LockResetIcon, ChevronLeft as ChevronLeftIcon, Person as PersonIcon } from "@mui/icons-material";
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
 export default function Page() {
@@ -29,7 +29,7 @@ export default function Page() {
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
   const [editDialog, setEditDialog] = useState({ open: false, user: null });
   const [deleteDialog, setDeleteDialog] = useState({ open: false, userId: null });
-  const [editForm, setEditForm] = useState({ role_id: '', user_status_id: '' });
+  const [editForm, setEditForm] = useState({ user_status_name: '' });
 
   // Data fetching
   useEffect(() => { fetchAccounts(); fetchStatusOptions(); fetchUsers(); fetchRoles(); }, []);
@@ -37,15 +37,20 @@ export default function Page() {
   const fetchAccounts = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase.from('profiles').select(`id, email, first_name, middle_initial, last_name, role_id, user_status_id, profiles_status (status_name), profiles_roles (role_name)`).order('created_at', { ascending: false });
+      const { data, error } = await supabase.from('profiles').select(`id, email, first_name, middle_initial, last_name, role_id, user_status_id, profiles_status (status_name), profiles_roles (role_name), created_at, last_sign_in_at, updated_at`).order('created_at', { ascending: false });
       if (error) throw error;
       const formattedAccounts = data.map(account => ({
         id: account.id,
         name: `${account.first_name || ''} ${account.middle_initial || ''} ${account.last_name || ''}`.trim() || account.email,
-        role: account.profiles_roles?.role_name === 'Airline Staff' ? 'Contractor' : (account.profiles_roles?.role_name || 'No Role'),
+        role: account.profiles_roles?.role_name === 'AirAsia'
+          ? 'Contractor'
+          : (account.profiles_roles?.role_name || 'No Role'),
         email: account.email,
         status: account.profiles_status?.status_name || 'Inactive',
-        user_status_id: account.user_status_id
+        user_status_id: account.user_status_id,
+        created_at: account.created_at,
+        last_sign_in_at: account.last_sign_in_at,
+        updated_at: account.updated_at
       }));
       setAccounts(formattedAccounts);
     } catch (error) {
@@ -137,19 +142,32 @@ export default function Page() {
   const handleMenuClick = (event, user) => { setAnchorEl(event.currentTarget); setSelectedAccount(user); };
   const handleEditClick = () => {
     setEditDialog({ open: true, user: selectedAccount });
-    setEditForm({ role_id: selectedAccount.role_id, user_status_id: selectedAccount.user_status_id });
+    const selectedStatus = statusOptions.find(opt => opt.id === selectedAccount.user_status_id);
+    setEditForm({ user_status_name: selectedStatus ? selectedStatus.status_name : '' });
     handleCloseMenu();
   };
   const handleDeleteClick = () => { setDeleteDialog({ open: true, userId: selectedAccount.id }); handleCloseMenu(); };
   const handleEditSubmit = async () => {
     try {
-      const { error } = await supabase.from('profiles').update({ role_id: editForm.role_id, user_status_id: editForm.user_status_id }).eq('id', editDialog.user.id);
-      if (error) throw error;
-      setSnackbar({ open: true, message: 'User updated successfully', severity: 'success' });
-      fetchAccounts();
+      const response = await fetch('/api/admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'updateUserStatus',
+          params: {
+            userId: editDialog.user.id,
+            statusName: editForm.user_status_name,
+          },
+        }),
+      });
+      const result = await response.json();
+      console.log('API response:', result);
+      if (!response.ok) throw new Error(result.error || 'Failed to update status');
+      setSnackbar({ open: true, message: 'User status updated successfully', severity: 'success' });
+      await fetchAccounts();
     } catch (error) {
-      console.error('Error updating user:', error);
-      setSnackbar({ open: true, message: 'Error updating user', severity: 'error' });
+      setSnackbar({ open: true, message: 'Error updating user status', severity: 'error' });
+      console.error('Update failed:', error);
     } finally {
       setEditDialog({ open: false, user: null });
     }
@@ -172,6 +190,7 @@ export default function Page() {
   // Styles
   const containerStyles = { p: 4, display: "flex", flexDirection: "column", gap: 4 };
   const titleStyles = { color: "primary.main", fontWeight: "bold" };
+  const titleContainerStyles = { display: "flex", alignItems: "center", gap: 1 };
   const searchContainerStyles = { display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" };
   const searchBoxStyles = { display: "flex", gap: 2 };
   const buttonContainerStyles = { display: "flex", gap: 2, ml: "auto" };
@@ -193,7 +212,12 @@ export default function Page() {
 
   return (
     <Box sx={containerStyles}>
-      <Box><Typography variant="h3" sx={titleStyles}>User Management</Typography></Box>
+      <Box sx={titleContainerStyles}>
+        <IconButton onClick={() => router.push('/egc-admin/dashboard')} size="small" color="primary">
+          <ChevronLeftIcon />
+        </IconButton>
+        <Typography variant="h4" sx={titleStyles}>User Management</Typography>
+      </Box>
 
       <Box sx={searchContainerStyles}>
         <Box sx={searchBoxStyles}>
@@ -213,8 +237,8 @@ export default function Page() {
       </Box>
 
       <Box>
-        <TableContainer component={Paper}>
-          <Table>
+        <TableContainer component={Paper} sx={{ width: '100%', overflowX: 'auto' }}>
+          <Table sx={{ minWidth: 1200 }}>
             <TableHead>
               <TableRow>
                 <TableCell><TableSortLabel active={orderBy === 'id'} direction={orderBy === 'id' ? order : undefined} onClick={() => handleRequestSort('id')}>ID</TableSortLabel></TableCell>
@@ -222,6 +246,9 @@ export default function Page() {
                 <TableCell><TableSortLabel active={orderBy === 'email'} direction={orderBy === 'email' ? order : undefined} onClick={() => handleRequestSort('email')}>Email</TableSortLabel></TableCell>
                 <TableCell><TableSortLabel active={orderBy === 'role'} direction={orderBy === 'role' ? order : undefined} onClick={() => handleRequestSort('role')}>Role</TableSortLabel></TableCell>
                 <TableCell><TableSortLabel active={orderBy === 'status'} direction={orderBy === 'status' ? order : undefined} onClick={() => handleRequestSort('status')}>Status</TableSortLabel></TableCell>
+                <TableCell><TableSortLabel active={orderBy === 'created_at'} direction={orderBy === 'created_at' ? order : undefined} onClick={() => handleRequestSort('created_at')}>Created At</TableSortLabel></TableCell>
+                <TableCell><TableSortLabel active={orderBy === 'last_sign_in_at'} direction={orderBy === 'last_sign_in_at' ? order : undefined} onClick={() => handleRequestSort('last_sign_in_at')}>Last Sign In</TableSortLabel></TableCell>
+                <TableCell><TableSortLabel active={orderBy === 'updated_at'} direction={orderBy === 'updated_at' ? order : undefined} onClick={() => handleRequestSort('updated_at')}>Updated At</TableSortLabel></TableCell>
                 <TableCell>Action</TableCell>
               </TableRow>
             </TableHead>
@@ -233,6 +260,9 @@ export default function Page() {
                   <TableCell>{account.email}</TableCell>
                   <TableCell>{account.role}</TableCell>
                   <TableCell>{account.status}</TableCell>
+                  <TableCell>{account.created_at ? new Date(account.created_at).toLocaleString() : 'N/A'}</TableCell>
+                  <TableCell>{account.last_sign_in_at ? new Date(account.last_sign_in_at).toLocaleString() : 'N/A'}</TableCell>
+                  <TableCell>{account.updated_at ? new Date(account.updated_at).toLocaleString() : 'N/A'}</TableCell>
                   <TableCell><IconButton onClick={(event) => handleMenuClick(event, account)}><MoreVertIcon /></IconButton></TableCell>
                 </TableRow>
               ))}
@@ -249,19 +279,22 @@ export default function Page() {
       </Box>
 
       <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleCloseMenu} anchorOrigin={{ vertical: "top", horizontal: "left" }} transformOrigin={{ vertical: "top", horizontal: "left" }}>
-        <MenuItem onClick={handleEditClick}><EditIcon fontSize="small" sx={iconStyles} /> Edit</MenuItem>
-        <MenuItem onClick={handleDeleteClick}><DeleteIcon fontSize="small" sx={iconStyles} /> Delete</MenuItem>
-        <MenuItem><LockResetIcon fontSize="small" sx={iconStyles} /> Reset Password</MenuItem>
+        <MenuItem onClick={() => {
+          router.push(`/egc-admin/user-management/view-profile/${selectedAccount.id}`);
+          handleCloseMenu();
+        }}>
+          <PersonIcon fontSize="small" sx={iconStyles} /> View Profile
+        </MenuItem>
+        <MenuItem onClick={handleEditClick}>
+          <EditIcon fontSize="small" sx={iconStyles} /> Edit User
+        </MenuItem>
       </Menu>
 
       <Dialog open={editDialog.open} onClose={() => setEditDialog({ open: false, user: null })}>
         <DialogTitle>Edit User</DialogTitle>
         <DialogContent>
-          <TextField select fullWidth label="Role" value={editForm.role_id} onChange={(e) => setEditForm(prev => ({ ...prev, role_id: e.target.value }))} sx={dialogFieldStyles}>
-            {roles.map((role) => <MenuItem key={role.id} value={role.id}>{role.role_name}</MenuItem>)}
-          </TextField>
-          <TextField select fullWidth label="Status" value={editForm.user_status_id} onChange={(e) => setEditForm(prev => ({ ...prev, user_status_id: e.target.value }))} sx={dialogFieldStyles}>
-            {statusOptions.map((status) => <MenuItem key={status.id} value={status.id}>{status.status_name}</MenuItem>)}
+          <TextField select fullWidth label="Status" value={editForm.user_status_name} onChange={e => setEditForm(prev => ({ ...prev, user_status_name: e.target.value }))} sx={dialogFieldStyles}>
+            {statusOptions.map((status) => <MenuItem key={status.id} value={status.status_name}>{status.status_name}</MenuItem>)}
           </TextField>
         </DialogContent>
         <DialogActions>

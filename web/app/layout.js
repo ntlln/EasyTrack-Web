@@ -43,6 +43,17 @@ export default function Layout({ children }) {
 
     return (
         <html lang="en">
+            <head>
+                <link
+                    href="https://fonts.googleapis.com/css2?family=Onest:wght@100;200;300;400;500;600;700;800;900&display=swap"
+                    rel="stylesheet"
+                />
+                <style jsx global>{`
+                    * {
+                        font-family: 'Onest', sans-serif;
+                    }
+                `}</style>
+            </head>
             <body>
                 <ColorModeContext.Provider value={{ mode, toggleMode }}>
                     <ThemeProvider theme={getTheme(mode)}>

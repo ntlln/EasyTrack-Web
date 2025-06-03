@@ -135,10 +135,10 @@ export default function Page() {
                         {!isMinimized && <ListItemText primary="Chat Support" />}
                     </ListItemButton>
 
-                    <ListItemButton onClick={() => handleNavigation("/egc-admin/history-and-reports")} sx={listItemStyles("/egc-admin/history-and-reports")}>
+                    {/* <ListItemButton onClick={() => handleNavigation("/egc-admin/history-and-reports")} sx={listItemStyles("/egc-admin/history-and-reports")}>
                         <ListItemIcon><AssignmentIcon sx={iconStyles("/egc-admin/history-and-reports")} /></ListItemIcon>
                         {!isMinimized && <ListItemText primary="History and Reports" />}
-                    </ListItemButton>
+                    </ListItemButton> */}
 
                     <ListItemButton onClick={() => handleNavigation("/egc-admin/statistics")} sx={listItemStyles("/egc-admin/statistics")}>
                         <ListItemIcon><BarChartIcon sx={iconStyles("/egc-admin/statistics")} /></ListItemIcon>

@@ -12,6 +12,24 @@ export const getTheme = (mode) => createTheme({
         }
     },
 
+    // Typography configuration
+    typography: {
+        fontFamily: 'Onest, sans-serif',
+        h1: { fontFamily: 'Onest, sans-serif' },
+        h2: { fontFamily: 'Onest, sans-serif' },
+        h3: { fontFamily: 'Onest, sans-serif' },
+        h4: { fontFamily: 'Onest, sans-serif' },
+        h5: { fontFamily: 'Onest, sans-serif' },
+        h6: { fontFamily: 'Onest, sans-serif' },
+        subtitle1: { fontFamily: 'Onest, sans-serif' },
+        subtitle2: { fontFamily: 'Onest, sans-serif' },
+        body1: { fontFamily: 'Onest, sans-serif' },
+        body2: { fontFamily: 'Onest, sans-serif' },
+        button: { fontFamily: 'Onest, sans-serif' },
+        caption: { fontFamily: 'Onest, sans-serif' },
+        overline: { fontFamily: 'Onest, sans-serif' }
+    },
+
     // Component styles
     components: {
         MuiPaper: {
