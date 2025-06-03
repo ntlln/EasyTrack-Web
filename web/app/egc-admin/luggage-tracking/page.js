@@ -178,6 +178,12 @@ const ContractList = ({ onTrackContract }) => {
     onTrackContract(contractId);
   };
 
+  // Helper to get current filter/search contracts
+  const getFilteredContracts = () =>
+    filteredContracts.filter(contract =>
+      !activeSearch || String(contract.id).toLowerCase().includes(activeSearch.toLowerCase())
+    );
+
   return (
     <Box>
       <Box sx={{ display: 'flex', justifyContent: 'center', mb: 4 }}>
