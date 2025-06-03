@@ -90,11 +90,94 @@ export default function Page() {
         return `${year}${month}${day}TRKLG${randomPart}`
     }
 
+    // Fetch pricing data
+    useEffect(() => {
+        const fetchPricingData = async () => {
+            try {
+                const { data: pricing, error } = await supabase
+                    .from('pricing')
+                    .select('city, price');
+                
+                if (error) {
+                    console.error('Error fetching pricing data:', error);
+                    return;
+                }
+                
+                if (!pricing || pricing.length === 0) {
+                    console.warn('No pricing data found in the database');
+                    return;
+                }
+                
+                const pricingMap = {};
+                pricing.forEach(item => {
+                    if (!item.city || item.price === null || item.price === undefined) {
+                        console.warn('Invalid pricing data:', item);
+                        return;
+                    }
+                    const normalized = normalizeCityName(item.city);
+                    pricingMap[normalized] = Number(item.price);
+                });
+                console.log('Pricing data loaded:', pricingMap);
+                setPricingData(pricingMap);
+            } catch (error) {
+                console.error('Error in fetchPricingData:', error);
+            }
+        };
+        
+        fetchPricingData();
+    }, []);
+
+    // Function to get city from coordinates
+    const getCityFromCoordinates = async (lat, lng) => {
+        if (!window.google) {
+            console.error('Google Maps not loaded');
+            return null;
+        }
+        
+        try {
+            const geocoder = new window.google.maps.Geocoder();
+            const response = await new Promise((resolve, reject) => {
+                geocoder.geocode(
+                    { location: { lat, lng } },
+                    (results, status) => {
+                        if (status === 'OK') resolve(results);
+                        else reject(new Error(`Geocoding failed: ${status}`));
+                    }
+                );
+            });
+
+            if (!response || !response[0]) {
+                console.warn('No results found for coordinates:', { lat, lng });
+                return null;
+            }
+
+            const addressComponents = response[0].address_components;
+            const cityComponent = addressComponents.find(
+                component => component.types.includes('locality')
+            );
+
+            if (!cityComponent) {
+                console.warn('No city found in address components:', addressComponents);
+                return null;
+            }
+
+            const city = cityComponent.long_name;
+            console.log('Found city:', city);
+            return city;
+        } catch (error) {
+            console.error('Error getting city from coordinates:', error);
+            return null;
+        }
+    };
+
     // Submit contract
     const handleSubmit = async () => { 
         try { 
             const { data: { user }, error: userError } = await supabase.auth.getUser(); 
-            if (userError) return; 
+            if (userError) {
+                console.error('Error getting user:', userError);
+                return;
+            }
 
             // Generate tracking IDs
             const contractTrackingID = generateTrackingID();
@@ -105,20 +188,33 @@ export default function Page() {
             if (dropoffAddress.lat && dropoffAddress.lng) {
                 city = await getCityFromCoordinates(dropoffAddress.lat, dropoffAddress.lng);
                 console.log('Determined city:', city);
+            } else {
+                console.warn('No coordinates available for city determination');
             }
 
             // Step 2: Fetch price for the determined city
             let deliveryCharge = null;
             if (city) {
                 const normalizedCity = normalizeCityName(city);
-                deliveryCharge = pricingData[normalizedCity] || null;
-                console.log('Fetched price for city:', normalizedCity, 'Price:', deliveryCharge);
+                deliveryCharge = pricingData[normalizedCity];
+                console.log('City lookup:', {
+                    original: city,
+                    normalized: normalizedCity,
+                    price: deliveryCharge,
+                    availableCities: Object.keys(pricingData)
+                });
+            } else {
+                console.warn('Could not determine city for price lookup');
             }
 
             // Step 3: Calculate total delivery charge based on number of forms
             const numberOfForms = contracts.length;
             const totalDeliveryCharge = deliveryCharge ? deliveryCharge * numberOfForms : null;
-            console.log('Number of forms:', numberOfForms, 'Total delivery charge:', totalDeliveryCharge);
+            console.log('Price calculation:', {
+                numberOfForms,
+                pricePerForm: deliveryCharge,
+                totalDeliveryCharge
+            });
 
             // Step 4: Prepare contract data with the total delivery charge
             const totalLuggageQuantity = contracts.reduce((sum, contract) => sum + Number(contract.quantity || 0), 0); 
@@ -131,6 +227,8 @@ export default function Page() {
                 drop_off_location_geo: { type: 'Point', coordinates: [dropoffAddress.lng, dropoffAddress.lat] },
                 delivery_charge: totalDeliveryCharge
             }; 
+
+            console.log('Submitting contract data:', contractData);
 
             // Step 5: Insert contract data
             const { data: insertedContract, error: contractError } = await supabase
@@ -186,61 +284,6 @@ export default function Page() {
         if (!name) return '';
         return name.trim().toLowerCase().replace(/ city$/, ''); // Remove ' city' at the end
     }
-
-    // Fetch pricing data
-    useEffect(() => {
-        const fetchPricingData = async () => {
-            try {
-                const { data: pricing, error } = await supabase
-                    .from('pricing')
-                    .select('city, price');
-                
-                if (error) throw error;
-                
-                const pricingMap = {};
-                pricing.forEach(item => {
-                    const normalized = normalizeCityName(item.city);
-                    pricingMap[normalized] = item.price;
-                });
-                console.log('Pricing data loaded:', pricingMap);
-                setPricingData(pricingMap);
-            } catch (error) {
-                console.error('Error fetching pricing data:', error);
-            }
-        };
-        
-        fetchPricingData();
-    }, []);
-
-    // Function to get city from coordinates
-    const getCityFromCoordinates = async (lat, lng) => {
-        if (!window.google) return null;
-        
-        try {
-            const geocoder = new window.google.maps.Geocoder();
-            const response = await new Promise((resolve, reject) => {
-                geocoder.geocode(
-                    { location: { lat, lng } },
-                    (results, status) => {
-                        if (status === 'OK') resolve(results);
-                        else reject(status);
-                    }
-                );
-            });
-
-            if (response && response[0]) {
-                const addressComponents = response[0].address_components;
-                const cityComponent = addressComponents.find(
-                    component => component.types.includes('locality')
-                );
-                return cityComponent ? cityComponent.long_name : null;
-            }
-            return null;
-        } catch (error) {
-            console.error('Error getting city from coordinates:', error);
-            return null;
-        }
-    };
 
     // Fetch contract list
     useEffect(() => {
