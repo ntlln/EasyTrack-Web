@@ -70,11 +70,35 @@ export default function Page() {
     const deleteContract = (index) => { const updatedContracts = contracts.filter((_, i) => i !== index); setContracts(updatedContracts); };
     const addContract = () => { setContracts([...contracts, { name: "", caseNumber: "", itemDescription: "", contact: "", weight: "", quantity: "" }]); };
 
+    // Generate tracking ID with format 'YYYYMMDDMKTPxxxx'
+    const generateTrackingID = () => {
+        const now = new Date()
+        const year = now.getFullYear()
+        const month = String(now.getMonth() + 1).padStart(2, '0')
+        const day = String(now.getDate()).padStart(2, '0')
+        const randomPart = [...Array(4)].map(() => Math.random().toString(36)[2].toUpperCase()).join('')
+        return `${year}${month}${day}MKTP${randomPart}`
+    }
+
+    // Generate luggage tracking ID with format 'YYYYMMDDTRKLGxxxx'
+    const generateLuggageTrackingID = () => {
+        const now = new Date()
+        const year = now.getFullYear()
+        const month = String(now.getMonth() + 1).padStart(2, '0')
+        const day = String(now.getDate()).padStart(2, '0')
+        const randomPart = [...Array(4)].map(() => Math.random().toString(36)[2].toUpperCase()).join('')
+        return `${year}${month}${day}TRKLG${randomPart}`
+    }
+
     // Submit contract
     const handleSubmit = async () => { 
         try { 
             const { data: { user }, error: userError } = await supabase.auth.getUser(); 
             if (userError) return; 
+
+            // Generate tracking IDs
+            const contractTrackingID = generateTrackingID();
+            const luggageTrackingIDs = contracts.map(() => generateLuggageTrackingID());
 
             // Step 1: Determine the city from coordinates
             let city = null;
@@ -99,6 +123,7 @@ export default function Page() {
             // Step 4: Prepare contract data with the total delivery charge
             const totalLuggageQuantity = contracts.reduce((sum, contract) => sum + Number(contract.quantity || 0), 0); 
             const contractData = { 
+                id: contractTrackingID,
                 luggage_quantity: totalLuggageQuantity, 
                 airline_id: user.id, 
                 pickup_location: pickupAddress.location, 
@@ -120,14 +145,15 @@ export default function Page() {
             }
 
             // Step 6: Insert luggage information
-            const formattedData = contracts.map(contract => ({ 
+            const formattedData = contracts.map((contract, index) => ({ 
+                id: luggageTrackingIDs[index],
                 case_number: contract.caseNumber, 
                 luggage_owner: contract.name, 
                 contact_number: contract.contact, 
                 item_description: contract.itemDescription, 
                 weight: contract.weight, 
                 quantity: contract.quantity, 
-                contract_id: insertedContract.id 
+                contract_id: contractTrackingID
             })); 
 
             const { data, error } = await supabase
