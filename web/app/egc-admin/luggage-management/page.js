@@ -361,6 +361,9 @@ const ContractList = ({ onTrackContract, initialSearch }) => {
                       Owner: <span style={{ color: 'text.primary' }}>{l.luggage_owner || 'N/A'}</span>
                     </Typography>
                     <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                      Flight Number: <span style={{ color: 'text.primary' }}>{l.flight_number || 'N/A'}</span>
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
                       Case Number: <span style={{ color: 'text.primary' }}>{l.case_number || 'N/A'}</span>
                     </Typography>
                     <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
@@ -471,6 +474,8 @@ const LuggageAssignments = ({ onAssignmentComplete }) => {
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [selectedContract, setSelectedContract] = useState(null);
   const [assigning, setAssigning] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [detailsContract, setDetailsContract] = useState(null);
 
   useEffect(() => {
     setMounted(true);
@@ -568,6 +573,36 @@ const LuggageAssignments = ({ onAssignmentComplete }) => {
     }
   };
 
+  const handleViewDetails = (contract) => {
+    setDetailsContract(contract);
+    setDetailsOpen(true);
+  };
+
+  const handleDetailsClose = () => {
+    setDetailsOpen(false);
+    setDetailsContract(null);
+  };
+
+  // Format date helper function
+  const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleString('en-US', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+      });
+    } catch (error) {
+      console.error('Error formatting date:', error);
+      return 'N/A';
+    }
+  };
+
   if (loading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
@@ -593,9 +628,10 @@ const LuggageAssignments = ({ onAssignmentComplete }) => {
               <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Contract ID</TableCell>
               <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Pickup Location</TableCell>
               <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Drop-off Location</TableCell>
+              <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Flight Number</TableCell>
               <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Airline Name</TableCell>
               <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Luggage Details</TableCell>
-              <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Action</TableCell>
+              <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Actions</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -611,6 +647,7 @@ const LuggageAssignments = ({ onAssignmentComplete }) => {
                   <TableCell>{assignment.id}</TableCell>
                   <TableCell>{assignment.pickup_location || 'N/A'}</TableCell>
                   <TableCell>{assignment.drop_off_location || 'N/A'}</TableCell>
+                  <TableCell>{assignment.luggage?.[0]?.flight_number || 'N/A'}</TableCell>
                   <TableCell>
                     {assignment.airline
                       ? `${assignment.airline.first_name || ''} ${assignment.airline.middle_initial || ''} ${
@@ -642,13 +679,24 @@ const LuggageAssignments = ({ onAssignmentComplete }) => {
                     )}
                   </TableCell>
                   <TableCell>
-                    <Button
-                      variant="contained"
-                      size="small"
-                      onClick={() => handleAssign(assignment)}
-                    >
-                      Assign
-                    </Button>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        onClick={() => handleViewDetails(assignment)}
+                        fullWidth
+                      >
+                        View Details
+                      </Button>
+                      <Button
+                        variant="contained"
+                        size="small"
+                        onClick={() => handleAssign(assignment)}
+                        fullWidth
+                      >
+                        Assign
+                      </Button>
+                    </Box>
                   </TableCell>
                 </TableRow>
               ))
@@ -720,6 +768,162 @@ const LuggageAssignments = ({ onAssignmentComplete }) => {
           >
             {assigning ? 'Assigning...' : 'Confirm Assignment'}
           </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Details Dialog */}
+      <Dialog open={detailsOpen} onClose={handleDetailsClose} maxWidth="md" fullWidth>
+        <DialogTitle>Contract Details</DialogTitle>
+        <DialogContent dividers>
+          {detailsContract && (
+            <Box sx={{ minWidth: 400 }}>
+              <Typography variant="subtitle1" sx={{ color: 'primary.main', fontWeight: 700, mb: 1 }}>
+                Contract ID: <span style={{ color: '#bdbdbd', fontWeight: 400 }}>{detailsContract.id}</span>
+              </Typography>
+              <Divider sx={{ my: 1 }} />
+              <Typography variant="subtitle2" sx={{ color: 'primary.main', fontWeight: 700, mb: 1 }}>
+                Location Information
+              </Typography>
+              <Box sx={{ ml: 1, mb: 1 }}>
+                <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                  <b>Pickup:</b> <span style={{ color: 'text.primary' }}>{detailsContract.pickup_location || 'N/A'}</span>
+                </Typography>
+                {detailsContract.pickup_location_geo && (
+                  <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                    <b>Pickup Coordinates:</b>{' '}
+                    <span style={{ color: 'text.primary' }}>
+                      {detailsContract.pickup_location_geo.coordinates[1].toFixed(6)}, {detailsContract.pickup_location_geo.coordinates[0].toFixed(6)}
+                    </span>
+                  </Typography>
+                )}
+                <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                  <b>Drop-off:</b> <span style={{ color: 'text.primary' }}>{detailsContract.drop_off_location || 'N/A'}</span>
+                </Typography>
+                {detailsContract.drop_off_location_geo && (
+                  <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                    <b>Drop-off Coordinates:</b>{' '}
+                    <span style={{ color: 'text.primary' }}>
+                      {detailsContract.drop_off_location_geo.coordinates[1].toFixed(6)}, {detailsContract.drop_off_location_geo.coordinates[0].toFixed(6)}
+                    </span>
+                  </Typography>
+                )}
+                {detailsContract.delivery_charge !== null && !isNaN(Number(detailsContract.delivery_charge)) ? (
+                  <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                    <b>Price:</b> <span style={{ color: 'text.primary' }}>₱{Number(detailsContract.delivery_charge).toLocaleString()}</span>
+                  </Typography>
+                ) : (
+                  <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                    <b>Price:</b> <span style={{ color: 'text.primary' }}>N/A</span>
+                  </Typography>
+                )}
+              </Box>
+              <Divider sx={{ my: 2 }} />
+              <Typography variant="subtitle2" sx={{ color: 'primary.main', fontWeight: 700, mb: 1 }}>
+                Contractor Information
+              </Typography>
+              <Box sx={{ ml: 1, mb: 1 }}>
+                <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                  <b>Contractor Name:</b>{' '}
+                  <span style={{ color: 'text.primary' }}>
+                    {detailsContract.airline
+                      ? `${detailsContract.airline.first_name || ''} ${detailsContract.airline.middle_initial || ''} ${
+                          detailsContract.airline.last_name || ''
+                        }${detailsContract.airline.suffix ? ` ${detailsContract.airline.suffix}` : ''}`
+                          .replace(/  +/g, ' ')
+                          .trim()
+                      : 'N/A'}
+                  </span>
+                </Typography>
+                <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                  <b>Contractor Email:</b>{' '}
+                  <span style={{ color: 'text.primary' }}>{detailsContract.airline?.email || 'N/A'}</span>
+                </Typography>
+                <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                  <b>Contractor Contact:</b>{' '}
+                  <span style={{ color: 'text.primary' }}>{detailsContract.airline?.contact_number || 'N/A'}</span>
+                </Typography>
+                <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                  <b>Status:</b>{' '}
+                  <span style={{ color: 'primary.main', fontWeight: 700 }}>
+                    {detailsContract.contract_status?.status_name || 'N/A'}
+                  </span>
+                </Typography>
+              </Box>
+              <Divider sx={{ my: 2 }} />
+              <Typography variant="subtitle2" sx={{ color: 'primary.main', fontWeight: 700, mb: 1 }}>
+                Luggage Information
+              </Typography>
+              <Box sx={{ ml: 1, mb: 1 }}>
+                {detailsContract.luggage.length === 0 && (
+                  <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                    No luggage info.
+                  </Typography>
+                )}
+                {detailsContract.luggage.map((l, lidx) => (
+                  <Box key={`luggage-${detailsContract.id}-${lidx}`} sx={{ mb: 2, pl: 1 }}>
+                    <Typography variant="subtitle2" sx={{ color: 'primary.main', fontWeight: 700 }}>
+                      Luggage {lidx + 1}
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                      Owner: <span style={{ color: 'text.primary' }}>{l.luggage_owner || 'N/A'}</span>
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                      Flight Number: <span style={{ color: 'text.primary' }}>{l.flight_number || 'N/A'}</span>
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                      Case Number: <span style={{ color: 'text.primary' }}>{l.case_number || 'N/A'}</span>
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                      Description: <span style={{ color: 'text.primary' }}>{l.item_description || 'N/A'}</span>
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                      Weight: <span style={{ color: 'text.primary' }}>{l.weight ? `${l.weight} kg` : 'N/A'}</span>
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                      Contact: <span style={{ color: 'text.primary' }}>{l.contact_number || 'N/A'}</span>
+                    </Typography>
+                  </Box>
+                ))}
+              </Box>
+              <Divider sx={{ my: 2 }} />
+              <Typography variant="subtitle2" sx={{ color: 'primary.main', fontWeight: 700, mb: 1 }}>
+                Timeline
+              </Typography>
+              <Box sx={{ ml: 1, mb: 1 }}>
+                <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                  <b>Created:</b>{' '}
+                  <span style={{ color: 'text.primary' }}>{formatDate(detailsContract.created_at)}</span>
+                </Typography>
+                <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                  <b>Accepted:</b>{' '}
+                  <span style={{ color: 'text.primary' }}>
+                    {detailsContract.accepted_at ? formatDate(detailsContract.accepted_at) : 'N/A'}
+                  </span>
+                </Typography>
+                <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                  <b>Pickup:</b>{' '}
+                  <span style={{ color: 'text.primary' }}>
+                    {detailsContract.pickup_at ? formatDate(detailsContract.pickup_at) : 'N/A'}
+                  </span>
+                </Typography>
+                <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                  <b>Delivered:</b>{' '}
+                  <span style={{ color: 'text.primary' }}>
+                    {detailsContract.delivered_at ? formatDate(detailsContract.delivered_at) : 'N/A'}
+                  </span>
+                </Typography>
+                <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                  <b>Cancelled:</b>{' '}
+                  <span style={{ color: 'text.primary' }}>
+                    {detailsContract.cancelled_at ? formatDate(detailsContract.cancelled_at) : 'N/A'}
+                  </span>
+                </Typography>
+              </Box>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleDetailsClose} color="primary">Close</Button>
         </DialogActions>
       </Dialog>
     </Box>
@@ -1486,6 +1690,9 @@ const LuggageTrackingTab = ({
                                 Owner: <span style={{ color: 'text.primary' }}>{l.luggage_owner || 'N/A'}</span>
                               </Typography>
                               <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                                Flight Number: <span style={{ color: 'text.primary' }}>{l.flight_number || 'N/A'}</span>
+                              </Typography>
+                              <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
                                 Case Number: <span style={{ color: 'text.primary' }}>{l.case_number || 'N/A'}</span>
                               </Typography>
                               <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
@@ -1508,32 +1715,30 @@ const LuggageTrackingTab = ({
                         <Box sx={{ ml: 1, mb: 1 }}>
                           <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
                             <b>Created:</b>{' '}
-                            <span style={{ color: 'text.primary' }}>
-                              {formatDate(contract.created_at)}
-                            </span>
+                            <span style={{ color: 'text.primary' }}>{formatDate(contract.created_at)}</span>
                           </Typography>
                           <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
                             <b>Accepted:</b>{' '}
                             <span style={{ color: 'text.primary' }}>
-                              {contract.accepted_at ? new Date(contract.accepted_at).toLocaleString() : 'N/A'}
+                              {contract.accepted_at ? formatDate(contract.accepted_at) : 'N/A'}
                             </span>
                           </Typography>
                           <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
                             <b>Pickup:</b>{' '}
                             <span style={{ color: 'text.primary' }}>
-                              {contract.pickup_at ? new Date(contract.pickup_at).toLocaleString() : 'N/A'}
+                              {contract.pickup_at ? formatDate(contract.pickup_at) : 'N/A'}
                             </span>
                           </Typography>
                           <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
                             <b>Delivered:</b>{' '}
                             <span style={{ color: 'text.primary' }}>
-                              {contract.delivered_at ? new Date(contract.delivered_at).toLocaleString() : 'N/A'}
+                              {contract.delivered_at ? formatDate(contract.delivered_at) : 'N/A'}
                             </span>
                           </Typography>
                           <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
                             <b>Cancelled:</b>{' '}
                             <span style={{ color: 'text.primary' }}>
-                              {contract.cancelled_at ? new Date(contract.cancelled_at).toLocaleString() : 'N/A'}
+                              {contract.cancelled_at ? formatDate(contract.cancelled_at) : 'N/A'}
                             </span>
                           </Typography>
                         </Box>

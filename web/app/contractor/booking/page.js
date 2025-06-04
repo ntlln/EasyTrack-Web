@@ -30,9 +30,9 @@ export default function Page() {
     const [map, setMap] = useState(null); const [isScriptLoaded, setIsScriptLoaded] = useState(false); const [mapError, setMapError] = useState(null); const updateTimeoutRef = useRef(null);
     const [mounted, setMounted] = useState(false); const [isFormMounted, setIsFormMounted] = useState(false);
     const [activeTab, setActiveTab] = useState(0); const [isGoogleMapsReady, setIsGoogleMapsReady] = useState(false);
-    const [contracts, setContracts] = useState([{ name: "", caseNumber: "", itemDescription: "", contact: "", weight: "", quantity: "" }]);
-    const [pickupAddress, setPickupAddress] = useState({ location: "", addressLine1: "", addressLine2: "", province: "", city: "", barangay: "", postalCode: "" });
-    const [dropoffAddress, setDropoffAddress] = useState({ location: "", lat: null, lng: null });
+    const [contracts, setContracts] = useState([{ name: "", caseNumber: "", itemDescription: "", contact: "", weight: "", quantity: "", flightNo: "" }]);
+    const [pickupAddress, setPickupAddress] = useState({ location: null, addressLine1: "", addressLine2: "", province: "", city: "", barangay: "", postalCode: "" });
+    const [dropoffAddress, setDropoffAddress] = useState({ location: null, lat: null, lng: null });
     const [placeOptions, setPlaceOptions] = useState([]); const [placeLoading, setPlaceLoading] = useState(false); const autocompleteServiceRef = useRef(null); const placesServiceRef = useRef(null);
     const [contractList, setContractList] = useState([]); const [contractListLoading, setContractListLoading] = useState(false); const [contractListError, setContractListError] = useState(null); const [expandedContracts, setExpandedContracts] = useState([]);
     const [pricingData, setPricingData] = useState({});
@@ -66,9 +66,9 @@ export default function Page() {
     const handleDropoffAddressChange = (field, value) => { setDropoffAddress(prev => ({ ...prev, [field]: value })); };
     const handleInputChange = (index, field, value) => { const updatedContracts = [...contracts]; updatedContracts[index][field] = value; setContracts(updatedContracts); };
     const handleImageChange = (index, file) => { const updatedContracts = [...contracts]; updatedContracts[index].image = file; setContracts(updatedContracts); };
-    const clearSingleContract = (index) => { const updatedContracts = [...contracts]; updatedContracts[index] = { name: "", caseNumber: "", itemDescription: "", contact: "", weight: "", quantity: "" }; setContracts(updatedContracts); };
+    const clearSingleContract = (index) => { const updatedContracts = [...contracts]; updatedContracts[index] = { name: "", caseNumber: "", itemDescription: "", contact: "", weight: "", quantity: "", flightNo: "" }; setContracts(updatedContracts); };
     const deleteContract = (index) => { const updatedContracts = contracts.filter((_, i) => i !== index); setContracts(updatedContracts); };
-    const addContract = () => { setContracts([...contracts, { name: "", caseNumber: "", itemDescription: "", contact: "", weight: "", quantity: "" }]); };
+    const addContract = () => { setContracts([...contracts, { name: "", caseNumber: "", itemDescription: "", contact: "", weight: "", quantity: "", flightNo: "" }]); };
 
     // Generate tracking ID with format 'YYYYMMDDMKTPxxxx'
     const generateTrackingID = () => {
@@ -246,6 +246,7 @@ export default function Page() {
             const formattedData = contracts.map((contract, index) => ({ 
                 id: luggageTrackingIDs[index],
                 case_number: contract.caseNumber, 
+                flight_number: contract.flightNo,
                 luggage_owner: contract.name, 
                 contact_number: contract.contact, 
                 item_description: contract.itemDescription, 
@@ -265,9 +266,9 @@ export default function Page() {
 
             setSnackbarOpen(true);
             // Reset form
-            setContracts([{ name: "", caseNumber: "", itemDescription: "", contact: "", weight: "", quantity: "" }]);
-            setPickupAddress({ location: "", addressLine1: "", addressLine2: "", province: "", city: "", barangay: "", postalCode: "" });
-            setDropoffAddress({ location: "", lat: null, lng: null });
+            setContracts([{ name: "", caseNumber: "", itemDescription: "", contact: "", weight: "", quantity: "", flightNo: "" }]);
+            setPickupAddress({ location: null, addressLine1: "", addressLine2: "", province: "", city: "", barangay: "", postalCode: "" });
+            setDropoffAddress({ location: null, lat: null, lng: null });
             // Switch to contract list tab and refresh
             setActiveTab(0);
             router.refresh();
@@ -565,6 +566,9 @@ export default function Page() {
                                                             Case Number: <span style={{ color: 'text.primary' }}>{l.case_number || 'N/A'}</span>
                                                         </Typography>
                                                         <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                                                            Flight Number: <span style={{ color: 'text.primary' }}>{l.flight_number || 'N/A'}</span>
+                                                        </Typography>
+                                                        <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
                                                             Description: <span style={{ color: 'text.primary' }}>{l.item_description || 'N/A'}</span>
                                                         </Typography>
                                                         <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
@@ -645,9 +649,12 @@ export default function Page() {
                             </IconButton>
                             <Typography variant="h6" fontWeight="bold" align="center" mb={3}>Delivery Information {index + 1}</Typography>
                             <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mb: 2 }}>
-                                <TextField label="Case Number" fullWidth size="small" value={contract.caseNumber} onChange={(e) => handleInputChange(index, "caseNumber", e.target.value)} required />
                                 <TextField label="Name" fullWidth size="small" value={contract.name} onChange={(e) => handleInputChange(index, "name", e.target.value)} required />
                                 <TextField label="Item Description" fullWidth size="small" value={contract.itemDescription} onChange={(e) => handleInputChange(index, "itemDescription", e.target.value)} required />
+                                <Box sx={{ display: 'flex', gap: 2, width: '100%' }}>
+                                    <TextField label="Case Number" fullWidth size="small" value={contract.caseNumber} onChange={(e) => handleInputChange(index, "caseNumber", e.target.value)} required sx={{ width: '50%' }} />
+                                    <TextField label="Flight No." fullWidth size="small" value={contract.flightNo} onChange={(e) => handleInputChange(index, "flightNo", e.target.value)} required sx={{ width: '50%' }} />
+                                </Box>
                                 <Box sx={{ display: 'flex', gap: 2, width: '100%' }}>
                                     <TextField label="Contact Number" fullWidth size="small" value={contract.contact} onChange={(e) => handleInputChange(index, "contact", e.target.value)} required />
                                     <TextField label="Weight (kg)" fullWidth size="small" type="number" value={contract.weight} onChange={(e) => handleInputChange(index, "weight", e.target.value)} required />

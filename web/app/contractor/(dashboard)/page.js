@@ -34,7 +34,7 @@ export default function Page() {
   // Styles
   const containerStyles = { p: 4 };
   const titleStyles = { mb: 4 };
-  const cardStyles = { height: "24vh", width: "35vh" };
+  const cardStyles = { height: "100%", width: "35vh" };
   const linkStyles = { textDecoration: "none" };
   const iconStyles = { fontSize: 40, color: "primary.main", mb: 2 };
 

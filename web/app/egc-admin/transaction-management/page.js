@@ -296,7 +296,7 @@ const TransactionManagement = () => {
             const selectedContracts = data.filter(row => selectedRows.includes(row.id));
             return selectedContracts.filter(contract => {
                 const status = contract.contract_status?.status_name?.toLowerCase() || '';
-                return ['delivered', 'failed', 'cancelled'].includes(status);
+                return ['delivered', 'delivery failed'].includes(status);
             });
         } catch (error) {
             console.error('Error getting selected contracts:', error);
