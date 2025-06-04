@@ -19,7 +19,7 @@ export default function Page() {
   const cards = [
     { title: "Profile", route: "/egc-admin/profile", icon: AccountCircleIcon },
     { title: "User Management", route: "/egc-admin/user-management", icon: GroupsIcon },
-    { title: "Luggage Tracking", route: "/egc-admin/luggage-tracking", icon: MyLocationIcon },
+    { title: "Luggage Management", route: "/egc-admin/luggage-management", icon: MyLocationIcon },
     { title: "Transaction Management", route: "/egc-admin/transaction-management", icon: AssignmentIcon },
     // { title: "History and Reports", route: "/egc-admin/history-and-reports", icon: AssignmentIcon },
     { title: "Statistics", route: "/egc-admin/statistics", icon: BarChartIcon },
@@ -35,7 +35,7 @@ export default function Page() {
 
   return (
     <Box sx={containerStyles}>
-      <Box sx={titleStyles}><Typography variant="h3" color="primary.main" fontWeight="bold">Dashboard</Typography></Box>
+      <Box sx={titleStyles}><Typography variant="h4" color="primary.main" fontWeight="bold">Dashboard</Typography></Box>
       <Grid container spacing={3}>
         {cards.map((card, index) => (
           <Grid item xs={12} sm={6} md={4} key={index}>

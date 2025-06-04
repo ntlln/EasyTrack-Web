@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Box, Tabs, Tab, Typography, Paper, Button, IconButton, CircularProgress, Divider, Collapse, TextField, Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from "@mui/material";
+import { Box, Tabs, Tab, Typography, Paper, Button, IconButton, CircularProgress, Divider, Collapse, TextField, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Dialog, DialogTitle, DialogContent, DialogActions, Radio } from "@mui/material";
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import { useRouter } from 'next/navigation';
@@ -21,7 +21,7 @@ const MapComponent = dynamic(() => Promise.resolve(({ mapRef, mapError }) => (
 )), { ssr: false });
 
 // Contract List Component
-const ContractList = ({ onTrackContract }) => {
+const ContractList = ({ onTrackContract, initialSearch }) => {
   const [contractList, setContractList] = useState([]);
   const [contractListLoading, setContractListLoading] = useState(false);
   const [contractListError, setContractListError] = useState(null);
@@ -31,7 +31,7 @@ const ContractList = ({ onTrackContract }) => {
   const [activeSearch, setActiveSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [page, setPage] = useState(0);
-  const rowsPerPage = 10; // Changed from 2 to 10 items per page
+  const rowsPerPage = 10;
   const supabase = createClientComponentClient();
   const router = useRouter();
 
@@ -46,49 +46,17 @@ const ContractList = ({ onTrackContract }) => {
     { value: 'cancelled', label: 'Cancelled' }
   ];
 
-  // Utility to normalize city names for matching
-  function normalizeCityName(name) {
-    if (!name) return '';
-    // Remove ' city' at the end, trim whitespace, and lowercase
-    return name.toLowerCase().replace(/ city$/, '').trim();
-  }
-
-  // Function to get city from coordinates (enhanced, with debug logs and fallback)
-  const getCityFromCoordinates = async (lat, lng) => {
-    if (!window.google) return null;
-    try {
-      const geocoder = new window.google.maps.Geocoder();
-      const response = await new Promise((resolve, reject) => {
-        geocoder.geocode(
-          { location: { lat, lng } },
-          (results, status) => {
-            if (status === 'OK') resolve(results);
-            else reject(status);
-          }
-        );
-      });
-      if (response && response[0]) {
-        const addressComponents = response[0].address_components;
-        // Try locality first
-        let cityComponent = addressComponents.find(c => c.types.includes('locality'));
-        // Fallback to admin area level 2
-        if (!cityComponent) cityComponent = addressComponents.find(c => c.types.includes('administrative_area_level_2'));
-        // Fallback to admin area level 1
-        if (!cityComponent) cityComponent = addressComponents.find(c => c.types.includes('administrative_area_level_1'));
-        // Fallback to postal_town (for some countries)
-        if (!cityComponent) cityComponent = addressComponents.find(c => c.types.includes('postal_town'));
-        return cityComponent ? cityComponent.long_name : null;
-      }
-      return null;
-    } catch (error) {
-      console.error('Error getting city from coordinates:', error);
-      return null;
-    }
-  };
-
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Autofill search if initialSearch is provided
+  useEffect(() => {
+    if (initialSearch) {
+      setSearchQuery(initialSearch);
+      setActiveSearch(initialSearch);
+    }
+  }, [initialSearch]);
 
   // Fetch contract list
   useEffect(() => {
@@ -98,19 +66,13 @@ const ContractList = ({ onTrackContract }) => {
       setContractListLoading(true);
       setContractListError(null);
       try {
-        console.log('Starting contract fetch...');
-        const response = await fetch('/api/admin/contracts');
+        const response = await fetch('/api/admin');
         const result = await response.json();
 
         if (!response.ok) {
           throw new Error(result.error || 'Failed to fetch contracts');
         }
 
-        console.log('Contracts fetched:', result.data);
-        // Add debug logging for delivery_charge
-        result.data.forEach(contract => {
-          console.log(`Contract ${contract.id} delivery_charge:`, contract.delivery_charge);
-        });
         setContractList(result.data || []);
       } catch (err) {
         console.error('Error in fetchContracts:', err);
@@ -499,11 +461,16 @@ const ContractList = ({ onTrackContract }) => {
 };
 
 // Add LuggageAssignments component
-const LuggageAssignments = () => {
+const LuggageAssignments = ({ onAssignmentComplete }) => {
   const [assignments, setAssignments] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [mounted, setMounted] = useState(false);
+  const [deliveryPersonnel, setDeliveryPersonnel] = useState([]);
+  const [selectedPersonnel, setSelectedPersonnel] = useState(null);
+  const [assignDialogOpen, setAssignDialogOpen] = useState(false);
+  const [selectedContract, setSelectedContract] = useState(null);
+  const [assigning, setAssigning] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -512,37 +479,93 @@ const LuggageAssignments = () => {
   useEffect(() => {
     if (!mounted) return;
 
-    const fetchAssignments = async () => {
+    const fetchData = async () => {
       setLoading(true);
       setError(null);
       try {
-        const response = await fetch('/api/admin/contracts');
-        const result = await response.json();
+        // Fetch contracts
+        const contractsResponse = await fetch('/api/admin');
+        const contractsResult = await contractsResponse.json();
 
-        if (!response.ok) {
-          throw new Error(result.error || 'Failed to fetch assignments');
+        if (!contractsResponse.ok) {
+          throw new Error(contractsResult.error || 'Failed to fetch contracts');
         }
 
         // Filter for available contracts only
-        const availableContracts = (result.data || []).filter(
-          contract => contract.contract_status?.status_name === 'available for pickup'
+        const availableContracts = (contractsResult.data || []).filter(
+          contract => contract.contract_status?.status_name?.toLowerCase() === 'available for pickup'
         );
         
         setAssignments(availableContracts);
+
+        // Fetch delivery personnel
+        const personnelResponse = await fetch('/api/admin?action=delivery-personnel');
+        const personnelResult = await personnelResponse.json();
+
+        if (!personnelResponse.ok) {
+          throw new Error(personnelResult.error || 'Failed to fetch delivery personnel');
+        }
+
+        setDeliveryPersonnel(personnelResult.data || []);
       } catch (err) {
-        console.error('Error in fetchAssignments:', err);
-        setError(err.message || 'Failed to fetch assignments');
+        console.error('Error in fetchData:', err);
+        setError(err.message || 'Failed to fetch data');
       } finally {
         setLoading(false);
       }
     };
 
-    fetchAssignments();
+    fetchData();
   }, [mounted]);
 
-  const handleAssign = (contractId) => {
-    // TODO: Implement assignment logic
-    console.log('Assigning contract:', contractId);
+  const handleAssign = (contract) => {
+    setSelectedContract(contract);
+    setAssignDialogOpen(true);
+  };
+
+  const handleCloseDialog = () => {
+    setAssignDialogOpen(false);
+    setSelectedContract(null);
+    setSelectedPersonnel(null);
+  };
+
+  const handleConfirmAssign = async () => {
+    if (!selectedContract || !selectedPersonnel) return;
+
+    setAssigning(true);
+    try {
+      const response = await fetch('/api/admin', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'assignContract',
+          params: {
+            contractId: selectedContract.id,
+            deliveryId: selectedPersonnel.id
+          }
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to assign contract');
+      }
+
+      // Update the local state to remove the assigned contract
+      setAssignments(prev => prev.filter(c => c.id !== selectedContract.id));
+      handleCloseDialog();
+      if (onAssignmentComplete) {
+        onAssignmentComplete(selectedContract.id);
+      }
+    } catch (err) {
+      console.error('Error assigning contract:', err);
+      setError(err.message || 'Failed to assign contract');
+    } finally {
+      setAssigning(false);
+    }
   };
 
   if (loading) {
@@ -571,13 +594,14 @@ const LuggageAssignments = () => {
               <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Pickup Location</TableCell>
               <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Drop-off Location</TableCell>
               <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Airline Name</TableCell>
+              <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Luggage Details</TableCell>
               <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Action</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {assignments.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} align="center">
+                <TableCell colSpan={6} align="center">
                   <Typography color="text.secondary">No available contracts for assignment</Typography>
                 </TableCell>
               </TableRow>
@@ -597,10 +621,31 @@ const LuggageAssignments = () => {
                       : 'N/A'}
                   </TableCell>
                   <TableCell>
+                    {assignment.luggage && assignment.luggage.length > 0 ? (
+                      <Box>
+                        {assignment.luggage.map((l, idx) => (
+                          <Box key={idx} sx={{ mb: 1 }}>
+                            <Typography variant="body2">
+                              <strong>Owner:</strong> {l.luggage_owner || 'N/A'}
+                            </Typography>
+                            <Typography variant="body2">
+                              <strong>Case #:</strong> {l.case_number || 'N/A'}
+                            </Typography>
+                            <Typography variant="body2">
+                              <strong>Weight:</strong> {l.weight ? `${l.weight} kg` : 'N/A'}
+                            </Typography>
+                          </Box>
+                        ))}
+                      </Box>
+                    ) : (
+                      'No luggage info'
+                    )}
+                  </TableCell>
+                  <TableCell>
                     <Button
                       variant="contained"
                       size="small"
-                      onClick={() => handleAssign(assignment.id)}
+                      onClick={() => handleAssign(assignment)}
                     >
                       Assign
                     </Button>
@@ -611,6 +656,72 @@ const LuggageAssignments = () => {
           </TableBody>
         </Table>
       </TableContainer>
+
+      {/* Assignment Dialog */}
+      <Dialog 
+        open={assignDialogOpen} 
+        onClose={handleCloseDialog}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Assign Delivery Personnel</DialogTitle>
+        <DialogContent>
+          <Box sx={{ mt: 2 }}>
+            <Typography variant="subtitle1" gutterBottom>
+              Select a delivery personnel to assign:
+            </Typography>
+            <Box sx={{ maxHeight: 400, overflow: 'auto' }}>
+              {deliveryPersonnel.map((personnel) => (
+                <Box
+                  key={personnel.id}
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    p: 1,
+                    border: '1px solid',
+                    borderColor: selectedPersonnel?.id === personnel.id ? 'primary.main' : 'divider',
+                    borderRadius: 1,
+                    mb: 1,
+                    cursor: 'pointer',
+                    '&:hover': {
+                      bgcolor: 'action.hover'
+                    }
+                  }}
+                  onClick={() => setSelectedPersonnel(personnel)}
+                >
+                  <Box sx={{ flex: 1 }}>
+                    <Typography variant="body1">
+                      {`${personnel.first_name || ''} ${personnel.middle_initial || ''} ${
+                        personnel.last_name || ''
+                      }${personnel.suffix ? ` ${personnel.suffix}` : ''}`.replace(/  +/g, ' ').trim()}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {personnel.email}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {personnel.contact_number}
+                    </Typography>
+                  </Box>
+                  <Radio
+                    checked={selectedPersonnel?.id === personnel.id}
+                    onChange={() => setSelectedPersonnel(personnel)}
+                  />
+                </Box>
+              ))}
+            </Box>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseDialog}>Cancel</Button>
+          <Button
+            onClick={handleConfirmAssign}
+            variant="contained"
+            disabled={!selectedPersonnel || assigning}
+          >
+            {assigning ? 'Assigning...' : 'Confirm Assignment'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };
@@ -636,6 +747,25 @@ const Page = () => {
   const [statusFilter, setStatusFilter] = useState('all');
   const [page, setPage] = useState(0);
   const rowsPerPage = 10; // Changed from 2 to 10 items per page
+  const [redirectContractId, setRedirectContractId] = useState(null);
+  const [trackContractId, setTrackContractId] = useState(null);
+
+  // Clear redirectContractId after search is set
+  useEffect(() => {
+    if (selectedTab === 0 && redirectContractId) {
+      // Clear after a short delay to avoid repeated autofill
+      const timer = setTimeout(() => setRedirectContractId(null), 500);
+      return () => clearTimeout(timer);
+    }
+  }, [selectedTab, redirectContractId]);
+
+  // Clear trackContractId after search is set
+  useEffect(() => {
+    if (selectedTab === 2 && trackContractId) {
+      const timer = setTimeout(() => setTrackContractId(null), 500);
+      return () => clearTimeout(timer);
+    }
+  }, [selectedTab, trackContractId]);
 
   useEffect(() => {
     setMounted(true);
@@ -650,7 +780,7 @@ const Page = () => {
       setError(null);
       try {
         console.log('Starting contract fetch...');
-        const response = await fetch('/api/admin/contracts');
+        const response = await fetch('/api/admin');
         const result = await response.json();
 
         if (!response.ok) {
@@ -658,10 +788,6 @@ const Page = () => {
         }
 
         console.log('Contracts fetched:', result.data);
-        // Add debug logging for delivery_charge
-        result.data.forEach(contract => {
-          console.log(`Contract ${contract.id} delivery_charge:`, contract.delivery_charge);
-        });
         setContractList(result.data || []);
       } catch (err) {
         console.error('Error in fetchContracts:', err);
@@ -711,66 +837,31 @@ const Page = () => {
 
   // Poll for current location updates
   useEffect(() => {
-    if (selectedTab !== 1) return; // Only poll when luggage tracking tab is selected
     let intervalId;
     let isPolling = false;
 
     const updateCurrentLocation = async () => {
-      // Prevent multiple simultaneous requests
-      if (isPolling) {
-        console.log('Skipping update - previous request still in progress');
-        return;
-      }
-
-      if (!contractList.length || !activeSearch || !map) {
-        console.log('Skipping location update - missing requirements:', {
-          hasContracts: contractList.length > 0,
-          hasActiveSearch: !!activeSearch,
-          hasMap: !!map
-        });
-        return;
-      }
-      
+      if (isPolling) return;
+      if (!contractList.length || !activeSearch || !mapRef.current) return;
       try {
         isPolling = true;
-        // Find the contract that matches the search query
         const searchedContract = contractList.find(contract => 
           String(contract.id).toLowerCase().includes(activeSearch.toLowerCase())
         );
-
-        if (!searchedContract) {
-          console.log('No contract found for search:', activeSearch);
-          return;
-        }
-
-        console.log('Fetching current location for contract:', searchedContract.id);
-
-        // Fetch current location from the API route
-        const response = await fetch(`/api/admin/contracts/contract-location?contractId=${searchedContract.id}`);
-        
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
-        }
-
+        if (!searchedContract) return;
+        const response = await fetch(`/api/admin?contractId=${searchedContract.id}`);
+        if (!response.ok) return;
         const result = await response.json();
-        
-        if (!result.data?.current_location_geo) {
-          console.log('No current location data available for contract:', searchedContract.id);
-          return;
-        }
+        if (!result.data?.current_location_geo) return;
 
         const newPosition = {
           lat: result.data.current_location_geo.coordinates[1],
           lng: result.data.current_location_geo.coordinates[0]
         };
 
-        console.log('Updating current location marker to:', newPosition);
-
         if (currentLocationMarkerRef.current) {
           currentLocationMarkerRef.current.position = newPosition;
         } else {
-          console.log('Creating new current location marker');
           const currentLocationMarker = new window.google.maps.marker.PinElement({
             scale: 1,
             background: '#FF9800',
@@ -787,7 +878,6 @@ const Page = () => {
           });
         }
 
-        // Clear any previous error messages if update was successful
         setMapError(null);
       } catch (err) {
         console.error('Error updating location:', err);
@@ -797,32 +887,15 @@ const Page = () => {
       }
     };
 
-    const startPolling = () => {
-      if (activeSearch && map) {
-        console.log('Starting current location updates for contract:', activeSearch);
-        // Initial update
-        updateCurrentLocation();
-        // Then poll every 5 seconds
-        intervalId = setInterval(updateCurrentLocation, 5000);
-      }
-    };
+    if (activeSearch && mapRef.current) {
+      updateCurrentLocation();
+      intervalId = setInterval(updateCurrentLocation, 5000);
+    }
 
-    const stopPolling = () => {
-      if (intervalId) {
-        console.log('Stopping current location updates');
-        clearInterval(intervalId);
-        intervalId = null;
-      }
-    };
-
-    // Start polling when component mounts or when dependencies change
-    startPolling();
-
-    // Cleanup function
     return () => {
-      stopPolling();
+      if (intervalId) clearInterval(intervalId);
     };
-  }, [contractList, map, activeSearch]);
+  }, [contractList, mapRef, activeSearch, map]);
 
   const handleTabChange = (event, newValue) => {
     setSelectedTab(newValue);
@@ -1003,11 +1076,14 @@ const Page = () => {
   };
 
   const handleTrackContract = (contractId) => {
-    setSelectedTab(1); // Switch to luggage tracking tab
-    setSearchQuery(contractId.toString());
-    setActiveSearch(contractId.toString());
-    // Reset map state to force reinitialization
-    setMap(null);
+    setTrackContractId(contractId.toString());
+    setSelectedTab(2); // Switch to luggage tracking tab
+  };
+
+  // Handler for assignment completion
+  const handleAssignmentComplete = (contractId) => {
+    setRedirectContractId(contractId);
+    setSelectedTab(0); // Switch to Contract List
   };
 
   if (!mounted) {
@@ -1042,227 +1118,450 @@ const Page = () => {
         <Tab label="Luggage Tracking" />
       </Tabs>
 
-      {selectedTab === 0 && <ContractList onTrackContract={handleTrackContract} />}
-      {selectedTab === 1 && <LuggageAssignments />}
+      {selectedTab === 0 && <ContractList onTrackContract={handleTrackContract} initialSearch={redirectContractId} />}
+      {selectedTab === 1 && <LuggageAssignments onAssignmentComplete={handleAssignmentComplete} />}
       {selectedTab === 2 && (
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <Box sx={{ display: 'flex', justifyContent: 'center', mb: 4 }}>
-            <TextField
-              label="Search Contract ID"
-              variant="outlined"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyPress={handleKeyPress}
-              sx={{ width: '100%', maxWidth: '400px' }}
-              size="small"
-              InputProps={{
-                endAdornment: (
-                  <IconButton 
-                    onClick={handleSearch}
-                    disabled={isLoading}
-                    size="small"
-                  >
-                    <SearchIcon />
-                  </IconButton>
-                ),
-              }}
-            />
-          </Box>
+        <LuggageTrackingTab
+          contractList={contractList}
+          isLoading={isLoading}
+          error={error}
+          expandedContracts={expandedContracts}
+          setExpandedContracts={setExpandedContracts}
+          mapRef={mapRef}
+          mapError={mapError}
+          formatDate={formatDate}
+          trackContractId={trackContractId}
+          setSearchQuery={setSearchQuery}
+          setActiveSearch={setActiveSearch}
+          searchQuery={searchQuery}
+          activeSearch={activeSearch}
+          handleKeyPress={handleKeyPress}
+          handleSearch={handleSearch}
+          setMap={setMap}
+          isScriptLoaded={isScriptLoaded}
+          setIsScriptLoaded={setIsScriptLoaded}
+          isGoogleMapsReady={isGoogleMapsReady}
+          setIsGoogleMapsReady={setIsGoogleMapsReady}
+          supabase={supabase}
+          statusFilter={statusFilter}
+          setStatusFilter={setStatusFilter}
+          page={page}
+          setPage={setPage}
+          rowsPerPage={rowsPerPage}
+        />
+      )}
+    </Box>
+  );
+};
 
-          {isLoading && (
-            <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
-              <CircularProgress />
+// Add a new LuggageTrackingTab component to handle the search autofill and UI
+const LuggageTrackingTab = ({
+  contractList,
+  isLoading,
+  error,
+  expandedContracts,
+  setExpandedContracts,
+  mapRef,
+  mapError,
+  formatDate,
+  trackContractId,
+  setSearchQuery,
+  setActiveSearch,
+  searchQuery,
+  activeSearch,
+  handleKeyPress,
+  handleSearch,
+  setMap,
+  isScriptLoaded,
+  setIsScriptLoaded,
+  isGoogleMapsReady,
+  setIsGoogleMapsReady,
+  supabase,
+  statusFilter,
+  setStatusFilter,
+  page,
+  setPage,
+  rowsPerPage
+}) => {
+  // Autofill search if trackContractId is provided
+  useEffect(() => {
+    if (trackContractId) {
+      setSearchQuery(trackContractId);
+      setActiveSearch(trackContractId);
+    }
+  }, [trackContractId, setSearchQuery, setActiveSearch]);
+
+  // Load Google Maps script when this tab is mounted
+  useEffect(() => {
+    if (window.google) {
+      setIsGoogleMapsReady(true);
+      setIsScriptLoaded(true);
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places,marker`;
+    script.async = true;
+    script.defer = true;
+    script.onload = () => {
+      setIsGoogleMapsReady(true);
+      setIsScriptLoaded(true);
+    };
+    document.head.appendChild(script);
+    return () => {
+      if (document.head.contains(script)) document.head.removeChild(script);
+    };
+  }, []);
+
+  // Initialize map when script is loaded, contractList is ready, and activeSearch changes
+  useEffect(() => {
+    if (!isScriptLoaded || !contractList.length || !mapRef.current || !activeSearch) return;
+    // Small delay to ensure DOM is ready
+    const timer = setTimeout(() => {
+      // Find the contract that matches the search query
+      const searchedContract = contractList.find(contract => 
+        String(contract.id).toLowerCase().includes(activeSearch.toLowerCase())
+      );
+      if (!searchedContract) return;
+      // Determine the center location based on available coordinates
+      let defaultLocation;
+      if (searchedContract.current_location_geo?.coordinates) {
+        defaultLocation = {
+          lat: parseFloat(searchedContract.current_location_geo.coordinates[1]),
+          lng: parseFloat(searchedContract.current_location_geo.coordinates[0])
+        };
+      } else if (searchedContract.drop_off_location_geo?.coordinates) {
+        defaultLocation = {
+          lat: parseFloat(searchedContract.drop_off_location_geo.coordinates[1]),
+          lng: parseFloat(searchedContract.drop_off_location_geo.coordinates[0])
+        };
+      } else {
+        defaultLocation = { lat: 14.5350, lng: 120.9821 }; // Default to Manila
+      }
+      const mapOptions = { 
+        center: defaultLocation, 
+        zoom: 15, 
+        mapTypeControl: false, 
+        streetViewControl: false, 
+        fullscreenControl: false, 
+        mapTypeId: 'roadmap', 
+        mapId: process.env.NEXT_PUBLIC_GOOGLE_MAPS_ID 
+      };
+      const newMap = new window.google.maps.Map(mapRef.current, mapOptions);
+      setMap(newMap);
+      // Add current location marker first
+      if (searchedContract.current_location_geo?.coordinates) {
+        const currentLocationMarker = new window.google.maps.marker.PinElement({ 
+          scale: 1, 
+          background: '#FF9800', 
+          borderColor: '#F57C00', 
+          glyphColor: '#FFFFFF' 
+        });
+        const currentPosition = {
+          lat: parseFloat(searchedContract.current_location_geo.coordinates[1]),
+          lng: parseFloat(searchedContract.current_location_geo.coordinates[0])
+        };
+        new window.google.maps.marker.AdvancedMarkerElement({ 
+          map: newMap, 
+          position: currentPosition, 
+          title: 'Current Location', 
+          content: currentLocationMarker.element, 
+          collisionBehavior: window.google.maps.CollisionBehavior.OPTIONAL_AND_HIDES_LOWER_PRIORITY 
+        });
+      }
+      // Add drop-off location marker
+      if (searchedContract.drop_off_location_geo?.coordinates) {
+        const dropoffMarker = new window.google.maps.marker.PinElement({ 
+          scale: 1, 
+          background: '#4CAF50', 
+          borderColor: '#388E3C', 
+          glyphColor: '#FFFFFF' 
+        });
+        const dropoffPosition = {
+          lat: parseFloat(searchedContract.drop_off_location_geo.coordinates[1]),
+          lng: parseFloat(searchedContract.drop_off_location_geo.coordinates[0])
+        };
+        new window.google.maps.marker.AdvancedMarkerElement({ 
+          map: newMap, 
+          position: dropoffPosition, 
+          title: 'Drop-off Location', 
+          content: dropoffMarker.element, 
+          collisionBehavior: window.google.maps.CollisionBehavior.OPTIONAL_AND_HIDES_LOWER_PRIORITY 
+        });
+      }
+      // Add pickup location marker
+      if (searchedContract.pickup_location_geo?.coordinates) {
+        const pickupMarker = new window.google.maps.marker.PinElement({ 
+          scale: 1, 
+          background: '#2196F3', 
+          borderColor: '#1976D2', 
+          glyphColor: '#FFFFFF' 
+        });
+        const pickupPosition = {
+          lat: parseFloat(searchedContract.pickup_location_geo.coordinates[1]),
+          lng: parseFloat(searchedContract.pickup_location_geo.coordinates[0])
+        };
+        new window.google.maps.marker.AdvancedMarkerElement({ 
+          map: newMap, 
+          position: pickupPosition, 
+          title: 'Pickup Location', 
+          content: pickupMarker.element, 
+          collisionBehavior: window.google.maps.CollisionBehavior.OPTIONAL_AND_HIDES_LOWER_PRIORITY 
+        });
+      }
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [isScriptLoaded, contractList, mapRef, activeSearch, setMap]);
+
+  // Poll for current location updates
+  useEffect(() => {
+    let intervalId;
+    let isPolling = false;
+    const updateCurrentLocation = async () => {
+      if (isPolling) return;
+      if (!contractList.length || !activeSearch || !mapRef.current) return;
+      try {
+        isPolling = true;
+        const searchedContract = contractList.find(contract => 
+          String(contract.id).toLowerCase().includes(activeSearch.toLowerCase())
+        );
+        if (!searchedContract) return;
+        const response = await fetch(`/api/admin?contractId=${searchedContract.id}`);
+        if (!response.ok) return;
+        const result = await response.json();
+        if (!result.data?.current_location_geo) return;
+        // You can update the map marker here if you want live updates
+      } catch (err) {
+        // Optionally handle polling errors
+      } finally {
+        isPolling = false;
+      }
+    };
+    if (activeSearch && mapRef.current) {
+      updateCurrentLocation();
+      intervalId = setInterval(updateCurrentLocation, 5000);
+    }
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [contractList, mapRef, activeSearch]);
+
+  return (
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'center', mb: 4 }}>
+        <TextField
+          label="Search Contract ID"
+          variant="outlined"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          onKeyPress={handleKeyPress}
+          sx={{ width: '100%', maxWidth: '400px' }}
+          size="small"
+          InputProps={{
+            endAdornment: (
+              <IconButton 
+                onClick={handleSearch}
+                disabled={isLoading}
+                size="small"
+              >
+                <SearchIcon />
+              </IconButton>
+            ),
+          }}
+        />
+      </Box>
+
+      {isLoading && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
+          <CircularProgress />
+        </Box>
+      )}
+
+      {error && (
+        <Typography color="error" align="center" sx={{ my: 4 }}>{error}</Typography>
+      )}
+
+      {!isLoading && !error && (
+        <>
+          {!activeSearch && (
+            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '200px' }}>
+              <Typography variant="h6" color="text.secondary">
+                Enter a contract ID and press Enter to track luggage
+              </Typography>
             </Box>
           )}
-
-          {error && (
-            <Typography color="error" align="center" sx={{ my: 4 }}>{error}</Typography>
+          
+          {activeSearch && contractList.length === 0 && (
+            <Typography align="center">No contracts found.</Typography>
           )}
 
-          {!isLoading && !error && (
-            <>
-              {!activeSearch && (
-                <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '200px' }}>
-                  <Typography variant="h6" color="text.secondary">
-                    Enter a contract ID and press Enter to track luggage
-                  </Typography>
-                </Box>
-              )}
-              
-              {activeSearch && contractList.length === 0 && (
-                <Typography align="center">No contracts found.</Typography>
-              )}
-
-              {activeSearch && contractList.length > 0 && (
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4, maxWidth: '1200px', mx: 'auto', width: '100%' }}>
-                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                    {contractList
-                      .filter(contract => 
-                        String(contract.id).toLowerCase().includes(activeSearch.toLowerCase())
-                      )
-                      .map((contract) => (
-                        <Paper key={`contract-${contract.id}`} elevation={3} sx={{ p: 3, borderRadius: 3, mb: 2, width: '100%' }}>
-                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', position: 'relative' }}>
-                            <Box sx={{ flex: 1 }}>
-                              <Typography variant="subtitle1" sx={{ color: 'primary.main', fontWeight: 700, mb: 1 }}>
-                                Contract ID: <span style={{ color: '#bdbdbd', fontWeight: 400 }}>{contract.id}</span>
+          {activeSearch && contractList.length > 0 && (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4, maxWidth: '1200px', mx: 'auto', width: '100%' }}>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {contractList
+                  .filter(contract => 
+                    String(contract.id).toLowerCase().includes(activeSearch.toLowerCase())
+                  )
+                  .map((contract) => (
+                    <Paper key={`contract-${contract.id}`} elevation={3} sx={{ p: 3, borderRadius: 3, mb: 2, width: '100%' }}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', position: 'relative' }}>
+                        <Box sx={{ flex: 1 }}>
+                          <Typography variant="subtitle1" sx={{ color: 'primary.main', fontWeight: 700, mb: 1 }}>
+                            Contract ID: <span style={{ color: '#bdbdbd', fontWeight: 400 }}>{contract.id}</span>
+                          </Typography>
+                          <Divider sx={{ my: 1 }} />
+                          <Typography variant="subtitle2" sx={{ color: 'primary.main', fontWeight: 700, mb: 1 }}>
+                            Location Information
+                          </Typography>
+                          <Box sx={{ ml: 1, mb: 1 }}>
+                            <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                              <b>Pickup:</b> <span style={{ color: 'text.primary' }}>{contract.pickup_location || 'N/A'}</span>
+                            </Typography>
+                            {contract.pickup_location_geo && (
+                              <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                                <b>Pickup Coordinates:</b>{' '}
+                                <span style={{ color: 'text.primary' }}>
+                                  {contract.pickup_location_geo.coordinates[1].toFixed(6)}, {contract.pickup_location_geo.coordinates[0].toFixed(6)}
+                                </span>
                               </Typography>
-                              <Divider sx={{ my: 1 }} />
-                              <Typography variant="subtitle2" sx={{ color: 'primary.main', fontWeight: 700, mb: 1 }}>
-                                Location Information
+                            )}
+                            <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                              <b>Drop-off:</b> <span style={{ color: 'text.primary' }}>{contract.drop_off_location || 'N/A'}</span>
+                            </Typography>
+                            {contract.drop_off_location_geo && (
+                              <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                                <b>Drop-off Coordinates:</b>{' '}
+                                <span style={{ color: 'text.primary' }}>
+                                  {contract.drop_off_location_geo.coordinates[1].toFixed(6)}, {contract.drop_off_location_geo.coordinates[0].toFixed(6)}
+                                </span>
                               </Typography>
-                              <Box sx={{ ml: 1, mb: 1 }}>
-                                <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
-                                  <b>Pickup:</b> <span style={{ color: 'text.primary' }}>{contract.pickup_location || 'N/A'}</span>
-                                </Typography>
-                                {contract.pickup_location_geo && (
-                                  <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
-                                    <b>Pickup Coordinates:</b>{' '}
-                                    <span style={{ color: 'text.primary' }}>
-                                      {contract.pickup_location_geo.coordinates[1].toFixed(6)}, {contract.pickup_location_geo.coordinates[0].toFixed(6)}
-                                    </span>
-                                  </Typography>
-                                )}
-                                <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
-                                  <b>Drop-off:</b> <span style={{ color: 'text.primary' }}>{contract.drop_off_location || 'N/A'}</span>
-                                </Typography>
-                                {contract.drop_off_location_geo && (
-                                  <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
-                                    <b>Drop-off Coordinates:</b>{' '}
-                                    <span style={{ color: 'text.primary' }}>
-                                      {contract.drop_off_location_geo.coordinates[1].toFixed(6)}, {contract.drop_off_location_geo.coordinates[0].toFixed(6)}
-                                    </span>
-                                  </Typography>
-                                )}
-                                {contract.delivery_charge !== null && !isNaN(Number(contract.delivery_charge)) ? (
-                                  <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
-                                    <b>Price:</b> <span style={{ color: 'text.primary' }}>₱{Number(contract.delivery_charge).toLocaleString()}</span>
-                                  </Typography>
-                                ) : (
-                                  <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
-                                    <b>Price:</b> <span style={{ color: 'text.primary' }}>N/A</span>
-                                  </Typography>
-                                )}
-                              </Box>
-                            </Box>
-                            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', ml: 2 }}>
-                              <IconButton
-                                onClick={() => handleExpandClick(contract.id)}
-                                aria-expanded={expandedContracts.includes(contract.id)}
-                                aria-label="show more"
-                                size="small"
-                                sx={{ 
-                                  transform: expandedContracts.includes(contract.id) ? 'rotate(180deg)' : 'rotate(0deg)',
-                                  transition: 'transform 0.3s',
-                                  color: 'primary.main',
-                                  '&:hover': {
-                                    color: 'primary.dark'
-                                  },
-                                  mt: 10
-                                }}
-                              >
-                                <ExpandMoreIcon />
-                              </IconButton>
-                            </Box>
+                            )}
+                            {contract.delivery_charge !== null && !isNaN(Number(contract.delivery_charge)) ? (
+                              <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                                <b>Price:</b> <span style={{ color: 'text.primary' }}>₱{Number(contract.delivery_charge).toLocaleString()}</span>
+                              </Typography>
+                            ) : (
+                              <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                                <b>Price:</b> <span style={{ color: 'text.primary' }}>N/A</span>
+                              </Typography>
+                            )}
                           </Box>
-                          <Collapse in={expandedContracts.includes(contract.id)} timeout="auto" unmountOnExit>
-                            <Divider sx={{ my: 2 }} />
-                            <Typography variant="subtitle2" sx={{ color: 'primary.main', fontWeight: 700, mb: 1 }}>
-                              Luggage Information
+                        </Box>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', ml: 2 }}>
+                          <IconButton
+                            onClick={() => setExpandedContracts((prev) => prev.includes(contract.id) ? prev.filter((id) => id !== contract.id) : [...prev, contract.id])}
+                            aria-expanded={expandedContracts.includes(contract.id)}
+                            aria-label="show more"
+                            size="small"
+                            sx={{ 
+                              transform: expandedContracts.includes(contract.id) ? 'rotate(180deg)' : 'rotate(0deg)',
+                              transition: 'transform 0.3s',
+                              color: 'primary.main',
+                              '&:hover': {
+                                color: 'primary.dark'
+                              },
+                              mt: 10
+                            }}
+                          >
+                            <ExpandMoreIcon />
+                          </IconButton>
+                        </Box>
+                      </Box>
+                      <Collapse in={expandedContracts.includes(contract.id)} timeout="auto" unmountOnExit>
+                        <Divider sx={{ my: 2 }} />
+                        <Typography variant="subtitle2" sx={{ color: 'primary.main', fontWeight: 700, mb: 1 }}>
+                          Luggage Information
+                        </Typography>
+                        <Box sx={{ ml: 1, mb: 1 }}>
+                          {contract.luggage.length === 0 && (
+                            <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                              No luggage info.
                             </Typography>
-                            <Box sx={{ ml: 1, mb: 1 }}>
-                              {contract.luggage.length === 0 && (
-                                <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
-                                  No luggage info.
-                                </Typography>
-                              )}
-                              {contract.luggage.map((l, lidx) => (
-                                <Box key={`luggage-${contract.id}-${lidx}`} sx={{ mb: 2, pl: 1 }}>
-                                  <Typography variant="subtitle2" sx={{ color: 'primary.main', fontWeight: 700 }}>
-                                    Luggage {lidx + 1}
-                                  </Typography>
-                                  <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
-                                    Owner: <span style={{ color: 'text.primary' }}>{l.luggage_owner || 'N/A'}</span>
-                                  </Typography>
-                                  <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
-                                    Case Number: <span style={{ color: 'text.primary' }}>{l.case_number || 'N/A'}</span>
-                                  </Typography>
-                                  <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
-                                    Description: <span style={{ color: 'text.primary' }}>{l.item_description || 'N/A'}</span>
-                                  </Typography>
-                                  <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
-                                    Weight: <span style={{ color: 'text.primary' }}>{l.weight ? `${l.weight} kg` : 'N/A'}</span>
-                                  </Typography>
-                                  <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
-                                    Contact: <span style={{ color: 'text.primary' }}>{l.contact_number || 'N/A'}</span>
-                                  </Typography>
-                                </Box>
-                              ))}
+                          )}
+                          {contract.luggage.map((l, lidx) => (
+                            <Box key={`luggage-${contract.id}-${lidx}`} sx={{ mb: 2, pl: 1 }}>
+                              <Typography variant="subtitle2" sx={{ color: 'primary.main', fontWeight: 700 }}>
+                                Luggage {lidx + 1}
+                              </Typography>
+                              <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                                Owner: <span style={{ color: 'text.primary' }}>{l.luggage_owner || 'N/A'}</span>
+                              </Typography>
+                              <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                                Case Number: <span style={{ color: 'text.primary' }}>{l.case_number || 'N/A'}</span>
+                              </Typography>
+                              <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                                Description: <span style={{ color: 'text.primary' }}>{l.item_description || 'N/A'}</span>
+                              </Typography>
+                              <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                                Weight: <span style={{ color: 'text.primary' }}>{l.weight ? `${l.weight} kg` : 'N/A'}</span>
+                              </Typography>
+                              <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                                Contact: <span style={{ color: 'text.primary' }}>{l.contact_number || 'N/A'}</span>
+                              </Typography>
                             </Box>
+                          ))}
+                        </Box>
 
-                            <Divider sx={{ my: 2 }} />
-                            <Typography variant="subtitle2" sx={{ color: 'primary.main', fontWeight: 700, mb: 1 }}>
-                              Timeline
-                            </Typography>
-                            <Box sx={{ ml: 1, mb: 1 }}>
-                              <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
-                                <b>Created:</b>{' '}
-                                <span style={{ color: 'text.primary' }}>
-                                  {formatDate(contract.created_at)}
-                                </span>
-                              </Typography>
-                              <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
-                                <b>Accepted:</b>{' '}
-                                <span style={{ color: 'text.primary' }}>
-                                  {contract.accepted_at ? new Date(contract.accepted_at).toLocaleString() : 'N/A'}
-                                </span>
-                              </Typography>
-                              <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
-                                <b>Pickup:</b>{' '}
-                                <span style={{ color: 'text.primary' }}>
-                                  {contract.pickup_at ? new Date(contract.pickup_at).toLocaleString() : 'N/A'}
-                                </span>
-                              </Typography>
-                              <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
-                                <b>Delivered:</b>{' '}
-                                <span style={{ color: 'text.primary' }}>
-                                  {contract.delivered_at ? new Date(contract.delivered_at).toLocaleString() : 'N/A'}
-                                </span>
-                              </Typography>
-                              <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
-                                <b>Cancelled:</b>{' '}
-                                <span style={{ color: 'text.primary' }}>
-                                  {contract.cancelled_at ? new Date(contract.cancelled_at).toLocaleString() : 'N/A'}
-                                </span>
-                              </Typography>
-                            </Box>
-                          </Collapse>
-                        </Paper>
-                      ))}
+                        <Divider sx={{ my: 2 }} />
+                        <Typography variant="subtitle2" sx={{ color: 'primary.main', fontWeight: 700, mb: 1 }}>
+                          Timeline
+                        </Typography>
+                        <Box sx={{ ml: 1, mb: 1 }}>
+                          <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                            <b>Created:</b>{' '}
+                            <span style={{ color: 'text.primary' }}>
+                              {formatDate(contract.created_at)}
+                            </span>
+                          </Typography>
+                          <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                            <b>Accepted:</b>{' '}
+                            <span style={{ color: 'text.primary' }}>
+                              {contract.accepted_at ? new Date(contract.accepted_at).toLocaleString() : 'N/A'}
+                            </span>
+                          </Typography>
+                          <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                            <b>Pickup:</b>{' '}
+                            <span style={{ color: 'text.primary' }}>
+                              {contract.pickup_at ? new Date(contract.pickup_at).toLocaleString() : 'N/A'}
+                            </span>
+                          </Typography>
+                          <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                            <b>Delivered:</b>{' '}
+                            <span style={{ color: 'text.primary' }}>
+                              {contract.delivered_at ? new Date(contract.delivered_at).toLocaleString() : 'N/A'}
+                            </span>
+                          </Typography>
+                          <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                            <b>Cancelled:</b>{' '}
+                            <span style={{ color: 'text.primary' }}>
+                              {contract.cancelled_at ? new Date(contract.cancelled_at).toLocaleString() : 'N/A'}
+                            </span>
+                          </Typography>
+                        </Box>
+                      </Collapse>
+                    </Paper>
+                  ))}
+              </Box>
+              <Paper elevation={3} sx={{ p: 3, borderRadius: 3, position: 'relative', overflow: 'hidden', border: '1px solid', borderColor: 'divider' }}>
+                <Typography variant="h6" sx={{ mb: 2 }}>Live Tracking</Typography>
+                <Box sx={{ display: 'flex', gap: 2, mb: 2, flexWrap: 'wrap' }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Box sx={{ width: 16, height: 16, borderRadius: '50%', bgcolor: '#4CAF50', border: '2px solid #388E3C' }} />
+                    <Typography variant="body2">Drop-off Location</Typography>
                   </Box>
-                  <Paper elevation={3} sx={{ p: 3, borderRadius: 3, position: 'relative', overflow: 'hidden', border: '1px solid', borderColor: 'divider' }}>
-                    <Typography variant="h6" sx={{ mb: 2 }}>Live Tracking</Typography>
-                    <Box sx={{ display: 'flex', gap: 2, mb: 2, flexWrap: 'wrap' }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <Box sx={{ width: 16, height: 16, borderRadius: '50%', bgcolor: '#4CAF50', border: '2px solid #388E3C' }} />
-                        <Typography variant="body2">Drop-off Location</Typography>
-                      </Box>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <Box sx={{ width: 16, height: 16, borderRadius: '50%', bgcolor: '#2196F3', border: '2px solid #1976D2' }} />
-                        <Typography variant="body2">Pickup Location</Typography>
-                      </Box>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <Box sx={{ width: 16, height: 16, borderRadius: '50%', bgcolor: '#FF9800', border: '2px solid #F57C00' }} />
-                        <Typography variant="body2">Current Location</Typography>
-                      </Box>
-                    </Box>
-                    <MapComponent mapRef={mapRef} mapError={mapError} />
-                  </Paper>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Box sx={{ width: 16, height: 16, borderRadius: '50%', bgcolor: '#2196F3', border: '2px solid #1976D2' }} />
+                    <Typography variant="body2">Pickup Location</Typography>
+                  </Box>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Box sx={{ width: 16, height: 16, borderRadius: '50%', bgcolor: '#FF9800', border: '2px solid #F57C00' }} />
+                    <Typography variant="body2">Current Location</Typography>
+                  </Box>
                 </Box>
-              )}
-            </>
+                <MapComponent mapRef={mapRef} mapError={mapError} />
+              </Paper>
+            </Box>
           )}
-        </Box>
+        </>
       )}
     </Box>
   );

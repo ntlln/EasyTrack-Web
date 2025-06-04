@@ -187,7 +187,7 @@ const TransactionManagement = () => {
             setLoading(true);
             setError(null);
             try {
-                const res = await fetch('/api/admin/contracts');
+                const res = await fetch('/api/admin');
                 const json = await res.json();
                 setData(json.data || []);
             } catch (err) {
@@ -228,7 +228,17 @@ const TransactionManagement = () => {
         if (!isSurchargeValid(surchargeValue)) { setSurchargeError('Surcharge must be 0 or a positive number.'); return; }
         setSurchargeLoading(true); setSurchargeError('');
         try {
-            const res = await fetch('/api/admin/transactions/surcharge', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contractId: surchargeContract.id, surcharge: Number(surchargeValue) }) });
+            const res = await fetch('/api/admin', { 
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/json' }, 
+                body: JSON.stringify({ 
+                    action: 'updateSurcharge',
+                    params: { 
+                        contractId: surchargeContract.id, 
+                        surcharge: Number(surchargeValue) 
+                    }
+                }) 
+            });
             const json = await res.json();
             if (!res.ok) throw new Error(json.error || 'Failed to update surcharge');
             setData((prev) => prev.map(row => row.id === surchargeContract.id ? { ...row, surcharge: Number(surchargeValue) || 0, total: (Number(row.delivery_charge) + Number(surchargeValue)) * (1 - (Number(row.discount) || 0) / 100) } : row));
@@ -242,7 +252,17 @@ const TransactionManagement = () => {
         if (!isDiscountValid(discountValue)) { setDiscountError('Discount must be between 0 and 100.'); return; }
         setDiscountLoading(true); setDiscountError('');
         try {
-            const res = await fetch('/api/admin/transactions/discount', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contractId: discountContract.id, discount: Number(discountValue) }) });
+            const res = await fetch('/api/admin', { 
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/json' }, 
+                body: JSON.stringify({ 
+                    action: 'updateDiscount',
+                    params: { 
+                        contractId: discountContract.id, 
+                        discount: Number(discountValue) 
+                    }
+                }) 
+            });
             const json = await res.json();
             if (!res.ok) throw new Error(json.error || 'Failed to update discount');
             setData((prev) => prev.map(row => row.id === discountContract.id ? { ...row, discount: Number(discountValue) || 0, total: (Number(row.delivery_charge) + Number(row.surcharge)) * (1 - (Number(discountValue) || 0) / 100) } : row));
