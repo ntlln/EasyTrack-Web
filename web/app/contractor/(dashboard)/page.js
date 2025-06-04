@@ -38,7 +38,7 @@ export default function Page() {
   const iconStyles = { fontSize: 40, color: "primary.main", mb: 2 };
 
   return (
-    <Box sx={containerStyles}>
+    <Box>
       <Box sx={titleStyles}><Typography variant="h4" color="primary.main" fontWeight="bold">Dashboard</Typography></Box>
       <Grid container spacing={3}>
         {cards.map((card, index) => (
