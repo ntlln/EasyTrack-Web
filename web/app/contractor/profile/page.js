@@ -167,7 +167,7 @@ export default function Page() {
     };
 
     // Styles
-    const containerStyles = { pt: 2, px: 4, display: "flex", flexDirection: "column", gap: 4 };
+    const containerStyles = {display: "flex", flexDirection: "column", gap: 4 };
     const headerStyles = { width: "100%", maxWidth: "1000px", display: "flex", alignItems: "center", gap: 2 };
     const profileCardStyles = { borderRadius: 2, background: theme.palette.background.paper };
     const profileContentStyles = { p: 4 };

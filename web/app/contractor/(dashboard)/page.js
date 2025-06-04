@@ -24,15 +24,14 @@ export default function Page() {
   const cards = [
     { title: "Profile", route: "/contractor/profile", icon: AccountCircleIcon },
     { title: "Booking", route: "/contractor/booking", icon: LocalShippingIcon },
-    { title: "Delivery History & Reports", route: "/contractor/history-and-reports", icon: AssignmentIcon },
+    // { title: "Delivery History & Reports", route: "/contractor/history-and-reports", icon: AssignmentIcon },
     { title: "Luggage Tracking", route: "/contractor/luggage-tracking", icon: MyLocationIcon },
-    { title: "Statistics", route: "/contractor/statistics", icon: BarChartIcon },
+    // { title: "Statistics", route: "/contractor/statistics", icon: BarChartIcon },
     { title: "Message Center", route: "/contractor/chat-support", icon: SupportAgentIcon },
     // { title: "Payments", route: "/contractor/payments", icon: PaymentIcon },
   ];
 
   // Styles
-  const containerStyles = { p: 4 };
   const titleStyles = { mb: 4 };
   const cardStyles = { height: "100%", width: "35vh" };
   const linkStyles = { textDecoration: "none" };
@@ -40,7 +39,7 @@ export default function Page() {
 
   return (
     <Box sx={containerStyles}>
-      <Box sx={titleStyles}><Typography variant="h3" color="primary.main" fontWeight="bold">Dashboard</Typography></Box>
+      <Box sx={titleStyles}><Typography variant="h4" color="primary.main" fontWeight="bold">Dashboard</Typography></Box>
       <Grid container spacing={3}>
         {cards.map((card, index) => (
           <Grid item xs={12} sm={6} md={4} key={index}>

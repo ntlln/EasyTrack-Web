@@ -125,7 +125,7 @@ export default function Page() {
 
   // Render
   return (
-    <Box sx={{ p: 2, display: "flex", flexDirection: "column", gap: 4 }}>
+    <Box sx={{display: "flex", flexDirection: "column", gap: 4 }}>
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <IconButton onClick={() => router.push('/contractor/booking')} sx={{ mr: 1, color: 'primary.main' }}><ChevronLeftIcon /></IconButton>

@@ -129,7 +129,7 @@ export default function Page() {
                         {!isMinimized && <ListItemText primary="Chat Support" />}
                     </ListItemButton>
 
-                    <ListItemButton onClick={() => handleNavigation("/contractor/history-and-reports")} sx={listItemStyles("/contractor/history-and-reports")}>
+                    {/* <ListItemButton onClick={() => handleNavigation("/contractor/history-and-reports")} sx={listItemStyles("/contractor/history-and-reports")}>
                         <ListItemIcon><AssignmentIcon sx={iconStyles("/contractor/history-and-reports")} /></ListItemIcon>
                         {!isMinimized && <ListItemText primary="History and Reports" />}
                     </ListItemButton>
@@ -137,7 +137,7 @@ export default function Page() {
                     <ListItemButton onClick={() => handleNavigation("/contractor/statistics")} sx={listItemStyles("/contractor/statistics")}>
                         <ListItemIcon><BarChartIcon sx={iconStyles("/contractor/statistics")} /></ListItemIcon>
                         {!isMinimized && <ListItemText primary="Statistics" />}
-                    </ListItemButton>
+                    </ListItemButton> */}
                 </List>
             </Box>
 

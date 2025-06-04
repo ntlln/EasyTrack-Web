@@ -92,7 +92,10 @@ export default function Page() {
             }
 
             resetLoginAttempts(email);
-            if (rememberMe) await supabase.auth.updateSession({ expires_in: 60 * 60 * 24 * 30 });
+            if (rememberMe) {
+                // Set a cookie to indicate remember me preference
+                document.cookie = `remember_me=true; path=/; max-age=${30 * 24 * 60 * 60}; secure; samesite=strict`;
+            }
             await supabase.from("profiles").update({ last_sign_in_at: new Date().toISOString() }).eq("id", userId);
             await supabase.auth.refreshSession();
             console.log('Redirecting to /contractor/dashboard...');
@@ -149,7 +152,7 @@ export default function Page() {
                     <TextField label="Password" type="password" placeholder="Enter your password" required sx={inputFieldStyles} value={password} onChange={e => setPassword(e.target.value)} disabled={isLoading || !loginStatus.canAttempt} />
 
                     <Box sx={checkboxContainerStyles}>
-                        <Box sx={checkboxWrapperStyles}>
+                        <Box sx={checkboxWrapperStyles} onClick={() => setRememberMe(!rememberMe)} style={{ cursor: 'pointer' }}>
                             <Checkbox checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} size="small" sx={checkboxStyles} disabled={isLoading || !loginStatus.canAttempt} />
                             <Typography sx={checkboxLabelStyles}>Remember me</Typography>
                         </Box>
