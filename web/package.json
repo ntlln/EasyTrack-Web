@@ -13,6 +13,7 @@
     "@emotion/styled": "^11.14.0",
     "@mui/icons-material": "^7.0.2",
     "@mui/material": "^7.0.2",
+    "@mui/x-charts": "^8.5.0",
     "@mui/x-date-pickers": "^8.5.0",
     "@react-google-maps/api": "^2.20.6",
     "@react-pdf/renderer": "^4.3.0",

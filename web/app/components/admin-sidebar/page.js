@@ -140,10 +140,10 @@ export default function Page() {
                         {!isMinimized && <ListItemText primary="History and Reports" />}
                     </ListItemButton> */}
 
-                    <ListItemButton onClick={() => handleNavigation("/egc-admin/statistics")} sx={listItemStyles("/egc-admin/statistics")}>
+                    {/* <ListItemButton onClick={() => handleNavigation("/egc-admin/statistics")} sx={listItemStyles("/egc-admin/statistics")}>
                         <ListItemIcon><BarChartIcon sx={iconStyles("/egc-admin/statistics")} /></ListItemIcon>
                         {!isMinimized && <ListItemText primary="Statistics" />}
-                    </ListItemButton>
+                    </ListItemButton> */}
                 </List>
             </Box>
 
