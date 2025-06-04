@@ -389,6 +389,109 @@ export async function POST(request) {
       return NextResponse.json({ data });
     }
 
+    // Handle fetching pricing regions
+    if (action === 'getPricingRegion') {
+      const { data, error } = await supabase
+        .from('pricing_region')
+        .select('id, region')
+        .order('region', { ascending: true });
+
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+
+      return NextResponse.json({ regions: data });
+    }
+
+    // Handle fetching cities by region
+    if (action === 'getCitiesByRegion') {
+      const { region_id } = params || {};
+      if (!region_id) {
+        return NextResponse.json({ error: 'Missing region_id' }, { status: 400 });
+      }
+
+      // Fetch distinct cities for the given region_id from the pricing table
+      const { data, error } = await supabase
+        .from('pricing')
+        .select('id, city')
+        .eq('region_id', region_id)
+        .order('city', { ascending: true });
+
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+
+      return NextResponse.json({ cities: data });
+    }
+
+    // Handle fetching price by city
+    if (action === 'getPriceByCity') {
+      const { city_id } = params || {};
+      if (!city_id) {
+        return NextResponse.json({ error: 'Missing city_id' }, { status: 400 });
+      }
+
+      const { data, error } = await supabase
+        .from('pricing')
+        .select('price')
+        .eq('id', city_id)
+        .single();
+
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+
+      return NextResponse.json({ price: data ? data.price : null });
+    }
+
+    // Handle fetching all pricing with region name
+    if (action === 'getAllPricing') {
+      const { data, error } = await supabase
+        .from('pricing')
+        .select('id, city, price, updated_at, region:region_id (region)')
+        .order('region_id', { ascending: true })
+        .order('city', { ascending: true });
+
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+
+      // Flatten the region object for easier frontend use
+      const pricing = (data || []).map(row => ({
+        id: row.id,
+        city: row.city,
+        price: row.price,
+        updated_at: row.updated_at,
+        region: row.region?.region || ''
+      }));
+
+      return NextResponse.json({ pricing });
+    }
+
+    // Handle price update
+    if (action === 'updatePrice') {
+      const { city_id, price } = params;
+      if (!city_id || typeof price === 'undefined') {
+        return NextResponse.json({ error: 'Missing city_id or price' }, { status: 400 });
+      }
+
+      const { data, error } = await supabase
+        .from('pricing')
+        .update({ 
+          price: price,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', city_id)
+        .select()
+        .single();
+
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+
+      return NextResponse.json({ data });
+    }
+
     return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
   } catch (error) {
     console.error('Server error:', error);

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Box, Typography, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, TablePagination, IconButton, Menu, MenuItem, CircularProgress, Checkbox, Dialog, DialogTitle, DialogContent, DialogActions, Button, Divider, Collapse, TextField, Snackbar, Alert } from '@mui/material';
+import { Box, Typography, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, TablePagination, IconButton, Menu, MenuItem, CircularProgress, Checkbox, Dialog, DialogTitle, DialogContent, DialogActions, Button, Divider, Collapse, TextField, Snackbar, Alert, Tabs, Tab, FormControl, InputLabel, Select } from '@mui/material';
 import { useRouter } from 'next/navigation';
 
 import MoreVertIcon from '@mui/icons-material/MoreVert';
@@ -186,6 +186,16 @@ const ReceiptPDF = ({ contracts = [], dateRange, invoiceImage }) => {
 // Transaction management main logic
 const TransactionManagement = () => {
     const router = useRouter();
+    const [tabValue, setTabValue] = useState(0);
+    const [selectedPricingType, setSelectedPricingType] = useState('');
+    const [selectedLocation, setSelectedLocation] = useState('');
+    const [selectedCity, setSelectedCity] = useState('');
+    const [priceValue, setPriceValue] = useState('');
+    const [pricingRegions, setPricingRegions] = useState([]);
+    const [loadingRegions, setLoadingRegions] = useState(true);
+    const [cities, setCities] = useState([]);
+    const [loadingCities, setLoadingCities] = useState(false);
+    const [loadingPrice, setLoadingPrice] = useState(false);
     const [page, setPage] = useState(0);
     const [rowsPerPage, setRowsPerPage] = useState(10);
     const [selectedMonth, setSelectedMonth] = useState(new Date());
@@ -220,6 +230,22 @@ const TransactionManagement = () => {
     const [pdfInvoiceImage, setPdfInvoiceImage] = useState(null);
     const pdfDownloadRef = useRef(null);
     const [pdfDownloadDialogOpen, setPdfDownloadDialogOpen] = useState(false);
+    const [pricingTable, setPricingTable] = useState([]);
+    const [loadingPricingTable, setLoadingPricingTable] = useState(true);
+    const [pricingPage, setPricingPage] = useState(0);
+    const [pricingRowsPerPage, setPricingRowsPerPage] = useState(10);
+    const [selectedPricingRows, setSelectedPricingRows] = useState([]);
+    const [regionFilter, setRegionFilter] = useState('');
+    const [citySearch, setCitySearch] = useState('');
+    // Add new state for edit price dialog
+    const [editPriceDialogOpen, setEditPriceDialogOpen] = useState(false);
+    const [editPriceValue, setEditPriceValue] = useState('');
+    const [editPriceLoading, setEditPriceLoading] = useState(false);
+    const [editPriceError, setEditPriceError] = useState('');
+    const [selectedPricingRow, setSelectedPricingRow] = useState(null);
+    // Add new state for confirmation dialog
+    const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+    const [pendingPriceUpdate, setPendingPriceUpdate] = useState(null);
 
     // Data fetching
     useEffect(() => {
@@ -239,6 +265,139 @@ const TransactionManagement = () => {
 
         fetchData();
     }, []);
+
+    // Fetch pricing regions
+    useEffect(() => {
+        const fetchPricingRegions = async () => {
+            try {
+                const response = await fetch('/api/admin', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        action: 'getPricingRegion'
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to fetch pricing regions');
+                }
+
+                const data = await response.json();
+                setPricingRegions(data.regions || []);
+            } catch (error) {
+                console.error('Error fetching pricing regions:', error);
+                setSnackbar({
+                    open: true,
+                    message: 'Failed to load pricing regions',
+                    severity: 'error'
+                });
+            } finally {
+                setLoadingRegions(false);
+            }
+        };
+
+        fetchPricingRegions();
+    }, []);
+
+    // Fetch cities when region changes
+    useEffect(() => {
+        if (!selectedLocation) {
+            setCities([]);
+            setSelectedCity('');
+            return;
+        }
+        setLoadingCities(true);
+        setSelectedCity('');
+        const fetchCities = async () => {
+            try {
+                const response = await fetch('/api/admin', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'getCitiesByRegion',
+                        params: { region_id: selectedLocation }
+                    })
+                });
+                if (!response.ok) throw new Error('Failed to fetch cities');
+                const data = await response.json();
+                setCities(data.cities || []);
+            } catch (error) {
+                setCities([]);
+                setSnackbar({
+                    open: true,
+                    message: 'Failed to load cities',
+                    severity: 'error'
+                });
+            } finally {
+                setLoadingCities(false);
+            }
+        };
+        fetchCities();
+    }, [selectedLocation]);
+
+    // Fetch price when city changes
+    useEffect(() => {
+        if (!selectedCity) {
+            setPriceValue('');
+            return;
+        }
+        setLoadingPrice(true);
+        const fetchPrice = async () => {
+            try {
+                const response = await fetch('/api/admin', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'getPriceByCity',
+                        params: { city_id: selectedCity }
+                    })
+                });
+                if (!response.ok) throw new Error('Failed to fetch price');
+                const data = await response.json();
+                setPriceValue(data.price ?? '');
+            } catch (error) {
+                setPriceValue('');
+                setSnackbar({
+                    open: true,
+                    message: 'Failed to load price',
+                    severity: 'error'
+                });
+            } finally {
+                setLoadingPrice(false);
+            }
+        };
+        fetchPrice();
+    }, [selectedCity]);
+
+    // Fetch all pricing data for the table
+    useEffect(() => {
+        if (tabValue !== 1) return;
+        setLoadingPricingTable(true);
+        const fetchPricingTable = async () => {
+            try {
+                const response = await fetch('/api/admin', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'getAllPricing' })
+                });
+                if (!response.ok) throw new Error('Failed to fetch pricing table');
+                const data = await response.json();
+                setPricingTable(data.pricing || []);
+            } catch (error) {
+                setPricingTable([]);
+                setSnackbar({
+                    open: true,
+                    message: 'Failed to load pricing table',
+                    severity: 'error'
+                });
+            } finally {
+                setLoadingPricingTable(false);
+            }
+        };
+        fetchPricingTable();
+    }, [tabValue]);
 
     // Filter data based on selected month using created_at
     const filteredData = React.useMemo(() => {
@@ -549,149 +708,429 @@ const TransactionManagement = () => {
         handleInvoiceDialogOpen();
     };
 
+    const handleTabChange = (event, newValue) => {
+        setTabValue(newValue);
+        // Reset form when switching tabs
+        if (newValue === 1) {
+            setSelectedPricingType('');
+            setSelectedLocation('');
+            setPriceValue('');
+        }
+    };
+
+    // Checkbox handlers
+    const isPricingRowSelected = (id) => selectedPricingRows.includes(id);
+    const handleSelectPricingRow = (id) => {
+        setSelectedPricingRows((prev) =>
+            prev.includes(id) ? prev.filter((rowId) => rowId !== id) : [...prev, id]
+        );
+    };
+    const handleSelectAllPricingRows = (event) => {
+        if (event.target.checked) {
+            const pageRowIds = pricingTable.slice(pricingPage * pricingRowsPerPage, pricingPage * pricingRowsPerPage + pricingRowsPerPage).map((row) => row.id);
+            setSelectedPricingRows((prev) => Array.from(new Set([...prev, ...pageRowIds])));
+        } else {
+            const pageRowIds = pricingTable.slice(pricingPage * pricingRowsPerPage, pricingPage * pricingRowsPerPage + pricingRowsPerPage).map((row) => row.id);
+            setSelectedPricingRows((prev) => prev.filter((id) => !pageRowIds.includes(id)));
+        }
+    };
+    const allPagePricingRowsSelected = pricingTable.length > 0 && pricingTable.slice(pricingPage * pricingRowsPerPage, pricingPage * pricingRowsPerPage + pricingRowsPerPage).every((row) => selectedPricingRows.includes(row.id));
+    const somePagePricingRowsSelected = pricingTable.slice(pricingPage * pricingRowsPerPage, pricingPage * pricingRowsPerPage + pricingRowsPerPage).some((row) => selectedPricingRows.includes(row.id));
+
+    // Get unique regions for filter
+    const uniqueRegions = Array.from(new Set(pricingTable.map(row => row.region))).filter(Boolean);
+
+    // Filtered table data
+    const filteredPricingTable = pricingTable.filter(row => {
+        const regionMatch = !regionFilter || row.region === regionFilter;
+        const cityMatch = !citySearch || row.city.toLowerCase().includes(citySearch.toLowerCase());
+        return regionMatch && cityMatch;
+    });
+
+    // Pagination logic
+    const paginatedPricingTable = filteredPricingTable.slice(pricingPage * pricingRowsPerPage, pricingPage * pricingRowsPerPage + pricingRowsPerPage);
+    const pageCount = Math.ceil(filteredPricingTable.length / pricingRowsPerPage);
+
+    // Pagination controls
+    const handleFirstPage = () => setPricingPage(0);
+    const handleLastPage = () => setPricingPage(pageCount - 1);
+    const handlePrevPage = () => setPricingPage(prev => Math.max(prev - 1, 0));
+    const handleNextPage = () => setPricingPage(prev => Math.min(prev + 1, pageCount - 1));
+    const handleSkipBack = () => setPricingPage(prev => Math.max(prev - 10, 0));
+    const handleSkipForward = () => setPricingPage(prev => Math.min(prev + 10, pageCount - 1));
+    const handleRowsPerPageChange = (event) => {
+        setPricingRowsPerPage(parseInt(event.target.value, 10));
+        setPricingPage(0);
+    };
+
+    // Modify the edit price handlers
+    const handleEditPriceClick = (row) => {
+        setSelectedPricingRow(row);
+        setEditPriceValue(row.price.toString());
+        setEditPriceError('');
+        setEditPriceDialogOpen(true);
+    };
+
+    const handleEditPriceClose = () => {
+        setEditPriceDialogOpen(false);
+        setEditPriceValue('');
+        setEditPriceError('');
+        setSelectedPricingRow(null);
+    };
+
+    const handleEditPriceSubmit = () => {
+        if (!selectedPricingRow) return;
+        
+        const newPrice = Number(editPriceValue);
+        if (isNaN(newPrice) || newPrice < 0) {
+            setEditPriceError('Please enter a valid price (0 or greater)');
+            return;
+        }
+
+        // Store the pending update and show confirmation dialog
+        setPendingPriceUpdate({
+            city_id: selectedPricingRow.id,
+            price: newPrice,
+            city: selectedPricingRow.city,
+            region: selectedPricingRow.region,
+            oldPrice: selectedPricingRow.price
+        });
+        setConfirmDialogOpen(true);
+        handleEditPriceClose();
+    };
+
+    const handleConfirmUpdate = async () => {
+        if (!pendingPriceUpdate) return;
+
+        setEditPriceLoading(true);
+        setEditPriceError('');
+
+        try {
+            const response = await fetch('/api/admin', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'updatePrice',
+                    params: {
+                        city_id: pendingPriceUpdate.city_id,
+                        price: pendingPriceUpdate.price
+                    }
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to update price');
+            }
+
+            const { data } = await response.json();
+
+            // Update the local state with the new price and updated_at timestamp
+            setPricingTable(prev => prev.map(row => 
+                row.id === pendingPriceUpdate.city_id 
+                    ? { 
+                        ...row, 
+                        price: pendingPriceUpdate.price,
+                        updated_at: data.updated_at 
+                    }
+                    : row
+            ));
+
+            setSnackbar({
+                open: true,
+                message: 'Price updated successfully',
+                severity: 'success'
+            });
+        } catch (error) {
+            setEditPriceError(error.message || 'Failed to update price');
+            setSnackbar({
+                open: true,
+                message: error.message || 'Failed to update price',
+                severity: 'error'
+            });
+        } finally {
+            setEditPriceLoading(false);
+            setConfirmDialogOpen(false);
+            setPendingPriceUpdate(null);
+        }
+    };
+
+    const handleCancelUpdate = () => {
+        setConfirmDialogOpen(false);
+        setPendingPriceUpdate(null);
+    };
+
     // Render
     if (loading) return (<Box sx={{ p: 3, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '300px' }}><CircularProgress /><Typography sx={{ mt: 2 }}>Loading...</Typography></Box>);
     if (error) return (<Box sx={{ p: 3 }}><Typography color="error">{error}</Typography></Box>);
     return (
         <Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                    <IconButton 
-                        onClick={() => router.push('/egc-admin')} 
-                        sx={{ 
-                            color: 'primary.main',
-                            mr: 2,
-                            '&:hover': {
-                                backgroundColor: 'rgba(93, 135, 54, 0.1)'
-                            }
-                        }}
-                    >
-                        <ChevronLeftIcon />
-                    </IconButton>
-                    <Typography variant="h4" color="primary.main">Transaction Management</Typography>
-                </Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                    <LocalizationProvider dateAdapter={AdapterDateFns}>
-                        <DatePicker
-                            views={['month', 'year']}
-                            value={selectedMonth}
-                            onChange={handleMonthChange}
-                            slotProps={{
-                                textField: {
-                                    variant: 'outlined',
-                                    size: 'small',
-                                    sx: { width: 200 }
-                                }
-                            }}
-                        />
-                    </LocalizationProvider>
-                    {shouldRenderPDF ? (
-                        <PDFDownloadLink 
-                            document={<ReceiptPDF 
-                                contracts={getSelectedContracts()} 
-                                dateRange={handleGeneratePDF()} 
-                                invoiceImage={pdfInvoiceImage}
-                            />}
-                            fileName={`GHE-Transmittal-Report-${format(selectedMonth, 'MMMM-yyyy')}.pdf`}
-                            ref={pdfDownloadRef}
-                            style={{ display: 'none' }}
-                        >
-                            {({ loading, error }) => loading ? 'Generating PDF...' : error ? 'Error generating PDF' : 'Download PDF'}
-                        </PDFDownloadLink>
-                    ) : (
-                        <Button 
-                            variant="contained" 
-                            color="secondary"
-                            onClick={handlePDFButtonClick}
-                            sx={{ 
-                                position: 'relative',
-                                '&::after': {
-                                    content: `"${getSelectedContracts().length}"`,
-                                    position: 'absolute',
-                                    top: -8,
-                                    right: -8,
-                                    backgroundColor: 'primary.main',
-                                    color: 'white',
-                                    borderRadius: '50%',
-                                    width: 20,
-                                    height: 20,
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    fontSize: '0.75rem',
-                                    fontWeight: 'bold'
-                                }
-                            }}
-                        >
-                            Generate PDF Receipt
-                        </Button>
-                    )}
-                </Box>
+            <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
+                <Tabs 
+                    value={tabValue} 
+                    onChange={handleTabChange} 
+                    aria-label="transaction management tabs"
+                    centered
+                >
+                    <Tab label="Transaction Management" />
+                    <Tab label="Pricing Update" />
+                </Tabs>
             </Box>
-            <TableContainer component={Paper}>
-                <Table>
-                    <TableHead>
-                        <TableRow sx={{ backgroundColor: 'primary.main' }}>
-                            <TableCell padding="checkbox" sx={{ color: 'white' }}>
-                                <Checkbox 
-                                    indeterminate={somePageRowsSelected && !allPageRowsSelected} 
-                                    checked={allPageRowsSelected} 
-                                    onChange={handleSelectAll} 
-                                    inputProps={{ 'aria-label': 'select all contracts' }}
-                                    sx={{ color: 'white', '&.Mui-checked': { color: 'white' } }}
+
+            {tabValue === 0 && (
+                <Box>
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', mb: 3 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                            <LocalizationProvider dateAdapter={AdapterDateFns}>
+                                <DatePicker
+                                    views={['month', 'year']}
+                                    value={selectedMonth}
+                                    onChange={handleMonthChange}
+                                    slotProps={{
+                                        textField: {
+                                            variant: 'outlined',
+                                            size: 'small',
+                                            sx: { width: 200 }
+                                        }
+                                    }}
                                 />
-                            </TableCell>
-                            <TableCell sx={{ color: 'white' }}>Tracking ID</TableCell>
-                            <TableCell sx={{ color: 'white' }}>Luggage Owner</TableCell>
-                            <TableCell sx={{ color: 'white' }}>Flight No.</TableCell>
-                            <TableCell sx={{ color: 'white' }}>Address</TableCell>
-                            <TableCell sx={{ color: 'white' }}>Date Received</TableCell>
-                            <TableCell sx={{ color: 'white' }}>Status</TableCell>
-                            <TableCell sx={{ color: 'white' }}>Amount</TableCell>
-                            <TableCell sx={{ color: 'white' }}>Remarks</TableCell>
-                            <TableCell sx={{ color: 'white' }}>Actions</TableCell>
-                        </TableRow>
-                    </TableHead>
-                    <TableBody>
-                        {filteredData.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((row) => {
-                            const status = row.contract_status?.status_name || row.contract_status_id || '';
-                            const delivery_charge = Number(row.delivery_charge) || 0;
-                            const surcharge = Number(row.surcharge) || 0;
-                            const discount = Number(row.discount) || 0;
-                            const total = (delivery_charge + surcharge) * (1 - discount / 100);
-                            const remarks = status === 'Delivery Failed' ? 'Delivery Failed' : '';
-                            
-                            return (
-                                <TableRow key={row.id} selected={isRowSelected(row.id)}>
-                                    <TableCell padding="checkbox">
-                                        <Checkbox checked={isRowSelected(row.id)} onChange={() => handleSelectRow(row.id)} inputProps={{ 'aria-label': `select contract ${row.id}` }} />
+                            </LocalizationProvider>
+                            {shouldRenderPDF ? (
+                                <PDFDownloadLink 
+                                    document={<ReceiptPDF 
+                                        contracts={getSelectedContracts()} 
+                                        dateRange={handleGeneratePDF()} 
+                                        invoiceImage={pdfInvoiceImage}
+                                    />}
+                                    fileName={`GHE-Transmittal-Report-${format(selectedMonth, 'MMMM-yyyy')}.pdf`}
+                                    ref={pdfDownloadRef}
+                                    style={{ display: 'none' }}
+                                >
+                                    {({ loading, error }) => loading ? 'Generating PDF...' : error ? 'Error generating PDF' : 'Download PDF'}
+                                </PDFDownloadLink>
+                            ) : (
+                                <Button 
+                                    variant="contained" 
+                                    color="secondary"
+                                    onClick={handlePDFButtonClick}
+                                    sx={{ 
+                                        position: 'relative',
+                                        '&::after': {
+                                            content: `"${getSelectedContracts().length}"`,
+                                            position: 'absolute',
+                                            top: -8,
+                                            right: -8,
+                                            backgroundColor: 'primary.main',
+                                            color: 'white',
+                                            borderRadius: '50%',
+                                            width: 20,
+                                            height: 20,
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            fontSize: '0.75rem',
+                                            fontWeight: 'bold'
+                                        }
+                                    }}
+                                >
+                                    Generate PDF Receipt
+                                </Button>
+                            )}
+                        </Box>
+                    </Box>
+                    <TableContainer component={Paper}>
+                        <Table>
+                            <TableHead>
+                                <TableRow sx={{ backgroundColor: 'primary.main' }}>
+                                    <TableCell padding="checkbox" sx={{ color: 'white' }}>
+                                        <Checkbox 
+                                            indeterminate={somePageRowsSelected && !allPageRowsSelected} 
+                                            checked={allPageRowsSelected} 
+                                            onChange={handleSelectAll} 
+                                            inputProps={{ 'aria-label': 'select all contracts' }}
+                                            sx={{ color: 'white', '&.Mui-checked': { color: 'white' } }}
+                                        />
                                     </TableCell>
-                                    <TableCell>{row.id}</TableCell>
-                                    <TableCell>{row.luggage?.[0]?.luggage_owner || 'N/A'}</TableCell>
-                                    <TableCell>{row.luggage?.[0]?.flight_number || 'N/A'}</TableCell>
-                                    <TableCell>{row.drop_off_location || 'N/A'}</TableCell>
-                                    <TableCell>{formatDate(row.delivered_at || row.created_at)}</TableCell>
-                                    <TableCell>{status}</TableCell>
-                                    <TableCell>₱{total.toFixed(2)}</TableCell>
-                                    <TableCell>{remarks}</TableCell>
-                                    <TableCell>
-                                        <IconButton size="small" onClick={(e) => handleMenuClick(e, row)}><MoreVertIcon /></IconButton>
-                                    </TableCell>
+                                    <TableCell sx={{ color: 'white' }}>Tracking ID</TableCell>
+                                    <TableCell sx={{ color: 'white' }}>Luggage Owner</TableCell>
+                                    <TableCell sx={{ color: 'white' }}>Flight No.</TableCell>
+                                    <TableCell sx={{ color: 'white' }}>Address</TableCell>
+                                    <TableCell sx={{ color: 'white' }}>Date Received</TableCell>
+                                    <TableCell sx={{ color: 'white' }}>Status</TableCell>
+                                    <TableCell sx={{ color: 'white' }}>Amount</TableCell>
+                                    <TableCell sx={{ color: 'white' }}>Remarks</TableCell>
+                                    <TableCell sx={{ color: 'white' }}>Actions</TableCell>
                                 </TableRow>
-                            );
-                        })}
-                    </TableBody>
-                </Table>
-                <TablePagination 
-                    rowsPerPageOptions={[10]} 
-                    component="div" 
-                    count={filteredData.length} 
-                    rowsPerPage={rowsPerPage} 
-                    page={page} 
-                    onPageChange={handleChangePage} 
-                    onRowsPerPageChange={handleChangeRowsPerPage} 
-                />
-            </TableContainer>
+                            </TableHead>
+                            <TableBody>
+                                {filteredData.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((row) => {
+                                    const status = row.contract_status?.status_name || row.contract_status_id || '';
+                                    const delivery_charge = Number(row.delivery_charge) || 0;
+                                    const surcharge = Number(row.surcharge) || 0;
+                                    const discount = Number(row.discount) || 0;
+                                    const total = (delivery_charge + surcharge) * (1 - discount / 100);
+                                    const remarks = status === 'Delivery Failed' ? 'Delivery Failed' : '';
+                                    
+                                    return (
+                                        <TableRow key={row.id} selected={isRowSelected(row.id)}>
+                                            <TableCell padding="checkbox">
+                                                <Checkbox checked={isRowSelected(row.id)} onChange={() => handleSelectRow(row.id)} inputProps={{ 'aria-label': `select contract ${row.id}` }} />
+                                            </TableCell>
+                                            <TableCell>{row.id}</TableCell>
+                                            <TableCell>{row.luggage?.[0]?.luggage_owner || 'N/A'}</TableCell>
+                                            <TableCell>{row.luggage?.[0]?.flight_number || 'N/A'}</TableCell>
+                                            <TableCell>{row.drop_off_location || 'N/A'}</TableCell>
+                                            <TableCell>{formatDate(row.delivered_at || row.created_at)}</TableCell>
+                                            <TableCell>{status}</TableCell>
+                                            <TableCell>₱{total.toFixed(2)}</TableCell>
+                                            <TableCell>{remarks}</TableCell>
+                                            <TableCell>
+                                                <IconButton size="small" onClick={(e) => handleMenuClick(e, row)}><MoreVertIcon /></IconButton>
+                                            </TableCell>
+                                        </TableRow>
+                                    );
+                                })}
+                            </TableBody>
+                        </Table>
+                        <TablePagination 
+                            rowsPerPageOptions={[10]} 
+                            component="div" 
+                            count={filteredData.length} 
+                            rowsPerPage={rowsPerPage} 
+                            page={page} 
+                            onPageChange={handleChangePage} 
+                            onRowsPerPageChange={handleChangeRowsPerPage} 
+                        />
+                    </TableContainer>
+                </Box>
+            )}
+
+            {tabValue === 1 && (
+                <Box sx={{ p: 3 }}>
+                    <Box sx={{ width: '100%', mb: 4 }}>
+                        {/* Filters */}
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                            <FormControl sx={{ minWidth: 180 }} size="small">
+                                <InputLabel id="region-filter-label">Filter by Region</InputLabel>
+                                <Select
+                                    labelId="region-filter-label"
+                                    value={regionFilter}
+                                    label="Filter by Region"
+                                    onChange={e => setRegionFilter(e.target.value)}
+                                >
+                                    <MenuItem value="">All Regions</MenuItem>
+                                    {uniqueRegions.map(region => (
+                                        <MenuItem key={region} value={region}>{region}</MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
+                            <TextField
+                                size="small"
+                                label="Search City"
+                                value={citySearch}
+                                onChange={e => setCitySearch(e.target.value)}
+                                sx={{ minWidth: 180 }}
+                            />
+                        </Box>
+                        <TableContainer component={Paper}>
+                            <Table>
+                                <TableHead>
+                                    <TableRow sx={{ backgroundColor: 'primary.main' }}>
+                                        <TableCell padding="checkbox" sx={{ color: 'white' }}>
+                                            <Checkbox
+                                                indeterminate={somePagePricingRowsSelected && !allPagePricingRowsSelected}
+                                                checked={allPagePricingRowsSelected}
+                                                onChange={handleSelectAllPricingRows}
+                                                inputProps={{ 'aria-label': 'select all pricing rows' }}
+                                                sx={{ color: 'white', '&.Mui-checked': { color: 'white' } }}
+                                            />
+                                        </TableCell>
+                                        <TableCell sx={{ color: 'white' }}><b>Region</b></TableCell>
+                                        <TableCell sx={{ color: 'white' }}><b>City</b></TableCell>
+                                        <TableCell align="right" sx={{ color: 'white' }}><b>Price (₱)</b></TableCell>
+                                        <TableCell sx={{ color: 'white' }}><b>Last Updated</b></TableCell>
+                                        <TableCell sx={{ color: 'white' }} align="center"><b>Action</b></TableCell>
+                                    </TableRow>
+                                </TableHead>
+                                <TableBody>
+                                    {loadingPricingTable ? (
+                                        <TableRow>
+                                            <TableCell colSpan={6} align="center">
+                                                <CircularProgress size={24} /> Loading...
+                                            </TableCell>
+                                        </TableRow>
+                                    ) : paginatedPricingTable.length === 0 ? (
+                                        <TableRow>
+                                            <TableCell colSpan={6} align="center">No pricing data available</TableCell>
+                                        </TableRow>
+                                    ) : (
+                                        paginatedPricingTable.map((row) => (
+                                            <TableRow key={row.id} selected={isPricingRowSelected(row.id)}>
+                                                <TableCell padding="checkbox">
+                                                    <Checkbox
+                                                        checked={isPricingRowSelected(row.id)}
+                                                        onChange={() => handleSelectPricingRow(row.id)}
+                                                        inputProps={{ 'aria-label': `select pricing row ${row.id}` }}
+                                                    />
+                                                </TableCell>
+                                                <TableCell>{row.region}</TableCell>
+                                                <TableCell>{row.city}</TableCell>
+                                                <TableCell align="right">₱{row.price}</TableCell>
+                                                <TableCell>
+                                                    {row.updated_at ? new Date(row.updated_at).toLocaleString('en-US', {
+                                                        year: 'numeric',
+                                                        month: 'short',
+                                                        day: 'numeric',
+                                                        hour: '2-digit',
+                                                        minute: '2-digit',
+                                                        hour12: true
+                                                    }) : 'Never'}
+                                                </TableCell>
+                                                <TableCell align="center" sx={{ p: 0 }}>
+                                                    <Box sx={{ display: 'flex', justifyContent: 'center' }}>
+                                                        <Button 
+                                                            variant="outlined" 
+                                                            size="small"
+                                                            onClick={() => handleEditPriceClick(row)}
+                                                        >
+                                                            Edit Price
+                                                        </Button>
+                                                    </Box>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))
+                                    )}
+                                </TableBody>
+                            </Table>
+                        </TableContainer>
+                        {/* Custom Pagination Controls */}
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mt: 1 }}>
+                            <FormControl size="small" sx={{ minWidth: 100 }}>
+                                <InputLabel id="rows-per-page-label">Rows</InputLabel>
+                                <Select
+                                    labelId="rows-per-page-label"
+                                    value={pricingRowsPerPage}
+                                    label="Rows"
+                                    onChange={handleRowsPerPageChange}
+                                >
+                                    {[10, 25, 50, 100].map(opt => (
+                                        <MenuItem key={opt} value={opt}>{opt}</MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <Button onClick={handleFirstPage} disabled={pricingPage === 0}>&laquo; First</Button>
+                                <Button onClick={handleSkipBack} disabled={pricingPage < 10}>&lt;&lt; -10</Button>
+                                <Button onClick={handlePrevPage} disabled={pricingPage === 0}>&lt; Prev</Button>
+                                <Typography sx={{ mx: 1 }}>Page {pageCount === 0 ? 0 : pricingPage + 1} of {pageCount}</Typography>
+                                <Button onClick={handleNextPage} disabled={pricingPage >= pageCount - 1}>Next &gt;</Button>
+                                <Button onClick={handleSkipForward} disabled={pricingPage > pageCount - 11}>+10 &gt;&gt;</Button>
+                                <Button onClick={handleLastPage} disabled={pricingPage >= pageCount - 1}>Last &raquo;</Button>
+                            </Box>
+                        </Box>
+                    </Box>
+                </Box>
+            )}
+
             <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleMenuClose}>
                 <MenuItem onClick={() => handleAction('view')}>View Details</MenuItem>
                 <MenuItem onClick={() => handleAction('surcharge')}>Surcharge</MenuItem>
@@ -882,6 +1321,92 @@ const TransactionManagement = () => {
                 <DialogActions>
                     <Button onClick={handlePdfDownloadDialogClose} color="primary">
                         Close
+                    </Button>
+                </DialogActions>
+            </Dialog>
+            {/* Add the Edit Price Dialog */}
+            <Dialog 
+                open={editPriceDialogOpen} 
+                onClose={handleEditPriceClose}
+                maxWidth="xs"
+                fullWidth
+            >
+                <DialogTitle>Edit Price</DialogTitle>
+                <DialogContent dividers>
+                    <Box sx={{ pt: 1 }}>
+                        <Typography gutterBottom>
+                            Update price for {selectedPricingRow?.city} ({selectedPricingRow?.region})
+                        </Typography>
+                        <TextField
+                            label="Price (₱)"
+                            type="number"
+                            value={editPriceValue}
+                            onChange={(e) => setEditPriceValue(e.target.value)}
+                            fullWidth
+                            margin="normal"
+                            inputProps={{ min: 0, step: "0.01" }}
+                            disabled={editPriceLoading}
+                            error={!!editPriceError}
+                            helperText={editPriceError}
+                        />
+                    </Box>
+                </DialogContent>
+                <DialogActions>
+                    <Button 
+                        onClick={handleEditPriceClose} 
+                        disabled={editPriceLoading}
+                    >
+                        Cancel
+                    </Button>
+                    <Button 
+                        onClick={handleEditPriceSubmit} 
+                        color="primary"
+                        disabled={editPriceLoading || !editPriceValue}
+                    >
+                        {editPriceLoading ? 'Saving...' : 'Save'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+            {/* Add the Confirmation Dialog */}
+            <Dialog
+                open={confirmDialogOpen}
+                onClose={handleCancelUpdate}
+                maxWidth="sm"
+                fullWidth
+            >
+                <DialogTitle>Confirm Price Update</DialogTitle>
+                <DialogContent dividers>
+                    <Box sx={{ pt: 1 }}>
+                        <Typography gutterBottom>
+                            Are you sure you want to update the price for {pendingPriceUpdate?.city} ({pendingPriceUpdate?.region})?
+                        </Typography>
+                        <Box sx={{ mt: 2, p: 2, bgcolor: 'background.default', borderRadius: 1 }}>
+                            <Typography variant="body2" color="text.secondary">
+                                Current Price: ₱{pendingPriceUpdate?.oldPrice}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary">
+                                New Price: ₱{pendingPriceUpdate?.price}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                                Price Difference: ₱{(pendingPriceUpdate?.price - pendingPriceUpdate?.oldPrice).toFixed(2)}
+                            </Typography>
+                        </Box>
+                    </Box>
+                </DialogContent>
+                <DialogActions>
+                    <Button 
+                        onClick={handleCancelUpdate}
+                        disabled={editPriceLoading}
+                    >
+                        Cancel
+                    </Button>
+                    <Button 
+                        onClick={handleConfirmUpdate}
+                        color="primary"
+                        disabled={editPriceLoading}
+                        variant="contained"
+                    >
+                        {editPriceLoading ? 'Updating...' : 'Confirm Update'}
                     </Button>
                 </DialogActions>
             </Dialog>
