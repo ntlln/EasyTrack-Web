@@ -125,6 +125,64 @@ export async function GET(request) {
 
 export async function POST(request) {
   try {
+    const contentType = request.headers.get('content-type') || '';
+    
+    // Handle multipart form data (file uploads)
+    if (contentType.includes('multipart/form-data')) {
+      const formData = await request.formData();
+      const file = formData.get('file');
+      const bucket = formData.get('bucket');
+      const path = formData.get('path');
+
+      if (!file || !bucket || !path) {
+        return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+      }
+
+      // Convert file to buffer
+      const bytes = await file.arrayBuffer();
+      const buffer = Buffer.from(bytes);
+
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL,
+        process.env.SUPABASE_SERVICE_ROLE_KEY,
+        {
+          auth: {
+            autoRefreshToken: false,
+            persistSession: false
+          }
+        }
+      );
+
+      // Upload file to Supabase storage with upsert
+      const { data, error } = await supabase
+        .storage
+        .from(bucket)
+        .upload(path, buffer, {
+          contentType: file.type,
+          cacheControl: '3600',
+          upsert: true // Allow overwriting existing files
+        });
+
+      if (error) {
+        console.error('Error uploading file:', error);
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+
+      // Get signed URL for the uploaded file
+      const { data: { signedUrl }, error: signedUrlError } = await supabase
+        .storage
+        .from(bucket)
+        .createSignedUrl(path, 31536000); // URL valid for 1 year
+
+      if (signedUrlError) {
+        console.error('Error getting signed URL:', signedUrlError);
+        return NextResponse.json({ error: signedUrlError.message }, { status: 500 });
+      }
+
+      return NextResponse.json({ signedUrl });
+    }
+
+    // Handle JSON data (other actions)
     const body = await request.json();
     const { action, params } = body;
 
@@ -138,6 +196,92 @@ export async function POST(request) {
         }
       }
     );
+
+    // Handle payment creation
+    if (action === 'createPayment') {
+      const { invoice_number, payment_status_id, created_at, due_date, total_charge, invoice_image } = params;
+
+      console.log('Payment creation params:', {
+        invoice_number,
+        payment_status_id,
+        created_at,
+        due_date,
+        total_charge,
+        invoice_image
+      });
+
+      if (!invoice_number || !payment_status_id || !created_at || !due_date || !total_charge || !invoice_image) {
+        console.log('Missing fields:', {
+          invoice_number: !invoice_number,
+          payment_status_id: !payment_status_id,
+          created_at: !created_at,
+          due_date: !due_date,
+          total_charge: !total_charge,
+          invoice_image: !invoice_image
+        });
+        return NextResponse.json({ error: 'Missing required payment fields' }, { status: 400 });
+      }
+
+      try {
+        // Check if payment with this id already exists
+        const { data: existingPayment, error: checkError } = await supabase
+          .from('payment')
+          .select('id')
+          .eq('id', invoice_number)
+          .single();
+
+        if (checkError && checkError.code !== 'PGRST116') { // PGRST116 is "no rows returned"
+          console.error('Error checking existing payment:', checkError);
+          return NextResponse.json({ error: checkError.message }, { status: 500 });
+        }
+
+        if (existingPayment) {
+          // Update existing payment
+          const { data, error } = await supabase
+            .from('payment')
+            .update({
+              payment_status_id,
+              due_date,
+              total_charge,
+              invoice_image
+            })
+            .eq('id', invoice_number)
+            .select()
+            .single();
+
+          if (error) {
+            console.error('Error updating payment:', error);
+            return NextResponse.json({ error: error.message }, { status: 500 });
+          }
+
+          return NextResponse.json({ data });
+        } else {
+          // Create new payment
+          const { data, error } = await supabase
+            .from('payment')
+            .insert({
+              id: invoice_number,
+              payment_status_id,
+              created_at,
+              due_date,
+              total_charge,
+              invoice_image
+            })
+            .select()
+            .single();
+
+          if (error) {
+            console.error('Error creating payment:', error);
+            return NextResponse.json({ error: error.message }, { status: 500 });
+          }
+
+          return NextResponse.json({ data });
+        }
+      } catch (error) {
+        console.error('Error in payment creation/update:', error);
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+    }
 
     // Handle surcharge update
     if (action === 'updateSurcharge') {
@@ -247,6 +391,7 @@ export async function POST(request) {
 
     return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
   } catch (error) {
+    console.error('Server error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 } 

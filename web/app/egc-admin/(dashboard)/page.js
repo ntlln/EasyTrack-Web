@@ -27,14 +27,13 @@ export default function Page() {
   ];
 
   // Styles
-  const containerStyles = { p: 4 };
   const titleStyles = { mb: 4 };
   const cardStyles = { height: "100%", width: "35vh" };
   const linkStyles = { textDecoration: "none" };
   const iconStyles = { fontSize: 40, color: "primary.main", mb: 2 };
 
   return (
-    <Box sx={containerStyles}>
+    <Box>
       <Box sx={titleStyles}><Typography variant="h4" color="primary.main" fontWeight="bold">Dashboard</Typography></Box>
       <Grid container spacing={3}>
         {cards.map((card, index) => (

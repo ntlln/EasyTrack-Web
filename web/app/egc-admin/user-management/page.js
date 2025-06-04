@@ -187,7 +187,7 @@ export default function Page() {
   const handleSnackbarClose = () => setSnackbar(prev => ({ ...prev, open: false }));
 
   // Styles
-  const containerStyles = { p: 4, display: "flex", flexDirection: "column", gap: 4 };
+  const containerStyles = {display: "flex", flexDirection: "column", gap: 4 };
   const titleStyles = { color: "primary.main", fontWeight: "bold" };
   const titleContainerStyles = { display: "flex", alignItems: "center", gap: 1 };
   const searchContainerStyles = { display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" };
