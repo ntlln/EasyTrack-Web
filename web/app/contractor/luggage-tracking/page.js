@@ -128,7 +128,7 @@ export default function Page() {
     <Box sx={{ p: 2, display: "flex", flexDirection: "column", gap: 4 }}>
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <IconButton onClick={() => router.push('/contractor/dashboard')} sx={{ mr: 1, color: 'primary.main' }}><ChevronLeftIcon /></IconButton>
+          <IconButton onClick={() => router.push('/contractor/booking')} sx={{ mr: 1, color: 'primary.main' }}><ChevronLeftIcon /></IconButton>
           <Typography variant="h4" color="primary.main" fontWeight="bold">Luggage Tracking</Typography>
         </Box>
         <TextField label="Track Luggage" placeholder="Enter Contract ID" variant="outlined" size="small" value={contractId} onChange={(e) => setContractId(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && handleSearch()} sx={{ width: "300px", '& .MuiOutlinedInput-root': { '& input': { textAlign: 'right', paddingRight: '14px' } } }} />

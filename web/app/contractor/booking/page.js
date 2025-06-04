@@ -31,7 +31,7 @@ export default function Page() {
     const [mounted, setMounted] = useState(false); const [isFormMounted, setIsFormMounted] = useState(false);
     const [activeTab, setActiveTab] = useState(0); const [isGoogleMapsReady, setIsGoogleMapsReady] = useState(false);
     const [contracts, setContracts] = useState([{ name: "", caseNumber: "", itemDescription: "", contact: "", weight: "", quantity: "", flightNo: "" }]);
-    const [pickupAddress, setPickupAddress] = useState({ location: null, addressLine1: "", addressLine2: "", province: "", city: "", barangay: "", postalCode: "" });
+    const [pickupAddress, setPickupAddress] = useState({ location: "", addressLine1: "", addressLine2: "", province: "", city: "", barangay: "", postalCode: "" });
     const [dropoffAddress, setDropoffAddress] = useState({ location: null, lat: null, lng: null });
     const [placeOptions, setPlaceOptions] = useState([]); const [placeLoading, setPlaceLoading] = useState(false); const autocompleteServiceRef = useRef(null); const placesServiceRef = useRef(null);
     const [contractList, setContractList] = useState([]); const [contractListLoading, setContractListLoading] = useState(false); const [contractListError, setContractListError] = useState(null); const [expandedContracts, setExpandedContracts] = useState([]);
@@ -114,8 +114,7 @@ export default function Page() {
                         console.warn('Invalid pricing data:', item);
                         return;
                     }
-                    const normalized = normalizeCityName(item.city);
-                    pricingMap[normalized] = Number(item.price);
+                    pricingMap[item.city] = Number(item.price);
                 });
                 console.log('Pricing data loaded:', pricingMap);
                 setPricingData(pricingMap);
@@ -126,6 +125,27 @@ export default function Page() {
         
         fetchPricingData();
     }, []);
+
+    // Function to normalize province name for pricing lookup
+    const normalizeProvinceName = (province) => {
+        if (!province) return '';
+        
+        // Convert to lowercase for comparison
+        const lowerProvince = province.toLowerCase();
+        
+        // Handle Cagayan variations
+        if (lowerProvince.includes('cagayan')) {
+            if (lowerProvince.includes('valley')) {
+                return 'Cagayan';
+            }
+            if (lowerProvince.includes('oro')) {
+                return 'Cagayan de Oro';
+            }
+            return 'Cagayan';
+        }
+        
+        return province;
+    };
 
     // Function to get city from coordinates
     const getCityFromCoordinates = async (lat, lng) => {
@@ -151,21 +171,24 @@ export default function Page() {
                 return null;
             }
 
-            const addressComponents = response[0].address_components;
-            const cityComponent = addressComponents.find(
-                component => component.types.includes('locality')
+            // Log the full address components for debugging
+            console.log('Full address components:', response[0].address_components);
+
+            // Look for the province (administrative_area_level_1)
+            const provinceComponent = response[0].address_components.find(
+                component => component.types.includes('administrative_area_level_1')
             );
 
-            if (!cityComponent) {
-                console.warn('No city found in address components:', addressComponents);
+            if (!provinceComponent) {
+                console.warn('No province found in address components:', response[0].address_components);
                 return null;
             }
 
-            const city = cityComponent.long_name;
-            console.log('Found city:', city);
-            return city;
+            const province = provinceComponent.long_name;
+            console.log('Found province:', province);
+            return province;
         } catch (error) {
-            console.error('Error getting city from coordinates:', error);
+            console.error('Error getting province from coordinates:', error);
             return null;
         }
     };
@@ -184,27 +207,48 @@ export default function Page() {
             const luggageTrackingIDs = contracts.map(() => generateLuggageTrackingID());
 
             // Step 1: Determine the city from coordinates
-            let city = null;
+            let province = null;
             if (dropoffAddress.lat && dropoffAddress.lng) {
-                city = await getCityFromCoordinates(dropoffAddress.lat, dropoffAddress.lng);
-                console.log('Determined city:', city);
+                province = await getCityFromCoordinates(dropoffAddress.lat, dropoffAddress.lng);
+                console.log('Determined province:', province);
             } else {
-                console.warn('No coordinates available for city determination');
+                console.warn('No coordinates available for province determination');
             }
 
-            // Step 2: Fetch price for the determined city
+            // Step 2: Fetch price for the determined province
             let deliveryCharge = null;
-            if (city) {
-                const normalizedCity = normalizeCityName(city);
-                deliveryCharge = pricingData[normalizedCity];
-                console.log('City lookup:', {
-                    original: city,
-                    normalized: normalizedCity,
+            if (province) {
+                // Normalize the province name
+                const normalizedProvince = normalizeProvinceName(province);
+                console.log('Normalized province:', normalizedProvince);
+                
+                // Log all available cities in pricing data
+                console.log('Available cities in pricing data:', Object.keys(pricingData));
+                
+                // Try exact match first
+                deliveryCharge = pricingData[normalizedProvince];
+                
+                // If no exact match, try case-insensitive match
+                if (deliveryCharge === undefined) {
+                    const provinceLower = normalizedProvince.toLowerCase();
+                    const matchingProvince = Object.keys(pricingData).find(
+                        pricingProvince => pricingProvince.toLowerCase() === provinceLower
+                    );
+                    if (matchingProvince) {
+                        deliveryCharge = pricingData[matchingProvince];
+                        console.log('Found case-insensitive match:', matchingProvince);
+                    }
+                }
+
+                console.log('Province lookup:', {
+                    original: province,
+                    normalized: normalizedProvince,
                     price: deliveryCharge,
-                    availableCities: Object.keys(pricingData)
+                    availableCities: Object.keys(pricingData),
+                    pricingData: pricingData
                 });
             } else {
-                console.warn('Could not determine city for price lookup');
+                console.warn('Could not determine province for price lookup');
             }
 
             // Step 3: Calculate total delivery charge based on number of forms
@@ -267,7 +311,7 @@ export default function Page() {
             setSnackbarOpen(true);
             // Reset form
             setContracts([{ name: "", caseNumber: "", itemDescription: "", contact: "", weight: "", quantity: "", flightNo: "" }]);
-            setPickupAddress({ location: null, addressLine1: "", addressLine2: "", province: "", city: "", barangay: "", postalCode: "" });
+            setPickupAddress({ location: "", addressLine1: "", addressLine2: "", province: "", city: "", barangay: "", postalCode: "" });
             setDropoffAddress({ location: null, lat: null, lng: null });
             // Switch to contract list tab and refresh
             setActiveTab(0);
@@ -279,12 +323,6 @@ export default function Page() {
 
     // Tab change
     const handleTabChange = (event, newValue) => { setActiveTab(newValue); };
-
-    // Utility to normalize city names for matching
-    function normalizeCityName(name) {
-        if (!name) return '';
-        return name.trim().toLowerCase().replace(/ city$/, ''); // Remove ' city' at the end
-    }
 
     // Fetch contract list
     useEffect(() => {
@@ -629,8 +667,17 @@ export default function Page() {
                         <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mb: 2 }}>
                             <FormControl fullWidth size="small" required>
                                 <InputLabel>Pickup Location</InputLabel>
-                                <Select value={pickupAddress.location} label="Pickup Location" onChange={(e) => handlePickupAddressChange("location", e.target.value)} required>
-                                    {[...Array(12)].map((_, i) => (<MenuItem key={`terminal-${i + 1}`} value={`Terminal 3, Bay ${i + 1}`}>{`Terminal 3, Bay ${i + 1}`}</MenuItem>))}
+                                <Select 
+                                    value={pickupAddress.location || ""} 
+                                    label="Pickup Location" 
+                                    onChange={(e) => handlePickupAddressChange("location", e.target.value)} 
+                                    required
+                                >
+                                    {[...Array(12)].map((_, i) => (
+                                        <MenuItem key={`terminal-${i + 1}`} value={`Terminal 3, Bay ${i + 1}`}>
+                                            {`Terminal 3, Bay ${i + 1}`}
+                                        </MenuItem>
+                                    ))}
                                 </Select>
                             </FormControl>
                         </Box>
@@ -638,7 +685,44 @@ export default function Page() {
                     <Paper elevation={3} sx={{ maxWidth: 700, mx: "auto", mt: 3, p: 4, pt: 2, borderRadius: 3, backgroundColor: theme.palette.background.paper, position: "relative" }}>
                         <Typography variant="h6" fontWeight="bold" align="center" mb={3}>Drop-off Location</Typography>
                         <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mb: 2 }}>
-                            {isFormMounted && (<Box><Autocomplete freeSolo filterOptions={(x) => x} options={placeOptions} getOptionLabel={(option) => option.description || ''} loading={placeLoading} inputValue={dropoffAddress.location} onInputChange={handleDropoffInputChange} onChange={handleDropoffSelect} renderInput={(params) => (<TextField {...params} label="Drop-off Location" fullWidth size="small" placeholder="Search for a location" required InputProps={{ ...params.InputProps, endAdornment: (<>{placeLoading ? <CircularProgress color="inherit" size={20} /> : null}{params.InputProps.endAdornment}</>), autoComplete: 'off', }} sx={{ mb: 1 }} />)} /></Box>)}
+                            {isFormMounted && (
+                                <Box>
+                                    <Autocomplete
+                                        freeSolo
+                                        filterOptions={(x) => x}
+                                        options={placeOptions || []}
+                                        getOptionLabel={(option) => {
+                                            if (typeof option === 'string') return option;
+                                            return option.description || '';
+                                        }}
+                                        loading={placeLoading}
+                                        inputValue={dropoffAddress.location || ''}
+                                        onInputChange={handleDropoffInputChange}
+                                        onChange={handleDropoffSelect}
+                                        renderInput={(params) => (
+                                            <TextField
+                                                {...params}
+                                                label="Drop-off Location"
+                                                fullWidth
+                                                size="small"
+                                                placeholder="Search for a location"
+                                                required
+                                                InputProps={{
+                                                    ...params.InputProps,
+                                                    endAdornment: (
+                                                        <>
+                                                            {placeLoading ? <CircularProgress color="inherit" size={20} /> : null}
+                                                            {params.InputProps.endAdornment}
+                                                        </>
+                                                    ),
+                                                    autoComplete: 'off',
+                                                }}
+                                                sx={{ mb: 1 }}
+                                            />
+                                        )}
+                                    />
+                                </Box>
+                            )}
                             {mounted && <MapComponent mapRef={mapRef} mapError={mapError} />}
                         </Box>
                     </Paper>
@@ -666,7 +750,7 @@ export default function Page() {
                             </Box>
                         </Paper>
                     ))}
-                    <Box sx={{ display: "flex", justifyContent: "center", mt: 4, gap: 2 }}><Button variant="outlined" onClick={addContract}>Add Another Form</Button><Button variant="contained" onClick={handleSubmit}>Send Contract</Button></Box>
+                    <Box sx={{ display: "flex", justifyContent: "center", mt: 4, gap: 2 }}><Button variant="outlined" onClick={addContract}>Add Another Form</Button><Button variant="contained" onClick={handleSubmit}>Create Booking</Button></Box>
                     <Box sx={{ textAlign: "center", mt: 6 }}><Typography variant="h6" fontWeight="bold">Partnered with:</Typography><Box sx={{ display: "flex", justifyContent: "center", gap: 4, mt: 2 }}><Image src="/brand-3.png" alt="AirAsia" width={60} height={60} /></Box></Box>
                 </Box>)}
                 <Snackbar open={snackbarOpen} autoHideDuration={4000} onClose={() => setSnackbarOpen(false)} message="Booking Complete" anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }} />
