@@ -36,6 +36,7 @@ export default function Page() {
 
         try {
             const { data: existingUser, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+            console.log('Login attempt result:', { existingUser, signInError });
             
             if (signInError) {
                 if (signInError.message.includes('Email not confirmed')) {
@@ -65,22 +66,26 @@ export default function Page() {
             }
 
             const userId = existingUser.user.id;
-            const { data: roles } = await supabase.from("profiles_roles").select("id, role_name").in("role_name", ["AirAsia", "Administrator"]);
             const { data: profile } = await supabase.from("profiles").select("role_id, profiles_status(status_name)").eq("id", userId).single();
+            console.log('Fetched profile:', profile);
 
-            if (!roles || roles.length === 0 || !profile) { 
+            if (!profile) { 
                 await supabase.auth.signOut(); 
-                throw new Error("User role or profile not found."); 
+                console.log('No profile found, signing out.');
+                throw new Error("User profile not found."); 
             }
             
             if (profile.profiles_status?.status_name === "Deactivated") { 
                 await supabase.auth.signOut(); 
+                console.log('Account deactivated, signing out.');
                 throw new Error("This account has been deactivated."); 
             }
 
-            const contractorRole = roles.find(r => r.role_name === 'AirAsia');
-            if (!contractorRole || Number(profile.role_id) !== Number(contractorRole.id)) {
+            console.log('User role_id:', profile.role_id);
+            // Check by role_id directly (3 = Airline Personnel, 1 = Administrator)
+            if (![3, 1].includes(Number(profile.role_id))) {
                 await supabase.auth.signOut();
+                console.log('Role not allowed, signing out.');
                 setSnackbar({ open: true, message: "Access denied: Only airline staff can log in here.", severity: "error" });
                 setEmail(""); setPassword(""); setIsLoading(false);
                 return;
@@ -90,8 +95,10 @@ export default function Page() {
             if (rememberMe) await supabase.auth.updateSession({ expires_in: 60 * 60 * 24 * 30 });
             await supabase.from("profiles").update({ last_sign_in_at: new Date().toISOString() }).eq("id", userId);
             await supabase.auth.refreshSession();
+            console.log('Redirecting to /contractor/dashboard...');
             router.replace("/contractor/");
         } catch (error) {
+            console.log('Login error:', error);
             setSnackbar({ open: true, message: error.message || "Login failed", severity: "error" });
             setEmail(""); setPassword("");
         } finally { setIsLoading(false); }

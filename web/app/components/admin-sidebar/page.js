@@ -51,7 +51,7 @@ export default function Page() {
     const handleClickPages = () => isMinimized ? setIsMinimized(false) : setOpenPages(!openPages);
     const handleNavigation = (route) => { router.push(route); setIsMinimized(true); };
     const isActive = (route) => pathname === route;
-    const isDropdownActive = () => openPages || pathname === "/egc-admin/luggage-tracking";
+    const isDropdownActive = () => openPages || pathname === "/egc-admin/luggage-management";
 
     // Auth check
     useEffect(() => {
@@ -118,9 +118,9 @@ export default function Page() {
                     {!isMinimized && openPages && (
                         <Collapse in={openPages} timeout="auto" unmountOnExit>
                             <List component="div" disablePadding sx={{ pl: 2 }}>
-                                <ListItemButton sx={{ pl: 4, ...(isActive("/egc-admin/luggage-tracking") ? activeStyles : {}), ...listItemStyles("/egc-admin/luggage-tracking") }} onClick={() => handleNavigation("/egc-admin/luggage-tracking")}>
-                                    <ListItemIcon><MyLocationIcon sx={iconStyles("/egc-admin/luggage-tracking")} /></ListItemIcon>
-                                    <ListItemText primary="Luggage Tracking" />
+                                <ListItemButton sx={{ pl: 4, ...(isActive("/egc-admin/luggage-management") ? activeStyles : {}), ...listItemStyles("/egc-admin/luggage-management") }} onClick={() => handleNavigation("/egc-admin/luggage-management")}>
+                                    <ListItemIcon><MyLocationIcon sx={iconStyles("/egc-admin/luggage-management")} /></ListItemIcon>
+                                    <ListItemText primary="Luggage Management" />
                                 </ListItemButton>
                                 <ListItemButton sx={{ pl: 4, ...(isActive("/egc-admin/transaction-management") ? activeStyles : {}), ...listItemStyles("/egc-admin/transaction-management") }} onClick={() => handleNavigation("/egc-admin/transaction-management")}>
                                     <ListItemIcon><AssignmentIcon sx={iconStyles("/egc-admin/transaction-management")} /></ListItemIcon>

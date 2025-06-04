@@ -42,9 +42,8 @@ export default function Page() {
       const formattedAccounts = data.map(account => ({
         id: account.id,
         name: `${account.first_name || ''} ${account.middle_initial || ''} ${account.last_name || ''}`.trim() || account.email,
-        role: account.profiles_roles?.role_name === 'AirAsia'
-          ? 'Contractor'
-          : (account.profiles_roles?.role_name || 'No Role'),
+        role: account.role_id === 3 ? 'Contractor' : (account.profiles_roles?.role_name || 'No Role'),
+        role_id: account.role_id,
         email: account.email,
         status: account.profiles_status?.status_name || 'Inactive',
         user_status_id: account.user_status_id,

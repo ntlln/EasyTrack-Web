@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getAdminSession } from './utils/adminSession';
-import { getContractorSession } from './utils/contractorSession';
+import { getContractorSessionMiddleware } from './utils/contractorSession';
 
 export async function middleware(req) {
   const res = NextResponse.next();
@@ -9,7 +9,8 @@ export async function middleware(req) {
   // Contractor section access control
   if (req.nextUrl.pathname.startsWith('/contractor')) {
     if (req.nextUrl.pathname === '/contractor/login' || req.nextUrl.pathname === '/contractor/forgot-password' || req.nextUrl.pathname === '/contractor/reset-password' || req.nextUrl.pathname === '/contractor/verify') return res;
-    const session = await getContractorSession();
+    const session = await getContractorSessionMiddleware(req, res);
+    console.log('Session in middleware:', session);
     if (!session) {
       const url = new URL('/contractor/login', req.url);
       url.searchParams.set('redirect', req.nextUrl.pathname);

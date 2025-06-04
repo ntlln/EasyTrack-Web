@@ -5,7 +5,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { Box, Divider, List, ListItemButton, ListItemIcon, ListItemText, Collapse, Button, IconButton, useMediaQuery, Typography } from "@mui/material";
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
-import PaymentIcon from '@mui/icons-material/Payment';
+// import PaymentIcon from '@mui/icons-material/Payment';
 import InventoryIcon from '@mui/icons-material/Inventory';
 import ExpandLess from '@mui/icons-material/ExpandLess';
 import ExpandMore from '@mui/icons-material/ExpandMore';
@@ -116,10 +116,10 @@ export default function Page() {
                                     <ListItemText primary="Luggage Tracking" />
                                 </ListItemButton>
 
-                                <ListItemButton sx={{ pl: 4, ...(isActive("/contractor/payments") ? activeStyles : {}), ...listItemStyles("/contractor/payments") }} onClick={() => handleNavigation("/contractor/payments")}>
+                                {/* <ListItemButton sx={{ pl: 4, ...(isActive("/contractor/payments") ? activeStyles : {}), ...listItemStyles("/contractor/payments") }} onClick={() => handleNavigation("/contractor/payments")}>
                                     <ListItemIcon><PaymentIcon sx={iconStyles("/contractor/payments")} /></ListItemIcon>
                                     <ListItemText primary="Payments" />
-                                </ListItemButton>
+                                </ListItemButton> */}
                             </List>
                         </Collapse>
                     )}

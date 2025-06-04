@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Box, Tabs, Tab, Typography, Paper, Button, IconButton, CircularProgress, Divider, Collapse, TextField } from "@mui/material";
+import { Box, Tabs, Tab, Typography, Paper, Button, IconButton, CircularProgress, Divider, Collapse, TextField, Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from "@mui/material";
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import { useRouter } from 'next/navigation';
@@ -30,6 +30,8 @@ const ContractList = ({ onTrackContract }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeSearch, setActiveSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [page, setPage] = useState(0);
+  const rowsPerPage = 10; // Changed from 2 to 10 items per page
   const supabase = createClientComponentClient();
   const router = useRouter();
 
@@ -178,11 +180,17 @@ const ContractList = ({ onTrackContract }) => {
     onTrackContract(contractId);
   };
 
-  // Helper to get current filter/search contracts
-  const getFilteredContracts = () =>
-    filteredContracts.filter(contract =>
+  // Helper to get current filter/search contracts with pagination
+  const getFilteredContracts = () => {
+    const filtered = filteredContracts.filter(contract =>
       !activeSearch || String(contract.id).toLowerCase().includes(activeSearch.toLowerCase())
     );
+    
+    // Apply pagination
+    const startIndex = page * rowsPerPage;
+    const endIndex = startIndex + rowsPerPage;
+    return filtered.slice(startIndex, endIndex);
+  };
 
   return (
     <Box>
@@ -246,12 +254,7 @@ const ContractList = ({ onTrackContract }) => {
         <Typography align="center">No contracts found.</Typography>
       )}
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4, maxWidth: '800px', mx: 'auto', width: '100%' }}>
-        {filteredContracts
-          .filter(contract => 
-            !activeSearch || 
-            String(contract.id).toLowerCase().includes(activeSearch.toLowerCase())
-          )
-          .map((contract) => (
+        {getFilteredContracts().map((contract) => (
           <Paper key={`contract-${contract.id}`} elevation={3} sx={{ p: 3, borderRadius: 3, mb: 2, width: '100%' }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', position: 'relative' }}>
               <Box sx={{ flex: 1 }}>
@@ -450,6 +453,164 @@ const ContractList = ({ onTrackContract }) => {
           </Paper>
         ))}
       </Box>
+
+      {/* Update pagination controls */}
+      {!contractListLoading && !contractListError && filteredContracts.length > 0 && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Typography variant="body2" color="text.secondary">
+              {`Page ${page + 1} of ${Math.ceil(filteredContracts.length / rowsPerPage)}`}
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <Button
+                onClick={() => setPage(0)}
+                disabled={page === 0}
+                size="small"
+              >
+                First
+              </Button>
+              <Button
+                onClick={() => setPage(page - 1)}
+                disabled={page === 0}
+                size="small"
+              >
+                Previous
+              </Button>
+              <Button
+                onClick={() => setPage(page + 1)}
+                disabled={page >= Math.ceil(filteredContracts.length / rowsPerPage) - 1}
+                size="small"
+              >
+                Next
+              </Button>
+              <Button
+                onClick={() => setPage(Math.ceil(filteredContracts.length / rowsPerPage) - 1)}
+                disabled={page >= Math.ceil(filteredContracts.length / rowsPerPage) - 1}
+                size="small"
+              >
+                Last
+              </Button>
+            </Box>
+          </Box>
+        </Box>
+      )}
+    </Box>
+  );
+};
+
+// Add LuggageAssignments component
+const LuggageAssignments = () => {
+  const [assignments, setAssignments] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!mounted) return;
+
+    const fetchAssignments = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const response = await fetch('/api/admin/contracts');
+        const result = await response.json();
+
+        if (!response.ok) {
+          throw new Error(result.error || 'Failed to fetch assignments');
+        }
+
+        // Filter for available contracts only
+        const availableContracts = (result.data || []).filter(
+          contract => contract.contract_status?.status_name === 'available for pickup'
+        );
+        
+        setAssignments(availableContracts);
+      } catch (err) {
+        console.error('Error in fetchAssignments:', err);
+        setError(err.message || 'Failed to fetch assignments');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchAssignments();
+  }, [mounted]);
+
+  const handleAssign = (contractId) => {
+    // TODO: Implement assignment logic
+    console.log('Assigning contract:', contractId);
+  };
+
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (error) {
+    return (
+      <Typography color="error" align="center" sx={{ my: 4 }}>
+        {error}
+      </Typography>
+    );
+  }
+
+  return (
+    <Box sx={{ maxWidth: '1200px', mx: 'auto', width: '100%', p: 2 }}>
+      <TableContainer component={Paper} elevation={3} sx={{ borderRadius: 2 }}>
+        <Table>
+          <TableHead>
+            <TableRow sx={{ backgroundColor: 'primary.main' }}>
+              <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Contract ID</TableCell>
+              <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Pickup Location</TableCell>
+              <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Drop-off Location</TableCell>
+              <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Airline Name</TableCell>
+              <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Action</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {assignments.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={5} align="center">
+                  <Typography color="text.secondary">No available contracts for assignment</Typography>
+                </TableCell>
+              </TableRow>
+            ) : (
+              assignments.map((assignment) => (
+                <TableRow key={assignment.id} hover>
+                  <TableCell>{assignment.id}</TableCell>
+                  <TableCell>{assignment.pickup_location || 'N/A'}</TableCell>
+                  <TableCell>{assignment.drop_off_location || 'N/A'}</TableCell>
+                  <TableCell>
+                    {assignment.airline
+                      ? `${assignment.airline.first_name || ''} ${assignment.airline.middle_initial || ''} ${
+                          assignment.airline.last_name || ''
+                        }${assignment.airline.suffix ? ` ${assignment.airline.suffix}` : ''}`
+                          .replace(/  +/g, ' ')
+                          .trim()
+                      : 'N/A'}
+                  </TableCell>
+                  <TableCell>
+                    <Button
+                      variant="contained"
+                      size="small"
+                      onClick={() => handleAssign(assignment.id)}
+                    >
+                      Assign
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </TableContainer>
     </Box>
   );
 };
@@ -473,6 +634,8 @@ const Page = () => {
   const supabase = createClientComponentClient();
   const [isGoogleMapsReady, setIsGoogleMapsReady] = useState(false);
   const [statusFilter, setStatusFilter] = useState('all');
+  const [page, setPage] = useState(0);
+  const rowsPerPage = 10; // Changed from 2 to 10 items per page
 
   useEffect(() => {
     setMounted(true);
@@ -875,11 +1038,13 @@ const Page = () => {
     <Box sx={{ p: 2, display: "flex", flexDirection: "column", gap: 4 }}>
       <Tabs value={selectedTab} onChange={handleTabChange} aria-label="navigation tabs" centered>
         <Tab label="Contract List" />
+        <Tab label="Luggage Assignments" />
         <Tab label="Luggage Tracking" />
       </Tabs>
 
       {selectedTab === 0 && <ContractList onTrackContract={handleTrackContract} />}
-      {selectedTab === 1 && (
+      {selectedTab === 1 && <LuggageAssignments />}
+      {selectedTab === 2 && (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           <Box sx={{ display: 'flex', justifyContent: 'center', mb: 4 }}>
             <TextField

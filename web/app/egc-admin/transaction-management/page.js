@@ -402,27 +402,28 @@ const TransactionManagement = () => {
             <TableContainer component={Paper}>
                 <Table>
                     <TableHead>
-                        <TableRow>
-                            <TableCell padding="checkbox">
+                        <TableRow sx={{ backgroundColor: 'primary.main' }}>
+                            <TableCell padding="checkbox" sx={{ color: 'white' }}>
                                 <Checkbox 
                                     indeterminate={somePageRowsSelected && !allPageRowsSelected} 
                                     checked={allPageRowsSelected} 
                                     onChange={handleSelectAll} 
-                                    inputProps={{ 'aria-label': 'select all contracts' }} 
+                                    inputProps={{ 'aria-label': 'select all contracts' }}
+                                    sx={{ color: 'white', '&.Mui-checked': { color: 'white' } }}
                                 />
                             </TableCell>
-                            <TableCell>Contract ID</TableCell>
-                            <TableCell>Status</TableCell>
-                            <TableCell>Completion Date</TableCell>
-                            <TableCell>Drop Off</TableCell>
-                            <TableCell>Airline Name</TableCell>
-                            <TableCell>Delivery Name</TableCell>
-                            <TableCell>Charge</TableCell>
-                            <TableCell>Surcharge</TableCell>
-                            <TableCell>Discount</TableCell>
-                            <TableCell>Total</TableCell>
-                            <TableCell>Created At</TableCell>
-                            <TableCell>Actions</TableCell>
+                            <TableCell sx={{ color: 'white' }}>Contract ID</TableCell>
+                            <TableCell sx={{ color: 'white' }}>Status</TableCell>
+                            <TableCell sx={{ color: 'white' }}>Completion Date</TableCell>
+                            <TableCell sx={{ color: 'white' }}>Drop Off</TableCell>
+                            <TableCell sx={{ color: 'white' }}>Airline Name</TableCell>
+                            <TableCell sx={{ color: 'white' }}>Delivery Name</TableCell>
+                            <TableCell sx={{ color: 'white' }}>Charge</TableCell>
+                            <TableCell sx={{ color: 'white' }}>Surcharge</TableCell>
+                            <TableCell sx={{ color: 'white' }}>Discount</TableCell>
+                            <TableCell sx={{ color: 'white' }}>Total</TableCell>
+                            <TableCell sx={{ color: 'white' }}>Created At</TableCell>
+                            <TableCell sx={{ color: 'white' }}>Actions</TableCell>
                         </TableRow>
                     </TableHead>
                     <TableBody>

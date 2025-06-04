@@ -5,6 +5,13 @@ import Link from "next/link";
 import { useTheme } from "@mui/material/styles";
 import { useRouter } from "next/navigation";
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import AccountCircleIcon from '@mui/icons-material/AccountCircle';
+import LocalShippingIcon from '@mui/icons-material/LocalShipping';
+import AssignmentIcon from '@mui/icons-material/Assignment';
+import MyLocationIcon from '@mui/icons-material/MyLocation';
+import BarChartIcon from '@mui/icons-material/BarChart';
+import SupportAgentIcon from '@mui/icons-material/SupportAgent';
+import PaymentIcon from '@mui/icons-material/Payment';
 
 export default function Page() {
   // Theme and client setup
@@ -15,46 +22,36 @@ export default function Page() {
 
   // Dashboard cards configuration
   const cards = [
-    { title: "Profile", route: "/contractor/profile" },
-    { title: "Booking", route: "/contractor/booking" },
-    { title: "Delivery History & Reports", route: "/contractor/history-and-reports" },
-    { title: "Luggage Tracking", route: "/contractor/luggage-tracking" },
-    { title: "Statistics", route: "/contractor/statistics" },
-    { title: "Message Center", route: "/contractor/chat-support" },
-    { title: "Payments", route: "/contractor/payments" },
+    { title: "Profile", route: "/contractor/profile", icon: AccountCircleIcon },
+    { title: "Booking", route: "/contractor/booking", icon: LocalShippingIcon },
+    { title: "Delivery History & Reports", route: "/contractor/history-and-reports", icon: AssignmentIcon },
+    { title: "Luggage Tracking", route: "/contractor/luggage-tracking", icon: MyLocationIcon },
+    { title: "Statistics", route: "/contractor/statistics", icon: BarChartIcon },
+    { title: "Message Center", route: "/contractor/chat-support", icon: SupportAgentIcon },
+    // { title: "Payments", route: "/contractor/payments", icon: PaymentIcon },
   ];
 
   // Styles
-  const linkStyles = { mt: 1, color: isDark ? "#fff" : "#000", cursor: "pointer", "&:hover": { color: theme.palette.primary.main, textDecoration: "underline" } };
-  const cardStyles = { height: "100%", width: "35vh" };
+  const containerStyles = { p: 4 };
+  const titleStyles = { mb: 4 };
+  const cardStyles = { height: "24vh", width: "35vh" };
+  const linkStyles = { textDecoration: "none" };
+  const iconStyles = { fontSize: 40, color: "primary.main", mb: 2 };
 
   return (
-    <Box p={4}>
-      <Box mb={4}>
-        <Typography variant="h3" color="primary.main" fontWeight="bold">
-          Dashboard
-        </Typography>
-      </Box>
-
+    <Box sx={containerStyles}>
+      <Box sx={titleStyles}><Typography variant="h3" color="primary.main" fontWeight="bold">Dashboard</Typography></Box>
       <Grid container spacing={3}>
         {cards.map((card, index) => (
           <Grid item xs={12} sm={6} md={4} key={index}>
-            <Card sx={cardStyles}>
-              <CardContent>
-                <Typography variant="h6" color="primary.main" fontWeight={'bold'}>
-                  {card.title}
-                </Typography>
-
-                <Link href={card.route} style={{ textDecoration: "none" }}>
-                  <Typography
-                    variant="body2"
-                    sx={linkStyles}
-                  >
-                    View Details
-                  </Typography>
-                </Link>
-              </CardContent>
-            </Card>
+            <Link href={card.route} style={linkStyles}>
+              <Card sx={{ ...cardStyles, cursor: 'pointer', '&:hover': { transform: 'scale(1.02)', transition: 'transform 0.2s ease-in-out' } }}>
+                <CardContent sx={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                  <card.icon sx={iconStyles} />
+                  <Typography variant="h6" color="primary.main" fontWeight="bold" textAlign="center">{card.title}</Typography>
+                </CardContent>
+              </Card>
+            </Link>
           </Grid>
         ))}
       </Grid>

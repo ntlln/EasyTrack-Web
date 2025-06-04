@@ -32,9 +32,9 @@ export default function Layout({ children }) {
         if (sessionError || !session) { if (mounted) { setIsLoading(false); router.replace("/egc-admin/login"); } return; }
 
         const { data: profile } = await supabase.from('profiles').select('role_id').eq('id', session.user.id).single();
-        const { data: adminRole } = await supabase.from('profiles_roles').select('id').eq('role_name', 'Administrator').single();
+        const adminRoleId = 1; // Administrator
 
-        if (!profile || !adminRole || Number(profile.role_id) !== Number(adminRole.id)) {
+        if (!profile || !adminRoleId || Number(profile.role_id) !== Number(adminRoleId)) {
           await supabase.auth.signOut();
           if (mounted) { setIsLoading(false); router.replace("/egc-admin/login"); }
           return;

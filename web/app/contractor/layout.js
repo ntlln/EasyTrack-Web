@@ -13,6 +13,7 @@ export default function Layout({ children }) {
   const supabase = createClientComponentClient();
   const [checkingSession, setCheckingSession] = useState(true);
   const isAuthPage = pathname === "/contractor/login" || pathname === "/contractor/forgot-password" || pathname === "/contractor/reset-password" || pathname === "/contractor/verify";
+  const contractorRoleId = 3; // AirAsia/Contractor
 
   // Session and role validation
   useEffect(() => {
@@ -23,9 +24,9 @@ export default function Layout({ children }) {
         if (!session || !session.user) { router.replace("/contractor/login"); return; }
 
         const { data: profile } = await supabase.from('profiles').select('role_id').eq('id', session.user.id).single();
-        const { data: contractorRole } = await supabase.from('profiles_roles').select('id').eq('role_name', 'AirAsia').single();
+        // const { data: contractorRole } = await supabase.from('profiles_roles').select('id').eq('role_name', 'AirAsia').single();
 
-        if (!profile || !contractorRole || Number(profile.role_id) !== Number(contractorRole.id)) {
+        if (!profile || !profile.role_id || Number(profile.role_id) !== Number(contractorRoleId)) {
           await supabase.auth.signOut();
           router.replace("/contractor/login");
           return;

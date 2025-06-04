@@ -74,19 +74,13 @@ export default function Page() {
             if (!session?.user) return;
             const email = session.user.email;
             setUserEmail(email);
-            const { data } = await supabase.from('profiles').select('*').eq('email', email).single();
+            const { data } = await supabase.from('profiles').select('*, profiles_roles(role_name)').eq('email', email).single();
             if (data) {
                 setProfile(data);
                 setProfileImage(data.pfp_id || null);
-                await fetchRoleName(data.role_id);
+                setRoleName(data.profiles_roles?.role_name || '');
             }
         } catch (error) { }
-    };
-
-    const fetchRoleName = async (roleId) => {
-        if (!roleId) return;
-        const { data: roleData } = await supabase.from('profiles_roles').select('role_name').eq('id', roleId).single();
-        if (roleData?.role_name) setRoleName(roleData.role_name);
     };
 
     // Image handling

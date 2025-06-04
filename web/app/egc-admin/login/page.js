@@ -23,8 +23,7 @@ export default function Page() {
         const { data: { session } } = await supabase.auth.getSession();
         if (session) {
           const { data: profile } = await supabase.from('profiles').select('role_id').eq('id', session.user.id).single();
-          const { data: adminRole } = await supabase.from('profiles_roles').select('id').eq('role_name', 'Administrator').single();
-          if (profile && adminRole && Number(profile.role_id) === Number(adminRole.id)) router.push("/egc-admin/");
+          if (profile && Number(profile.role_id) === 1) router.push("/egc-admin/"); // 1 = Administrator
         }
       } catch (error) { }
     };
@@ -64,12 +63,12 @@ export default function Page() {
       }
 
       const userId = data.user.id;
-      const { data: adminRole } = await supabase.from("profiles_roles").select("id").eq("role_name", "Administrator").single();
+      const adminRoleId = 1; // Administrator role ID
       const { data: profile } = await supabase.from("profiles").select("role_id, profiles_status(status_name)").eq("id", userId).single();
 
-      if (!adminRole || !profile) { await supabase.auth.signOut(); throw new Error("User role or profile not found."); }
+      if (!profile) { await supabase.auth.signOut(); throw new Error("User profile not found."); }
       if (profile.profiles_status?.status_name === "Deactivated") { await supabase.auth.signOut(); throw new Error("This account has been deactivated."); }
-      if (Number(profile.role_id) !== Number(adminRole.id)) {
+      if (Number(profile.role_id) !== adminRoleId) {
         await supabase.auth.signOut();
         setSnackbar({ open: true, message: "Access denied: Only administrators can log in here.", severity: "error" });
         setEmail(""); setPassword(""); setIsLoading(false);

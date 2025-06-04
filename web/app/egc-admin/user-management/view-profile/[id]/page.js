@@ -99,7 +99,8 @@ export default function ViewProfile({ params }) {
   const userData = {
     fullName: `${user.first_name || ''} ${user.middle_initial || ''} ${user.last_name || ''}${user.suffix ? ` ${user.suffix}` : ''}`.replace(/  +/g, ' ').trim(),
     employeeId: user.id || '',
-    role: user.profiles_roles?.role_name || '',
+    role: user.role_id === 3 ? 'Contractor' : (user.profiles_roles?.role_name || ''),
+    role_id: user.role_id,
     dateRegistered: user.created_at ? new Date(user.created_at).toLocaleString() : '',
     lastUpdated: user.updated_at ? new Date(user.updated_at).toLocaleString() : 'Never',
     lastSignIn: user.last_sign_in_at ? new Date(user.last_sign_in_at).toLocaleString() : 'Never',
