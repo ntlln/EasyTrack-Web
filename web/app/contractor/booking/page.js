@@ -30,13 +30,14 @@ export default function Page() {
     const [map, setMap] = useState(null); const [isScriptLoaded, setIsScriptLoaded] = useState(false); const [mapError, setMapError] = useState(null); const updateTimeoutRef = useRef(null);
     const [mounted, setMounted] = useState(false); const [isFormMounted, setIsFormMounted] = useState(false);
     const [activeTab, setActiveTab] = useState(0); const [isGoogleMapsReady, setIsGoogleMapsReady] = useState(false);
-    const [contracts, setContracts] = useState([{ name: "", caseNumber: "", itemDescription: "", contact: "", weight: "", quantity: "", flightNo: "" }]);
+    const [contracts, setContracts] = useState([{ name: "", caseNumber: "", itemDescription: "", address: "", contact: "", weight: "", quantity: "", flightNo: "" }]);
     const [pickupAddress, setPickupAddress] = useState({ location: "", addressLine1: "", addressLine2: "", province: "", city: "", barangay: "", postalCode: "" });
     const [dropoffAddress, setDropoffAddress] = useState({ location: null, lat: null, lng: null });
     const [placeOptions, setPlaceOptions] = useState([]); const [placeLoading, setPlaceLoading] = useState(false); const autocompleteServiceRef = useRef(null); const placesServiceRef = useRef(null);
     const [contractList, setContractList] = useState([]); const [contractListLoading, setContractListLoading] = useState(false); const [contractListError, setContractListError] = useState(null); const [expandedContracts, setExpandedContracts] = useState([]);
     const [pricingData, setPricingData] = useState({});
     const [snackbarOpen, setSnackbarOpen] = useState(false);
+    const [snackbarMessage, setSnackbarMessage] = useState('');
     const [statusFilter, setStatusFilter] = useState('all');
 
     // Mount
@@ -51,24 +52,218 @@ export default function Page() {
     useEffect(() => { if (activeTab !== 1 && map) { if (markerRef.current) { markerRef.current.map = null; markerRef.current = null; } setMap(null); } }, [activeTab]);
 
     // Map functions
-    const initMap = () => { if (!window.google || !mapRef.current) return; try { const defaultLocation = { lat: 14.5350, lng: 120.9821 }; const mapOptions = { center: defaultLocation, zoom: 15, mapTypeControl: false, streetViewControl: false, fullscreenControl: false, mapTypeId: 'roadmap', mapId: process.env.NEXT_PUBLIC_GOOGLE_MAPS_ID }; const newMap = new window.google.maps.Map(mapRef.current, mapOptions); setMap(newMap); const markerView = new window.google.maps.marker.PinElement({ scale: 1, background: theme.palette.primary.main, borderColor: theme.palette.primary.dark, glyphColor: '#FFFFFF' }); markerRef.current = new window.google.maps.marker.AdvancedMarkerElement({ map: newMap, position: defaultLocation, title: 'SM Mall of Asia', content: markerView.element, gmpDraggable: true, collisionBehavior: window.google.maps.CollisionBehavior.OPTIONAL_AND_HIDES_LOWER_PRIORITY }); setDropoffAddress({ location: 'SM Mall of Asia, Pasay, Metro Manila', lat: defaultLocation.lat, lng: defaultLocation.lng }); let isDragging = false; newMap.addListener('dragstart', () => { isDragging = true; }); newMap.addListener('dragend', () => { isDragging = false; const center = newMap.getCenter(); if (markerRef.current) { markerRef.current.position = center; updateAddressFromPosition(center); } }); newMap.addListener('zoom_changed', () => { if (markerRef.current) { const markerPosition = markerRef.current.position; newMap.panTo(markerPosition); } }); newMap.addListener('click', (event) => { const lat = event.latLng.lat(); const lng = event.latLng.lng(); updateMarkerAndAddress({ lat, lng }); }); markerRef.current.addListener('dragend', () => { const position = markerRef.current.position; updateAddressFromPosition(position); }); } catch (error) { setMapError(error.message); } };
+    const initMap = () => { 
+        if (!window.google || !mapRef.current) return; 
+        try { 
+            // Define Luzon bounds
+            const luzonBounds = new window.google.maps.LatLngBounds(
+                new window.google.maps.LatLng(12.5, 119.5), // Southwest corner
+                new window.google.maps.LatLng(18.5, 122.5)  // Northeast corner
+            );
+
+            // NAIA Terminal 3 coordinates
+            const defaultLocation = { lat: 14.5091, lng: 121.0120 }; // NAIA Terminal 3
+            const mapOptions = { 
+                center: defaultLocation, 
+                zoom: 15, // Zoomed out a bit to show more of the surrounding area
+                mapTypeControl: false, 
+                streetViewControl: false, 
+                fullscreenControl: false, 
+                mapTypeId: 'roadmap', 
+                mapId: process.env.NEXT_PUBLIC_GOOGLE_MAPS_ID,
+                restriction: {
+                    latLngBounds: luzonBounds,
+                    strictBounds: false // Allow panning outside bounds
+                },
+                minZoom: 5, // Allow zooming out more
+                maxZoom: 18 // Prevent zooming in too close
+            }; 
+
+            const newMap = new window.google.maps.Map(mapRef.current, mapOptions); 
+            setMap(newMap); 
+
+            const markerView = new window.google.maps.marker.PinElement({ 
+                scale: 1, 
+                background: theme.palette.primary.main, 
+                borderColor: theme.palette.primary.dark, 
+                glyphColor: '#FFFFFF' 
+            }); 
+
+            markerRef.current = new window.google.maps.marker.AdvancedMarkerElement({ 
+                map: newMap, 
+                position: defaultLocation, 
+                title: 'NAIA Terminal 3, Bay 10', 
+                content: markerView.element, 
+                gmpDraggable: true, 
+                collisionBehavior: window.google.maps.CollisionBehavior.OPTIONAL_AND_HIDES_LOWER_PRIORITY 
+            }); 
+
+            setDropoffAddress({ 
+                location: 'NAIA Terminal 3, Bay 10, Pasay, Metro Manila', 
+                lat: defaultLocation.lat, 
+                lng: defaultLocation.lng 
+            }); 
+
+            let isDragging = false; 
+            newMap.addListener('dragstart', () => { isDragging = true; }); 
+            newMap.addListener('dragend', () => { 
+                isDragging = false; 
+                const center = newMap.getCenter(); 
+                if (markerRef.current) { 
+                    markerRef.current.position = center; 
+                    updateAddressFromPosition(center); 
+                } 
+            }); 
+
+            newMap.addListener('zoom_changed', () => { 
+                if (markerRef.current) { 
+                    const markerPosition = markerRef.current.position; 
+                    newMap.panTo(markerPosition); 
+                } 
+            }); 
+
+            newMap.addListener('click', (event) => { 
+                const lat = event.latLng.lat(); 
+                const lng = event.latLng.lng(); 
+                updateMarkerAndAddress({ lat, lng }); 
+            }); 
+
+            markerRef.current.addListener('dragend', () => { 
+                const position = markerRef.current.position; 
+                updateAddressFromPosition(position); 
+            }); 
+        } catch (error) { 
+            setMapError(error.message); 
+        } 
+    };
     const updateAddressFromPosition = (position) => { const lat = position.lat(); const lng = position.lng(); const geocoder = new window.google.maps.Geocoder(); geocoder.geocode({ location: { lat, lng } }, (results, status) => { if (status === 'OK' && results[0]) { setDropoffAddress(prev => ({ ...prev, location: results[0].formatted_address, lat: lat, lng: lng })); } }); };
     const updateMarkerAndAddress = (position) => { if (!window.google || !map) return; const markerView = new window.google.maps.marker.PinElement({ scale: 1, background: theme.palette.primary.main, borderColor: theme.palette.primary.dark, glyphColor: '#FFFFFF' }); if (markerRef.current) { markerRef.current.position = position; } else { markerRef.current = new window.google.maps.marker.AdvancedMarkerElement({ map: map, position: position, content: markerView.element, gmpDraggable: true, collisionBehavior: window.google.maps.CollisionBehavior.OPTIONAL_AND_HIDES_LOWER_PRIORITY }); } map.panTo(position); const geocoder = new window.google.maps.Geocoder(); geocoder.geocode({ location: position }, (results, status) => { if (status === 'OK' && results[0]) { const formattedAddress = results[0].formatted_address; setDropoffAddress(prev => ({ ...prev, location: formattedAddress, lat: position.lat, lng: position.lng })); } }); };
-    const updateMapLocation = useCallback((position, address) => { if (!window.google || !map) return; const markerView = new window.google.maps.marker.PinElement({ scale: 1, background: theme.palette.primary.main, borderColor: theme.palette.primary.dark, glyphColor: '#FFFFFF' }); if (markerRef.current) { markerRef.current.map = null; } markerRef.current = new window.google.maps.marker.AdvancedMarkerElement({ map: map, position: position, title: address, content: markerView.element, gmpDraggable: true, collisionBehavior: window.google.maps.CollisionBehavior.OPTIONAL_AND_HIDES_LOWER_PRIORITY }); map.panTo(position); map.setZoom(15); markerRef.current.addListener('dragend', () => { const newPosition = markerRef.current.position; const lat = newPosition.lat; const lng = newPosition.lng; const geocoder = new window.google.maps.Geocoder(); geocoder.geocode({ location: { lat, lng }, componentRestrictions: { country: 'ph' } }, (results, status) => { if (status === 'OK' && results[0]) { setDropoffAddress(prev => ({ ...prev, location: results[0].formatted_address, lat: lat, lng: lng })); } }); }); setTimeout(() => { window.google.maps.event.trigger(map, 'resize'); map.setCenter(position); }, 100); }, [map]);
+    const updateMapLocation = useCallback((position, address) => { 
+        if (!window.google || !map) return; 
+        const markerView = new window.google.maps.marker.PinElement({ 
+            scale: 1, 
+            background: theme.palette.primary.main, 
+            borderColor: theme.palette.primary.dark, 
+            glyphColor: '#FFFFFF' 
+        }); 
+
+        if (markerRef.current) { 
+            markerRef.current.map = null; 
+        } 
+
+        markerRef.current = new window.google.maps.marker.AdvancedMarkerElement({ 
+            map: map, 
+            position: position, 
+            title: address, 
+            content: markerView.element, 
+            gmpDraggable: true, 
+            collisionBehavior: window.google.maps.CollisionBehavior.OPTIONAL_AND_HIDES_LOWER_PRIORITY 
+        }); 
+
+        map.panTo(position);
+        
+        // Set zoom level based on whether it's a pickup location
+        const isPickupLocation = address.toLowerCase().includes('terminal');
+        map.setZoom(isPickupLocation ? 14 : 15); // Zoom out more for terminal locations
+
+        markerRef.current.addListener('dragend', () => { 
+            const newPosition = markerRef.current.position; 
+            const lat = newPosition.lat; 
+            const lng = newPosition.lng; 
+            const geocoder = new window.google.maps.Geocoder(); 
+            geocoder.geocode({ location: { lat, lng }, componentRestrictions: { country: 'ph' } }, (results, status) => { 
+                if (status === 'OK' && results[0]) { 
+                    setDropoffAddress(prev => ({ 
+                        ...prev, 
+                        location: results[0].formatted_address, 
+                        lat: lat, 
+                        lng: lng 
+                    })); 
+                } 
+            }); 
+        }); 
+
+        setTimeout(() => { 
+            window.google.maps.event.trigger(map, 'resize'); 
+            map.setCenter(position); 
+        }, 100); 
+    }, [map]);
 
     // Google Places
-    const fetchPlaceSuggestions = (input) => { if (!input || !autocompleteServiceRef.current) { setPlaceOptions([]); return; } setPlaceLoading(true); autocompleteServiceRef.current.getPlacePredictions({ input, types: ['geocode', 'establishment'], componentRestrictions: { country: 'ph' } }, (predictions, status) => { if (status === window.google.maps.places.PlacesServiceStatus.OK && predictions) { setPlaceOptions(predictions); } else { setPlaceOptions([]); } setPlaceLoading(false); }); };
+    const fetchPlaceSuggestions = (input) => { 
+        if (!input || !autocompleteServiceRef.current) { 
+            setPlaceOptions([]); 
+            return; 
+        } 
+        setPlaceLoading(true); 
+        autocompleteServiceRef.current.getPlacePredictions({ 
+            input, 
+            types: ['geocode', 'establishment'], 
+            componentRestrictions: { country: 'ph' },
+            bounds: new window.google.maps.LatLngBounds(
+                new window.google.maps.LatLng(12.5, 119.5), // Southwest corner
+                new window.google.maps.LatLng(18.5, 122.5)  // Northeast corner
+            ),
+            strictBounds: false // Allow suggestions outside bounds
+        }, (predictions, status) => { 
+            if (status === window.google.maps.places.PlacesServiceStatus.OK && predictions) { 
+                setPlaceOptions(predictions); 
+            } else { 
+                setPlaceOptions([]); 
+            } 
+            setPlaceLoading(false); 
+        }); 
+    };
     const handleDropoffInputChange = (event, value) => { setDropoffAddress(prev => ({ ...prev, location: value })); fetchPlaceSuggestions(value); };
-    const handleDropoffSelect = (event, value) => { if (!value || !placesServiceRef.current) return; setDropoffAddress(prev => ({ ...prev, location: value.description })); placesServiceRef.current.getDetails({ placeId: value.place_id }, (data, status) => { if (status === window.google.maps.places.PlacesServiceStatus.OK && data && data.geometry) { const loc = data.geometry.location; const newPosition = { lat: loc.lat(), lng: loc.lng() }; updateMapLocation(newPosition, data.formatted_address || value.description); setDropoffAddress(prev => ({ ...prev, location: data.formatted_address || value.description, lat: newPosition.lat, lng: newPosition.lng })); } }); };
+    const handleDropoffSelect = (event, value) => { 
+        if (!value || !placesServiceRef.current) return; 
+        setDropoffAddress(prev => ({ ...prev, location: value.description })); 
+        placesServiceRef.current.getDetails({ placeId: value.place_id }, (data, status) => { 
+            if (status === window.google.maps.places.PlacesServiceStatus.OK && data && data.geometry) { 
+                const loc = data.geometry.location; 
+                const newPosition = { lat: loc.lat(), lng: loc.lng() }; 
+                
+                // Check if the location is within Luzon bounds
+                if (!isWithinLuzonBounds(newPosition.lat, newPosition.lng)) {
+                    setSnackbarMessage('This place is not covered by our service');
+                    setSnackbarOpen(true);
+                    return;
+                }
+
+                updateMapLocation(newPosition, data.formatted_address || value.description); 
+                setDropoffAddress(prev => ({ 
+                    ...prev, 
+                    location: data.formatted_address || value.description, 
+                    lat: newPosition.lat, 
+                    lng: newPosition.lng 
+                })); 
+            } 
+        }); 
+    };
 
     // Contract form handlers
     const handlePickupAddressChange = (field, value) => { setPickupAddress(prev => ({ ...prev, [field]: value })); };
     const handleDropoffAddressChange = (field, value) => { setDropoffAddress(prev => ({ ...prev, [field]: value })); };
-    const handleInputChange = (index, field, value) => { const updatedContracts = [...contracts]; updatedContracts[index][field] = value; setContracts(updatedContracts); };
+    const handleInputChange = (index, field, value) => {
+        const updatedContracts = [...contracts];
+        if (field === 'contact') {
+            // Handle backspace and empty values
+            if (!value) {
+                updatedContracts[index][field] = '';
+            } else {
+                // Only format if we have input
+                const formatted = formatPhoneNumber(value);
+                updatedContracts[index][field] = formatted;
+            }
+        } else {
+            updatedContracts[index][field] = value;
+        }
+        setContracts(updatedContracts);
+    };
     const handleImageChange = (index, file) => { const updatedContracts = [...contracts]; updatedContracts[index].image = file; setContracts(updatedContracts); };
-    const clearSingleContract = (index) => { const updatedContracts = [...contracts]; updatedContracts[index] = { name: "", caseNumber: "", itemDescription: "", contact: "", weight: "", quantity: "", flightNo: "" }; setContracts(updatedContracts); };
+    const clearSingleContract = (index) => { const updatedContracts = [...contracts]; updatedContracts[index] = { name: "", caseNumber: "", itemDescription: "", address: "", contact: "", weight: "", quantity: "", flightNo: "" }; setContracts(updatedContracts); };
     const deleteContract = (index) => { const updatedContracts = contracts.filter((_, i) => i !== index); setContracts(updatedContracts); };
-    const addContract = () => { setContracts([...contracts, { name: "", caseNumber: "", itemDescription: "", contact: "", weight: "", quantity: "", flightNo: "" }]); };
+    const addContract = () => { setContracts([...contracts, { name: "", caseNumber: "", itemDescription: "", address: "", contact: "", weight: "", quantity: "", flightNo: "" }]); };
 
     // Generate tracking ID with format 'YYYYMMDDMKTPxxxx'
     const generateTrackingID = () => {
@@ -126,27 +321,6 @@ export default function Page() {
         fetchPricingData();
     }, []);
 
-    // Function to normalize province name for pricing lookup
-    const normalizeProvinceName = (province) => {
-        if (!province) return '';
-        
-        // Convert to lowercase for comparison
-        const lowerProvince = province.toLowerCase();
-        
-        // Handle Cagayan variations
-        if (lowerProvince.includes('cagayan')) {
-            if (lowerProvince.includes('valley')) {
-                return 'Cagayan';
-            }
-            if (lowerProvince.includes('oro')) {
-                return 'Cagayan de Oro';
-            }
-            return 'Cagayan';
-        }
-        
-        return province;
-    };
-
     // Function to get city from coordinates
     const getCityFromCoordinates = async (lat, lng) => {
         if (!window.google) {
@@ -174,21 +348,29 @@ export default function Page() {
             // Log the full address components for debugging
             console.log('Full address components:', response[0].address_components);
 
-            // Look for the province (administrative_area_level_1)
-            const provinceComponent = response[0].address_components.find(
-                component => component.types.includes('administrative_area_level_1')
-            );
+            // First try to find the city (locality)
+            let city = response[0].address_components.find(
+                component => component.types.includes('locality')
+            )?.long_name;
 
-            if (!provinceComponent) {
-                console.warn('No province found in address components:', response[0].address_components);
+            // If no city found, try administrative_area_level_1 (province)
+            if (!city) {
+                city = response[0].address_components.find(
+                    component => component.types.includes('administrative_area_level_1')
+                )?.long_name;
+            }
+
+            if (!city) {
+                console.warn('No city/province found in address components:', response[0].address_components);
                 return null;
             }
 
-            const province = provinceComponent.long_name;
-            console.log('Found province:', province);
-            return province;
+            // Remove "City" suffix if present
+            city = city.replace(/\s*City\s*$/i, '').trim();
+            console.log('Found city/province:', city);
+            return city;
         } catch (error) {
-            console.error('Error getting province from coordinates:', error);
+            console.error('Error getting city from coordinates:', error);
             return null;
         }
     };
@@ -207,48 +389,61 @@ export default function Page() {
             const luggageTrackingIDs = contracts.map(() => generateLuggageTrackingID());
 
             // Step 1: Determine the city from coordinates
-            let province = null;
+            let city = null;
             if (dropoffAddress.lat && dropoffAddress.lng) {
-                province = await getCityFromCoordinates(dropoffAddress.lat, dropoffAddress.lng);
-                console.log('Determined province:', province);
+                city = await getCityFromCoordinates(dropoffAddress.lat, dropoffAddress.lng);
+                console.log('Determined city:', city);
             } else {
-                console.warn('No coordinates available for province determination');
+                console.warn('No coordinates available for city determination');
             }
 
-            // Step 2: Fetch price for the determined province
+            // Step 2: Fetch price for the determined city
             let deliveryCharge = null;
-            if (province) {
-                // Normalize the province name
-                const normalizedProvince = normalizeProvinceName(province);
-                console.log('Normalized province:', normalizedProvince);
+            if (city) {
+                // Remove "City" suffix if present for database lookup
+                const cleanCity = city.replace(/\s*City\s*$/i, '').trim();
+                console.log('Clean city for lookup:', cleanCity);
                 
                 // Log all available cities in pricing data
                 console.log('Available cities in pricing data:', Object.keys(pricingData));
                 
                 // Try exact match first
-                deliveryCharge = pricingData[normalizedProvince];
+                deliveryCharge = pricingData[cleanCity];
                 
                 // If no exact match, try case-insensitive match
                 if (deliveryCharge === undefined) {
-                    const provinceLower = normalizedProvince.toLowerCase();
-                    const matchingProvince = Object.keys(pricingData).find(
-                        pricingProvince => pricingProvince.toLowerCase() === provinceLower
+                    const cityLower = cleanCity.toLowerCase();
+                    const matchingCity = Object.keys(pricingData).find(
+                        pricingCity => pricingCity.toLowerCase() === cityLower
                     );
-                    if (matchingProvince) {
-                        deliveryCharge = pricingData[matchingProvince];
-                        console.log('Found case-insensitive match:', matchingProvince);
+                    if (matchingCity) {
+                        deliveryCharge = pricingData[matchingCity];
+                        console.log('Found case-insensitive match:', matchingCity);
                     }
                 }
 
-                console.log('Province lookup:', {
-                    original: province,
-                    normalized: normalizedProvince,
+                // If still no match, try partial match
+                if (deliveryCharge === undefined) {
+                    const cityLower = cleanCity.toLowerCase();
+                    const matchingCity = Object.keys(pricingData).find(
+                        pricingCity => pricingCity.toLowerCase().includes(cityLower) || 
+                                     cityLower.includes(pricingCity.toLowerCase())
+                    );
+                    if (matchingCity) {
+                        deliveryCharge = pricingData[matchingCity];
+                        console.log('Found partial match:', matchingCity);
+                    }
+                }
+
+                console.log('City lookup:', {
+                    original: city,
+                    clean: cleanCity,
                     price: deliveryCharge,
                     availableCities: Object.keys(pricingData),
                     pricingData: pricingData
                 });
             } else {
-                console.warn('Could not determine province for price lookup');
+                console.warn('Could not determine city for price lookup');
             }
 
             // Step 3: Calculate total delivery charge based on number of forms
@@ -293,7 +488,8 @@ export default function Page() {
                 flight_number: contract.flightNo,
                 luggage_owner: contract.name, 
                 contact_number: contract.contact, 
-                item_description: contract.itemDescription, 
+                item_description: contract.itemDescription,
+                address: contract.address,
                 weight: contract.weight, 
                 quantity: contract.quantity, 
                 contract_id: contractTrackingID
@@ -310,7 +506,7 @@ export default function Page() {
 
             setSnackbarOpen(true);
             // Reset form
-            setContracts([{ name: "", caseNumber: "", itemDescription: "", contact: "", weight: "", quantity: "", flightNo: "" }]);
+            setContracts([{ name: "", caseNumber: "", itemDescription: "", address: "", contact: "", weight: "", quantity: "", flightNo: "" }]);
             setPickupAddress({ location: "", addressLine1: "", addressLine2: "", province: "", city: "", barangay: "", postalCode: "" });
             setDropoffAddress({ location: null, lat: null, lng: null });
             // Switch to contract list tab and refresh
@@ -413,6 +609,44 @@ export default function Page() {
         { value: 'failed', label: 'Failed' },
         { value: 'cancelled', label: 'Cancelled' }
     ];
+
+    // Function to check if coordinates are within Luzon bounds
+    const isWithinLuzonBounds = (lat, lng) => {
+        return lat >= 12.5 && lat <= 18.5 && lng >= 119.5 && lng <= 122.5;
+    };
+
+    // Add phone number formatting function
+    const formatPhoneNumber = (value) => {
+        // If empty, return empty string
+        if (!value) return '';
+        
+        // Remove all non-digit characters
+        const phoneNumber = value.replace(/\D/g, '');
+        
+        // Only allow up to 10 digits after the country code
+        let trimmedNumber = phoneNumber;
+        if (trimmedNumber.startsWith('63')) {
+            trimmedNumber = trimmedNumber.slice(2);
+        } else if (trimmedNumber.startsWith('0')) {
+            trimmedNumber = trimmedNumber.slice(1);
+        }
+        trimmedNumber = trimmedNumber.slice(0, 10);
+        
+        // Format as +63 XXX XXX XXXX
+        if (trimmedNumber.length === 0) return '+63 ';
+        if (trimmedNumber.length <= 3) return `+63 ${trimmedNumber}`;
+        if (trimmedNumber.length <= 6) return `+63 ${trimmedNumber.slice(0, 3)} ${trimmedNumber.slice(3)}`;
+        return `+63 ${trimmedNumber.slice(0, 3)} ${trimmedNumber.slice(3, 6)} ${trimmedNumber.slice(6)}`;
+    };
+
+    // Add onFocus handler for phone number
+    const handlePhoneFocus = (index) => {
+        const updatedContracts = [...contracts];
+        if (!updatedContracts[index].contact) {
+            updatedContracts[index].contact = '+63';
+            setContracts(updatedContracts);
+        }
+    };
 
     // Render
     return (
@@ -598,22 +832,25 @@ export default function Page() {
                                                             Luggage {lidx + 1}
                                                         </Typography>
                                                         <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
-                                                            Owner: <span style={{ color: 'text.primary' }}>{l.luggage_owner || 'N/A'}</span>
-                                                        </Typography>
-                                                        <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
                                                             Case Number: <span style={{ color: 'text.primary' }}>{l.case_number || 'N/A'}</span>
                                                         </Typography>
                                                         <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
                                                             Flight Number: <span style={{ color: 'text.primary' }}>{l.flight_number || 'N/A'}</span>
                                                         </Typography>
                                                         <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
-                                                            Description: <span style={{ color: 'text.primary' }}>{l.item_description || 'N/A'}</span>
+                                                            Name: <span style={{ color: 'text.primary' }}>{l.luggage_owner || 'N/A'}</span>
+                                                        </Typography>
+                                                        <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                                                            Contact Number: <span style={{ color: 'text.primary' }}>{l.contact_number || 'N/A'}</span>
+                                                        </Typography>
+                                                        <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                                                            Address: <span style={{ color: 'text.primary' }}>{l.address || 'N/A'}</span>
                                                         </Typography>
                                                         <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
                                                             Weight: <span style={{ color: 'text.primary' }}>{l.weight ? `${l.weight} kg` : 'N/A'}</span>
                                                         </Typography>
                                                         <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
-                                                            Contact: <span style={{ color: 'text.primary' }}>{l.contact_number || 'N/A'}</span>
+                                                            Description: <span style={{ color: 'text.primary' }}>{l.item_description || 'N/A'}</span>
                                                         </Typography>
                                                     </Box>
                                                 ))}
@@ -735,12 +972,25 @@ export default function Page() {
                             <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mb: 2 }}>
                                 <TextField label="Name" fullWidth size="small" value={contract.name} onChange={(e) => handleInputChange(index, "name", e.target.value)} required />
                                 <TextField label="Item Description" fullWidth size="small" value={contract.itemDescription} onChange={(e) => handleInputChange(index, "itemDescription", e.target.value)} required />
+                                <TextField label="Address" fullWidth size="small" value={contract.address} onChange={(e) => handleInputChange(index, "address", e.target.value)} required />
                                 <Box sx={{ display: 'flex', gap: 2, width: '100%' }}>
                                     <TextField label="Case Number" fullWidth size="small" value={contract.caseNumber} onChange={(e) => handleInputChange(index, "caseNumber", e.target.value)} required sx={{ width: '50%' }} />
                                     <TextField label="Flight No." fullWidth size="small" value={contract.flightNo} onChange={(e) => handleInputChange(index, "flightNo", e.target.value)} required sx={{ width: '50%' }} />
                                 </Box>
                                 <Box sx={{ display: 'flex', gap: 2, width: '100%' }}>
-                                    <TextField label="Contact Number" fullWidth size="small" value={contract.contact} onChange={(e) => handleInputChange(index, "contact", e.target.value)} required />
+                                    <TextField 
+                                        label="Contact Number" 
+                                        fullWidth 
+                                        size="small" 
+                                        value={contract.contact} 
+                                        onChange={(e) => handleInputChange(index, "contact", e.target.value)} 
+                                        onFocus={() => handlePhoneFocus(index)}
+                                        required 
+                                        placeholder="+63 XXX XXX XXXX"
+                                        inputProps={{
+                                            pattern: '^\\+63\\s\\d{3}\\s\\d{3}\\s\\d{4}$'
+                                        }}
+                                    />
                                     <TextField label="Weight (kg)" fullWidth size="small" type="number" value={contract.weight} onChange={(e) => handleInputChange(index, "weight", e.target.value)} required />
                                     <TextField label="Luggage Quantity" fullWidth size="small" type="number" value={contract.quantity} onChange={(e) => handleInputChange(index, "quantity", e.target.value)} required />
                                 </Box>
@@ -753,7 +1003,19 @@ export default function Page() {
                     <Box sx={{ display: "flex", justifyContent: "center", mt: 4, gap: 2 }}><Button variant="outlined" onClick={addContract}>Add Another Form</Button><Button variant="contained" onClick={handleSubmit}>Create Booking</Button></Box>
                     <Box sx={{ textAlign: "center", mt: 6 }}><Typography variant="h6" fontWeight="bold">Partnered with:</Typography><Box sx={{ display: "flex", justifyContent: "center", gap: 4, mt: 2 }}><Image src="/brand-3.png" alt="AirAsia" width={60} height={60} /></Box></Box>
                 </Box>)}
-                <Snackbar open={snackbarOpen} autoHideDuration={4000} onClose={() => setSnackbarOpen(false)} message="Booking Complete" anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }} />
+                <Snackbar 
+                    open={snackbarOpen} 
+                    autoHideDuration={4000} 
+                    onClose={() => setSnackbarOpen(false)} 
+                    message={snackbarMessage}
+                    anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+                    sx={{
+                        '& .MuiSnackbarContent-root': {
+                            backgroundColor: theme.palette.error.main,
+                            color: theme.palette.error.contrastText
+                        }
+                    }}
+                />
             </>)}
         </Box>
     );

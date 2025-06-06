@@ -47,7 +47,7 @@ Font.register({
 const formatDate = (date) => date ? new Date(date).toISOString().split('T')[0] : '';
 
 // PDF Receipt component
-const ReceiptPDF = ({ contracts = [], dateRange, invoiceImage }) => {
+const ReceiptPDF = ({ contracts = [], dateRange }) => {
     // Ensure contracts is always an array and has valid data
     const safeContracts = React.useMemo(() => {
         if (!Array.isArray(contracts)) return [];
@@ -91,86 +91,60 @@ const ReceiptPDF = ({ contracts = [], dateRange, invoiceImage }) => {
 
     return (
         <Document>
-            {/* Invoice Image Page */}
-            {invoiceImage && (
-                <PDFPage size="A4" style={{ padding: 24 }}>
-                    <View style={{
-                        width: '100%',
-                        height: '100%',
-                        position: 'relative',
-                        overflow: 'hidden',
-                        border: '1px solid #000'
-                    }}>
-                        <Image
-                            src={invoiceImage}
-                            style={{
-                                position: 'absolute',
-                                top: 0,
-                                left: 0,
-                                width: '100%',
-                                height: '100%',
-                                objectFit: 'contain',
-                                objectPosition: 'center'
-                            }}
-                        />
-                    </View>
-                </PDFPage>
-            )}
-            {/* Receipt Page */}
-            <PDFPage size="A4" style={{ padding: 24, fontSize: 10, fontFamily: 'Roboto' }}>
-                <View style={{ alignItems: 'center', marginBottom: 8 }}>
+            <PDFPage size="A4" style={{ padding: 12, fontSize: 10, fontFamily: 'Roboto' }}>
+                <View style={{ alignItems: 'center', marginBottom: 4 }}>
                     <Text style={{ fontSize: 16, fontWeight: 'bold' }}>GHE TRANSMITTAL - AIRPORT CLIENTS PROPERTY IRREGULARITY SUMMARY REPORT</Text>
-                    <Text style={{ fontSize: 14, marginTop: 4 }}>{dateRange || 'No date range specified'}</Text>
+                    <Text style={{ fontSize: 14, marginTop: 2 }}>{dateRange || 'No date range specified'}</Text>
                 </View>
-                <View style={{ borderWidth: 1, borderColor: '#000', marginBottom: 8 }}>
+                <View style={{ borderWidth: 1, borderColor: '#000', marginBottom: 4 }}>
                     <View style={{ flexDirection: 'row', backgroundColor: '#eee', borderBottomWidth: 1, borderColor: '#000' }}>
-                        <Text style={{ flex: 0.5, fontWeight: 'bold', padding: 4 }}>No.</Text>
-                        <Text style={{ flex: 1, fontWeight: 'bold', padding: 4 }}>Tracking ID</Text>
-                        <Text style={{ flex: 2, fontWeight: 'bold', padding: 4 }}>Luggage Owner</Text>
-                        <Text style={{ flex: 1, fontWeight: 'bold', padding: 4 }}>Flight No.</Text>
-                        <Text style={{ flex: 3, fontWeight: 'bold', padding: 4 }}>Address</Text>
-                        <Text style={{ flex: 2, fontWeight: 'bold', padding: 4 }}>Date Received</Text>
-                        <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 4 }}>Status</Text>
-                        <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 4 }}>Amount</Text>
-                        <Text style={{ flex: 1, fontWeight: 'bold', padding: 4 }}>Remarks</Text>
+                        <Text style={{ flex: 0.5, fontWeight: 'bold', padding: 2 }}>No.</Text>
+                        <Text style={{ flex: 1, fontWeight: 'bold', padding: 2 }}>Tracking ID</Text>
+                        <Text style={{ flex: 2, fontWeight: 'bold', padding: 2 }}>Luggage Owner</Text>
+                        <Text style={{ flex: 1, fontWeight: 'bold', padding: 2 }}>Flight No.</Text>
+                        <Text style={{ flex: 3, fontWeight: 'bold', padding: 2 }}>Address</Text>
+                        <Text style={{ flex: 2, fontWeight: 'bold', padding: 2 }}>Date Received</Text>
+                        <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 2 }}>Status</Text>
+                        <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 2 }}>Amount</Text>
+                        <Text style={{ flex: 1, fontWeight: 'bold', padding: 2 }}>Remarks</Text>
                     </View>
                     {safeContracts.map((c, idx) => (
                         <View key={c.id || idx} style={{ flexDirection: 'row', borderBottomWidth: 1, borderColor: '#000' }}>
-                            <Text style={{ flex: 0.5, padding: 4 }}>{idx + 1}</Text>
-                            <Text style={{ flex: 1, padding: 4 }}>{c.id}</Text>
-                            <Text style={{ flex: 2, padding: 4 }}>{c.luggage?.[0]?.luggage_owner || 'N/A'}</Text>
-                            <Text style={{ flex: 1, padding: 4 }}>{c.luggage?.[0]?.flight_number || 'N/A'}</Text>
-                            <Text style={{ flex: 3, padding: 4 }}>{c.drop_off_location || 'N/A'}</Text>
-                            <Text style={{ flex: 2, padding: 4 }}>{formatDate(c.delivered_at || c.created_at)}</Text>
-                            <Text style={{ flex: 1.5, padding: 4 }}>{c.contract_status?.status_name || 'N/A'}</Text>
-                            <Text style={{ flex: 1.5, padding: 4, fontFamily: 'Roboto' }}>{'\u20B1\u00A0'}{getRowAmount(c).toFixed(2)}</Text>
-                            <Text style={{ flex: 1, padding: 4 }}>{c.contract_status?.status_name === 'Delivery Failed' ? 'Delivery Failed' : ''}</Text>
+                            <Text style={{ flex: 0.5, padding: 2 }}>{idx + 1}</Text>
+                            <Text style={{ flex: 1, padding: 2 }}>{c.id}</Text>
+                            <Text style={{ flex: 2, padding: 2 }}>{c.luggage?.[0]?.luggage_owner || 'N/A'}</Text>
+                            <Text style={{ flex: 1, padding: 2 }}>{c.luggage?.[0]?.flight_number || 'N/A'}</Text>
+                            <Text style={{ flex: 3, padding: 2 }}>{c.drop_off_location || 'N/A'}</Text>
+                            <Text style={{ flex: 2, padding: 2 }}>{formatDate(c.delivered_at || c.created_at)}</Text>
+                            <Text style={{ flex: 1.5, padding: 2 }}>{c.contract_status?.status_name || 'N/A'}</Text>
+                            <Text style={{ flex: 1.5, padding: 2, fontFamily: 'Roboto' }}>{'\u20B1\u00A0'}{getRowAmount(c).toFixed(2)}</Text>
+                            <Text style={{ flex: 1, padding: 2 }}>{c.contract_status?.status_name === 'Delivery Failed' ? 'Delivery Failed' : ''}</Text>
                         </View>
                     ))}
                     <View style={{ flexDirection: 'row', borderTopWidth: 1, borderColor: '#000', backgroundColor: '#f7f7f7' }}>
-                        <Text style={{ flex: 7.5, fontWeight: 'bold', padding: 4, textAlign: 'right' }}>Subtotal:</Text>
-                        <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 4, fontFamily: 'Roboto' }}>{'\u20B1\u00A0'}{subtotal.toFixed(2)}</Text>
+                        <Text style={{ flex: 7.5, fontWeight: 'bold', padding: 2, textAlign: 'right' }}>Subtotal:</Text>
+                        <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 2, fontFamily: 'Roboto' }}>{'\u20B1\u00A0'}{subtotal.toFixed(2)}</Text>
                         <Text style={{ flex: 2 }}></Text>
                     </View>
                     <View style={{ flexDirection: 'row', borderTopWidth: 1, borderColor: '#000', backgroundColor: '#f7f7f7' }}>
-                        <Text style={{ flex: 7.5, fontWeight: 'bold', padding: 4, textAlign: 'right' }}>Surcharge Total:</Text>
-                        <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 4, fontFamily: 'Roboto' }}>{'\u20B1\u00A0'}{surchargeTotal.toFixed(2)}</Text>
+                        <Text style={{ flex: 7.5, fontWeight: 'bold', padding: 2, textAlign: 'right' }}>Surcharge Total:</Text>
+                        <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 2, fontFamily: 'Roboto' }}>{'\u20B1\u00A0'}{surchargeTotal.toFixed(2)}</Text>
                         <Text style={{ flex: 2 }}></Text>
                     </View>
                     <View style={{ flexDirection: 'row', borderTopWidth: 1, borderColor: '#000', backgroundColor: '#f7f7f7' }}>
-                        <Text style={{ flex: 7.5, fontWeight: 'bold', padding: 4, textAlign: 'right' }}>Discount (Average):</Text>
-                        <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 4, fontFamily: 'Roboto' }}>{discountAvg.toFixed(2)}%</Text>
+                        <Text style={{ flex: 7.5, fontWeight: 'bold', padding: 2, textAlign: 'right' }}>Discount (Average):</Text>
+                        <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 2, fontFamily: 'Roboto' }}>{discountAvg.toFixed(2)}%</Text>
                         <Text style={{ flex: 2 }}></Text>
                     </View>
                     <View style={{ flexDirection: 'row', borderTopWidth: 2, borderColor: '#000', backgroundColor: '#eee' }}>
-                        <Text style={{ flex: 9.5, fontWeight: 'bold', padding: 4, textAlign: 'right' }}>TOTAL</Text>
-                        <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 4, fontFamily: 'Roboto' }}>{'\u20B1\u00A0'}{totalAmount.toFixed(2)}</Text>
+                        <Text style={{ flex: 9.5, fontWeight: 'bold', padding: 2, textAlign: 'right' }}>TOTAL</Text>
+                        <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 2, fontFamily: 'Roboto' }}>{'\u20B1\u00A0'}{totalAmount.toFixed(2)}</Text>
                     </View>
                 </View>
-                <View style={{ flexDirection: 'row', marginTop: 24, justifyContent: 'space-between' }}>
+                <View style={{ flexDirection: 'row', marginTop: 12, justifyContent: 'space-between' }}>
                     <View>
                         <Text>Received by: _______________, Date: _______________</Text>
-                        <Text style={{ fontWeight: 'bold', marginTop: 8 }}>AIRLINE'S REPRESENTATIVE</Text>
+                        <Text style={{ fontWeight: 'bold', marginTop: 4 }}>AIRLINE'S REPRESENTATIVE</Text>
                     </View>
                     <View style={{ alignItems: 'flex-end' }}>
                         <Text>GENERATED ON: {formatDate(new Date().toISOString())}</Text>
@@ -218,18 +192,12 @@ const TransactionManagement = () => {
     const [discountError, setDiscountError] = useState('');
     const [discountContract, setDiscountContract] = useState(null);
     const [shouldRenderPDF, setShouldRenderPDF] = useState(false);
-    const [invoiceDialogOpen, setInvoiceDialogOpen] = useState(false);
-    const [invoiceNumber, setInvoiceNumber] = useState('');
-    const [invoiceImage, setInvoiceImage] = useState(null);
-    const [invoiceError, setInvoiceError] = useState('');
     const [snackbar, setSnackbar] = useState({
         open: false,
         message: '',
         severity: 'success'
     });
-    const [pdfInvoiceImage, setPdfInvoiceImage] = useState(null);
-    const pdfDownloadRef = useRef(null);
-    const [pdfDownloadDialogOpen, setPdfDownloadDialogOpen] = useState(false);
+    const [pdfDownloadRef, setPdfDownloadRef] = useState(null);
     const [pricingTable, setPricingTable] = useState([]);
     const [loadingPricingTable, setLoadingPricingTable] = useState(true);
     const [pricingPage, setPricingPage] = useState(0);
@@ -497,7 +465,7 @@ const TransactionManagement = () => {
             const selectedContracts = data.filter(row => selectedRows.includes(row.id));
             return selectedContracts.filter(contract => {
                 const status = contract.contract_status?.status_name?.toLowerCase() || '';
-                return ['delivered', 'delivery failed'].includes(status);
+                return status !== 'cancelled';
             });
         } catch (error) {
             console.error('Error getting selected contracts:', error);
@@ -521,191 +489,18 @@ const TransactionManagement = () => {
         setPage(0); // Reset to first page when month changes
     };
 
-    // Add new handlers for invoice dialog
-    const handleInvoiceDialogOpen = () => {
-        setInvoiceDialogOpen(true);
-        setInvoiceNumber('');
-        setInvoiceImage(null);
-        setInvoiceError('');
-    };
-
-    const handleInvoiceDialogClose = () => {
-        setInvoiceDialogOpen(false);
-        setInvoiceNumber('');
-        setInvoiceImage(null);
-        setInvoiceError('');
-    };
-
-    const handleInvoiceNumberChange = (e) => {
-        const value = e.target.value.replace(/[^0-9]/g, '').slice(0, 4);
-        setInvoiceNumber(value);
-        setInvoiceError('');
-    };
-
-    const handleInvoiceImageChange = (e) => {
-        const file = e.target.files[0];
-        if (file && file.type.startsWith('image/')) {
-            setInvoiceImage(file);
-            setInvoiceError('');
-        } else {
-            setInvoiceError('Please upload a valid image file');
-        }
-    };
-
-    const handleSnackbarClose = () => {
-        setSnackbar(prev => ({ ...prev, open: false }));
-    };
-
-    const handleInvoiceSubmit = async () => {
-        if (!invoiceNumber || invoiceNumber.length !== 4) {
-            setInvoiceError('Please enter a valid 4-digit invoice number');
-            return;
-        }
-        if (!invoiceImage) {
-            setInvoiceError('Please upload an invoice image');
-            return;
-        }
-
-        try {
-            // Calculate total amount for all selected contracts
-            const selectedContracts = getSelectedContracts();
-            console.log('Selected contracts:', selectedContracts);
-
-            if (selectedContracts.length === 0) {
-                setSnackbar({
-                    open: true,
-                    message: 'Please select at least one delivered or delivery failed contract',
-                    severity: 'warning'
-                });
-                return;
-            }
-
-            const totalAmount = selectedContracts.reduce((sum, contract) => {
-                const delivery_charge = Number(contract.delivery_charge) || 0;
-                const surcharge = Number(contract.surcharge) || 0;
-                const discount = Number(contract.discount) || 0;
-                const contractTotal = (delivery_charge + surcharge) * (1 - discount / 100);
-                console.log('Contract calculation:', {
-                    id: contract.id,
-                    delivery_charge,
-                    surcharge,
-                    discount,
-                    contractTotal
-                });
-                return sum + contractTotal;
-            }, 0);
-
-            console.log('Total amount calculated:', totalAmount);
-
-            if (isNaN(totalAmount) || totalAmount <= 0) {
-                setSnackbar({
-                    open: true,
-                    message: 'Invalid total amount calculated. Please check the contract amounts.',
-                    severity: 'error'
-                });
-                return;
-            }
-
-            // Upload invoice image to Supabase storage
-            const formData = new FormData();
-            formData.append('file', invoiceImage);
-            formData.append('bucket', 'invoices');
-            formData.append('path', `${format(new Date(), 'yyyy')}${invoiceNumber.padStart(4, '0')}.${invoiceImage.name.split('.').pop()}`);
-
-            console.log('Uploading file:', {
-                fileName: invoiceImage.name,
-                fileType: invoiceImage.type,
-                fileSize: invoiceImage.size
-            });
-
-            const uploadRes = await fetch('/api/admin', {
-                method: 'POST',
-                body: formData
-            });
-
-            if (!uploadRes.ok) {
-                const errorData = await uploadRes.json();
-                throw new Error(errorData.error || 'Failed to upload invoice image');
-            }
-
-            const { signedUrl } = await uploadRes.json();
-
-            if (!signedUrl) {
-                throw new Error('No signed URL received from upload');
-            }
-
-            // Create payment record
-            const paymentData = {
-                action: 'createPayment',
-                params: {
-                    invoice_number: `${format(new Date(), 'yyyy')}${invoiceNumber.padStart(4, '0')}`,
-                    payment_status_id: 1, // Unpaid
-                    created_at: new Date().toISOString(),
-                    due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days from now
-                    total_charge: Number(totalAmount.toFixed(2)), // Ensure it's a number with 2 decimal places
-                    invoice_image: signedUrl
-                }
-            };
-
-            // Validate all required fields are present
-            const requiredFields = ['invoice_number', 'payment_status_id', 'created_at', 'due_date', 'total_charge', 'invoice_image'];
-            const missingFields = requiredFields.filter(field => !paymentData.params[field]);
-            
-            if (missingFields.length > 0) {
-                console.error('Payment data validation failed:', {
-                    paymentData,
-                    missingFields,
-                    totalAmount
-                });
-                throw new Error(`Missing required fields: ${missingFields.join(', ')}`);
-            }
-
-            console.log('Creating payment with data:', paymentData);
-
-            const paymentRes = await fetch('/api/admin', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(paymentData)
-            });
-
-            const paymentResult = await paymentRes.json();
-
-            if (!paymentRes.ok) {
-                throw new Error(paymentResult.error || 'Failed to create payment record');
-            }
-
-            // Set the invoice image for PDF generation
-            setPdfInvoiceImage(signedUrl);
-            setShouldRenderPDF(true);
-            handleInvoiceDialogClose();
-            setSnackbar({
-                open: true,
-                message: 'Payment record created successfully',
-                severity: 'success'
-            });
-
-            // Show PDF download dialog
-            setPdfDownloadDialogOpen(true);
-
-        } catch (error) {
-            console.error('Error in handleInvoiceSubmit:', error);
-            setInvoiceError(error.message || 'Failed to process invoice');
-            setSnackbar({
-                open: true,
-                message: error.message || 'Failed to process invoice',
-                severity: 'error'
-            });
-        }
-    };
-
-    const handlePdfDownloadDialogClose = () => {
-        setPdfDownloadDialogOpen(false);
-        window.location.reload();
-    };
-
     // Modify the existing PDF button click handler
     const handlePDFButtonClick = () => {
-        handleInvoiceDialogOpen();
+        const contracts = getSelectedContracts();
+        if (contracts.length === 0) {
+            setSnackbar({
+                open: true,
+                message: 'Please select at least one delivered or delivery failed contract',
+                severity: 'warning'
+            });
+            return;
+        }
+        setShouldRenderPDF(true);
     };
 
     const handleTabChange = (event, newValue) => {
@@ -899,13 +694,18 @@ const TransactionManagement = () => {
                                     document={<ReceiptPDF 
                                         contracts={getSelectedContracts()} 
                                         dateRange={handleGeneratePDF()} 
-                                        invoiceImage={pdfInvoiceImage}
                                     />}
                                     fileName={`GHE-Transmittal-Report-${format(selectedMonth, 'MMMM-yyyy')}.pdf`}
-                                    ref={pdfDownloadRef}
-                                    style={{ display: 'none' }}
                                 >
-                                    {({ loading, error }) => loading ? 'Generating PDF...' : error ? 'Error generating PDF' : 'Download PDF'}
+                                    {({ loading, error }) => (
+                                        <Button 
+                                            variant="contained" 
+                                            color="secondary"
+                                            disabled={loading || error}
+                                        >
+                                            {loading ? 'Generating PDF...' : error ? 'Error generating PDF' : 'Download PDF Receipt'}
+                                        </Button>
+                                    )}
                                 </PDFDownloadLink>
                             ) : (
                                 <Button 
@@ -1208,122 +1008,19 @@ const TransactionManagement = () => {
                     <Button onClick={handleDiscountSubmit} color="primary" disabled={discountLoading || discountValue === ''}>{discountLoading ? 'Saving...' : 'Save'}</Button>
                 </DialogActions>
             </Dialog>
-            <Dialog open={invoiceDialogOpen} onClose={handleInvoiceDialogClose} maxWidth="sm" fullWidth>
-                <DialogTitle>Assign Invoice Number</DialogTitle>
-                <DialogContent dividers>
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
-                        <TextField
-                            label="Invoice Number"
-                            value={invoiceNumber}
-                            onChange={handleInvoiceNumberChange}
-                            inputProps={{ maxLength: 4 }}
-                            fullWidth
-                            error={!!invoiceError && !invoiceNumber}
-                            helperText={invoiceError && !invoiceNumber ? invoiceError : ''}
-                        />
-                        <Typography variant="body2" color="text.secondary">
-                            Full Invoice Number: {format(new Date(), 'yyyy')}{invoiceNumber.padStart(4, '0')}
-                        </Typography>
-                        <Box sx={{ mt: 2 }}>
-                            <Typography variant="subtitle2" gutterBottom>
-                                Upload Invoice Image
-                            </Typography>
-                            <input
-                                accept="image/*"
-                                type="file"
-                                onChange={handleInvoiceImageChange}
-                                style={{ display: 'none' }}
-                                id="invoice-image-upload"
-                            />
-                            <label htmlFor="invoice-image-upload">
-                                <Button
-                                    variant="outlined"
-                                    component="span"
-                                    fullWidth
-                                    sx={{ mb: 1 }}
-                                >
-                                    {invoiceImage ? 'Change Image' : 'Upload Image'}
-                                </Button>
-                            </label>
-                            {invoiceImage && (
-                                <Typography variant="body2" color="text.secondary">
-                                    Selected: {invoiceImage.name}
-                                </Typography>
-                            )}
-                            {invoiceError && !invoiceImage && (
-                                <Typography variant="body2" color="error">
-                                    {invoiceError}
-                                </Typography>
-                            )}
-                        </Box>
-                    </Box>
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={handleInvoiceDialogClose}>Cancel</Button>
-                    <Button 
-                        onClick={handleInvoiceSubmit}
-                        variant="contained"
-                        color="primary"
-                    >
-                        Generate
-                    </Button>
-                </DialogActions>
-            </Dialog>
             <Snackbar 
                 open={snackbar.open} 
                 autoHideDuration={6000} 
-                onClose={handleSnackbarClose}
+                onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}
                 anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
             >
                 <Alert 
-                    onClose={handleSnackbarClose} 
                     severity={snackbar.severity}
                     sx={{ width: '100%' }}
                 >
                     {snackbar.message}
                 </Alert>
             </Snackbar>
-            <Dialog 
-                open={pdfDownloadDialogOpen} 
-                onClose={handlePdfDownloadDialogClose}
-                maxWidth="sm"
-                fullWidth
-            >
-                <DialogTitle>Download PDF Receipt</DialogTitle>
-                <DialogContent dividers>
-                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, py: 2 }}>
-                        <Typography variant="body1" align="center">
-                            Your payment has been created successfully. Would you like to download the PDF receipt now?
-                        </Typography>
-                        {shouldRenderPDF && (
-                            <PDFDownloadLink 
-                                document={<ReceiptPDF 
-                                    contracts={getSelectedContracts()} 
-                                    dateRange={handleGeneratePDF()} 
-                                    invoiceImage={pdfInvoiceImage}
-                                />}
-                                fileName={`GHE-Transmittal-Report-${format(selectedMonth, 'MMMM-yyyy')}.pdf`}
-                            >
-                                {({ loading, error }) => (
-                                    <Button 
-                                        variant="contained" 
-                                        color="primary"
-                                        disabled={loading || error}
-                                        size="large"
-                                    >
-                                        {loading ? 'Generating PDF...' : error ? 'Error generating PDF' : 'Download PDF Receipt'}
-                                    </Button>
-                                )}
-                            </PDFDownloadLink>
-                        )}
-                    </Box>
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={handlePdfDownloadDialogClose} color="primary">
-                        Close
-                    </Button>
-                </DialogActions>
-            </Dialog>
             {/* Add the Edit Price Dialog */}
             <Dialog 
                 open={editPriceDialogOpen} 
