@@ -17,6 +17,7 @@ import LogoutIcon from '@mui/icons-material/Logout';
 import DarkModeIcon from '@mui/icons-material/DarkMode';
 import LightModeIcon from '@mui/icons-material/LightMode';
 import MenuIcon from '@mui/icons-material/Menu';
+import HistoryIcon from '@mui/icons-material/History';
 import { ColorModeContext } from "../../layout";
 import { useTheme } from "@mui/material/styles";
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
@@ -133,6 +134,11 @@ export default function Page() {
                     <ListItemButton onClick={() => handleNavigation("/egc-admin/chat-support")} sx={listItemStyles("/egc-admin/chat-support")}>
                         <ListItemIcon><SupportAgentIcon sx={iconStyles("/egc-admin/chat-support")} /></ListItemIcon>
                         {!isMinimized && <ListItemText primary="Chat Support" />}
+                    </ListItemButton>
+
+                    <ListItemButton onClick={() => handleNavigation("/egc-admin/logs")} sx={listItemStyles("/egc-admin/logs")}>
+                        <ListItemIcon><HistoryIcon sx={iconStyles("/egc-admin/logs")} /></ListItemIcon>
+                        {!isMinimized && <ListItemText primary="System Logs" />}
                     </ListItemButton>
 
                     {/* <ListItemButton onClick={() => handleNavigation("/egc-admin/history-and-reports")} sx={listItemStyles("/egc-admin/history-and-reports")}>

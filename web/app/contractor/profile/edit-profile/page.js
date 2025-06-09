@@ -1,6 +1,6 @@
 "use client";
 
-import { Box, Typography, Grid, TextField, MenuItem, InputAdornment, IconButton, Button, useTheme, Snackbar, Alert } from "@mui/material";
+import { Box, Typography, Grid, TextField, MenuItem, InputAdornment, IconButton, Button, useTheme, Snackbar, Alert, Autocomplete } from "@mui/material";
 import UploadIcon from "@mui/icons-material/Upload";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import { useState, useEffect, useRef } from "react";
@@ -22,6 +22,46 @@ export default function Page() {
   const [snackbarMessage, setSnackbarMessage] = useState("");
   const [snackbarSeverity, setSnackbarSeverity] = useState("success");
   const [form, setForm] = useState({ first_name: "", middle_initial: "", last_name: "", suffix: "", contact_number: "", birth_date: "", emergency_contact_name: "", emergency_contact_number: "", gov_id_number: "", gov_id_proof: "", gov_id_proof_back: "" });
+
+  // Suffix options
+  const suffixes = ["", "Jr", "Jr.", "Sr", "Sr.", "II", "III", "IV", "V"];
+
+  // Add phone number formatting function
+  const formatPhoneNumber = (value) => {
+    // If empty, return empty string
+    if (!value) return '';
+    
+    // Remove all non-digit characters
+    const phoneNumber = value.replace(/\D/g, '');
+    
+    // Only allow up to 10 digits after the country code
+    let trimmedNumber = phoneNumber;
+    if (trimmedNumber.startsWith('63')) {
+      trimmedNumber = trimmedNumber.slice(2);
+    } else if (trimmedNumber.startsWith('0')) {
+      trimmedNumber = trimmedNumber.slice(1);
+    }
+    trimmedNumber = trimmedNumber.slice(0, 10);
+    
+    // Format as +63 XXX XXX XXXX
+    if (trimmedNumber.length === 0) return '+63 ';
+    if (trimmedNumber.length <= 3) return `+63 ${trimmedNumber}`;
+    if (trimmedNumber.length <= 6) return `+63 ${trimmedNumber.slice(0, 3)} ${trimmedNumber.slice(3)}`;
+    return `+63 ${trimmedNumber.slice(0, 3)} ${trimmedNumber.slice(3, 6)} ${trimmedNumber.slice(6)}`;
+  };
+
+  // Add onFocus handler for phone number
+  const handlePhoneFocus = () => {
+    if (!form.contact_number) {
+      setForm(prev => ({ ...prev, contact_number: '+63' }));
+    }
+  };
+
+  const handleEmergencyPhoneFocus = () => {
+    if (!form.emergency_contact_number) {
+      setForm(prev => ({ ...prev, emergency_contact_number: '+63' }));
+    }
+  };
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -46,7 +86,22 @@ export default function Page() {
     fetchGovIdTypes();
   }, []);
 
-  const handleChange = (e) => { const { name, value } = e.target; setForm((prev) => ({ ...prev, [name]: value })); };
+  const handleChange = (e) => { 
+    const { name, value } = e.target; 
+    if (name === 'middle_initial') {
+      // Only allow a single letter
+      const singleLetter = value.slice(0, 1).toUpperCase();
+      if (singleLetter.match(/^[A-Z]$/) || singleLetter === '') {
+        setForm(prev => ({ ...prev, [name]: singleLetter }));
+      }
+    } else if (name === 'contact_number' || name === 'emergency_contact_number') {
+      // Handle phone number formatting
+      const formatted = formatPhoneNumber(value);
+      setForm(prev => ({ ...prev, [name]: formatted }));
+    } else {
+      setForm(prev => ({ ...prev, [name]: value }));
+    }
+  };
   const handleKeyPress = (event) => { if (event.key === 'Enter') handleSave(); };
   const handleClear = () => window.location.reload();
   const triggerFileInput = (type) => type === 'front' ? fileInputRef.current?.click() : fileInputBackRef.current?.click();
@@ -130,18 +185,41 @@ export default function Page() {
       <form onSubmit={(e) => { e.preventDefault(); handleSave(); }}>
         <Typography variant="h6" fontWeight="bold" mb={2} color="primary">Personal Information</Typography>
         <Grid container spacing={2} mb={4}>
-          <Grid item xs={12} sm={4}><TextField fullWidth sx={formStyles} label="First Name" name="first_name" value={form.first_name} onChange={handleChange} required onKeyPress={handleKeyPress} /></Grid>
-          <Grid item xs={12} sm={4}><TextField fullWidth sx={formStyles} label="Middle Name" name="middle_initial" value={form.middle_initial} onChange={handleChange} required onKeyPress={handleKeyPress} /></Grid>
-          <Grid item xs={12} sm={4}><TextField fullWidth sx={formStyles} label="Last Name" name="last_name" value={form.last_name} onChange={handleChange} required onKeyPress={handleKeyPress} /></Grid>
-          <Grid item xs={12} sm={4}><TextField fullWidth sx={formStyles} label="Suffix" name="suffix" value={form.suffix} onChange={handleChange} placeholder="Jr., Sr., III, etc." onKeyPress={handleKeyPress} /></Grid>
-          <Grid item xs={12} sm={6}><TextField fullWidth sx={formStyles} label="Contact Number" name="contact_number" value={form.contact_number} onChange={handleChange} placeholder="+63 XXX XXX XXXX" required onKeyPress={handleKeyPress} /></Grid>
+          <Grid item xs={12} sm={4}><TextField fullWidth sx={formStyles} label="First Name" name="first_name" value={form.first_name} onChange={handleChange} required onKeyPress={handleKeyPress} inputProps={{ minLength: 2, maxLength: 50 }} /></Grid>
+          <Grid item xs={12} sm={4}><TextField fullWidth sx={formStyles} label="Middle Initial" name="middle_initial" value={form.middle_initial} onChange={handleChange} required onKeyPress={handleKeyPress} inputProps={{ maxLength: 1 }} placeholder="A" /></Grid>
+          <Grid item xs={12} sm={4}><TextField fullWidth sx={formStyles} label="Last Name" name="last_name" value={form.last_name} onChange={handleChange} required onKeyPress={handleKeyPress} inputProps={{ minLength: 2, maxLength: 50 }} /></Grid>
+          <Grid item xs={12} sm={4}>
+            <Autocomplete
+              freeSolo
+              options={suffixes}
+              value={form.suffix}
+              onChange={(event, newValue) => {
+                setForm(prev => ({ ...prev, suffix: newValue || "" }));
+              }}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  fullWidth
+                  sx={formStyles}
+                  label="Suffix"
+                  name="suffix"
+                  onKeyPress={handleKeyPress}
+                  inputProps={{
+                    ...params.inputProps,
+                    maxLength: 5
+                  }}
+                />
+              )}
+            />
+          </Grid>
+          <Grid item xs={12} sm={6}><TextField fullWidth sx={formStyles} label="Contact Number" name="contact_number" value={form.contact_number} onChange={handleChange} placeholder="+63 XXX XXX XXXX" required onKeyPress={handleKeyPress} onFocus={handlePhoneFocus} inputProps={{ pattern: '^\\+63\\s\\d{3}\\s\\d{3}\\s\\d{4}$' }} /></Grid>
           <Grid item xs={12} sm={6}><TextField fullWidth sx={formStyles} label="Date of Birth" name="birth_date" value={form.birth_date} onChange={handleChange} type="date" InputLabelProps={{ shrink: true }} required onKeyPress={handleKeyPress} /></Grid>
         </Grid>
 
         <Typography variant="h6" fontWeight="bold" mb={2} color="primary">Emergency Contact</Typography>
         <Grid container spacing={2} mb={4}>
-          <Grid item xs={12} sm={6}><TextField fullWidth sx={formStyles} label="Emergency Contact Name" name="emergency_contact_name" value={form.emergency_contact_name} onChange={handleChange} required onKeyPress={handleKeyPress} /></Grid>
-          <Grid item xs={12} sm={6}><TextField fullWidth sx={formStyles} label="Contact Number" name="emergency_contact_number" value={form.emergency_contact_number} onChange={handleChange} required onKeyPress={handleKeyPress} /></Grid>
+          <Grid item xs={12} sm={6}><TextField fullWidth sx={formStyles} label="Emergency Contact Name" name="emergency_contact_name" value={form.emergency_contact_name} onChange={handleChange} required onKeyPress={handleKeyPress} inputProps={{ minLength: 2, maxLength: 100 }} /></Grid>
+          <Grid item xs={12} sm={6}><TextField fullWidth sx={formStyles} label="Contact Number" name="emergency_contact_number" value={form.emergency_contact_number} onChange={handleChange} required onKeyPress={handleKeyPress} onFocus={handleEmergencyPhoneFocus} placeholder="+63 XXX XXX XXXX" inputProps={{ pattern: '^\\+63\\s\\d{3}\\s\\d{3}\\s\\d{4}$' }} /></Grid>
         </Grid>
 
         <Typography variant="h6" fontWeight="bold" mb={2} color="primary">Identification & Verification</Typography>
@@ -151,7 +229,7 @@ export default function Page() {
               {govIdTypes.map((type) => <MenuItem key={type.id} value={String(type.id)}>{type.id_type_name}</MenuItem>)}
             </TextField>
           </Grid>
-          <Grid item xs={12} sm={6}><TextField fullWidth sx={formStyles} label="Government ID Number" name="gov_id_number" value={form.gov_id_number} onChange={handleChange} onKeyPress={handleKeyPress} /></Grid>
+          <Grid item xs={12} sm={6}><TextField fullWidth sx={formStyles} label="Government ID Number" name="gov_id_number" value={form.gov_id_number} onChange={handleChange} onKeyPress={handleKeyPress} inputProps={{ minLength: 5, maxLength: 20 }} /></Grid>
           <Grid item xs={12} sm={6}>
             <input type="file" ref={fileInputRef} onChange={(e) => handleFileUpload(e, 'front')} style={fileInputStyles} accept="image/*" />
             <TextField fullWidth sx={formStyles} label="Upload Government ID (Front)" value={form.gov_id_proof ? 'Image uploaded' : ''} InputProps={{ endAdornment: <InputAdornment position="end"><IconButton onClick={() => triggerFileInput('front')} disabled={uploading}><UploadIcon /></IconButton></InputAdornment>, readOnly: true }} onKeyPress={handleKeyPress} />

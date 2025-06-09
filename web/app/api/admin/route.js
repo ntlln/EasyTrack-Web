@@ -18,6 +18,70 @@ export async function GET(request) {
       }
     );
 
+    // Handle logs request
+    if (action === 'logs') {
+      try {
+        const page = parseInt(searchParams.get('page') || '1');
+        const per_page = parseInt(searchParams.get('per_page') || '10');
+        const search = searchParams.get('search') || '';
+        const type = searchParams.get('type') || 'all';
+
+        // Get project ref from env or URL
+        const projectRef = process.env.NEXT_PUBLIC_SUPABASE_URL?.split('https://')[1]?.split('.')[0];
+        if (!projectRef) throw new Error('Project ref not found in NEXT_PUBLIC_SUPABASE_URL');
+
+        // Debug logging
+        console.log('ProjectRef:', projectRef);
+        console.log('ServiceRoleKey:', process.env.SUPABASE_SERVICE_ROLE_KEY?.slice(0, 8) + '...');
+
+        // Build query params for the platform API
+        const params = new URLSearchParams({
+          source: 'postgres',
+          limit: per_page.toString(),
+          offset: ((page - 1) * per_page).toString(),
+        });
+        if (search) params.append('search', search);
+        if (type !== 'all') params.append('event_message', type);
+
+        const platformUrl = `https://api.supabase.com/v1/projects/${projectRef}/logs?${params.toString()}`;
+
+        // Debug logging
+        console.log('Platform URL:', platformUrl);
+
+        const response = await fetch(platformUrl, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
+            'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('Supabase Platform Logs API error:', {
+            status: response.status,
+            statusText: response.statusText,
+            error: errorText
+          });
+          throw new Error(`Failed to fetch logs: ${response.status} ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        // data.result is the array of logs, data.count is the total
+        return NextResponse.json({
+          logs: data.result || [],
+          total: data.count || 0
+        });
+      } catch (error) {
+        console.error('Error in logs handler:', error);
+        return NextResponse.json(
+          { error: error.message || 'Failed to fetch logs' },
+          { status: 500 }
+        );
+      }
+    }
+
     // Handle contract location request
     if (contractId) {
       const { data, error } = await supabase
@@ -196,6 +260,46 @@ export async function POST(request) {
         }
       }
     );
+
+    // Handle logs request
+    if (action === 'logs') {
+      const { page = 1, per_page = 10, search, type } = params;
+
+      // Fetch logs from Supabase Postgres
+      const { data: logs, error } = await supabase
+        .from('pg_stat_activity')
+        .select('*')
+        .order('query_start', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching Postgres logs:', error);
+        throw new Error(`Failed to fetch logs: ${error.message}`);
+      }
+
+      console.log('Received logs:', { count: logs?.length || 0 });
+
+      // Filter logs based on search term and type
+      let filteredLogs = logs || [];
+      if (search) {
+        const searchLower = search.toLowerCase();
+        filteredLogs = logs.filter(log => 
+          JSON.stringify(log).toLowerCase().includes(searchLower)
+        );
+      }
+      if (type !== 'all') {
+        filteredLogs = filteredLogs.filter(log => log.type === type);
+      }
+
+      // Apply pagination
+      const start = (page - 1) * per_page;
+      const end = start + per_page;
+      const paginatedLogs = filteredLogs.slice(start, end);
+
+      return NextResponse.json({
+        logs: paginatedLogs,
+        total: filteredLogs.length
+      });
+    }
 
     // Handle payment creation
     if (action === 'createPayment') {
