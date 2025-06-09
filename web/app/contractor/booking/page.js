@@ -1013,32 +1013,89 @@ export default function Page() {
                     <Paper elevation={3} sx={{ maxWidth: 700, mx: "auto", mt: 4, p: 4, pt: 2, borderRadius: 3, backgroundColor: theme.palette.background.paper, position: "relative" }}>
                         <Typography variant="h6" fontWeight="bold" align="center" mb={3}>Delivery Information</Typography>
                         <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mb: 2 }}>
-                            <TextField label="Name" fullWidth size="small" value={contract.name} onChange={(e) => handleInputChange("name", e.target.value)} required InputProps={{ endAdornment: contract.name ? (
-                                <IconButton size="small" onClick={() => handleInputChange("name", "")} edge="end">
-                                    <CloseIcon fontSize="small" />
-                                </IconButton>
-                            ) : null, }} />
-                            <TextField label="Item Description" fullWidth size="small" value={contract.itemDescription} onChange={(e) => handleInputChange("itemDescription", e.target.value)} required InputProps={{ endAdornment: contract.itemDescription ? (
-                                <IconButton size="small" onClick={() => handleInputChange("itemDescription", "")} edge="end">
-                                    <CloseIcon fontSize="small" />
-                                </IconButton>
-                            ) : null, }} />
-                            <TextField label="Address" fullWidth size="small" value={contract.address} onChange={(e) => handleInputChange("address", e.target.value)} required InputProps={{ endAdornment: contract.address ? (
-                                <IconButton size="small" onClick={() => handleInputChange("address", "")} edge="end">
-                                    <CloseIcon fontSize="small" />
-                                </IconButton>
-                            ) : null, }} />
+                            <TextField 
+                                label="Name" 
+                                fullWidth 
+                                size="small" 
+                                value={contract.name} 
+                                onChange={(e) => handleInputChange("name", e.target.value.slice(0, 100))} 
+                                required 
+                                inputProps={{ maxLength: 100 }}
+                                InputProps={{ 
+                                    endAdornment: contract.name ? (
+                                        <IconButton size="small" onClick={() => handleInputChange("name", "")} edge="end">
+                                            <CloseIcon fontSize="small" />
+                                        </IconButton>
+                                    ) : null, 
+                                }} 
+                            />
+                            <TextField 
+                                label="Item Description" 
+                                fullWidth 
+                                size="small" 
+                                value={contract.itemDescription} 
+                                onChange={(e) => handleInputChange("itemDescription", e.target.value.slice(0, 200))} 
+                                required 
+                                inputProps={{ maxLength: 200 }}
+                                InputProps={{ 
+                                    endAdornment: contract.itemDescription ? (
+                                        <IconButton size="small" onClick={() => handleInputChange("itemDescription", "")} edge="end">
+                                            <CloseIcon fontSize="small" />
+                                        </IconButton>
+                                    ) : null, 
+                                }} 
+                            />
+                            <TextField 
+                                label="Address" 
+                                fullWidth 
+                                size="small" 
+                                value={contract.address} 
+                                onChange={(e) => handleInputChange("address", e.target.value.slice(0, 200))} 
+                                required 
+                                inputProps={{ maxLength: 200 }}
+                                InputProps={{ 
+                                    endAdornment: contract.address ? (
+                                        <IconButton size="small" onClick={() => handleInputChange("address", "")} edge="end">
+                                            <CloseIcon fontSize="small" />
+                                        </IconButton>
+                                    ) : null, 
+                                }} 
+                            />
                             <Box sx={{ display: 'flex', gap: 2, width: '100%' }}>
-                                <TextField label="Case Number" fullWidth size="small" value={contract.caseNumber} onChange={(e) => handleInputChange("caseNumber", e.target.value)} required sx={{ width: '50%' }} InputProps={{ endAdornment: contract.caseNumber ? (
-                                    <IconButton size="small" onClick={() => handleInputChange("caseNumber", "")} edge="end">
-                                        <CloseIcon fontSize="small" />
-                                    </IconButton>
-                                ) : null, }} />
-                                <TextField label="Flight No." fullWidth size="small" value={contract.flightNo} onChange={(e) => handleInputChange("flightNo", e.target.value)} required sx={{ width: '50%' }} InputProps={{ endAdornment: contract.flightNo ? (
-                                    <IconButton size="small" onClick={() => handleInputChange("flightNo", "")} edge="end">
-                                        <CloseIcon fontSize="small" />
-                                    </IconButton>
-                                ) : null, }} />
+                                <TextField 
+                                    label="Case Number" 
+                                    fullWidth 
+                                    size="small" 
+                                    value={contract.caseNumber} 
+                                    onChange={(e) => handleInputChange("caseNumber", e.target.value.slice(0, 20))} 
+                                    required 
+                                    sx={{ width: '50%' }} 
+                                    inputProps={{ maxLength: 20 }}
+                                    InputProps={{ 
+                                        endAdornment: contract.caseNumber ? (
+                                            <IconButton size="small" onClick={() => handleInputChange("caseNumber", "")} edge="end">
+                                                <CloseIcon fontSize="small" />
+                                            </IconButton>
+                                        ) : null, 
+                                    }} 
+                                />
+                                <TextField 
+                                    label="Flight No." 
+                                    fullWidth 
+                                    size="small" 
+                                    value={contract.flightNo} 
+                                    onChange={(e) => handleInputChange("flightNo", e.target.value.slice(0, 10))} 
+                                    required 
+                                    sx={{ width: '50%' }} 
+                                    inputProps={{ maxLength: 10 }}
+                                    InputProps={{ 
+                                        endAdornment: contract.flightNo ? (
+                                            <IconButton size="small" onClick={() => handleInputChange("flightNo", "")} edge="end">
+                                                <CloseIcon fontSize="small" />
+                                            </IconButton>
+                                        ) : null, 
+                                    }} 
+                                />
                             </Box>
                             <Box sx={{ display: 'flex', gap: 2, width: '100%' }}>
                                 <TextField 
@@ -1051,24 +1108,69 @@ export default function Page() {
                                     required 
                                     placeholder="+63 XXX XXX XXXX"
                                     inputProps={{
-                                        pattern: '^\\+63\\s\\d{3}\\s\\d{3}\\s\\d{4}$'
+                                        pattern: '^\\+63\\s\\d{3}\\s\\d{3}\\s\\d{4}$',
+                                        maxLength: 17 // +63 XXX XXX XXXX format
                                     }}
-                                    InputProps={{ endAdornment: contract.contact ? (
-                                        <IconButton size="small" onClick={() => handleInputChange("contact", "")} edge="end">
-                                            <CloseIcon fontSize="small" />
-                                        </IconButton>
-                                    ) : null, }}
+                                    InputProps={{ 
+                                        endAdornment: contract.contact ? (
+                                            <IconButton size="small" onClick={() => handleInputChange("contact", "")} edge="end">
+                                                <CloseIcon fontSize="small" />
+                                            </IconButton>
+                                        ) : null, 
+                                    }}
                                 />
-                                <TextField label="Weight (kg)" fullWidth size="small" type="number" value={contract.weight} onChange={(e) => handleInputChange("weight", e.target.value)} required InputProps={{ endAdornment: contract.weight ? (
-                                    <IconButton size="small" onClick={() => handleInputChange("weight", "")} edge="end">
-                                        <CloseIcon fontSize="small" />
-                                    </IconButton>
-                                ) : null, }} />
-                                <TextField label="Luggage Quantity" fullWidth size="small" type="number" value={contract.quantity} onChange={(e) => handleInputChange("quantity", e.target.value)} required InputProps={{ endAdornment: contract.quantity ? (
-                                    <IconButton size="small" onClick={() => handleInputChange("quantity", "")} edge="end">
-                                        <CloseIcon fontSize="small" />
-                                    </IconButton>
-                                ) : null, }} />
+                                <TextField 
+                                    label="Weight (kg)" 
+                                    fullWidth 
+                                    size="small" 
+                                    type="number" 
+                                    value={contract.weight} 
+                                    onChange={(e) => {
+                                        const value = e.target.value;
+                                        if (value === '' || (Number(value) >= 0 && Number(value) <= 100)) {
+                                            handleInputChange("weight", value);
+                                        }
+                                    }} 
+                                    required 
+                                    inputProps={{ 
+                                        min: 0,
+                                        max: 100,
+                                        step: 0.1
+                                    }}
+                                    InputProps={{ 
+                                        endAdornment: contract.weight ? (
+                                            <IconButton size="small" onClick={() => handleInputChange("weight", "")} edge="end">
+                                                <CloseIcon fontSize="small" />
+                                            </IconButton>
+                                        ) : null, 
+                                    }} 
+                                />
+                                <TextField 
+                                    label="Luggage Quantity" 
+                                    fullWidth 
+                                    size="small" 
+                                    type="number" 
+                                    value={contract.quantity} 
+                                    onChange={(e) => {
+                                        const value = e.target.value;
+                                        if (value === '' || (Number(value) >= 1 && Number(value) <= 10)) {
+                                            handleInputChange("quantity", value);
+                                        }
+                                    }} 
+                                    required 
+                                    inputProps={{ 
+                                        min: 1,
+                                        max: 10,
+                                        step: 1
+                                    }}
+                                    InputProps={{ 
+                                        endAdornment: contract.quantity ? (
+                                            <IconButton size="small" onClick={() => handleInputChange("quantity", "")} edge="end">
+                                                <CloseIcon fontSize="small" />
+                                            </IconButton>
+                                        ) : null, 
+                                    }} 
+                                />
                             </Box>
                         </Box>
                     </Paper>
