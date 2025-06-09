@@ -1,10 +1,12 @@
 "use client";
 
-import { Box, Typography, Button, TextField, Snackbar, Alert, CircularProgress } from "@mui/material";
+import { Box, Typography, Button, TextField, Snackbar, Alert, CircularProgress, IconButton, InputAdornment } from "@mui/material";
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { getLoginStatus, incrementLoginAttempt, resetLoginAttempts, MAX_ATTEMPTS, COOLDOWN_MINUTES } from "../../../utils/auth";
+import Visibility from '@mui/icons-material/Visibility';
+import VisibilityOff from '@mui/icons-material/VisibilityOff';
 
 export default function Page() {
   // Client and state setup
@@ -12,6 +14,7 @@ export default function Page() {
   const supabase = createClientComponentClient();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "error" });
   const [isLoading, setIsLoading] = useState(false);
   const [loginStatus, setLoginStatus] = useState({ canAttempt: true, remainingTime: 0, attempts: 0 });
@@ -68,6 +71,7 @@ export default function Page() {
 
       if (!profile) { await supabase.auth.signOut(); throw new Error("User profile not found."); }
       if (profile.profiles_status?.status_name === "Deactivated") { await supabase.auth.signOut(); throw new Error("This account has been deactivated."); }
+      if (profile.profiles_status?.status_name === "Archived") { await supabase.auth.signOut(); throw new Error("This account has been archived."); }
       if (Number(profile.role_id) !== adminRoleId) {
         await supabase.auth.signOut();
         setSnackbar({ open: true, message: "Access denied: Only administrators can log in here.", severity: "error" });
@@ -83,6 +87,9 @@ export default function Page() {
       setEmail(""); setPassword("");
     } finally { setIsLoading(false); }
   };
+
+  const handleClickShowPassword = () => setShowPassword((show) => !show);
+  const handleMouseDownPassword = (event) => event.preventDefault();
 
   // Styles
   const containerStyles = {
@@ -125,8 +132,21 @@ export default function Page() {
   const formStyles = { width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' };
   const textFieldStyles = { width: "70%" };
   const forgotPasswordStyles = { fontSize: ".85rem", cursor: "pointer", "&:hover": { textDecoration: "underline", color: "primary.main" } };
-  const buttonStyles = { width: "40%", minHeight: "36px", position: "relative" };
-  const progressStyles = { color: "primary.main", position: "absolute", top: "50%", left: "50%", marginTop: -12, marginLeft: -12 };
+  const buttonStyles = { 
+    width: "40%", 
+    minHeight: "36px", 
+    position: "relative",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center"
+  };
+  const progressStyles = { 
+    color: "primary.main", 
+    position: "absolute",
+    top: "50%",
+    left: "50%",
+    transform: "translate(-50%, -50%)"
+  };
   const linkContainerStyles = { display: "flex", gap: 5 };
   const linkStyles = { fontSize: ".75rem", cursor: "pointer", "&:hover": { textDecoration: "underline", color: "primary.main" } };
   const alertStyles = { width: '100%' };
@@ -140,7 +160,31 @@ export default function Page() {
 
         <Box component="form" onSubmit={handleLogin} sx={formStyles}>
           <TextField label="Email" type="email" placeholder="Enter your email" required sx={textFieldStyles} value={email} onChange={(e) => setEmail(e.target.value)} disabled={isLoading || !loginStatus.canAttempt} />
-          <TextField label="Password" type="password" placeholder="Enter your password" required sx={textFieldStyles} value={password} onChange={(e) => setPassword(e.target.value)} disabled={isLoading || !loginStatus.canAttempt} />
+          <TextField
+            label="Password"
+            type={showPassword ? 'text' : 'password'}
+            placeholder="Enter your password"
+            required
+            sx={textFieldStyles}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            disabled={isLoading || !loginStatus.canAttempt}
+            InputProps={{
+              endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton
+                    aria-label="toggle password visibility"
+                    onClick={handleClickShowPassword}
+                    onMouseDown={handleMouseDownPassword}
+                    edge="end"
+                    disabled={isLoading || !loginStatus.canAttempt}
+                  >
+                    {showPassword ? <VisibilityOff /> : <Visibility />}
+                  </IconButton>
+                </InputAdornment>
+              ),
+            }}
+          />
 
           <Box sx={{ display: "flex", justifyContent: "flex-end", alignItems: "center", width: "70%" }}>
             <Typography color="secondary.main" onClick={() => router.push("./forgot-password")} sx={forgotPasswordStyles}>Forgot Password?</Typography>

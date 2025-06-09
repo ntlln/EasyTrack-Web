@@ -1,10 +1,12 @@
 "use client";
 
-import { Box, Typography, Button, TextField, Checkbox, FormControlLabel, Snackbar, Alert, CircularProgress } from "@mui/material";
+import { Box, Typography, Button, TextField, Checkbox, FormControlLabel, Snackbar, Alert, CircularProgress, IconButton, InputAdornment } from "@mui/material";
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { getLoginStatus, incrementLoginAttempt, resetLoginAttempts, MAX_ATTEMPTS, COOLDOWN_MINUTES } from '../../../utils/auth';
+import Visibility from '@mui/icons-material/Visibility';
+import VisibilityOff from '@mui/icons-material/VisibilityOff';
 
 export default function Page() {
     // Client and state setup
@@ -12,6 +14,7 @@ export default function Page() {
     const supabase = createClientComponentClient();
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
+    const [showPassword, setShowPassword] = useState(false);
     const [rememberMe, setRememberMe] = useState(false);
     const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'error' });
     const [isLoading, setIsLoading] = useState(false);
@@ -81,6 +84,12 @@ export default function Page() {
                 throw new Error("This account has been deactivated."); 
             }
 
+            if (profile.profiles_status?.status_name === "Archived") {
+                await supabase.auth.signOut();
+                console.log('Account archived, signing out.');
+                throw new Error("This account has been archived.");
+            }
+
             console.log('User role_id:', profile.role_id);
             // Check by role_id directly (3 = Airline Personnel, 1 = Administrator)
             if (![3, 1].includes(Number(profile.role_id))) {
@@ -105,6 +114,14 @@ export default function Page() {
             setSnackbar({ open: true, message: error.message || "Login failed", severity: "error" });
             setEmail(""); setPassword("");
         } finally { setIsLoading(false); }
+    };
+
+    const handleClickShowPassword = () => {
+        setShowPassword(!showPassword);
+    };
+
+    const handleMouseDownPassword = (event) => {
+        event.preventDefault();
     };
 
     // Styles
@@ -149,7 +166,31 @@ export default function Page() {
 
                 <Box component="form" onSubmit={handleLogin} sx={formStyles}>
                     <TextField label="Email" type="email" placeholder="Enter your email" required sx={inputFieldStyles} value={email} onChange={e => setEmail(e.target.value)} disabled={isLoading || !loginStatus.canAttempt} />
-                    <TextField label="Password" type="password" placeholder="Enter your password" required sx={inputFieldStyles} value={password} onChange={e => setPassword(e.target.value)} disabled={isLoading || !loginStatus.canAttempt} />
+                    <TextField 
+                        label="Password" 
+                        type={showPassword ? 'text' : 'password'} 
+                        placeholder="Enter your password" 
+                        required 
+                        sx={inputFieldStyles} 
+                        value={password} 
+                        onChange={e => setPassword(e.target.value)} 
+                        disabled={isLoading || !loginStatus.canAttempt}
+                        InputProps={{
+                            endAdornment: (
+                                <InputAdornment position="end">
+                                    <IconButton
+                                        aria-label="toggle password visibility"
+                                        onClick={handleClickShowPassword}
+                                        onMouseDown={handleMouseDownPassword}
+                                        edge="end"
+                                        disabled={isLoading || !loginStatus.canAttempt}
+                                    >
+                                        {showPassword ? <VisibilityOff /> : <Visibility />}
+                                    </IconButton>
+                                </InputAdornment>
+                            ),
+                        }}
+                    />
 
                     <Box sx={checkboxContainerStyles}>
                         <Box sx={checkboxWrapperStyles} onClick={() => setRememberMe(!rememberMe)} style={{ cursor: 'pointer' }}>

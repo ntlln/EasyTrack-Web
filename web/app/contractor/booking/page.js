@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Box, Typography, TextField, Button, Paper, useTheme, IconButton, Grid, Select, MenuItem, FormControl, InputLabel, Tabs, Tab, Autocomplete, CircularProgress, Snackbar, Divider, Collapse } from "@mui/material";
+import { Box, Typography, TextField, Button, Paper, useTheme, IconButton, Grid, Select, MenuItem, FormControl, InputLabel, Tabs, Tab, Autocomplete, CircularProgress, Snackbar, Divider, Collapse, Dialog, DialogTitle, DialogContent, DialogActions } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
@@ -30,7 +30,7 @@ export default function Page() {
     const [map, setMap] = useState(null); const [isScriptLoaded, setIsScriptLoaded] = useState(false); const [mapError, setMapError] = useState(null); const updateTimeoutRef = useRef(null);
     const [mounted, setMounted] = useState(false); const [isFormMounted, setIsFormMounted] = useState(false);
     const [activeTab, setActiveTab] = useState(0); const [isGoogleMapsReady, setIsGoogleMapsReady] = useState(false);
-    const [contracts, setContracts] = useState([{ name: "", caseNumber: "", itemDescription: "", address: "", contact: "", weight: "", quantity: "", flightNo: "" }]);
+    const [contract, setContract] = useState({ name: "", caseNumber: "", itemDescription: "", address: "", contact: "", weight: "", quantity: "", flightNo: "" });
     const [pickupAddress, setPickupAddress] = useState({ location: "", addressLine1: "", addressLine2: "", province: "", city: "", barangay: "", postalCode: "" });
     const [dropoffAddress, setDropoffAddress] = useState({ location: null, lat: null, lng: null });
     const [placeOptions, setPlaceOptions] = useState([]); const [placeLoading, setPlaceLoading] = useState(false); const autocompleteServiceRef = useRef(null); const placesServiceRef = useRef(null);
@@ -39,6 +39,9 @@ export default function Page() {
     const [snackbarOpen, setSnackbarOpen] = useState(false);
     const [snackbarMessage, setSnackbarMessage] = useState('');
     const [statusFilter, setStatusFilter] = useState('all');
+    const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+    const [selectedContractId, setSelectedContractId] = useState(null);
+    const [cancelling, setCancelling] = useState(false);
 
     // Mount
     useEffect(() => { setMounted(true); setIsFormMounted(true); }, []);
@@ -244,26 +247,21 @@ export default function Page() {
     // Contract form handlers
     const handlePickupAddressChange = (field, value) => { setPickupAddress(prev => ({ ...prev, [field]: value })); };
     const handleDropoffAddressChange = (field, value) => { setDropoffAddress(prev => ({ ...prev, [field]: value })); };
-    const handleInputChange = (index, field, value) => {
-        const updatedContracts = [...contracts];
+    const handleInputChange = (field, value) => {
         if (field === 'contact') {
             // Handle backspace and empty values
             if (!value) {
-                updatedContracts[index][field] = '';
+                setContract(prev => ({ ...prev, [field]: '' }));
             } else {
                 // Only format if we have input
                 const formatted = formatPhoneNumber(value);
-                updatedContracts[index][field] = formatted;
+                setContract(prev => ({ ...prev, [field]: formatted }));
             }
         } else {
-            updatedContracts[index][field] = value;
+            setContract(prev => ({ ...prev, [field]: value }));
         }
-        setContracts(updatedContracts);
     };
-    const handleImageChange = (index, file) => { const updatedContracts = [...contracts]; updatedContracts[index].image = file; setContracts(updatedContracts); };
-    const clearSingleContract = (index) => { const updatedContracts = [...contracts]; updatedContracts[index] = { name: "", caseNumber: "", itemDescription: "", address: "", contact: "", weight: "", quantity: "", flightNo: "" }; setContracts(updatedContracts); };
-    const deleteContract = (index) => { const updatedContracts = contracts.filter((_, i) => i !== index); setContracts(updatedContracts); };
-    const addContract = () => { setContracts([...contracts, { name: "", caseNumber: "", itemDescription: "", address: "", contact: "", weight: "", quantity: "", flightNo: "" }]); };
+    const handleImageChange = (file) => { setContract(prev => ({ ...prev, image: file })); };
 
     // Generate tracking ID with format 'YYYYMMDDMKTPxxxx'
     const generateTrackingID = () => {
@@ -386,7 +384,7 @@ export default function Page() {
 
             // Generate tracking IDs
             const contractTrackingID = generateTrackingID();
-            const luggageTrackingIDs = contracts.map(() => generateLuggageTrackingID());
+            const luggageTrackingIDs = [generateLuggageTrackingID()];
 
             // Step 1: Determine the city from coordinates
             let city = null;
@@ -447,7 +445,7 @@ export default function Page() {
             }
 
             // Step 3: Calculate total delivery charge based on number of forms
-            const numberOfForms = contracts.length;
+            const numberOfForms = 1;
             const totalDeliveryCharge = deliveryCharge ? deliveryCharge * numberOfForms : null;
             console.log('Price calculation:', {
                 numberOfForms,
@@ -456,7 +454,7 @@ export default function Page() {
             });
 
             // Step 4: Prepare contract data with the total delivery charge
-            const totalLuggageQuantity = contracts.reduce((sum, contract) => sum + Number(contract.quantity || 0), 0); 
+            const totalLuggageQuantity = Number(contract.quantity || 0); 
             const contractData = { 
                 id: contractTrackingID,
                 luggage_quantity: totalLuggageQuantity, 
@@ -482,8 +480,8 @@ export default function Page() {
             }
 
             // Step 6: Insert luggage information
-            const formattedData = contracts.map((contract, index) => ({ 
-                id: luggageTrackingIDs[index],
+            const formattedData = luggageTrackingIDs.map((id, index) => ({ 
+                id,
                 case_number: contract.caseNumber, 
                 flight_number: contract.flightNo,
                 luggage_owner: contract.name, 
@@ -506,7 +504,7 @@ export default function Page() {
 
             setSnackbarOpen(true);
             // Reset form
-            setContracts([{ name: "", caseNumber: "", itemDescription: "", address: "", contact: "", weight: "", quantity: "", flightNo: "" }]);
+            setContract({ name: "", caseNumber: "", itemDescription: "", address: "", contact: "", weight: "", quantity: "", flightNo: "" });
             setPickupAddress({ location: "", addressLine1: "", addressLine2: "", province: "", city: "", barangay: "", postalCode: "" });
             setDropoffAddress({ location: null, lat: null, lng: null });
             // Switch to contract list tab and refresh
@@ -640,12 +638,52 @@ export default function Page() {
     };
 
     // Add onFocus handler for phone number
-    const handlePhoneFocus = (index) => {
-        const updatedContracts = [...contracts];
-        if (!updatedContracts[index].contact) {
-            updatedContracts[index].contact = '+63';
-            setContracts(updatedContracts);
+    const handlePhoneFocus = () => {
+        if (!contract.contact) {
+            setContract(prev => ({ ...prev, contact: '+63' }));
         }
+    };
+
+    const handleCancelClick = (contractId) => {
+        setSelectedContractId(contractId);
+        setCancelDialogOpen(true);
+    };
+
+    const handleCancelConfirm = async () => {
+        if (!selectedContractId) return;
+        setCancelling(true);
+        try {
+            const { error } = await supabase
+                .from('contract')
+                .update({ contract_status_id: 2 })
+                .eq('id', selectedContractId);
+
+            if (error) throw error;
+
+            setSnackbarMessage('Contract cancelled successfully');
+            setSnackbarOpen(true);
+
+            // Refresh contract list in state
+            setContractList((prev) =>
+                prev.map((c) =>
+                    c.id === selectedContractId
+                        ? { ...c, contract_status_id: 2, contract_status: { status_name: 'Cancelled' } }
+                        : c
+                )
+            );
+        } catch (err) {
+            setSnackbarMessage(err.message || 'Failed to cancel contract');
+            setSnackbarOpen(true);
+        } finally {
+            setCancelling(false);
+            setCancelDialogOpen(false);
+            setSelectedContractId(null);
+        }
+    };
+
+    const handleCancelClose = () => {
+        setCancelDialogOpen(false);
+        setSelectedContractId(null);
     };
 
     // Render
@@ -694,41 +732,41 @@ export default function Page() {
                                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', position: 'relative' }}>
                                             <Box sx={{ flex: 1 }}>
                                                 <Typography variant="subtitle1" sx={{ color: 'primary.main', fontWeight: 700, mb: 1 }}>
-                                                    Contract ID: <span style={{ color: '#bdbdbd', fontWeight: 400 }}>{contract.id}</span>
+                                                    Contract ID: <span style={{ fontWeight: 400 }}>{contract.id}</span>
                                                 </Typography>
                                                 <Divider sx={{ my: 1 }} />
                                                 <Typography variant="subtitle2" sx={{ color: 'primary.main', fontWeight: 700, mb: 1 }}>
                                                     Location Information
                                                 </Typography>
                                                 <Box sx={{ ml: 1, mb: 1 }}>
-                                                    <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
-                                                        <b>Pickup:</b> <span style={{ color: 'text.primary' }}>{contract.pickup_location || 'N/A'}</span>
+                                                    <Typography variant="body2">
+                                                        <b>Pickup:</b> <span>{contract.pickup_location || 'N/A'}</span>
                                                     </Typography>
                                                     {contract.pickup_location_geo && (
-                                                        <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                                                        <Typography variant="body2">
                                                             <b>Pickup Coordinates:</b>{' '}
-                                                            <span style={{ color: 'text.primary' }}>
+                                                            <span>
                                                                 {contract.pickup_location_geo.coordinates[1].toFixed(6)}, {contract.pickup_location_geo.coordinates[0].toFixed(6)}
                                                             </span>
                                                         </Typography>
                                                     )}
-                                                    <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
-                                                        <b>Drop-off:</b> <span style={{ color: 'text.primary' }}>{contract.drop_off_location || 'N/A'}</span>
+                                                    <Typography variant="body2">
+                                                        <b>Drop-off:</b> <span>{contract.drop_off_location || 'N/A'}</span>
                                                     </Typography>
                                                     {contract.city && (
-                                                        <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
-                                                            <b>City:</b> <span style={{ color: 'text.primary' }}>{contract.city}</span>
+                                                        <Typography variant="body2">
+                                                            <b>City:</b> <span>{contract.city}</span>
                                                         </Typography>
                                                     )}
                                                     {contract.price !== null && (
-                                                        <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
-                                                            <b>Price:</b> <span style={{ color: 'text.primary' }}>₱{Number(contract.delivery_charge).toLocaleString()}</span>
+                                                        <Typography variant="body2">
+                                                            <b>Price:</b> <span>₱{Number(contract.delivery_charge).toLocaleString()}</span>
                                                         </Typography>
                                                     )}
                                                     {contract.drop_off_location_geo && (
-                                                        <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                                                        <Typography variant="body2">
                                                             <b>Drop-off Coordinates:</b>{' '}
-                                                            <span style={{ color: 'text.primary' }}>
+                                                            <span>
                                                                 {contract.drop_off_location_geo.coordinates[1].toFixed(6)}, {contract.drop_off_location_geo.coordinates[0].toFixed(6)}
                                                             </span>
                                                         </Typography>
@@ -743,6 +781,15 @@ export default function Page() {
                                                     sx={{ mb: 1 }}
                                                 >
                                                     Track
+                                                </Button>
+                                                <Button
+                                                    variant="outlined"
+                                                    color="error"
+                                                    onClick={() => handleCancelClick(contract.id)}
+                                                    sx={{ mb: 1 }}
+                                                    disabled={contract.contract_status?.status_name?.toLowerCase() === 'cancelled'}
+                                                >
+                                                    Cancel
                                                 </Button>
                                                 <IconButton
                                                     onClick={() => handleExpandClick(contract.id)}
@@ -769,9 +816,9 @@ export default function Page() {
                                                 Contractor Information
                                             </Typography>
                                             <Box sx={{ ml: 1, mb: 1 }}>
-                                                <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                                                <Typography variant="body2">
                                                     <b>Contractor Name:</b>{' '}
-                                                    <span style={{ color: 'text.primary' }}>
+                                                    <span>
                                                         {contract.airline
                                                             ? `${contract.airline.first_name || ''} ${contract.airline.middle_initial || ''} ${
                                                                 contract.airline.last_name || ''
@@ -781,17 +828,17 @@ export default function Page() {
                                                             : 'N/A'}
                                                     </span>
                                                 </Typography>
-                                                <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                                                <Typography variant="body2">
                                                     <b>Contractor Email:</b>{' '}
-                                                    <span style={{ color: 'text.primary' }}>{contract.airline?.email || 'N/A'}</span>
+                                                    <span>{contract.airline?.email || 'N/A'}</span>
                                                 </Typography>
-                                                <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                                                <Typography variant="body2">
                                                     <b>Contractor Contact:</b>{' '}
-                                                    <span style={{ color: 'text.primary' }}>{contract.airline?.contact_number || 'N/A'}</span>
+                                                    <span>{contract.airline?.contact_number || 'N/A'}</span>
                                                 </Typography>
-                                                <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                                                <Typography variant="body2">
                                                     <b>Subcontractor Name:</b>{' '}
-                                                    <span style={{ color: 'text.primary' }}>
+                                                    <span>
                                                         {contract.delivery
                                                             ? `${contract.delivery.first_name || ''} ${contract.delivery.middle_initial || ''} ${
                                                                 contract.delivery.last_name || ''
@@ -801,17 +848,17 @@ export default function Page() {
                                                             : 'N/A'}
                                                     </span>
                                                 </Typography>
-                                                <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                                                <Typography variant="body2">
                                                     <b>Subcontractor Email:</b>{' '}
-                                                    <span style={{ color: 'text.primary' }}>{contract.delivery?.email || 'N/A'}</span>
+                                                    <span>{contract.delivery?.email || 'N/A'}</span>
                                                 </Typography>
-                                                <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                                                <Typography variant="body2">
                                                     <b>Subcontractor Contact:</b>{' '}
-                                                    <span style={{ color: 'text.primary' }}>{contract.delivery?.contact_number || 'N/A'}</span>
+                                                    <span>{contract.delivery?.contact_number || 'N/A'}</span>
                                                 </Typography>
-                                                <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                                                <Typography variant="body2">
                                                     <b>Status:</b>{' '}
-                                                    <span style={{ color: 'primary.main', fontWeight: 700 }}>
+                                                    <span style={{ fontWeight: 700 }}>
                                                         {contract.contract_status?.status_name || 'N/A'}
                                                     </span>
                                                 </Typography>
@@ -822,7 +869,7 @@ export default function Page() {
                                             </Typography>
                                             <Box sx={{ ml: 1, mb: 1 }}>
                                                 {contract.luggage.length === 0 && (
-                                                    <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                                                    <Typography variant="body2">
                                                         No luggage info.
                                                     </Typography>
                                                 )}
@@ -831,26 +878,26 @@ export default function Page() {
                                                         <Typography variant="subtitle2" sx={{ color: 'primary.main', fontWeight: 700 }}>
                                                             Luggage {lidx + 1}
                                                         </Typography>
-                                                        <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
-                                                            Case Number: <span style={{ color: 'text.primary' }}>{l.case_number || 'N/A'}</span>
+                                                        <Typography variant="body2">
+                                                            Case Number: <span>{l.case_number || 'N/A'}</span>
                                                         </Typography>
-                                                        <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
-                                                            Flight Number: <span style={{ color: 'text.primary' }}>{l.flight_number || 'N/A'}</span>
+                                                        <Typography variant="body2">
+                                                            Flight Number: <span>{l.flight_number || 'N/A'}</span>
                                                         </Typography>
-                                                        <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
-                                                            Name: <span style={{ color: 'text.primary' }}>{l.luggage_owner || 'N/A'}</span>
+                                                        <Typography variant="body2">
+                                                            Name: <span>{l.luggage_owner || 'N/A'}</span>
                                                         </Typography>
-                                                        <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
-                                                            Contact Number: <span style={{ color: 'text.primary' }}>{l.contact_number || 'N/A'}</span>
+                                                        <Typography variant="body2">
+                                                            Contact Number: <span>{l.contact_number || 'N/A'}</span>
                                                         </Typography>
-                                                        <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
-                                                            Address: <span style={{ color: 'text.primary' }}>{l.address || 'N/A'}</span>
+                                                        <Typography variant="body2">
+                                                            Address: <span>{l.address || 'N/A'}</span>
                                                         </Typography>
-                                                        <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
-                                                            Weight: <span style={{ color: 'text.primary' }}>{l.weight ? `${l.weight} kg` : 'N/A'}</span>
+                                                        <Typography variant="body2">
+                                                            Weight: <span>{l.weight ? `${l.weight} kg` : 'N/A'}</span>
                                                         </Typography>
-                                                        <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
-                                                            Description: <span style={{ color: 'text.primary' }}>{l.item_description || 'N/A'}</span>
+                                                        <Typography variant="body2">
+                                                            Description: <span>{l.item_description || 'N/A'}</span>
                                                         </Typography>
                                                     </Box>
                                                 ))}
@@ -860,33 +907,33 @@ export default function Page() {
                                                 Timeline
                                             </Typography>
                                             <Box sx={{ ml: 1, mb: 1 }}>
-                                                <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                                                <Typography variant="body2">
                                                     <b>Created:</b>{' '}
-                                                    <span style={{ color: 'text.primary' }}>
+                                                    <span>
                                                         {contract.created_at ? new Date(contract.created_at).toLocaleString() : 'N/A'}
                                                     </span>
                                                 </Typography>
-                                                <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                                                <Typography variant="body2">
                                                     <b>Accepted:</b>{' '}
-                                                    <span style={{ color: 'text.primary' }}>
+                                                    <span>
                                                         {contract.accepted_at ? new Date(contract.accepted_at).toLocaleString() : 'N/A'}
                                                     </span>
                                                 </Typography>
-                                                <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                                                <Typography variant="body2">
                                                     <b>Pickup:</b>{' '}
-                                                    <span style={{ color: 'text.primary' }}>
+                                                    <span>
                                                         {contract.pickup_at ? new Date(contract.pickup_at).toLocaleString() : 'N/A'}
                                                     </span>
                                                 </Typography>
-                                                <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                                                <Typography variant="body2">
                                                     <b>Delivered:</b>{' '}
-                                                    <span style={{ color: 'text.primary' }}>
+                                                    <span>
                                                         {contract.delivered_at ? new Date(contract.delivered_at).toLocaleString() : 'N/A'}
                                                     </span>
                                                 </Typography>
-                                                <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
+                                                <Typography variant="body2">
                                                     <b>Cancelled:</b>{' '}
-                                                    <span style={{ color: 'text.primary' }}>
+                                                    <span>
                                                         {contract.cancelled_at ? new Date(contract.cancelled_at).toLocaleString() : 'N/A'}
                                                     </span>
                                                 </Typography>
@@ -963,44 +1010,69 @@ export default function Page() {
                             {mounted && <MapComponent mapRef={mapRef} mapError={mapError} />}
                         </Box>
                     </Paper>
-                    {contracts.map((contract, index) => (
-                        <Paper key={`contract-form-${index}`} elevation={3} sx={{ maxWidth: 700, mx: "auto", mt: 4, p: 4, pt: 2, borderRadius: 3, backgroundColor: theme.palette.background.paper, position: "relative" }}>
-                            <IconButton size="small" onClick={() => deleteContract(index)} sx={{ position: "absolute", top: 8, right: 8, color: theme.palette.grey[600] }} aria-label="delete form">
-                                <CloseIcon />
-                            </IconButton>
-                            <Typography variant="h6" fontWeight="bold" align="center" mb={3}>Delivery Information {index + 1}</Typography>
-                            <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mb: 2 }}>
-                                <TextField label="Name" fullWidth size="small" value={contract.name} onChange={(e) => handleInputChange(index, "name", e.target.value)} required />
-                                <TextField label="Item Description" fullWidth size="small" value={contract.itemDescription} onChange={(e) => handleInputChange(index, "itemDescription", e.target.value)} required />
-                                <TextField label="Address" fullWidth size="small" value={contract.address} onChange={(e) => handleInputChange(index, "address", e.target.value)} required />
-                                <Box sx={{ display: 'flex', gap: 2, width: '100%' }}>
-                                    <TextField label="Case Number" fullWidth size="small" value={contract.caseNumber} onChange={(e) => handleInputChange(index, "caseNumber", e.target.value)} required sx={{ width: '50%' }} />
-                                    <TextField label="Flight No." fullWidth size="small" value={contract.flightNo} onChange={(e) => handleInputChange(index, "flightNo", e.target.value)} required sx={{ width: '50%' }} />
-                                </Box>
-                                <Box sx={{ display: 'flex', gap: 2, width: '100%' }}>
-                                    <TextField 
-                                        label="Contact Number" 
-                                        fullWidth 
-                                        size="small" 
-                                        value={contract.contact} 
-                                        onChange={(e) => handleInputChange(index, "contact", e.target.value)} 
-                                        onFocus={() => handlePhoneFocus(index)}
-                                        required 
-                                        placeholder="+63 XXX XXX XXXX"
-                                        inputProps={{
-                                            pattern: '^\\+63\\s\\d{3}\\s\\d{3}\\s\\d{4}$'
-                                        }}
-                                    />
-                                    <TextField label="Weight (kg)" fullWidth size="small" type="number" value={contract.weight} onChange={(e) => handleInputChange(index, "weight", e.target.value)} required />
-                                    <TextField label="Luggage Quantity" fullWidth size="small" type="number" value={contract.quantity} onChange={(e) => handleInputChange(index, "quantity", e.target.value)} required />
-                                </Box>
+                    <Paper elevation={3} sx={{ maxWidth: 700, mx: "auto", mt: 4, p: 4, pt: 2, borderRadius: 3, backgroundColor: theme.palette.background.paper, position: "relative" }}>
+                        <Typography variant="h6" fontWeight="bold" align="center" mb={3}>Delivery Information</Typography>
+                        <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mb: 2 }}>
+                            <TextField label="Name" fullWidth size="small" value={contract.name} onChange={(e) => handleInputChange("name", e.target.value)} required InputProps={{ endAdornment: contract.name ? (
+                                <IconButton size="small" onClick={() => handleInputChange("name", "")} edge="end">
+                                    <CloseIcon fontSize="small" />
+                                </IconButton>
+                            ) : null, }} />
+                            <TextField label="Item Description" fullWidth size="small" value={contract.itemDescription} onChange={(e) => handleInputChange("itemDescription", e.target.value)} required InputProps={{ endAdornment: contract.itemDescription ? (
+                                <IconButton size="small" onClick={() => handleInputChange("itemDescription", "")} edge="end">
+                                    <CloseIcon fontSize="small" />
+                                </IconButton>
+                            ) : null, }} />
+                            <TextField label="Address" fullWidth size="small" value={contract.address} onChange={(e) => handleInputChange("address", e.target.value)} required InputProps={{ endAdornment: contract.address ? (
+                                <IconButton size="small" onClick={() => handleInputChange("address", "")} edge="end">
+                                    <CloseIcon fontSize="small" />
+                                </IconButton>
+                            ) : null, }} />
+                            <Box sx={{ display: 'flex', gap: 2, width: '100%' }}>
+                                <TextField label="Case Number" fullWidth size="small" value={contract.caseNumber} onChange={(e) => handleInputChange("caseNumber", e.target.value)} required sx={{ width: '50%' }} InputProps={{ endAdornment: contract.caseNumber ? (
+                                    <IconButton size="small" onClick={() => handleInputChange("caseNumber", "")} edge="end">
+                                        <CloseIcon fontSize="small" />
+                                    </IconButton>
+                                ) : null, }} />
+                                <TextField label="Flight No." fullWidth size="small" value={contract.flightNo} onChange={(e) => handleInputChange("flightNo", e.target.value)} required sx={{ width: '50%' }} InputProps={{ endAdornment: contract.flightNo ? (
+                                    <IconButton size="small" onClick={() => handleInputChange("flightNo", "")} edge="end">
+                                        <CloseIcon fontSize="small" />
+                                    </IconButton>
+                                ) : null, }} />
                             </Box>
-                            <Box sx={{ display: "flex", justifyContent: "center", mt: 2 }}>
-                                <Button variant="contained" size="small" sx={{ bgcolor: "#4a4a4a", color: "#fff", "&:hover": { bgcolor: "#333" } }} onClick={() => clearSingleContract(index)}>Clear Contract</Button>
+                            <Box sx={{ display: 'flex', gap: 2, width: '100%' }}>
+                                <TextField 
+                                    label="Contact Number" 
+                                    fullWidth 
+                                    size="small" 
+                                    value={contract.contact} 
+                                    onChange={(e) => handleInputChange("contact", e.target.value)} 
+                                    onFocus={handlePhoneFocus}
+                                    required 
+                                    placeholder="+63 XXX XXX XXXX"
+                                    inputProps={{
+                                        pattern: '^\\+63\\s\\d{3}\\s\\d{3}\\s\\d{4}$'
+                                    }}
+                                    InputProps={{ endAdornment: contract.contact ? (
+                                        <IconButton size="small" onClick={() => handleInputChange("contact", "")} edge="end">
+                                            <CloseIcon fontSize="small" />
+                                        </IconButton>
+                                    ) : null, }}
+                                />
+                                <TextField label="Weight (kg)" fullWidth size="small" type="number" value={contract.weight} onChange={(e) => handleInputChange("weight", e.target.value)} required InputProps={{ endAdornment: contract.weight ? (
+                                    <IconButton size="small" onClick={() => handleInputChange("weight", "")} edge="end">
+                                        <CloseIcon fontSize="small" />
+                                    </IconButton>
+                                ) : null, }} />
+                                <TextField label="Luggage Quantity" fullWidth size="small" type="number" value={contract.quantity} onChange={(e) => handleInputChange("quantity", e.target.value)} required InputProps={{ endAdornment: contract.quantity ? (
+                                    <IconButton size="small" onClick={() => handleInputChange("quantity", "")} edge="end">
+                                        <CloseIcon fontSize="small" />
+                                    </IconButton>
+                                ) : null, }} />
                             </Box>
-                        </Paper>
-                    ))}
-                    <Box sx={{ display: "flex", justifyContent: "center", mt: 4, gap: 2 }}><Button variant="outlined" onClick={addContract}>Add Another Form</Button><Button variant="contained" onClick={handleSubmit}>Create Booking</Button></Box>
+                        </Box>
+                    </Paper>
+                    <Box sx={{ display: "flex", justifyContent: "center", mt: 4, gap: 2 }}><Button variant="contained" onClick={handleSubmit}>Create Booking</Button></Box>
                     <Box sx={{ textAlign: "center", mt: 6 }}><Typography variant="h6" fontWeight="bold">Partnered with:</Typography><Box sx={{ display: "flex", justifyContent: "center", gap: 4, mt: 2 }}><Image src="/brand-3.png" alt="AirAsia" width={60} height={60} /></Box></Box>
                 </Box>)}
                 <Snackbar 
@@ -1016,6 +1088,31 @@ export default function Page() {
                         }
                     }}
                 />
+                <Dialog
+                    open={cancelDialogOpen}
+                    onClose={handleCancelClose}
+                    aria-labelledby="cancel-dialog-title"
+                >
+                    <DialogTitle id="cancel-dialog-title">Confirm Cancellation</DialogTitle>
+                    <DialogContent>
+                        <Typography>
+                            Are you sure you want to cancel this contract? This action cannot be undone.
+                        </Typography>
+                    </DialogContent>
+                    <DialogActions>
+                        <Button onClick={handleCancelClose} disabled={cancelling}>
+                            No, Keep It
+                        </Button>
+                        <Button
+                            onClick={handleCancelConfirm}
+                            color="error"
+                            variant="contained"
+                            disabled={cancelling}
+                        >
+                            {cancelling ? 'Cancelling...' : 'Yes, Cancel Contract'}
+                        </Button>
+                    </DialogActions>
+                </Dialog>
             </>)}
         </Box>
     );

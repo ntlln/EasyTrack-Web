@@ -9,6 +9,10 @@ export const getTheme = (mode) => createTheme({
         background: {
             default: mode === "dark" ? "#28282B" : "#FAF9F6",
             paper: mode === "dark" ? "#28282B" : "#FAF9F6"
+        },
+        text: {
+            primary: mode === "dark" ? "#FFFFFF" : "#000000",
+            secondary: mode === "dark" ? "rgba(255, 255, 255, 0.7)" : "rgba(0, 0, 0, 0.7)"
         }
     },
 

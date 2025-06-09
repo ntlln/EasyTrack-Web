@@ -710,7 +710,7 @@ const TransactionManagement = () => {
                             ) : (
                                 <Button 
                                     variant="contained" 
-                                    color="secondary"
+                                    color={selectedRows.length > 0 ? "primary" : "secondary"}
                                     onClick={handlePDFButtonClick}
                                     sx={{ 
                                         position: 'relative',

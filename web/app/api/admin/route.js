@@ -596,6 +596,24 @@ export async function POST(request) {
       return NextResponse.json({ data });
     }
 
+    // Handle contract cancellation
+    if (action === 'cancelContract') {
+      const { contractId } = params;
+      if (!contractId) {
+        return NextResponse.json({ error: 'Missing contractId' }, { status: 400 });
+      }
+      const { data, error } = await supabase
+        .from('contract')
+        .update({ contract_status_id: 2 }) // 2 = Cancelled
+        .eq('id', contractId)
+        .select()
+        .single();
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+      return NextResponse.json({ data });
+    }
+
     return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
   } catch (error) {
     console.error('Server error:', error);
