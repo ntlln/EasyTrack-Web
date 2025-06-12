@@ -23,11 +23,36 @@ export default function Page() {
         setIsLoading(true);
 
         try {
-            const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/contractor/reset-password` });
-            if (error) {
-                setSnackbar({ open: true, message: error.message, severity: 'error' });
+            // First check if the user exists and is verified
+            const response = await fetch('/api/check-verification', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ email }),
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                setSnackbar({ open: true, message: data.error, severity: 'error' });
                 return;
             }
+
+            // Only proceed with password reset if user is verified
+            const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, { 
+                redirectTo: `${window.location.origin}/contractor/forgot-password` 
+            });
+            
+            if (resetError) { 
+                if (resetError.message.includes('seconds')) {
+                    setSnackbar({ open: true, message: resetError.message, severity: 'error' });
+                } else {
+                    setSnackbar({ open: true, message: resetError.message, severity: 'error' });
+                }
+                return; 
+            }
+            
             setSnackbar({ open: true, message: 'Password reset link has been sent to your email.', severity: 'success' });
         } catch (error) {
             console.error('Reset password error:', error);
@@ -35,6 +60,12 @@ export default function Page() {
         } finally {
             setIsLoading(false);
         }
+    };
+
+    const handleBackToLogin = () => {
+        // Clear any existing session before navigating back
+        supabase.auth.signOut();
+        router.push("/contractor/login");
     };
 
     // Styles
@@ -59,7 +90,7 @@ export default function Page() {
                             {!isLoading ? "Send Email Reset Link" : <CircularProgress size={24} sx={{ color: "primary.main" }} />}
                         </Button>
                     </form>
-                    <Typography sx={backLinkStyles} onClick={() => router.push("/contractor/login")}>Back to Login</Typography>
+                    <Typography sx={backLinkStyles} onClick={handleBackToLogin}>Back to Login</Typography>
                 </Box>
             </Box>
             <Snackbar open={snackbar.open} autoHideDuration={4000} onClose={handleCloseSnackbar} anchorOrigin={{ vertical: "top", horizontal: "center" }}>

@@ -53,8 +53,8 @@ export default function Page() {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) {
         if (error.message?.toLowerCase().includes('email not confirmed')) {
-          const { error: otpError } = await supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: `${window.location.origin}/egc-admin/verify` } });
-          setSnackbar({ open: true, message: otpError ? otpError.message : "Please check your email for a verification link.", severity: otpError ? "error" : "info" });
+          await supabase.auth.signOut();
+          setSnackbar({ open: true, message: "Please verify your email address before logging in.", severity: "error" });
           setEmail(""); setPassword(""); setIsLoading(false);
           return;
         }
@@ -62,6 +62,14 @@ export default function Page() {
         const remaining = MAX_ATTEMPTS - attempts;
         setSnackbar({ open: true, message: remaining > 0 ? `Invalid credentials. ${remaining} attempts remaining.` : `Too many failed attempts. Please wait ${COOLDOWN_MINUTES} minutes.`, severity: "error" });
         setPassword(""); setIsLoading(false); setLoginStatus(getLoginStatus(email));
+        return;
+      }
+
+      // Check if email is verified
+      if (!data.user.email_confirmed_at) {
+        await supabase.auth.signOut();
+        setSnackbar({ open: true, message: "Please verify your email address before logging in.", severity: "error" });
+        setEmail(""); setPassword(""); setIsLoading(false);
         return;
       }
 
