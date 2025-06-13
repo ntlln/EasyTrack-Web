@@ -212,7 +212,7 @@ export default function Page() {
   return (
     <Box sx={containerStyles}>
       <Box sx={titleContainerStyles}>
-        <IconButton onClick={() => router.push('/egc-admin/dashboard')} size="small" color="primary">
+        <IconButton onClick={() => router.push('/egc-admin')} size="small" color="primary">
           <ChevronLeftIcon />
         </IconButton>
         <Typography variant="h4" sx={titleStyles}>User Management</Typography>
