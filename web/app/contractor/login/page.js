@@ -50,7 +50,7 @@ export default function Page() {
                     
                     if (otpError) throw otpError;
                     
-                    setSnackbar({ open: true, message: "Please verify your email address before logging in. A new verification link has been sent to your email.", severity: "error" });
+                    setSnackbar({ open: true, message: "Please check your email for a verification link.", severity: "info" });
                     setEmail(""); setPassword(""); setIsLoading(false);
                     return;
                 }
@@ -65,18 +65,6 @@ export default function Page() {
                     severity: "error" 
                 });
                 setPassword(""); setIsLoading(false); setLoginStatus(getLoginStatus(email));
-                return;
-            }
-
-            // Check if email is verified
-            if (!existingUser.user.email_confirmed_at) {
-                await supabase.auth.signOut();
-                const { error: otpError } = await supabase.auth.signInWithOtp({
-                    email: email,
-                    options: { emailRedirectTo: `${window.location.origin}/contractor/verify` }
-                });
-                setSnackbar({ open: true, message: "Please verify your email address before logging in. A new verification link has been sent to your email.", severity: "error" });
-                setEmail(""); setPassword(""); setIsLoading(false);
                 return;
             }
 
@@ -103,8 +91,8 @@ export default function Page() {
             }
 
             console.log('User role_id:', profile.role_id);
-            // Check by role_id directly (3 = Airline Personnel)
-            if (Number(profile.role_id) !== 3) {
+            // Check by role_id directly (3 = Airline Personnel, 1 = Administrator)
+            if (![3, 1].includes(Number(profile.role_id))) {
                 await supabase.auth.signOut();
                 console.log('Role not allowed, signing out.');
                 setSnackbar({ open: true, message: "Access denied: Only airline staff can log in here.", severity: "error" });

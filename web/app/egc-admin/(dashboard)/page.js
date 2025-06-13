@@ -24,7 +24,7 @@ export default function Page() {
     { title: "Luggage Management", route: "/egc-admin/luggage-management", icon: MyLocationIcon },
     { title: "Transaction Management", route: "/egc-admin/transaction-management", icon: AssignmentIcon },
     // { title: "History and Reports", route: "/egc-admin/history-and-reports", icon: AssignmentIcon },
-    { title: "Statistics", route: "/egc-admin/statistics", icon: BarChartIcon },
+    // { title: "Statistics", route: "/egc-admin/statistics", icon: BarChartIcon },
     { title: "Chat Support", route: "/egc-admin/chat-support", icon: SupportAgentIcon },
   ];
 

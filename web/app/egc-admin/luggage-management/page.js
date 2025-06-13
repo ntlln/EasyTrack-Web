@@ -575,7 +575,7 @@ const ContractList = ({ onTrackContract, initialSearch }) => {
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
         sx={{
           '& .MuiSnackbarContent-root': {
-            backgroundColor: 'rgb(211, 47, 47)',
+            backgroundColor: 'primary.main',
             color: '#fff'
           }
         }}
@@ -1064,11 +1064,36 @@ const Page = () => {
   const [isGoogleMapsReady, setIsGoogleMapsReady] = useState(false);
   const [statusFilter, setStatusFilter] = useState('all');
   const [page, setPage] = useState(0);
-  const rowsPerPage = 10; // Changed from 2 to 10 items per page
+  const rowsPerPage = 10;
   const [redirectContractId, setRedirectContractId] = useState(null);
   const [trackContractId, setTrackContractId] = useState(null);
   const directionsServiceRef = useRef(null);
   const routeSegmentsRef = useRef([]);
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState('');
+
+  // Move fetchContracts outside useEffect
+  const fetchContracts = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      console.log('Starting contract fetch...');
+      const response = await fetch('/api/admin');
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to fetch contracts');
+      }
+
+      console.log('Contracts fetched:', result.data);
+      setContractList(result.data || []);
+    } catch (err) {
+      console.error('Error in fetchContracts:', err);
+      setError(err.message || 'Failed to fetch contracts');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // Clear redirectContractId after search is set
   useEffect(() => {
@@ -1094,29 +1119,6 @@ const Page = () => {
   // Fetch contract list
   useEffect(() => {
     if (!mounted) return;
-
-    const fetchContracts = async () => {
-      setIsLoading(true);
-      setError(null);
-      try {
-        console.log('Starting contract fetch...');
-        const response = await fetch('/api/admin');
-        const result = await response.json();
-
-        if (!response.ok) {
-          throw new Error(result.error || 'Failed to fetch contracts');
-        }
-
-        console.log('Contracts fetched:', result.data);
-        setContractList(result.data || []);
-      } catch (err) {
-        console.error('Error in fetchContracts:', err);
-        setError(err.message || 'Failed to fetch contracts');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
     fetchContracts();
   }, [mounted]);
 
@@ -1567,6 +1569,9 @@ const Page = () => {
   const handleAssignmentComplete = (contractId) => {
     // Refresh contract list after assignment is completed
     fetchContracts();
+    // Show success message
+    setSnackbarMessage('Luggage assigned successfully');
+    setSnackbarOpen(true);
   };
 
   // drawCompleteRoute function moved to LuggageTrackingTab component
@@ -1615,6 +1620,20 @@ const Page = () => {
           rowsPerPage={rowsPerPage}
         />
       )}
+
+      <Snackbar
+        open={snackbarOpen}
+        autoHideDuration={4000}
+        onClose={() => setSnackbarOpen(false)}
+        message={snackbarMessage}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        sx={{
+          '& .MuiSnackbarContent-root': {
+            backgroundColor: 'primary.main',
+            color: '#fff'
+          }
+        }}
+      />
     </Box>
   );
 };
