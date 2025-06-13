@@ -1138,18 +1138,199 @@ const Page = () => {
     };
   }, [selectedTab]);
 
-  // Initialize map
+  // Initialize map when script is loaded, contractList is ready, and activeSearch changes
   useEffect(() => {
-    if (selectedTab !== 1) return; // Only initialize map when luggage tracking tab is selected
-    if (!isScriptLoaded || !contractList.length || !mapRef.current) return;
-    
+    if (!isScriptLoaded || !contractList.length || !mapRef.current || !activeSearch) return;
     // Small delay to ensure DOM is ready
     const timer = setTimeout(() => {
-      initMap();
-    }, 100);
+      if (!window.google || !mapRef.current || !contractList.length) {
+        console.log('Map initialization conditions not met:', {
+          hasGoogle: !!window.google,
+          hasMapRef: !!mapRef.current,
+          hasContracts: contractList.length > 0
+        });
+        return;
+      }
 
+      try {
+        // Find the contract that matches the search query
+        const searchedContract = contractList.find(contract => 
+          String(contract.id).toLowerCase().includes(activeSearch.toLowerCase())
+        );
+
+        if (!searchedContract) {
+          console.log('No matching contract found for search:', activeSearch);
+          return;
+        }
+
+        console.log('Found contract for map:', searchedContract);
+        console.log('Contract location data:', {
+          current: searchedContract.current_location_geo,
+          dropoff: searchedContract.drop_off_location_geo,
+          pickup: searchedContract.pickup_location_geo
+        });
+
+        // Initialize map with a default center (Manila)
+        const defaultCenter = { lat: 14.5350, lng: 120.9821 };
+        const mapOptions = { 
+          center: defaultCenter,
+          zoom: 12,
+          mapTypeControl: false, 
+          streetViewControl: false, 
+          fullscreenControl: false, 
+          mapTypeId: 'roadmap', 
+          mapId: process.env.NEXT_PUBLIC_GOOGLE_MAPS_ID 
+        };
+
+        console.log('Creating map with initial options:', mapOptions);
+        const newMap = new window.google.maps.Map(mapRef.current, mapOptions);
+        setMap(newMap);
+        console.log('Map created successfully');
+
+        // Add all markers first
+        const markers = [];
+
+        // Add current location marker
+        if (searchedContract.current_location_geo?.coordinates) {
+          console.log('Adding current location marker');
+          const currentPosition = {
+            lat: parseFloat(searchedContract.current_location_geo.coordinates[1]),
+            lng: parseFloat(searchedContract.current_location_geo.coordinates[0])
+          };
+          
+          console.log('Current location position:', currentPosition);
+          
+          // Create a custom SVG marker for current location
+          const currentLocationMarker = document.createElement('div');
+          currentLocationMarker.innerHTML = `
+            <style>
+              @keyframes pulse {
+                0% {
+                  transform: scale(1);
+                  opacity: 1;
+                }
+                50% {
+                  transform: scale(1.2);
+                  opacity: 0.8;
+                }
+                100% {
+                  transform: scale(1);
+                  opacity: 1;
+                }
+              }
+              .location-marker {
+                animation: pulse 2s infinite;
+                filter: drop-shadow(0 0 8px rgba(255, 152, 0, 0.8));
+              }
+            </style>
+            <div class="location-marker">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="12" cy="12" r="10" fill="#FF9800" fill-opacity="0.6"/>
+                <circle cx="12" cy="12" r="8" fill="#FF9800" fill-opacity="0.8"/>
+                <circle cx="12" cy="12" r="6" fill="#FF9800" fill-opacity="0.9"/>
+                <circle cx="12" cy="12" r="4" fill="#FF9800"/>
+                <circle cx="12" cy="12" r="2" fill="white"/>
+              </svg>
+            </div>
+          `;
+          
+          currentLocationMarkerRef.current = new window.google.maps.marker.AdvancedMarkerElement({ 
+            map: newMap, 
+            position: currentPosition, 
+            title: 'Current Location', 
+            content: currentLocationMarker,
+            collisionBehavior: window.google.maps.CollisionBehavior.OPTIONAL_AND_HIDES_LOWER_PRIORITY 
+          });
+          markers.push(currentPosition);
+          console.log('Current location marker added to map');
+        }
+
+        // Add pickup location marker
+        if (searchedContract.pickup_location_geo?.coordinates) {
+          console.log('Adding pickup marker');
+          const pickupMarker = new window.google.maps.marker.PinElement({ 
+            scale: 1, 
+            background: '#2196F3', 
+            borderColor: '#1976D2', 
+            glyphColor: '#FFFFFF' 
+          });
+          
+          const pickupPosition = {
+            lat: parseFloat(searchedContract.pickup_location_geo.coordinates[1]),
+            lng: parseFloat(searchedContract.pickup_location_geo.coordinates[0])
+          };
+          
+          new window.google.maps.marker.AdvancedMarkerElement({ 
+            map: newMap, 
+            position: pickupPosition, 
+            title: 'Pickup Location', 
+            content: pickupMarker.element, 
+            collisionBehavior: window.google.maps.CollisionBehavior.OPTIONAL_AND_HIDES_LOWER_PRIORITY 
+          });
+          markers.push(pickupPosition);
+        }
+
+        // Add drop-off location marker
+        if (searchedContract.drop_off_location_geo?.coordinates) {
+          console.log('Adding drop-off marker');
+          const dropoffMarker = new window.google.maps.marker.PinElement({ 
+            scale: 1, 
+            background: '#4CAF50', 
+            borderColor: '#388E3C', 
+            glyphColor: '#FFFFFF' 
+          });
+          
+          const dropoffPosition = {
+            lat: parseFloat(searchedContract.drop_off_location_geo.coordinates[1]),
+            lng: parseFloat(searchedContract.drop_off_location_geo.coordinates[0])
+          };
+          
+          markerRef.current = new window.google.maps.marker.AdvancedMarkerElement({ 
+            map: newMap, 
+            position: dropoffPosition, 
+            title: 'Drop-off Location', 
+            content: dropoffMarker.element, 
+            collisionBehavior: window.google.maps.CollisionBehavior.OPTIONAL_AND_HIDES_LOWER_PRIORITY 
+          });
+          markers.push(dropoffPosition);
+        }
+
+        // After all markers are added, center the map
+        if (markers.length > 0) {
+          // If we have current location, center on it
+          if (searchedContract.current_location_geo?.coordinates) {
+            const currentPosition = {
+              lat: parseFloat(searchedContract.current_location_geo.coordinates[1]),
+              lng: parseFloat(searchedContract.current_location_geo.coordinates[0])
+            };
+            newMap.setCenter(currentPosition);
+            newMap.setZoom(15);
+            console.log('Map centered on current location');
+          } else {
+            // Otherwise, fit bounds to show all markers
+            const bounds = new window.google.maps.LatLngBounds();
+            markers.forEach(marker => bounds.extend(marker));
+            newMap.fitBounds(bounds);
+            // Add some padding to the bounds
+            const padding = 0.02; // degrees
+            const ne = bounds.getNorthEast();
+            const sw = bounds.getSouthWest();
+            bounds.extend({ lat: ne.lat() + padding, lng: ne.lng() + padding });
+            bounds.extend({ lat: sw.lat() - padding, lng: sw.lng() - padding });
+            newMap.fitBounds(bounds);
+            console.log('Map fitted to show all markers');
+          }
+        }
+
+        console.log('Map initialization completed successfully');
+
+      } catch (error) {
+        console.error('Error in map initialization:', error);
+        setMapError(error.message);
+      }
+    }, 100);
     return () => clearTimeout(timer);
-  }, [isScriptLoaded, contractList, selectedTab, activeSearch]);
+  }, [isScriptLoaded, contractList, mapRef, activeSearch, setMap]);
 
   // Poll for current location updates
   useEffect(() => {
@@ -1178,18 +1359,45 @@ const Page = () => {
         if (currentLocationMarkerRef.current) {
           currentLocationMarkerRef.current.position = newPosition;
         } else {
-          const currentLocationMarker = new window.google.maps.marker.PinElement({
-            scale: 1,
-            background: '#FF9800',
-            borderColor: '#F57C00',
-            glyphColor: '#FFFFFF'
-          });
+          // Create a custom SVG marker for current location
+          const currentLocationMarker = document.createElement('div');
+          currentLocationMarker.innerHTML = `
+            <style>
+              @keyframes pulse {
+                0% {
+                  transform: scale(1);
+                  opacity: 1;
+                }
+                50% {
+                  transform: scale(1.2);
+                  opacity: 0.8;
+                }
+                100% {
+                  transform: scale(1);
+                  opacity: 1;
+                }
+              }
+              .location-marker {
+                animation: pulse 2s infinite;
+                filter: drop-shadow(0 0 8px rgba(255, 152, 0, 0.8));
+              }
+            </style>
+            <div class="location-marker">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="12" cy="12" r="10" fill="#FF9800" fill-opacity="0.6"/>
+                <circle cx="12" cy="12" r="8" fill="#FF9800" fill-opacity="0.8"/>
+                <circle cx="12" cy="12" r="6" fill="#FF9800" fill-opacity="0.9"/>
+                <circle cx="12" cy="12" r="4" fill="#FF9800"/>
+                <circle cx="12" cy="12" r="2" fill="white"/>
+              </svg>
+            </div>
+          `;
           
           currentLocationMarkerRef.current = new window.google.maps.marker.AdvancedMarkerElement({
             map: map,
             position: newPosition,
             title: 'Current Location',
-            content: currentLocationMarker.element,
+            content: currentLocationMarker,
             collisionBehavior: window.google.maps.CollisionBehavior.OPTIONAL_AND_HIDES_LOWER_PRIORITY
           });
         }
@@ -1241,153 +1449,6 @@ const Page = () => {
   const handleKeyPress = (event) => {
     if (event.key === 'Enter') {
       handleSearch();
-    }
-  };
-
-  // Initialize map
-  const initMap = () => {
-    if (!window.google || !mapRef.current || !contractList.length) {
-      console.log('Map initialization conditions not met:', {
-        hasGoogle: !!window.google,
-        hasMapRef: !!mapRef.current,
-        hasContracts: contractList.length > 0
-      });
-      return;
-    }
-
-    try {
-      // Find the contract that matches the search query
-      const searchedContract = contractList.find(contract => 
-        String(contract.id).toLowerCase().includes(activeSearch.toLowerCase())
-      );
-
-      if (!searchedContract) {
-        console.log('No matching contract found for search:', activeSearch);
-        return;
-      }
-
-      console.log('Found contract for map:', searchedContract);
-      console.log('Contract location data:', {
-        current: searchedContract.current_location_geo,
-        dropoff: searchedContract.drop_off_location_geo,
-        pickup: searchedContract.pickup_location_geo
-      });
-
-      // Determine the center location based on available coordinates
-      let defaultLocation;
-      
-      if (searchedContract.current_location_geo?.coordinates) {
-        defaultLocation = {
-          lat: parseFloat(searchedContract.current_location_geo.coordinates[1]),
-          lng: parseFloat(searchedContract.current_location_geo.coordinates[0])
-        };
-        console.log('Using current location as center:', defaultLocation);
-      } else if (searchedContract.drop_off_location_geo?.coordinates) {
-        defaultLocation = {
-          lat: parseFloat(searchedContract.drop_off_location_geo.coordinates[1]),
-          lng: parseFloat(searchedContract.drop_off_location_geo.coordinates[0])
-        };
-        console.log('Using drop-off location as center:', defaultLocation);
-      } else {
-        defaultLocation = { lat: 14.5350, lng: 120.9821 }; // Default to Manila
-        console.log('No valid coordinates found, using Manila as center:', defaultLocation);
-      }
-
-      const mapOptions = { 
-        center: defaultLocation, 
-        zoom: 15, 
-        mapTypeControl: false, 
-        streetViewControl: false, 
-        fullscreenControl: false, 
-        mapTypeId: 'roadmap', 
-        mapId: process.env.NEXT_PUBLIC_GOOGLE_MAPS_ID 
-      };
-
-      console.log('Creating map with options:', mapOptions);
-      const newMap = new window.google.maps.Map(mapRef.current, mapOptions);
-      setMap(newMap);
-      console.log('Map created successfully');
-
-      // Add current location marker first
-      if (searchedContract.current_location_geo?.coordinates) {
-        console.log('Adding initial current location marker');
-        const currentLocationMarker = new window.google.maps.marker.PinElement({ 
-          scale: 1, 
-          background: '#FF9800', 
-          borderColor: '#F57C00', 
-          glyphColor: '#FFFFFF' 
-        });
-        
-        const currentPosition = {
-          lat: parseFloat(searchedContract.current_location_geo.coordinates[1]),
-          lng: parseFloat(searchedContract.current_location_geo.coordinates[0])
-        };
-        
-        console.log('Initial current location position:', currentPosition);
-        
-        currentLocationMarkerRef.current = new window.google.maps.marker.AdvancedMarkerElement({ 
-          map: newMap, 
-          position: currentPosition, 
-          title: 'Current Location', 
-          content: currentLocationMarker.element, 
-          collisionBehavior: window.google.maps.CollisionBehavior.OPTIONAL_AND_HIDES_LOWER_PRIORITY 
-        });
-        console.log('Initial current location marker added to map');
-      }
-
-      // Add drop-off location marker
-      if (searchedContract.drop_off_location_geo?.coordinates) {
-        console.log('Adding drop-off marker');
-        const dropoffMarker = new window.google.maps.marker.PinElement({ 
-          scale: 1, 
-          background: '#4CAF50', 
-          borderColor: '#388E3C', 
-          glyphColor: '#FFFFFF' 
-        });
-        
-        const dropoffPosition = {
-          lat: parseFloat(searchedContract.drop_off_location_geo.coordinates[1]),
-          lng: parseFloat(searchedContract.drop_off_location_geo.coordinates[0])
-        };
-        
-        markerRef.current = new window.google.maps.marker.AdvancedMarkerElement({ 
-          map: newMap, 
-          position: dropoffPosition, 
-          title: 'Drop-off Location', 
-          content: dropoffMarker.element, 
-          collisionBehavior: window.google.maps.CollisionBehavior.OPTIONAL_AND_HIDES_LOWER_PRIORITY 
-        });
-      }
-
-      // Add pickup location marker
-      if (searchedContract.pickup_location_geo?.coordinates) {
-        console.log('Adding pickup marker');
-        const pickupMarker = new window.google.maps.marker.PinElement({ 
-          scale: 1, 
-          background: '#2196F3', 
-          borderColor: '#1976D2', 
-          glyphColor: '#FFFFFF' 
-        });
-        
-        const pickupPosition = {
-          lat: parseFloat(searchedContract.pickup_location_geo.coordinates[1]),
-          lng: parseFloat(searchedContract.pickup_location_geo.coordinates[0])
-        };
-        
-        new window.google.maps.marker.AdvancedMarkerElement({ 
-          map: newMap, 
-          position: pickupPosition, 
-          title: 'Pickup Location', 
-          content: pickupMarker.element, 
-          collisionBehavior: window.google.maps.CollisionBehavior.OPTIONAL_AND_HIDES_LOWER_PRIORITY 
-        });
-      }
-
-      console.log('Map initialization completed successfully');
-
-    } catch (error) {
-      console.error('Error in map initialization:', error);
-      setMapError(error.message);
     }
   };
 
@@ -1507,139 +1568,6 @@ const LuggageTrackingTab = ({
       if (document.head.contains(script)) document.head.removeChild(script);
     };
   }, []);
-
-  // Initialize map when script is loaded, contractList is ready, and activeSearch changes
-  useEffect(() => {
-    if (!isScriptLoaded || !contractList.length || !mapRef.current || !activeSearch) return;
-    // Small delay to ensure DOM is ready
-    const timer = setTimeout(() => {
-      // Find the contract that matches the search query
-      const searchedContract = contractList.find(contract => 
-        String(contract.id).toLowerCase().includes(activeSearch.toLowerCase())
-      );
-      if (!searchedContract) return;
-      // Determine the center location based on available coordinates
-      let defaultLocation;
-      if (searchedContract.current_location_geo?.coordinates) {
-        defaultLocation = {
-          lat: parseFloat(searchedContract.current_location_geo.coordinates[1]),
-          lng: parseFloat(searchedContract.current_location_geo.coordinates[0])
-        };
-      } else if (searchedContract.drop_off_location_geo?.coordinates) {
-        defaultLocation = {
-          lat: parseFloat(searchedContract.drop_off_location_geo.coordinates[1]),
-          lng: parseFloat(searchedContract.drop_off_location_geo.coordinates[0])
-        };
-      } else {
-        defaultLocation = { lat: 14.5350, lng: 120.9821 }; // Default to Manila
-      }
-      const mapOptions = { 
-        center: defaultLocation, 
-        zoom: 15, 
-        mapTypeControl: false, 
-        streetViewControl: false, 
-        fullscreenControl: false, 
-        mapTypeId: 'roadmap', 
-        mapId: process.env.NEXT_PUBLIC_GOOGLE_MAPS_ID 
-      };
-      const newMap = new window.google.maps.Map(mapRef.current, mapOptions);
-      setMap(newMap);
-      // Add current location marker first
-      if (searchedContract.current_location_geo?.coordinates) {
-        const currentLocationMarker = new window.google.maps.marker.PinElement({ 
-          scale: 1, 
-          background: '#FF9800', 
-          borderColor: '#F57C00', 
-          glyphColor: '#FFFFFF' 
-        });
-        const currentPosition = {
-          lat: parseFloat(searchedContract.current_location_geo.coordinates[1]),
-          lng: parseFloat(searchedContract.current_location_geo.coordinates[0])
-        };
-        new window.google.maps.marker.AdvancedMarkerElement({ 
-          map: newMap, 
-          position: currentPosition, 
-          title: 'Current Location', 
-          content: currentLocationMarker.element, 
-          collisionBehavior: window.google.maps.CollisionBehavior.OPTIONAL_AND_HIDES_LOWER_PRIORITY 
-        });
-      }
-      // Add drop-off location marker
-      if (searchedContract.drop_off_location_geo?.coordinates) {
-        const dropoffMarker = new window.google.maps.marker.PinElement({ 
-          scale: 1, 
-          background: '#4CAF50', 
-          borderColor: '#388E3C', 
-          glyphColor: '#FFFFFF' 
-        });
-        const dropoffPosition = {
-          lat: parseFloat(searchedContract.drop_off_location_geo.coordinates[1]),
-          lng: parseFloat(searchedContract.drop_off_location_geo.coordinates[0])
-        };
-        new window.google.maps.marker.AdvancedMarkerElement({ 
-          map: newMap, 
-          position: dropoffPosition, 
-          title: 'Drop-off Location', 
-          content: dropoffMarker.element, 
-          collisionBehavior: window.google.maps.CollisionBehavior.OPTIONAL_AND_HIDES_LOWER_PRIORITY 
-        });
-      }
-      // Add pickup location marker
-      if (searchedContract.pickup_location_geo?.coordinates) {
-        const pickupMarker = new window.google.maps.marker.PinElement({ 
-          scale: 1, 
-          background: '#2196F3', 
-          borderColor: '#1976D2', 
-          glyphColor: '#FFFFFF' 
-        });
-        const pickupPosition = {
-          lat: parseFloat(searchedContract.pickup_location_geo.coordinates[1]),
-          lng: parseFloat(searchedContract.pickup_location_geo.coordinates[0])
-        };
-        new window.google.maps.marker.AdvancedMarkerElement({ 
-          map: newMap, 
-          position: pickupPosition, 
-          title: 'Pickup Location', 
-          content: pickupMarker.element, 
-          collisionBehavior: window.google.maps.CollisionBehavior.OPTIONAL_AND_HIDES_LOWER_PRIORITY 
-        });
-      }
-    }, 100);
-    return () => clearTimeout(timer);
-  }, [isScriptLoaded, contractList, mapRef, activeSearch, setMap]);
-
-  // Poll for current location updates
-  useEffect(() => {
-    let intervalId;
-    let isPolling = false;
-    const updateCurrentLocation = async () => {
-      if (isPolling) return;
-      if (!contractList.length || !activeSearch || !mapRef.current) return;
-      try {
-        isPolling = true;
-        const searchedContract = contractList.find(contract => 
-          String(contract.id).toLowerCase().includes(activeSearch.toLowerCase())
-        );
-        if (!searchedContract) return;
-        const response = await fetch(`/api/admin?contractId=${searchedContract.id}`);
-        if (!response.ok) return;
-        const result = await response.json();
-        if (!result.data?.current_location_geo) return;
-        // You can update the map marker here if you want live updates
-      } catch (err) {
-        // Optionally handle polling errors
-      } finally {
-        isPolling = false;
-      }
-    };
-    if (activeSearch && mapRef.current) {
-      updateCurrentLocation();
-      intervalId = setInterval(updateCurrentLocation, 5000);
-    }
-    return () => {
-      if (intervalId) clearInterval(intervalId);
-    };
-  }, [contractList, mapRef, activeSearch]);
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4 }}>

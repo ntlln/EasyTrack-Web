@@ -87,7 +87,7 @@ export async function GET(request) {
       const { data, error } = await supabase
         .from('contract')
         .select('current_location_geo')
-        .eq('id', Number(contractId))
+        .eq('id', contractId)
         .single();
 
       if (error) {
