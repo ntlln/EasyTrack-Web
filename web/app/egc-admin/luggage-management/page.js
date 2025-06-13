@@ -1058,6 +1058,8 @@ const Page = () => {
   const mapRef = useRef(null);
   const markerRef = useRef(null);
   const currentLocationMarkerRef = useRef(null);
+  const pathRef = useRef([]);
+  const polylineRef = useRef(null);
   const supabase = createClientComponentClient();
   const [isGoogleMapsReady, setIsGoogleMapsReady] = useState(false);
   const [statusFilter, setStatusFilter] = useState('all');
@@ -1065,6 +1067,8 @@ const Page = () => {
   const rowsPerPage = 10; // Changed from 2 to 10 items per page
   const [redirectContractId, setRedirectContractId] = useState(null);
   const [trackContractId, setTrackContractId] = useState(null);
+  const directionsServiceRef = useRef(null);
+  const routeSegmentsRef = useRef([]);
 
   // Clear redirectContractId after search is set
   useEffect(() => {
@@ -1122,6 +1126,7 @@ const Page = () => {
     if (window.google) {
       setIsGoogleMapsReady(true);
       setIsScriptLoaded(true);
+      directionsServiceRef.current = new window.google.maps.DirectionsService();
       return;
     }
     const script = document.createElement('script');
@@ -1131,6 +1136,7 @@ const Page = () => {
     script.onload = () => {
       setIsGoogleMapsReady(true);
       setIsScriptLoaded(true);
+      directionsServiceRef.current = new window.google.maps.DirectionsService();
     };
     document.head.appendChild(script);
     return () => {
@@ -1178,14 +1184,39 @@ const Page = () => {
           mapTypeControl: false, 
           streetViewControl: false, 
           fullscreenControl: false, 
+          zoomControl: false,
+          scaleControl: false,
+          rotateControl: false,
+          panControl: false,
           mapTypeId: 'roadmap', 
-          mapId: process.env.NEXT_PUBLIC_GOOGLE_MAPS_ID 
+          mapId: process.env.NEXT_PUBLIC_GOOGLE_MAPS_ID,
+          gestureHandling: 'greedy',
+          draggableCursor: 'grab',
+          draggingCursor: 'grabbing'
         };
 
         console.log('Creating map with initial options:', mapOptions);
         const newMap = new window.google.maps.Map(mapRef.current, mapOptions);
         setMap(newMap);
+        directionsServiceRef.current = new window.google.maps.DirectionsService();
         console.log('Map created successfully');
+
+        // Load route_history if available
+        if (searchedContract.route_history && Array.isArray(searchedContract.route_history) && searchedContract.route_history.length > 0) {
+          pathRef.current = searchedContract.route_history.map(point => ({ lat: point.lat, lng: point.lng }));
+        } else if (searchedContract.current_location_geo?.coordinates) {
+          pathRef.current = [{
+            lat: searchedContract.current_location_geo.coordinates[1],
+            lng: searchedContract.current_location_geo.coordinates[0]
+          }];
+        } else {
+          pathRef.current = [];
+        }
+        if (polylineRef.current) {
+          polylineRef.current.forEach(polyline => polyline.setMap(null));
+          polylineRef.current = [];
+        }
+        routeSegmentsRef.current = [];
 
         // Add all markers first
         const markers = [];
@@ -1220,15 +1251,15 @@ const Page = () => {
               }
               .location-marker {
                 animation: pulse 2s infinite;
-                filter: drop-shadow(0 0 8px rgba(255, 152, 0, 0.8));
+                filter: drop-shadow(0 0 8px rgba(76, 175, 80, 0.8));
               }
             </style>
             <div class="location-marker">
               <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <circle cx="12" cy="12" r="10" fill="#FF9800" fill-opacity="0.6"/>
-                <circle cx="12" cy="12" r="8" fill="#FF9800" fill-opacity="0.8"/>
-                <circle cx="12" cy="12" r="6" fill="#FF9800" fill-opacity="0.9"/>
-                <circle cx="12" cy="12" r="4" fill="#FF9800"/>
+                <circle cx="12" cy="12" r="10" fill="#4CAF50" fill-opacity="0.6"/>
+                <circle cx="12" cy="12" r="8" fill="#4CAF50" fill-opacity="0.8"/>
+                <circle cx="12" cy="12" r="6" fill="#4CAF50" fill-opacity="0.9"/>
+                <circle cx="12" cy="12" r="4" fill="#4CAF50"/>
                 <circle cx="12" cy="12" r="2" fill="white"/>
               </svg>
             </div>
@@ -1239,8 +1270,9 @@ const Page = () => {
             position: currentPosition, 
             title: 'Current Location', 
             content: currentLocationMarker,
-            collisionBehavior: window.google.maps.CollisionBehavior.OPTIONAL_AND_HIDES_LOWER_PRIORITY 
+            collisionBehavior: window.google.maps.CollisionBehavior.OPTIONAL_AND_HIDES_LOWER_PRIORITY
           });
+
           markers.push(currentPosition);
           console.log('Current location marker added to map');
         }
@@ -1265,7 +1297,7 @@ const Page = () => {
             position: pickupPosition, 
             title: 'Pickup Location', 
             content: pickupMarker.element, 
-            collisionBehavior: window.google.maps.CollisionBehavior.OPTIONAL_AND_HIDES_LOWER_PRIORITY 
+            collisionBehavior: window.google.maps.CollisionBehavior.OPTIONAL_AND_HIDES_LOWER_PRIORITY
           });
           markers.push(pickupPosition);
         }
@@ -1275,8 +1307,8 @@ const Page = () => {
           console.log('Adding drop-off marker');
           const dropoffMarker = new window.google.maps.marker.PinElement({ 
             scale: 1, 
-            background: '#4CAF50', 
-            borderColor: '#388E3C', 
+            background: '#FF9800', 
+            borderColor: '#F57C00', 
             glyphColor: '#FFFFFF' 
           });
           
@@ -1290,14 +1322,13 @@ const Page = () => {
             position: dropoffPosition, 
             title: 'Drop-off Location', 
             content: dropoffMarker.element, 
-            collisionBehavior: window.google.maps.CollisionBehavior.OPTIONAL_AND_HIDES_LOWER_PRIORITY 
+            collisionBehavior: window.google.maps.CollisionBehavior.OPTIONAL_AND_HIDES_LOWER_PRIORITY
           });
           markers.push(dropoffPosition);
         }
 
         // After all markers are added, center the map
         if (markers.length > 0) {
-          // If we have current location, center on it
           if (searchedContract.current_location_geo?.coordinates) {
             const currentPosition = {
               lat: parseFloat(searchedContract.current_location_geo.coordinates[1]),
@@ -1307,12 +1338,10 @@ const Page = () => {
             newMap.setZoom(15);
             console.log('Map centered on current location');
           } else {
-            // Otherwise, fit bounds to show all markers
             const bounds = new window.google.maps.LatLngBounds();
             markers.forEach(marker => bounds.extend(marker));
             newMap.fitBounds(bounds);
-            // Add some padding to the bounds
-            const padding = 0.02; // degrees
+            const padding = 0.02;
             const ne = bounds.getNorthEast();
             const sw = bounds.getSouthWest();
             bounds.extend({ lat: ne.lat() + padding, lng: ne.lng() + padding });
@@ -1322,7 +1351,10 @@ const Page = () => {
           }
         }
 
-        console.log('Map initialization completed successfully');
+        // Draw complete route if we have route history
+        if (pathRef.current.length >= 2) {
+          drawCompleteRoute(newMap, pathRef.current);
+        }
 
       } catch (error) {
         console.error('Error in map initialization:', error);
@@ -1332,7 +1364,7 @@ const Page = () => {
     return () => clearTimeout(timer);
   }, [isScriptLoaded, contractList, mapRef, activeSearch, setMap]);
 
-  // Poll for current location updates
+  // Update the polling effect for real-time updates
   useEffect(() => {
     let intervalId;
     let isPolling = false;
@@ -1356,9 +1388,14 @@ const Page = () => {
           lng: result.data.current_location_geo.coordinates[0]
         };
 
+        console.log('New position received:', newPosition);
+
+        // Update current location marker
         if (currentLocationMarkerRef.current) {
+          console.log('Updating existing current location marker');
           currentLocationMarkerRef.current.position = newPosition;
         } else {
+          console.log('Creating new current location marker');
           // Create a custom SVG marker for current location
           const currentLocationMarker = document.createElement('div');
           currentLocationMarker.innerHTML = `
@@ -1379,15 +1416,15 @@ const Page = () => {
               }
               .location-marker {
                 animation: pulse 2s infinite;
-                filter: drop-shadow(0 0 8px rgba(255, 152, 0, 0.8));
+                filter: drop-shadow(0 0 8px rgba(76, 175, 80, 0.8));
               }
             </style>
             <div class="location-marker">
               <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <circle cx="12" cy="12" r="10" fill="#FF9800" fill-opacity="0.6"/>
-                <circle cx="12" cy="12" r="8" fill="#FF9800" fill-opacity="0.8"/>
-                <circle cx="12" cy="12" r="6" fill="#FF9800" fill-opacity="0.9"/>
-                <circle cx="12" cy="12" r="4" fill="#FF9800"/>
+                <circle cx="12" cy="12" r="10" fill="#4CAF50" fill-opacity="0.6"/>
+                <circle cx="12" cy="12" r="8" fill="#4CAF50" fill-opacity="0.8"/>
+                <circle cx="12" cy="12" r="6" fill="#4CAF50" fill-opacity="0.9"/>
+                <circle cx="12" cy="12" r="4" fill="#4CAF50"/>
                 <circle cx="12" cy="12" r="2" fill="white"/>
               </svg>
             </div>
@@ -1402,6 +1439,45 @@ const Page = () => {
           });
         }
 
+        // Update path and polyline from route_history if available
+        let routeHistory = result.data.route_history && Array.isArray(result.data.route_history) ? result.data.route_history : [];
+        console.log('Route history from API:', routeHistory);
+        
+        // Convert route history to path points
+        const newPathPoints = routeHistory.map(point => ({ lat: point.lat, lng: point.lng }));
+        
+        // Add the new position if it's not already the last point
+        if (!newPathPoints.length || 
+            (newPathPoints[newPathPoints.length - 1].lat !== newPosition.lat || 
+             newPathPoints[newPathPoints.length - 1].lng !== newPosition.lng)) {
+          console.log('Adding new position to path');
+          newPathPoints.push(newPosition);
+        }
+
+        // Update pathRef with new points
+        pathRef.current = newPathPoints;
+        console.log('Updated path points:', pathRef.current);
+
+        // If we have at least 2 points, update the polyline
+        if (pathRef.current.length >= 2) {
+          console.log('Drawing complete route with updated points');
+          await drawCompleteRoute(map, pathRef.current);
+        }
+
+        // Save updated route_history to Supabase
+        console.log('Saving updated route history to Supabase');
+        await fetch(`/api/admin`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'updateRouteHistory',
+            params: {
+              contractId: searchedContract.id,
+              route_history: pathRef.current.map(point => ({ lat: point.lat, lng: point.lng }))
+            }
+          })
+        });
+
         setMapError(null);
       } catch (err) {
         console.error('Error updating location:', err);
@@ -1412,14 +1488,44 @@ const Page = () => {
     };
 
     if (activeSearch && mapRef.current) {
+      console.log('Starting location polling');
       updateCurrentLocation();
       intervalId = setInterval(updateCurrentLocation, 5000);
     }
 
     return () => {
-      if (intervalId) clearInterval(intervalId);
+      if (intervalId) {
+        console.log('Cleaning up location polling interval');
+        clearInterval(intervalId);
+      }
     };
   }, [contractList, mapRef, activeSearch, map]);
+
+  // Initialize map when script is loaded
+  useEffect(() => {
+    if (isScriptLoaded && !mapRef.current && !mapError) {
+      try {
+        console.log('Initializing map...');
+        const map = new window.google.maps.Map(document.getElementById('map'), {
+          center: { lat: 1.3521, lng: 103.8198 }, // Singapore
+          zoom: 12,
+          mapTypeControl: false,
+          streetViewControl: false,
+          fullscreenControl: false,
+        });
+
+        // Initialize directions service
+        directionsServiceRef.current = new window.google.maps.DirectionsService();
+
+        mapRef.current = map;
+        setMap(map);
+        console.log('Map initialized successfully');
+      } catch (error) {
+        console.error('Error initializing map:', error);
+        setMapError('Failed to initialize map. Please try again.');
+      }
+    }
+  }, [isScriptLoaded, mapError, setMap]);
 
   const handleTabChange = (event, newValue) => {
     setSelectedTab(newValue);
@@ -1459,9 +1565,11 @@ const Page = () => {
 
   // Handler for assignment completion
   const handleAssignmentComplete = (contractId) => {
-    setRedirectContractId(contractId);
-    setSelectedTab(0); // Switch to Contract List
+    // Refresh contract list after assignment is completed
+    fetchContracts();
   };
+
+  // drawCompleteRoute function moved to LuggageTrackingTab component
 
   if (!mounted) {
     return null; // Prevent hydration errors: only render on client
@@ -1540,6 +1648,112 @@ const LuggageTrackingTab = ({
   setPage,
   rowsPerPage
 }) => {
+  const directionsServiceRef = useRef(null);
+  const routeSegmentsRef = useRef([]);
+  const polylineRef = useRef(null);
+  const pathRef = useRef([]);
+  const currentLocationMarkerRef = useRef(null);
+
+  // Helper to update polyline with directions between two points (road-based)
+  const updatePolylineWithDirections = async (start, end, mapInstance) => {
+    console.log('updatePolylineWithDirections called with:', { start, end });
+    if (!directionsServiceRef.current || !mapInstance) {
+      console.error('Missing required dependencies:', { 
+        hasDirectionsService: !!directionsServiceRef.current, 
+        hasMapInstance: !!mapInstance 
+      });
+      return;
+    }
+
+    try {
+      console.log('Requesting directions from Google Maps API...');
+      const result = await directionsServiceRef.current.route({
+        origin: start,
+        destination: end,
+        travelMode: window.google.maps.TravelMode.DRIVING,
+      });
+
+      console.log('Directions received:', result);
+      const routePath = result.routes[0].overview_path;
+      console.log('Route path points:', routePath);
+      routeSegmentsRef.current.push(routePath);
+
+      // Create a new polyline for this segment
+      console.log('Creating new polyline with path:', routePath);
+      const newPolyline = new window.google.maps.Polyline({
+        path: routePath,
+        geodesic: true,
+        strokeColor: '#4CAF50',
+        strokeOpacity: 0.8,
+        strokeWeight: 5,
+        map: mapInstance
+      });
+
+      // Store the polyline reference
+      if (!polylineRef.current) {
+        console.log('Initializing polylineRef array');
+        polylineRef.current = [];
+      }
+      polylineRef.current.push(newPolyline);
+      console.log('Current polyline count:', polylineRef.current.length);
+    } catch (error) {
+      console.error('Error getting directions:', error);
+      console.log('Falling back to straight line between points');
+      // Fallback to straight line if directions service fails
+      const fallbackPath = [start, end];
+      routeSegmentsRef.current.push(fallbackPath);
+
+      console.log('Creating fallback polyline with path:', fallbackPath);
+      const newPolyline = new window.google.maps.Polyline({
+        path: fallbackPath,
+        geodesic: true,
+        strokeColor: '#4CAF50',
+        strokeOpacity: 0.8,
+        strokeWeight: 6,
+        map: mapInstance
+      });
+
+      if (!polylineRef.current) {
+        console.log('Initializing polylineRef array for fallback');
+        polylineRef.current = [];
+      }
+      polylineRef.current.push(newPolyline);
+      console.log('Current polyline count after fallback:', polylineRef.current.length);
+    }
+  };
+
+  // Helper to draw complete route history
+  const drawCompleteRoute = async (mapInstance, pathArr) => {
+    console.log('drawCompleteRoute called with path array:', pathArr);
+    if (!directionsServiceRef.current || !mapInstance || !pathArr || pathArr.length < 2) {
+      console.error('Invalid parameters for drawCompleteRoute:', {
+        hasDirectionsService: !!directionsServiceRef.current,
+        hasMapInstance: !!mapInstance,
+        pathArrLength: pathArr?.length
+      });
+      return;
+    }
+
+    // Clear existing polylines
+    if (polylineRef.current) {
+      console.log('Clearing existing polylines:', polylineRef.current.length);
+      polylineRef.current.forEach(polyline => polyline.setMap(null));
+      polylineRef.current = [];
+    }
+    routeSegmentsRef.current = [];
+
+    // Draw route segments
+    console.log('Drawing route segments...');
+    for (let i = 0; i < pathArr.length - 1; i++) {
+      console.log(`Drawing segment ${i + 1}/${pathArr.length - 1}:`, {
+        start: pathArr[i],
+        end: pathArr[i + 1]
+      });
+      await updatePolylineWithDirections(pathArr[i], pathArr[i + 1], mapInstance);
+    }
+    console.log('Route drawing complete');
+  };
+
   // Autofill search if trackContractId is provided
   useEffect(() => {
     if (trackContractId) {
@@ -1812,7 +2026,7 @@ const LuggageTrackingTab = ({
                 <Typography variant="h6" sx={{ mb: 2 }}>Live Tracking</Typography>
                 <Box sx={{ display: 'flex', gap: 2, mb: 2, flexWrap: 'wrap' }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Box sx={{ width: 16, height: 16, borderRadius: '50%', bgcolor: '#4CAF50', border: '2px solid #388E3C' }} />
+                    <Box sx={{ width: 16, height: 16, borderRadius: '50%', bgcolor: '#FF9800', border: '2px solid #F57C00' }} />
                     <Typography variant="body2">Drop-off Location</Typography>
                   </Box>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -1820,7 +2034,7 @@ const LuggageTrackingTab = ({
                     <Typography variant="body2">Pickup Location</Typography>
                   </Box>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Box sx={{ width: 16, height: 16, borderRadius: '50%', bgcolor: '#FF9800', border: '2px solid #F57C00' }} />
+                    <Box sx={{ width: 16, height: 16, borderRadius: '50%', bgcolor: '#4CAF50', border: '2px solid #388E3C' }} />
                     <Typography variant="body2">Current Location</Typography>
                   </Box>
                 </Box>

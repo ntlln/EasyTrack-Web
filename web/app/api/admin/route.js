@@ -614,6 +614,24 @@ export async function POST(request) {
       return NextResponse.json({ data });
     }
 
+    // Handle updateRouteHistory
+    if (action === 'updateRouteHistory') {
+      const { contractId, route_history } = params;
+      if (!contractId || !route_history) {
+        return NextResponse.json({ error: 'Missing contractId or route_history' }, { status: 400 });
+      }
+      const { error } = await supabase
+        .from('contract')
+        .update({ route_history })
+        .eq('id', contractId);
+
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+
+      return NextResponse.json({ success: true });
+    }
+
     return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
   } catch (error) {
     console.error('Server error:', error);

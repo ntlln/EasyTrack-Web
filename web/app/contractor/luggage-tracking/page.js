@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { Box, Typography, TextField, Paper, Divider, IconButton, Collapse, CircularProgress } from "@mui/material";
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
+import CloseIcon from '@mui/icons-material/Close';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import dynamic from 'next/dynamic';
 import { useSearchParams, useRouter } from 'next/navigation';
@@ -28,6 +29,10 @@ export default function Page() {
   const mapRef = useRef(null);
   const markerRef = useRef(null);
   const currentLocationMarkerRef = useRef(null);
+  const pathRef = useRef([]);
+  const polylineRef = useRef(null);
+  const directionsServiceRef = useRef(null);
+  const routeSegmentsRef = useRef([]);
   const supabase = createClientComponentClient();
 
   // Handle contract ID from URL
@@ -39,30 +44,223 @@ export default function Page() {
     }
   }, [searchParams]);
 
-  // Poll for current location updates
+  // Fetch contract and luggage info (moved out for reuse)
+  const fetchData = async (id = contractId) => {
+    if (!id.trim()) return;
+    setError(null);
+    try {
+      const { data: contracts, error: contractError } = await supabase.from('contract').select(`id, created_at, accepted_at, pickup_at, delivered_at, cancelled_at, pickup_location, pickup_location_geo, drop_off_location, drop_off_location_geo, current_location_geo, contract_status_id, contract_status(status_name), airline_id, delivery_id, airline:airline_id (*), delivery:delivery_id (*), route_history`).eq('id', id).single();
+      if (contractError) throw contractError;
+      if (contracts) {
+        const { data: luggage, error: luggageError } = await supabase.from('contract_luggage_information').select('*').eq('contract_id', contracts.id);
+        if (luggageError) throw luggageError;
+        setContract(prev => {
+          const newContract = { ...contracts, luggage: luggage || [] };
+          return JSON.stringify(prev) !== JSON.stringify(newContract) ? newContract : prev;
+        });
+      }
+    } catch (err) { setError(err.message || 'Failed to fetch contract'); }
+  };
+
+  // Reset map/markers only when contractId changes
+  useEffect(() => {
+    if (!contractId) return;
+    // Reset map and markers
+    if (map) setMap(null);
+    if (markerRef.current) { markerRef.current.map = null; markerRef.current = null; }
+    if (currentLocationMarkerRef.current) { currentLocationMarkerRef.current.map = null; currentLocationMarkerRef.current = null; }
+    setIsScriptLoaded(false);
+    fetchData(contractId);
+  }, [contractId]);
+
+  // Real-time subscription for contract changes (no reset)
+  useEffect(() => {
+    if (!contractId) return;
+    const subscription = supabase
+      .channel(`contract-${contractId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'contract',
+          filter: `id=eq.${contractId}`,
+        },
+        () => fetchData(contractId)
+      )
+      .subscribe();
+    return () => { subscription.unsubscribe(); };
+  }, [contractId]);
+
+  // Update polyline with directions
+  const updatePolylineWithDirections = async (start, end) => {
+    if (!directionsServiceRef.current || !map) return;
+
+    try {
+      const result = await directionsServiceRef.current.route({
+        origin: start,
+        destination: end,
+        travelMode: window.google.maps.TravelMode.DRIVING,
+      });
+
+      const routePath = result.routes[0].overview_path;
+      routeSegmentsRef.current.push(routePath);
+
+      // Create a new polyline for this segment
+      const newPolyline = new window.google.maps.Polyline({
+        path: routePath,
+        geodesic: true,
+        strokeColor: '#4CAF50',
+        strokeOpacity: 0.8,
+        strokeWeight: 5,
+        map: map
+      });
+
+      // Store the polyline reference
+      if (!polylineRef.current) {
+        polylineRef.current = [];
+      }
+      polylineRef.current.push(newPolyline);
+    } catch (error) {
+      console.error('Error getting directions:', error);
+      // Fallback to straight line if directions service fails
+      const fallbackPath = [start, end];
+      routeSegmentsRef.current.push(fallbackPath);
+
+      const newPolyline = new window.google.maps.Polyline({
+        path: fallbackPath,
+        geodesic: true,
+        strokeColor: '#4CAF50',
+        strokeOpacity: 0.8,
+        strokeWeight: 6,
+        map: map
+      });
+
+      if (!polylineRef.current) {
+        polylineRef.current = [];
+      }
+      polylineRef.current.push(newPolyline);
+    }
+  };
+
+  // Draw complete route history
+  const drawCompleteRoute = async () => {
+    if (!directionsServiceRef.current || !map || pathRef.current.length < 2) return;
+
+    // Clear existing polylines
+    if (polylineRef.current) {
+      polylineRef.current.forEach(polyline => polyline.setMap(null));
+      polylineRef.current = [];
+    }
+    routeSegmentsRef.current = [];
+
+    // Draw route segments
+    for (let i = 0; i < pathRef.current.length - 1; i++) {
+      await updatePolylineWithDirections(pathRef.current[i], pathRef.current[i + 1]);
+    }
+  };
+
+  // Poll for current location updates (map only)
   useEffect(() => {
     let intervalId;
-    const updateCurrentLocation = async () => {
+    const updateMapLocation = async () => {
       if (!contract?.id) return;
       try {
-        const { data, error: locationError } = await supabase.from('contract').select('current_location_geo').eq('id', contract.id).single();
+        const { data, error: locationError } = await supabase
+          .from('contract')
+          .select('current_location_geo, route_history')
+          .eq('id', contract.id)
+          .single();
+
         if (locationError) throw locationError;
         if (data?.current_location_geo && map) {
-          const newPosition = { lat: data.current_location_geo.coordinates[1], lng: data.current_location_geo.coordinates[0] };
+          const newPosition = {
+            lat: data.current_location_geo.coordinates[1],
+            lng: data.current_location_geo.coordinates[0]
+          };
+
+          // Update current location marker
           if (currentLocationMarkerRef.current) {
             currentLocationMarkerRef.current.position = newPosition;
           } else {
-            const currentLocationMarker = new window.google.maps.marker.PinElement({ scale: 1, background: '#FF9800', borderColor: '#F57C00', glyphColor: '#FFFFFF' });
-            currentLocationMarkerRef.current = new window.google.maps.marker.AdvancedMarkerElement({ map: map, position: newPosition, title: 'Current Location', content: currentLocationMarker.element, collisionBehavior: window.google.maps.CollisionBehavior.OPTIONAL_AND_HIDES_LOWER_PRIORITY });
+            const currentLocationMarker = document.createElement('div');
+            currentLocationMarker.innerHTML = `
+              <style>
+                @keyframes pulse {
+                  0% {
+                    transform: scale(1);
+                    opacity: 1;
+                  }
+                  50% {
+                    transform: scale(1.2);
+                    opacity: 0.8;
+                  }
+                  100% {
+                    transform: scale(1);
+                    opacity: 1;
+                  }
+                }
+                .location-marker {
+                  animation: pulse 2s infinite;
+                  filter: drop-shadow(0 0 8px rgba(76, 175, 80, 0.8));
+                }
+              </style>
+              <div class="location-marker">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <circle cx="12" cy="12" r="10" fill="#4CAF50" fill-opacity="0.6"/>
+                  <circle cx="12" cy="12" r="8" fill="#4CAF50" fill-opacity="0.8"/>
+                  <circle cx="12" cy="12" r="6" fill="#4CAF50" fill-opacity="0.9"/>
+                  <circle cx="12" cy="12" r="4" fill="#4CAF50"/>
+                  <circle cx="12" cy="12" r="2" fill="white"/>
+                </svg>
+              </div>
+            `;
+            
+            currentLocationMarkerRef.current = new window.google.maps.marker.AdvancedMarkerElement({
+              map: map,
+              position: newPosition,
+              title: 'Current Location',
+              content: currentLocationMarker,
+              collisionBehavior: window.google.maps.CollisionBehavior.OPTIONAL_AND_HIDES_LOWER_PRIORITY
+            });
           }
+
+          // Update path and polyline from route_history if available
+          let routeHistory = data.route_history && Array.isArray(data.route_history) ? data.route_history : [];
+          pathRef.current = routeHistory.map(point => ({ lat: point.lat, lng: point.lng }));
+          // Add the new position if it's not already the last point
+          if (!pathRef.current.length || (pathRef.current[pathRef.current.length - 1].lat !== newPosition.lat || pathRef.current[pathRef.current.length - 1].lng !== newPosition.lng)) {
+            pathRef.current.push(newPosition);
+          }
+
+          // If we have at least 2 points, update the polyline
+          if (pathRef.current.length >= 2) {
+            const start = pathRef.current[pathRef.current.length - 2];
+            const end = pathRef.current[pathRef.current.length - 1];
+            await updatePolylineWithDirections(start, end);
+          }
+
+          // Save updated route_history to Supabase
+          await supabase
+            .from('contract')
+            .update({
+              route_history: pathRef.current.map(point => ({ lat: point.lat, lng: point.lng }))
+            })
+            .eq('id', contract.id);
         }
-      } catch (err) {}
+      } catch (err) {
+        console.error('Error updating location:', err);
+      }
     };
+
     if (contract?.id && map) {
-      updateCurrentLocation();
-      intervalId = setInterval(updateCurrentLocation, 5000);
+      updateMapLocation();
+      intervalId = setInterval(updateMapLocation, 5000);
     }
-    return () => { if (intervalId) clearInterval(intervalId); };
+
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
   }, [contract?.id, map]);
 
   // Google Maps script loader
@@ -86,115 +284,488 @@ export default function Page() {
   const initMap = () => {
     if (!window.google || !mapRef.current || !contract) return;
     try {
-      const defaultLocation = contract.drop_off_location_geo ? { lat: contract.drop_off_location_geo.coordinates[1], lng: contract.drop_off_location_geo.coordinates[0] } : { lat: 14.5350, lng: 120.9821 };
-      const mapOptions = { center: defaultLocation, zoom: 15, mapTypeControl: false, streetViewControl: false, fullscreenControl: false, mapTypeId: 'roadmap', mapId: process.env.NEXT_PUBLIC_GOOGLE_MAPS_ID };
+      // Load route_history if available
+      if (contract.route_history && Array.isArray(contract.route_history) && contract.route_history.length > 0) {
+        pathRef.current = contract.route_history.map(point => ({ lat: point.lat, lng: point.lng }));
+      } else if (contract.current_location_geo?.coordinates) {
+        pathRef.current = [{
+          lat: contract.current_location_geo.coordinates[1],
+          lng: contract.current_location_geo.coordinates[0]
+        }];
+      } else {
+        pathRef.current = [];
+      }
+      if (polylineRef.current) {
+        polylineRef.current.forEach(polyline => polyline.setMap(null));
+        polylineRef.current = [];
+      }
+      routeSegmentsRef.current = [];
+
+      const defaultCenter = { lat: 14.5350, lng: 120.9821 };
+      const mapOptions = {
+        center: defaultCenter,
+        zoom: 12,
+        mapTypeControl: false,
+        streetViewControl: false,
+        fullscreenControl: false,
+        zoomControl: false,
+        scaleControl: false,
+        rotateControl: false,
+        panControl: false,
+        mapTypeId: 'roadmap',
+        mapId: process.env.NEXT_PUBLIC_GOOGLE_MAPS_ID,
+        gestureHandling: 'greedy',
+        draggableCursor: 'grab',
+        draggingCursor: 'grabbing'
+      };
+
       const newMap = new window.google.maps.Map(mapRef.current, mapOptions);
       setMap(newMap);
-      if (contract.drop_off_location_geo) {
-        const dropoffMarker = new window.google.maps.marker.PinElement({ scale: 1, background: '#4CAF50', borderColor: '#388E3C', glyphColor: '#FFFFFF' });
-        markerRef.current = new window.google.maps.marker.AdvancedMarkerElement({ map: newMap, position: defaultLocation, title: 'Drop-off Location', content: dropoffMarker.element, collisionBehavior: window.google.maps.CollisionBehavior.OPTIONAL_AND_HIDES_LOWER_PRIORITY });
+      directionsServiceRef.current = new window.google.maps.DirectionsService();
+
+      const markers = [];
+
+      if (contract.current_location_geo?.coordinates) {
+        const currentPosition = {
+          lat: contract.current_location_geo.coordinates[1],
+          lng: contract.current_location_geo.coordinates[0]
+        };
+
+        const currentLocationMarker = document.createElement('div');
+        currentLocationMarker.innerHTML = `
+          <style>
+            @keyframes pulse {
+              0% {
+                transform: scale(1);
+                opacity: 1;
+              }
+              50% {
+                transform: scale(1.2);
+                opacity: 0.8;
+              }
+              100% {
+                transform: scale(1);
+                opacity: 1;
+              }
+            }
+            .location-marker {
+              animation: pulse 2s infinite;
+              filter: drop-shadow(0 0 8px rgba(76, 175, 80, 0.8));
+            }
+          </style>
+          <div class="location-marker">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="12" cy="12" r="10" fill="#4CAF50" fill-opacity="0.6"/>
+              <circle cx="12" cy="12" r="8" fill="#4CAF50" fill-opacity="0.8"/>
+              <circle cx="12" cy="12" r="6" fill="#4CAF50" fill-opacity="0.9"/>
+              <circle cx="12" cy="12" r="4" fill="#4CAF50"/>
+              <circle cx="12" cy="12" r="2" fill="white"/>
+            </svg>
+          </div>
+        `;
+
+        currentLocationMarkerRef.current = new window.google.maps.marker.AdvancedMarkerElement({
+          map: newMap,
+          position: currentPosition,
+          title: 'Current Location',
+          content: currentLocationMarker,
+          collisionBehavior: window.google.maps.CollisionBehavior.OPTIONAL_AND_HIDES_LOWER_PRIORITY
+        });
+
+        markers.push(currentPosition);
       }
-      if (contract.pickup_location_geo) {
-        const pickupMarker = new window.google.maps.marker.PinElement({ scale: 1, background: '#2196F3', borderColor: '#1976D2', glyphColor: '#FFFFFF' });
-        new window.google.maps.marker.AdvancedMarkerElement({ map: newMap, position: { lat: contract.pickup_location_geo.coordinates[1], lng: contract.pickup_location_geo.coordinates[0] }, title: 'Pickup Location', content: pickupMarker.element, collisionBehavior: window.google.maps.CollisionBehavior.OPTIONAL_AND_HIDES_LOWER_PRIORITY });
+
+      if (contract.pickup_location_geo?.coordinates) {
+        const pickupMarker = new window.google.maps.marker.PinElement({
+          scale: 1,
+          background: '#2196F3',
+          borderColor: '#1976D2',
+          glyphColor: '#FFFFFF'
+        });
+
+        const pickupPosition = {
+          lat: contract.pickup_location_geo.coordinates[1],
+          lng: contract.pickup_location_geo.coordinates[0]
+        };
+
+        new window.google.maps.marker.AdvancedMarkerElement({
+          map: newMap,
+          position: pickupPosition,
+          title: 'Pickup Location',
+          content: pickupMarker.element,
+          collisionBehavior: window.google.maps.CollisionBehavior.OPTIONAL_AND_HIDES_LOWER_PRIORITY
+        });
+
+        markers.push(pickupPosition);
       }
-      if (contract.current_location_geo) {
-        const currentLocationMarker = new window.google.maps.marker.PinElement({ scale: 1, background: '#FF9800', borderColor: '#F57C00', glyphColor: '#FFFFFF' });
-        currentLocationMarkerRef.current = new window.google.maps.marker.AdvancedMarkerElement({ map: newMap, position: { lat: contract.current_location_geo.coordinates[1], lng: contract.current_location_geo.coordinates[0] }, title: 'Current Location', content: currentLocationMarker.element, collisionBehavior: window.google.maps.CollisionBehavior.OPTIONAL_AND_HIDES_LOWER_PRIORITY });
+
+      if (contract.drop_off_location_geo?.coordinates) {
+        const dropoffMarker = new window.google.maps.marker.PinElement({
+          scale: 1,
+          background: '#FF9800',
+          borderColor: '#F57C00',
+          glyphColor: '#FFFFFF'
+        });
+
+        const dropoffPosition = {
+          lat: contract.drop_off_location_geo.coordinates[1],
+          lng: contract.drop_off_location_geo.coordinates[0]
+        };
+
+        markerRef.current = new window.google.maps.marker.AdvancedMarkerElement({
+          map: newMap,
+          position: dropoffPosition,
+          title: 'Drop-off Location',
+          content: dropoffMarker.element,
+          collisionBehavior: window.google.maps.CollisionBehavior.OPTIONAL_AND_HIDES_LOWER_PRIORITY
+        });
+
+        markers.push(dropoffPosition);
       }
-    } catch (error) { setMapError(error.message); }
+
+      // Draw complete route if we have route history
+      if (pathRef.current.length >= 2) {
+        drawCompleteRoute();
+      }
+
+      if (markers.length > 0) {
+        if (contract.current_location_geo?.coordinates) {
+          const currentPosition = {
+            lat: contract.current_location_geo.coordinates[1],
+            lng: contract.current_location_geo.coordinates[0]
+          };
+          newMap.setCenter(currentPosition);
+          newMap.setZoom(15);
+        } else {
+          const bounds = new window.google.maps.LatLngBounds();
+          markers.forEach(marker => bounds.extend(marker));
+          newMap.fitBounds(bounds);
+          const padding = 0.02;
+          const ne = bounds.getNorthEast();
+          const sw = bounds.getSouthWest();
+          bounds.extend({ lat: ne.lat() + padding, lng: ne.lng() + padding });
+          bounds.extend({ lat: sw.lat() - padding, lng: sw.lng() - padding });
+          newMap.fitBounds(bounds);
+        }
+      }
+    } catch (error) {
+      setMapError(error.message);
+    }
   };
 
-  // Contract search
-  const handleSearch = async (id = contractId) => {
-    if (!id.trim()) return;
-    setLoading(true); setError(null); setContract(null); if (map) setMap(null); if (markerRef.current) { markerRef.current.map = null; markerRef.current = null; } if (currentLocationMarkerRef.current) { currentLocationMarkerRef.current.map = null; currentLocationMarkerRef.current = null; } setIsScriptLoaded(false);
-    try {
-      const { data: contracts, error: contractError } = await supabase.from('contract').select(`id, created_at, accepted_at, pickup_at, delivered_at, cancelled_at, pickup_location, pickup_location_geo, drop_off_location, drop_off_location_geo, current_location_geo, contract_status_id, contract_status(status_name), airline_id, delivery_id, airline:airline_id (*), delivery:delivery_id (*)`).eq('id', id).single();
-      if (contractError) throw contractError;
-      if (contracts) {
-        const { data: luggage, error: luggageError } = await supabase.from('contract_luggage_information').select('*').eq('contract_id', contracts.id);
-        if (luggageError) throw luggageError;
-        setContract({ ...contracts, luggage: luggage || [] });
-      }
-    } catch (err) { setError(err.message || 'Failed to fetch contract'); } finally { setLoading(false); }
-  };
+  // Replace handleSearch to use fetchData
+  const handleSearch = (id = contractId) => fetchData(id);
 
   // Expand/collapse
   const handleExpandClick = () => { setExpanded(!expanded); };
 
+  const handleClearSearch = () => {
+    setContractId("");
+    setContract(null);
+    if (map) setMap(null);
+    if (markerRef.current) {
+      markerRef.current.map = null;
+      markerRef.current = null;
+    }
+    if (currentLocationMarkerRef.current) {
+      currentLocationMarkerRef.current.map = null;
+      currentLocationMarkerRef.current = null;
+    }
+    setIsScriptLoaded(false);
+  };
+
   // Render
   return (
     <Box sx={{display: "flex", flexDirection: "column", gap: 4 }}>
-      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <IconButton onClick={() => router.push('/contractor/booking')} sx={{ mr: 1, color: 'primary.main' }}><ChevronLeftIcon /></IconButton>
-          <Typography variant="h4" color="primary.main" fontWeight="bold">Luggage Tracking</Typography>
+      {!contract ? (
+        <Box sx={{ 
+          display: "flex", 
+          flexDirection: "column", 
+          alignItems: "center", 
+          justifyContent: "center", 
+          minHeight: "80vh",
+          gap: 2
+        }}>
+          <Typography variant="h4" color="primary.main" fontWeight="bold" sx={{ mb: 2 }}>
+            Track Your Luggage
+          </Typography>
+          <Box sx={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: 1,
+            width: "100%",
+            maxWidth: "400px"
+          }}>
+            <TextField 
+              label="Track Luggage" 
+              placeholder="Enter Contract ID" 
+              variant="outlined" 
+              size="small" 
+              value={contractId} 
+              onChange={(e) => setContractId(e.target.value)} 
+              onKeyPress={(e) => e.key === 'Enter' && handleSearch()} 
+              sx={{ width: "100%" }}
+              InputProps={{
+                endAdornment: contractId && (
+                  <IconButton
+                    size="small"
+                    onClick={handleClearSearch}
+                    sx={{ 
+                      color: 'text.secondary',
+                      '&:hover': {
+                        color: 'text.primary'
+                      }
+                    }}
+                  >
+                    <CloseIcon fontSize="small" />
+                  </IconButton>
+                )
+              }}
+            />
+          </Box>
         </Box>
-        <TextField label="Track Luggage" placeholder="Enter Contract ID" variant="outlined" size="small" value={contractId} onChange={(e) => setContractId(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && handleSearch()} sx={{ width: "300px", '& .MuiOutlinedInput-root': { '& input': { textAlign: 'right', paddingRight: '14px' } } }} />
-      </Box>
-      {loading && (<Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}><CircularProgress /></Box>)}
-      {error && (<Typography color="error" align="center">{error}</Typography>)}
-      {contract && (<>
-        <Paper elevation={3} sx={{ p: 3, borderRadius: 3, position: 'relative', overflow: 'hidden', border: '1px solid', borderColor: 'divider' }}>
-          <Box>
-            <Typography variant="subtitle1" sx={{ color: 'primary.main', fontWeight: 700, mb: 1, letterSpacing: 0.5 }}>Contract ID: <span style={{ color: '#bdbdbd', fontWeight: 400 }}>{contract.id}</span></Typography>
-            <Divider sx={{ my: 1, bgcolor: 'primary.main' }} />
-            <Typography variant="subtitle2" sx={{ color: 'primary.main', fontWeight: 700, mb: 1 }}>Location Information</Typography>
-            <Box sx={{ ml: 1, mb: 1 }}>
-              <Typography variant="body2" sx={{ color: '#bdbdbd' }}><b>Pickup:</b> <span style={{ color: 'text.primary' }}>{contract.pickup_location || 'N/A'}</span></Typography>
-              {contract.pickup_location_geo && (<Typography variant="body2" sx={{ color: '#bdbdbd' }}><b>Pickup Coordinates:</b> <span style={{ color: 'text.primary' }}>{contract.pickup_location_geo.coordinates[1].toFixed(6)}, {contract.pickup_location_geo.coordinates[0].toFixed(6)}</span></Typography>)}
-              <Typography variant="body2" sx={{ color: '#bdbdbd' }}><b>Drop-off:</b> <span style={{ color: 'text.primary' }}>{contract.drop_off_location || 'N/A'}</span></Typography>
-              {contract.drop_off_location_geo && (<Typography variant="body2" sx={{ color: '#bdbdbd' }}><b>Drop-off Coordinates:</b> <span style={{ color: 'text.primary' }}>{contract.drop_off_location_geo.coordinates[1].toFixed(6)}, {contract.drop_off_location_geo.coordinates[0].toFixed(6)}</span></Typography>)}
+      ) : (
+        <>
+          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <IconButton onClick={() => router.push('/contractor/booking')} sx={{ mr: 1, color: 'primary.main' }}><ChevronLeftIcon /></IconButton>
+              <Typography variant="h4" color="primary.main" fontWeight="bold">Luggage Tracking</Typography>
+            </Box>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <TextField 
+                label="Track Luggage" 
+                placeholder="Enter Contract ID" 
+                variant="outlined" 
+                size="small" 
+                value={contractId} 
+                onChange={(e) => setContractId(e.target.value)} 
+                onKeyPress={(e) => e.key === 'Enter' && handleSearch()} 
+                sx={{ width: "300px" }}
+                InputProps={{
+                  endAdornment: contractId && (
+                    <IconButton
+                      size="small"
+                      onClick={handleClearSearch}
+                      sx={{ 
+                        color: 'text.secondary',
+                        '&:hover': {
+                          color: 'text.primary'
+                        }
+                      }}
+                    >
+                      <CloseIcon fontSize="small" />
+                    </IconButton>
+                  )
+                }}
+              />
             </Box>
           </Box>
-          <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2, position: 'relative', minHeight: 40 }}>{!expanded && (<IconButton onClick={handleExpandClick} aria-expanded={expanded} aria-label="show more" sx={{ background: 'none', color: 'primary.main', borderRadius: 2, '&:hover': { color: 'primary.dark', background: 'none' } }}><ExpandMoreIcon /></IconButton>)}</Box>
-          <Collapse in={expanded} timeout="auto" unmountOnExit>
-            <Divider sx={{ my: 2, bgcolor: 'primary.main' }} />
-            <Typography variant="subtitle2" sx={{ color: 'primary.main', fontWeight: 700, mb: 1 }}>Contractor Information</Typography>
-            <Box sx={{ ml: 1, mb: 1 }}>
-              <Typography variant="body2" sx={{ color: '#bdbdbd' }}><b>Contractor Name:</b> <span style={{ color: 'text.primary' }}>{contract.airline ? `${contract.airline.first_name || ''} ${contract.airline.middle_initial || ''} ${contract.airline.last_name || ''}${contract.airline.suffix ? ` ${contract.airline.suffix}` : ''}`.replace(/  +/g, ' ').trim() : 'N/A'}</span></Typography>
-              <Typography variant="body2" sx={{ color: '#bdbdbd' }}><b>Contractor Email:</b> <span style={{ color: 'text.primary' }}>{contract.airline?.email || 'N/A'}</span></Typography>
-              <Typography variant="body2" sx={{ color: '#bdbdbd' }}><b>Contractor Contact:</b> <span style={{ color: 'text.primary' }}>{contract.airline?.contact_number || 'N/A'}</span></Typography>
-              <Typography variant="body2" sx={{ color: '#bdbdbd' }}><b>Subcontractor Name:</b> <span style={{ color: 'text.primary' }}>{contract.delivery ? `${contract.delivery.first_name || ''} ${contract.delivery.middle_initial || ''} ${contract.delivery.last_name || ''}${contract.delivery.suffix ? ` ${contract.delivery.suffix}` : ''}`.replace(/  +/g, ' ').trim() : 'N/A'}</span></Typography>
-              <Typography variant="body2" sx={{ color: '#bdbdbd' }}><b>Subcontractor Email:</b> <span style={{ color: 'text.primary' }}>{contract.delivery?.email || 'N/A'}</span></Typography>
-              <Typography variant="body2" sx={{ color: '#bdbdbd' }}><b>Subcontractor Contact:</b> <span style={{ color: 'text.primary' }}>{contract.delivery?.contact_number || 'N/A'}</span></Typography>
-              <Typography variant="body2" sx={{ color: '#bdbdbd' }}><b>Status:</b> <span style={{ color: 'primary.main', fontWeight: 700 }}>{contract.contract_status?.status_name || 'N/A'}</span></Typography>
+          {error && (<Typography color="error" align="center">{error}</Typography>)}
+          <Paper elevation={3} sx={{ p: 3, borderRadius: 3, position: 'relative', overflow: 'hidden', border: '1px solid', borderColor: 'divider' }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', position: 'relative' }}>
+              <Box sx={{ flex: 1 }}>
+                <Typography variant="subtitle1" sx={{ color: 'primary.main', fontWeight: 700, mb: 1 }}>
+                  Contract ID: <span style={{ fontWeight: 400 }}>{contract.id}</span>
+                </Typography>
+                <Divider sx={{ my: 1 }} />
+                <Typography variant="subtitle2" sx={{ color: 'primary.main', fontWeight: 700, mb: 1 }}>
+                  Location Information
+                </Typography>
+                <Box sx={{ ml: 1, mb: 1 }}>
+                  <Typography variant="body2">
+                    <b>Pickup:</b> <span>{contract.pickup_location || 'N/A'}</span>
+                  </Typography>
+                  {contract.pickup_location_geo && (
+                    <Typography variant="body2">
+                      <b>Pickup Coordinates:</b>{' '}
+                      <span>
+                        {contract.pickup_location_geo.coordinates[1].toFixed(6)}, {contract.pickup_location_geo.coordinates[0].toFixed(6)}
+                      </span>
+                    </Typography>
+                  )}
+                  <Typography variant="body2">
+                    <b>Drop-off:</b> <span>{contract.drop_off_location || 'N/A'}</span>
+                  </Typography>
+                  {contract.drop_off_location_geo && (
+                    <Typography variant="body2">
+                      <b>Drop-off Coordinates:</b>{' '}
+                      <span>
+                        {contract.drop_off_location_geo.coordinates[1].toFixed(6)}, {contract.drop_off_location_geo.coordinates[0].toFixed(6)}
+                      </span>
+                    </Typography>
+                  )}
+                </Box>
+              </Box>
+              <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', ml: 2 }}>
+                <IconButton
+                  onClick={handleExpandClick}
+                  aria-expanded={expanded}
+                  aria-label="show more"
+                  size="small"
+                  sx={{ 
+                    transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                    transition: 'transform 0.3s',
+                    color: 'primary.main',
+                    '&:hover': {
+                      color: 'primary.dark'
+                    },
+                    mt: 3
+                  }}
+                >
+                  <ExpandMoreIcon />
+                </IconButton>
+              </Box>
             </Box>
-            <Divider sx={{ my: 2, bgcolor: 'primary.main' }} />
-            <Typography variant="subtitle2" sx={{ color: 'primary.main', fontWeight: 700, mb: 1 }}>Luggage Information</Typography>
-            <Box sx={{ ml: 1, mb: 1 }}>{contract.luggage.length === 0 && (<Typography variant="body2" sx={{ color: '#bdbdbd' }}>No luggage info.</Typography>)}{contract.luggage.map((l, lidx) => (<Box key={l.id} sx={{ mb: 2, pl: 1 }}><Typography variant="subtitle2" sx={{ color: 'primary.main', fontWeight: 700 }}>Luggage {lidx + 1}</Typography><Typography variant="body2" sx={{ color: '#bdbdbd' }}>Owner: <span style={{ color: 'text.primary' }}>{l.luggage_owner || 'N/A'}</span></Typography><Typography variant="body2" sx={{ color: '#bdbdbd' }}>Case Number: <span style={{ color: 'text.primary' }}>{l.case_number || 'N/A'}</span></Typography><Typography variant="body2" sx={{ color: '#bdbdbd' }}>Description: <span style={{ color: 'text.primary' }}>{l.item_description || 'N/A'}</span></Typography><Typography variant="body2" sx={{ color: '#bdbdbd' }}>Weight: <span style={{ color: 'text.primary' }}>{l.weight ? `${l.weight} kg` : 'N/A'}</span></Typography><Typography variant="body2" sx={{ color: '#bdbdbd' }}>Contact: <span style={{ color: 'text.primary' }}>{l.contact_number || 'N/A'}</span></Typography></Box>))}</Box>
-            <Divider sx={{ my: 2, bgcolor: 'primary.main' }} />
-            <Typography variant="subtitle2" sx={{ color: 'primary.main', fontWeight: 700, mb: 1 }}>Timeline</Typography>
-            <Box sx={{ ml: 1, mb: 1 }}>
-              <Typography variant="body2" sx={{ color: '#bdbdbd' }}><b>Created:</b> <span style={{ color: 'text.primary' }}>{contract.created_at ? new Date(contract.created_at).toLocaleString() : 'N/A'}</span></Typography>
-              <Typography variant="body2" sx={{ color: '#bdbdbd' }}><b>Accepted:</b> <span style={{ color: 'text.primary' }}>{contract.accepted_at ? new Date(contract.accepted_at).toLocaleString() : 'N/A'}</span></Typography>
-              <Typography variant="body2" sx={{ color: '#bdbdbd' }}><b>Pickup:</b> <span style={{ color: 'text.primary' }}>{contract.pickup_at ? new Date(contract.pickup_at).toLocaleString() : 'N/A'}</span></Typography>
-              <Typography variant="body2" sx={{ color: '#bdbdbd' }}><b>Delivered:</b> <span style={{ color: 'text.primary' }}>{contract.delivered_at ? new Date(contract.delivered_at).toLocaleString() : 'N/A'}</span></Typography>
-              <Typography variant="body2" sx={{ color: '#bdbdbd' }}><b>Cancelled:</b> <span style={{ color: 'text.primary' }}>{contract.cancelled_at ? new Date(contract.cancelled_at).toLocaleString() : 'N/A'}</span></Typography>
+            <Collapse in={expanded} timeout="auto" unmountOnExit>
+              <Divider sx={{ my: 2 }} />
+              <Typography variant="subtitle2" sx={{ color: 'primary.main', fontWeight: 700, mb: 1 }}>
+                Contractor Information
+              </Typography>
+              <Box sx={{ ml: 1, mb: 1 }}>
+                <Typography variant="body2">
+                  <b>Contractor Name:</b>{' '}
+                  <span>
+                    {contract.airline
+                      ? `${contract.airline.first_name || ''} ${contract.airline.middle_initial || ''} ${
+                          contract.airline.last_name || ''
+                        }${contract.airline.suffix ? ` ${contract.airline.suffix}` : ''}`
+                          .replace(/  +/g, ' ')
+                          .trim()
+                      : 'N/A'}
+                  </span>
+                </Typography>
+                <Typography variant="body2">
+                  <b>Contractor Email:</b>{' '}
+                  <span>{contract.airline?.email || 'N/A'}</span>
+                </Typography>
+                <Typography variant="body2">
+                  <b>Contractor Contact:</b>{' '}
+                  <span>{contract.airline?.contact_number || 'N/A'}</span>
+                </Typography>
+                <Typography variant="body2">
+                  <b>Subcontractor Name:</b>{' '}
+                  <span>
+                    {contract.delivery
+                      ? `${contract.delivery.first_name || ''} ${contract.delivery.middle_initial || ''} ${
+                          contract.delivery.last_name || ''
+                        }${contract.delivery.suffix ? ` ${contract.delivery.suffix}` : ''}`
+                          .replace(/  +/g, ' ')
+                          .trim()
+                      : 'N/A'}
+                  </span>
+                </Typography>
+                <Typography variant="body2">
+                  <b>Subcontractor Email:</b>{' '}
+                  <span>{contract.delivery?.email || 'N/A'}</span>
+                </Typography>
+                <Typography variant="body2">
+                  <b>Subcontractor Contact:</b>{' '}
+                  <span>{contract.delivery?.contact_number || 'N/A'}</span>
+                </Typography>
+                <Typography variant="body2">
+                  <b>Status:</b>{' '}
+                  <span style={{ fontWeight: 700 }}>
+                    {contract.contract_status?.status_name || 'N/A'}
+                  </span>
+                </Typography>
+              </Box>
+              <Divider sx={{ my: 2 }} />
+              <Typography variant="subtitle2" sx={{ color: 'primary.main', fontWeight: 700, mb: 1 }}>
+                Luggage Information
+              </Typography>
+              <Box sx={{ ml: 1, mb: 1 }}>
+                {contract.luggage.length === 0 && (
+                  <Typography variant="body2">
+                    No luggage info.
+                  </Typography>
+                )}
+                {contract.luggage.map((l, lidx) => (
+                  <Box key={l.id} sx={{ mb: 2, pl: 1 }}>
+                    <Typography variant="subtitle2" sx={{ color: 'primary.main', fontWeight: 700 }}>
+                      Luggage {lidx + 1}
+                    </Typography>
+                    <Typography variant="body2">
+                      Case Number: <span>{l.case_number || 'N/A'}</span>
+                    </Typography>
+                    <Typography variant="body2">
+                      Flight Number: <span>{l.flight_number || 'N/A'}</span>
+                    </Typography>
+                    <Typography variant="body2">
+                      Name: <span>{l.luggage_owner || 'N/A'}</span>
+                    </Typography>
+                    <Typography variant="body2">
+                      Contact Number: <span>{l.contact_number || 'N/A'}</span>
+                    </Typography>
+                    <Typography variant="body2">
+                      Address: <span>{l.address || 'N/A'}</span>
+                    </Typography>
+                    <Typography variant="body2">
+                      Weight: <span>{l.weight ? `${l.weight} kg` : 'N/A'}</span>
+                    </Typography>
+                    <Typography variant="body2">
+                      Description: <span>{l.item_description || 'N/A'}</span>
+                    </Typography>
+                  </Box>
+                ))}
+              </Box>
+              <Divider sx={{ my: 2 }} />
+              <Typography variant="subtitle2" sx={{ color: 'primary.main', fontWeight: 700, mb: 1 }}>
+                Timeline
+              </Typography>
+              <Box sx={{ ml: 1, mb: 1 }}>
+                <Typography variant="body2">
+                  <b>Created:</b>{' '}
+                  <span>
+                    {contract.created_at ? new Date(contract.created_at).toLocaleString() : 'N/A'}
+                  </span>
+                </Typography>
+                <Typography variant="body2">
+                  <b>Accepted:</b>{' '}
+                  <span>
+                    {contract.accepted_at ? new Date(contract.accepted_at).toLocaleString() : 'N/A'}
+                  </span>
+                </Typography>
+                <Typography variant="body2">
+                  <b>Pickup:</b>{' '}
+                  <span>
+                    {contract.pickup_at ? new Date(contract.pickup_at).toLocaleString() : 'N/A'}
+                  </span>
+                </Typography>
+                <Typography variant="body2">
+                  <b>Delivered:</b>{' '}
+                  <span>
+                    {contract.delivered_at ? new Date(contract.delivered_at).toLocaleString() : 'N/A'}
+                  </span>
+                </Typography>
+                <Typography variant="body2">
+                  <b>Cancelled:</b>{' '}
+                  <span>
+                    {contract.cancelled_at ? new Date(contract.cancelled_at).toLocaleString() : 'N/A'}
+                  </span>
+                </Typography>
+              </Box>
+            </Collapse>
+          </Paper>
+          <Paper elevation={3} sx={{ p: 3, borderRadius: 3, position: 'relative', overflow: 'hidden', border: '1px solid', borderColor: 'divider' }}>
+            <Typography variant="h6" sx={{ mb: 2 }}>Live Tracking</Typography>
+            <Box sx={{ display: 'flex', gap: 2, mb: 2, flexWrap: 'wrap' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Box sx={{ width: 16, height: 16, borderRadius: '50%', bgcolor: '#FF9800', border: '2px solid #F57C00' }} />
+                <Typography variant="body2">Drop-off Location</Typography>
+              </Box>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Box sx={{ width: 16, height: 16, borderRadius: '50%', bgcolor: '#2196F3', border: '2px solid #1976D2' }} />
+                <Typography variant="body2">Pickup Location</Typography>
+              </Box>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Box sx={{ width: 16, height: 16, borderRadius: '50%', bgcolor: '#4CAF50', border: '2px solid #388E3C' }} />
+                <Typography variant="body2">Current Location</Typography>
+              </Box>
             </Box>
-            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}><IconButton onClick={handleExpandClick} aria-expanded={expanded} aria-label="show less" sx={{ background: 'none', color: 'primary.main', borderRadius: 2, '&:hover': { color: 'primary.dark', background: 'none' } }}><ExpandMoreIcon /></IconButton></Box>
-          </Collapse>
-        </Paper>
-        <Paper elevation={3} sx={{ p: 3, borderRadius: 3, position: 'relative', overflow: 'hidden', border: '1px solid', borderColor: 'divider' }}>
-          <Typography variant="h6" sx={{ mb: 2 }}>Live Tracking</Typography>
-          <Box sx={{ display: 'flex', gap: 2, mb: 2, flexWrap: 'wrap' }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Box sx={{ width: 16, height: 16, borderRadius: '50%', bgcolor: '#4CAF50', border: '2px solid #388E3C' }} />
-              <Typography variant="body2">Drop-off Location</Typography>
-            </Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Box sx={{ width: 16, height: 16, borderRadius: '50%', bgcolor: '#2196F3', border: '2px solid #1976D2' }} />
-              <Typography variant="body2">Pickup Location</Typography>
-            </Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Box sx={{ width: 16, height: 16, borderRadius: '50%', bgcolor: '#FF9800', border: '2px solid #F57C00' }} />
-              <Typography variant="body2">Current Location</Typography>
-            </Box>
-          </Box>
-          <MapComponent mapRef={mapRef} mapError={mapError} />
-        </Paper>
-      </>)}
+            <MapComponent mapRef={mapRef} mapError={mapError} />
+          </Paper>
+        </>
+      )}
     </Box>
   );
 }

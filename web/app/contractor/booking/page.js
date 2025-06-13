@@ -778,7 +778,8 @@ export default function Page() {
                                                     variant="contained"
                                                     startIcon={<LocationOnIcon />}
                                                     onClick={() => handleTrackContract(contract.id)}
-                                                    sx={{ mb: 1 }}
+                                                    sx={{ mb: 1, minWidth: '120px' }}
+                                                    disabled={contract.contract_status?.status_name?.toLowerCase() === 'cancelled'}
                                                 >
                                                     Track
                                                 </Button>
@@ -786,7 +787,7 @@ export default function Page() {
                                                     variant="outlined"
                                                     color="error"
                                                     onClick={() => handleCancelClick(contract.id)}
-                                                    sx={{ mb: 1 }}
+                                                    sx={{ mb: 1, minWidth: '120px' }}
                                                     disabled={contract.contract_status?.status_name?.toLowerCase() === 'cancelled'}
                                                 >
                                                     Cancel
@@ -803,7 +804,7 @@ export default function Page() {
                                                         '&:hover': {
                                                             color: 'primary.dark'
                                                         },
-                                                        mt: 5
+                                                        mt: 3
                                                     }}
                                                 >
                                                     <ExpandMoreIcon />
