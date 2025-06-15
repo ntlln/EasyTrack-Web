@@ -91,65 +91,65 @@ const ReceiptPDF = ({ contracts = [], dateRange }) => {
 
     return (
         <Document>
-            <PDFPage size="A4" style={{ padding: 12, fontSize: 10, fontFamily: 'Roboto' }}>
+            <PDFPage size="A4" style={{ padding: 12, fontSize: 8, fontFamily: 'Roboto' }}>
                 <View style={{ alignItems: 'center', marginBottom: 4 }}>
-                    <Text style={{ fontSize: 16, fontWeight: 'bold' }}>GHE TRANSMITTAL - AIRPORT CLIENTS PROPERTY IRREGULARITY SUMMARY REPORT</Text>
-                    <Text style={{ fontSize: 14, marginTop: 2 }}>{dateRange || 'No date range specified'}</Text>
+                    <Text style={{ fontSize: 14, fontWeight: 'bold' }}>GHE TRANSMITTAL - AIRPORT CLIENTS PROPERTY IRREGULARITY SUMMARY REPORT</Text>
+                    <Text style={{ fontSize: 12, marginTop: 2 }}>{dateRange || 'No date range specified'}</Text>
                 </View>
                 <View style={{ borderWidth: 1, borderColor: '#000', marginBottom: 4 }}>
                     <View style={{ flexDirection: 'row', backgroundColor: '#eee', borderBottomWidth: 1, borderColor: '#000' }}>
-                        <Text style={{ flex: 0.5, fontWeight: 'bold', padding: 2 }}>No.</Text>
-                        <Text style={{ flex: 1, fontWeight: 'bold', padding: 2 }}>Tracking ID</Text>
-                        <Text style={{ flex: 2, fontWeight: 'bold', padding: 2 }}>Luggage Owner</Text>
-                        <Text style={{ flex: 1, fontWeight: 'bold', padding: 2 }}>Flight No.</Text>
-                        <Text style={{ flex: 3, fontWeight: 'bold', padding: 2 }}>Address</Text>
-                        <Text style={{ flex: 2, fontWeight: 'bold', padding: 2 }}>Date Received</Text>
-                        <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 2 }}>Status</Text>
-                        <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 2 }}>Amount</Text>
-                        <Text style={{ flex: 1, fontWeight: 'bold', padding: 2 }}>Remarks</Text>
+                        <Text style={{ flex: 0.5, fontWeight: 'bold', padding: 2, fontSize: 8 }}>No.</Text>
+                        <Text style={{ flex: 1, fontWeight: 'bold', padding: 2, fontSize: 8 }}>Tracking ID</Text>
+                        <Text style={{ flex: 2, fontWeight: 'bold', padding: 2, fontSize: 8 }}>Luggage Owner</Text>
+                        <Text style={{ flex: 1, fontWeight: 'bold', padding: 2, fontSize: 8 }}>Flight No.</Text>
+                        <Text style={{ flex: 3, fontWeight: 'bold', padding: 2, fontSize: 8 }}>Address</Text>
+                        <Text style={{ flex: 2, fontWeight: 'bold', padding: 2, fontSize: 8 }}>Date Received</Text>
+                        <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 2, fontSize: 8 }}>Status</Text>
+                        <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 2, fontSize: 8 }}>Amount</Text>
+                        <Text style={{ flex: 1, fontWeight: 'bold', padding: 2, fontSize: 8 }}>Remarks</Text>
                     </View>
                     {safeContracts.map((c, idx) => (
                         <View key={c.id || idx} style={{ flexDirection: 'row', borderBottomWidth: 1, borderColor: '#000' }}>
-                            <Text style={{ flex: 0.5, padding: 2 }}>{idx + 1}</Text>
-                            <Text style={{ flex: 1, padding: 2 }}>{c.id}</Text>
-                            <Text style={{ flex: 2, padding: 2 }}>{c.luggage?.[0]?.luggage_owner || 'N/A'}</Text>
-                            <Text style={{ flex: 1, padding: 2 }}>{c.luggage?.[0]?.flight_number || 'N/A'}</Text>
-                            <Text style={{ flex: 3, padding: 2 }}>{c.drop_off_location || 'N/A'}</Text>
-                            <Text style={{ flex: 2, padding: 2 }}>{formatDate(c.delivered_at || c.created_at)}</Text>
-                            <Text style={{ flex: 1.5, padding: 2 }}>{c.contract_status?.status_name || 'N/A'}</Text>
-                            <Text style={{ flex: 1.5, padding: 2, fontFamily: 'Roboto' }}>{'\u20B1\u00A0'}{getRowAmount(c).toFixed(2)}</Text>
-                            <Text style={{ flex: 1, padding: 2 }}>{c.contract_status?.status_name === 'Delivery Failed' ? 'Delivery Failed' : ''}</Text>
+                            <Text style={{ flex: 0.5, padding: 2, fontSize: 8 }}>{idx + 1}</Text>
+                            <Text style={{ flex: 1, padding: 2, fontSize: 8 }}>{c.id}</Text>
+                            <Text style={{ flex: 2, padding: 2, fontSize: 8 }}>{c.luggage?.[0]?.luggage_owner || 'N/A'}</Text>
+                            <Text style={{ flex: 1, padding: 2, fontSize: 8 }}>{c.luggage?.[0]?.flight_number || 'N/A'}</Text>
+                            <Text style={{ flex: 3, padding: 2, fontSize: 8 }}>{c.drop_off_location || 'N/A'}</Text>
+                            <Text style={{ flex: 2, padding: 2, fontSize: 8 }}>{formatDate(c.delivered_at || c.created_at)}</Text>
+                            <Text style={{ flex: 1.5, padding: 2, fontSize: 8 }}>{c.contract_status?.status_name || 'N/A'}</Text>
+                            <Text style={{ flex: 1.5, padding: 2, fontFamily: 'Roboto', fontSize: 8 }}>{'\u20B1\u00A0'}{getRowAmount(c).toFixed(2)}</Text>
+                            <Text style={{ flex: 1, padding: 2, fontSize: 8 }}>{c.contract_status?.status_name === 'Delivery Failed' ? 'Delivery Failed' : ''}</Text>
                         </View>
                     ))}
                     <View style={{ flexDirection: 'row', borderTopWidth: 1, borderColor: '#000', backgroundColor: '#f7f7f7' }}>
-                        <Text style={{ flex: 7.5, fontWeight: 'bold', padding: 2, textAlign: 'right' }}>Subtotal:</Text>
-                        <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 2, fontFamily: 'Roboto' }}>{'\u20B1\u00A0'}{subtotal.toFixed(2)}</Text>
+                        <Text style={{ flex: 7.5, fontWeight: 'bold', padding: 2, textAlign: 'right', fontSize: 8 }}>Subtotal:</Text>
+                        <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 2, fontFamily: 'Roboto', fontSize: 8 }}>{'\u20B1\u00A0'}{subtotal.toFixed(2)}</Text>
                         <Text style={{ flex: 2 }}></Text>
                     </View>
                     <View style={{ flexDirection: 'row', borderTopWidth: 1, borderColor: '#000', backgroundColor: '#f7f7f7' }}>
-                        <Text style={{ flex: 7.5, fontWeight: 'bold', padding: 2, textAlign: 'right' }}>Surcharge Total:</Text>
-                        <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 2, fontFamily: 'Roboto' }}>{'\u20B1\u00A0'}{surchargeTotal.toFixed(2)}</Text>
+                        <Text style={{ flex: 7.5, fontWeight: 'bold', padding: 2, textAlign: 'right', fontSize: 8 }}>Surcharge Total:</Text>
+                        <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 2, fontFamily: 'Roboto', fontSize: 8 }}>{'\u20B1\u00A0'}{surchargeTotal.toFixed(2)}</Text>
                         <Text style={{ flex: 2 }}></Text>
                     </View>
                     <View style={{ flexDirection: 'row', borderTopWidth: 1, borderColor: '#000', backgroundColor: '#f7f7f7' }}>
-                        <Text style={{ flex: 7.5, fontWeight: 'bold', padding: 2, textAlign: 'right' }}>Discount (Average):</Text>
-                        <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 2, fontFamily: 'Roboto' }}>{discountAvg.toFixed(2)}%</Text>
+                        <Text style={{ flex: 7.5, fontWeight: 'bold', padding: 2, textAlign: 'right', fontSize: 8 }}>Discount (Average):</Text>
+                        <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 2, fontFamily: 'Roboto', fontSize: 8 }}>{discountAvg.toFixed(2)}%</Text>
                         <Text style={{ flex: 2 }}></Text>
                     </View>
                     <View style={{ flexDirection: 'row', borderTopWidth: 2, borderColor: '#000', backgroundColor: '#eee' }}>
-                        <Text style={{ flex: 9.5, fontWeight: 'bold', padding: 2, textAlign: 'right' }}>TOTAL</Text>
-                        <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 2, fontFamily: 'Roboto' }}>{'\u20B1\u00A0'}{totalAmount.toFixed(2)}</Text>
+                        <Text style={{ flex: 9.5, fontWeight: 'bold', padding: 2, textAlign: 'right', fontSize: 8 }}>TOTAL</Text>
+                        <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 2, fontFamily: 'Roboto', fontSize: 8 }}>{'\u20B1\u00A0'}{totalAmount.toFixed(2)}</Text>
                     </View>
                 </View>
                 <View style={{ flexDirection: 'row', marginTop: 12, justifyContent: 'space-between' }}>
                     <View>
-                        <Text>Received by: _______________, Date: _______________</Text>
-                        <Text style={{ fontWeight: 'bold', marginTop: 4 }}>AIRLINE'S REPRESENTATIVE</Text>
+                        <Text style={{ fontSize: 8 }}>Received by: _______________, Date: _______________</Text>
+                        <Text style={{ fontWeight: 'bold', marginTop: 4, fontSize: 8 }}>AIRLINE'S REPRESENTATIVE</Text>
                     </View>
                     <View style={{ alignItems: 'flex-end' }}>
-                        <Text>GENERATED ON: {formatDate(new Date().toISOString())}</Text>
-                        <Text>*************SUBMITTED ALL ORIGINAL SIGNED PIR*****</Text>
-                        <Text>Total PIR submitted: {safeContracts.length}</Text>
+                        <Text style={{ fontSize: 8 }}>GENERATED ON: {formatDate(new Date().toISOString())}</Text>
+                        <Text style={{ fontSize: 8 }}>*************SUBMITTED ALL ORIGINAL SIGNED PIR*****</Text>
+                        <Text style={{ fontSize: 8 }}>Total PIR submitted: {safeContracts.length}</Text>
                     </View>
                 </View>
             </PDFPage>
@@ -450,11 +450,11 @@ const TransactionManagement = () => {
     };
     const handleSelectAll = (event) => {
         if (event.target.checked) {
-            const allIds = filteredData.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((row) => row.id);
+            const allIds = filteredData.map((row) => row.id);
             setSelectedRows((prev) => Array.from(new Set([...prev, ...allIds])));
         } else {
-            const pageIds = filteredData.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((row) => row.id);
-            setSelectedRows((prev) => prev.filter((id) => !pageIds.includes(id)));
+            const monthIds = filteredData.map((row) => row.id);
+            setSelectedRows((prev) => prev.filter((id) => !monthIds.includes(id)));
         }
         setShouldRenderPDF(false);
     };
