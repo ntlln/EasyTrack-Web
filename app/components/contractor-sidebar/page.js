@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useContext, useEffect } from "react";
+import { useState, useContext, useEffect, Suspense } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { Box, Divider, List, ListItemButton, ListItemIcon, ListItemText, Collapse, Button, IconButton, useMediaQuery, Typography } from "@mui/material";
 import DashboardIcon from '@mui/icons-material/Dashboard';
@@ -23,6 +23,14 @@ import { useTheme } from "@mui/material/styles";
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
 export default function Page() {
+    return (
+        <Suspense fallback={<div>Loading...</div>}>
+            <ContractorSidebarContent />
+        </Suspense>
+    );
+}
+
+function ContractorSidebarContent() {
     // State and context setup
     const [openPages, setOpenPages] = useState(() => typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('contractorSidebarTransactionsOpen') || 'false') : false);
     const [isMinimized, setIsMinimized] = useState(true);
