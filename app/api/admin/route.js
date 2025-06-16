@@ -1,5 +1,17 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
+import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from '@google/generative-ai';
+
+// Validate API key
+const apiKey = process.env.GEMINI_API_KEY;
+if (!apiKey) {
+  console.error('GEMINI_API_KEY is not set in environment variables');
+} else {
+  console.log('GEMINI_API_KEY is set:', apiKey.substring(0, 5) + '...');
+}
+
+// Initialize Gemini API
+const genAI = new GoogleGenerativeAI(apiKey);
 
 export async function GET(request) {
   try {
@@ -212,13 +224,13 @@ export async function GET(request) {
   }
 }
 
-export async function POST(request) {
+export async function POST(req) {
   try {
-    const contentType = request.headers.get('content-type') || '';
+    const contentType = req.headers.get('content-type') || '';
     
     // Handle multipart form data (file uploads)
     if (contentType.includes('multipart/form-data')) {
-      const formData = await request.formData();
+      const formData = await req.formData();
       const file = formData.get('file');
       const bucket = formData.get('bucket');
       const path = formData.get('path');
@@ -272,7 +284,7 @@ export async function POST(request) {
     }
 
     // Handle JSON data (other actions)
-    const body = await request.json();
+    const body = await req.json();
     const { action, params } = body;
 
     const supabase = createClient(
@@ -706,6 +718,81 @@ export async function POST(request) {
         return NextResponse.json({ error: error.message }, { status: 500 });
       }
       return NextResponse.json({ data });
+    }
+
+    // If this is a Gemini insight request
+    if (action === 'geminiInsight') {
+      const { stats } = params;
+      if (stats) {
+        try {
+          if (!apiKey) {
+            throw new Error('GEMINI_API_KEY is not configured');
+          }
+
+          // Configure the model
+          const model = genAI.getGenerativeModel({
+            model: "gemini-1.5-pro-latest",
+            safetySettings: [
+              {
+                category: HarmCategory.HARM_CATEGORY_HARASSMENT,
+                threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+              },
+              {
+                category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+                threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+              },
+              {
+                category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+                threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+              },
+              {
+                category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+                threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+              },
+            ],
+          });
+          
+          const prompt = `Analyze the following delivery statistics and provide actionable insights and recommendations in a clear, concise format. Focus on key trends, potential improvements, and specific actions that could be taken to enhance delivery performance.
+
+Statistics:
+${JSON.stringify(stats, null, 2)}
+
+Please provide:
+1. A brief overview of the current performance
+2. Key trends and patterns identified
+3. Specific recommendations for improvement
+4. Areas of concern that need attention`;
+
+          console.log('Sending request to Gemini API...');
+          const result = await model.generateContent({
+            contents: [{ role: 'user', parts: [{ text: prompt }] }],
+            generationConfig: {
+              temperature: 0.7,
+              topK: 40,
+              topP: 0.95,
+              maxOutputTokens: 2048,
+            },
+          });
+
+          const response = await result.response;
+          let text = response.text();
+          text = text.replace(/\*\*/g, ''); // Remove all **
+          
+          return NextResponse.json({ insight: text });
+        } catch (error) {
+          console.error('Gemini API error:', error);
+          // Log more details about the error
+          if (error.response) {
+            console.error('Error response:', await error.response.text());
+          }
+          return NextResponse.json({ 
+            error: 'Failed to generate insight. Please check your API key and try again.',
+            details: error.message,
+            apiKeyPresent: !!apiKey,
+            apiKeyPrefix: apiKey ? apiKey.substring(0, 5) + '...' : null
+          }, { status: 500 });
+        }
+      }
     }
 
     return NextResponse.json({ error: 'Unknown action' }, { status: 400 });

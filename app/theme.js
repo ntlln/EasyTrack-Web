@@ -13,7 +13,8 @@ export const getTheme = (mode) => createTheme({
         text: {
             primary: mode === "dark" ? "#FFFFFF" : "#000000",
             secondary: mode === "dark" ? "rgba(255, 255, 255, 0.7)" : "rgba(0, 0, 0, 0.7)"
-        }
+        },
+        divider: mode === "dark" ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.12)",
     },
 
     // Typography configuration

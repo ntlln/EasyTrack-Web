@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import dynamic from 'next/dynamic';
-import { Box, Tabs, Tab, Typography, Paper, Button, IconButton, CircularProgress, Divider, Collapse, TextField, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Dialog, DialogTitle, DialogContent, DialogActions, Radio, Snackbar, TablePagination } from "@mui/material";
+import { Box, Tabs, Tab, Typography, Paper, Button, IconButton, CircularProgress, Divider, Collapse, TextField, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Dialog, DialogTitle, DialogContent, DialogActions, Radio, Snackbar, TablePagination, Select, MenuItem, useTheme } from "@mui/material";
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import { useRouter } from 'next/navigation';
@@ -29,6 +29,71 @@ const formatDate = (dateString) => {
   }
 };
 
+// Add dateOptions constant at the top level
+const dateOptions = [
+  { label: 'All Time', value: 'all' },
+  { label: 'Today', value: 'today' },
+  { label: 'Yesterday', value: 'yesterday' },
+  { label: 'This Week', value: 'thisWeek' },
+  { label: 'Last Week', value: 'lastWeek' },
+  { label: 'This Month', value: 'thisMonth' },
+  { label: 'Last Month', value: 'lastMonth' },
+  { label: 'This Year', value: 'thisYear' },
+  { label: 'Last Year', value: 'lastYear' },
+];
+
+// Add filterByDate helper function
+function filterByDate(contracts, filter) {
+  if (filter === 'all') return contracts;
+  const now = new Date();
+  return contracts.filter(contract => {
+    const createdAt = contract.created_at ? new Date(contract.created_at) : null;
+    if (!createdAt) return false;
+    switch (filter) {
+      case 'today':
+        return createdAt.toDateString() === now.toDateString();
+      case 'yesterday': {
+        const yesterday = new Date(now);
+        yesterday.setDate(now.getDate() - 1);
+        return createdAt.toDateString() === yesterday.toDateString();
+      }
+      case 'thisWeek': {
+        const firstDayOfWeek = new Date(now);
+        firstDayOfWeek.setDate(now.getDate() - now.getDay());
+        firstDayOfWeek.setHours(0,0,0,0);
+        const lastDayOfWeek = new Date(firstDayOfWeek);
+        lastDayOfWeek.setDate(firstDayOfWeek.getDate() + 6);
+        lastDayOfWeek.setHours(23,59,59,999);
+        return createdAt >= firstDayOfWeek && createdAt <= lastDayOfWeek;
+      }
+      case 'lastWeek': {
+        const firstDayOfThisWeek = new Date(now);
+        firstDayOfThisWeek.setDate(now.getDate() - now.getDay());
+        firstDayOfThisWeek.setHours(0,0,0,0);
+        const firstDayOfLastWeek = new Date(firstDayOfThisWeek);
+        firstDayOfLastWeek.setDate(firstDayOfThisWeek.getDate() - 7);
+        const lastDayOfLastWeek = new Date(firstDayOfLastWeek);
+        lastDayOfLastWeek.setDate(firstDayOfLastWeek.getDate() + 6);
+        lastDayOfLastWeek.setHours(23,59,59,999);
+        return createdAt >= firstDayOfLastWeek && createdAt <= lastDayOfLastWeek;
+      }
+      case 'thisMonth':
+        return createdAt.getMonth() === now.getMonth() && createdAt.getFullYear() === now.getFullYear();
+      case 'lastMonth': {
+        const lastMonth = new Date(now);
+        lastMonth.setMonth(now.getMonth() - 1);
+        return createdAt.getMonth() === lastMonth.getMonth() && createdAt.getFullYear() === lastMonth.getFullYear();
+      }
+      case 'thisYear':
+        return createdAt.getFullYear() === now.getFullYear();
+      case 'lastYear':
+        return createdAt.getFullYear() === now.getFullYear() - 1;
+      default:
+        return true;
+    }
+  });
+}
+
 // Contract List Component
 const ContractList = ({ onTrackContract, initialSearch, setRedirectContractId }) => {
   const [contractList, setContractList] = useState([]);
@@ -48,6 +113,9 @@ const ContractList = ({ onTrackContract, initialSearch, setRedirectContractId })
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const supabase = createClientComponentClient();
   const router = useRouter();
+  const [dateFilter, setDateFilter] = useState('all');
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
 
   // Filter options
   const filterOptions = [
@@ -152,9 +220,10 @@ const ContractList = ({ onTrackContract, initialSearch, setRedirectContractId })
     }
   });
 
-  // Helper to get current filter/search contracts with pagination
+  // Update getFilteredContracts to include date filter
   const getFilteredContracts = () => {
-    const filtered = filteredContracts.filter(contract =>
+    const dateFiltered = filterByDate(filteredContracts, dateFilter);
+    const filtered = dateFiltered.filter(contract =>
       !activeSearch || String(contract.id).toLowerCase().includes(activeSearch.toLowerCase())
     );
     
@@ -223,7 +292,7 @@ const ContractList = ({ onTrackContract, initialSearch, setRedirectContractId })
 
   return (
     <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'center', mb: 4 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
         <TextField
           label="Search Contract ID"
           variant="outlined"
@@ -243,6 +312,27 @@ const ContractList = ({ onTrackContract, initialSearch, setRedirectContractId })
             ),
           }}
         />
+        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+          <Typography sx={{ mr: 2 }}>Filter by Date:</Typography>
+          <Select
+            value={dateFilter}
+            onChange={e => setDateFilter(e.target.value)}
+            size="small"
+            sx={{ minWidth: 180, bgcolor: isDark ? theme.palette.background.paper : '#fff', color: theme.palette.text.primary, borderRadius: 1 }}
+            MenuProps={{
+              PaperProps: {
+                sx: {
+                  bgcolor: isDark ? theme.palette.background.paper : '#fff',
+                  color: theme.palette.text.primary,
+                },
+              },
+            }}
+          >
+            {dateOptions.map(opt => (
+              <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
+            ))}
+          </Select>
+        </Box>
       </Box>
 
       <Box sx={{ maxWidth: '800px', mx: 'auto', width: '100%', mb: 3, overflowX: 'auto' }}>
@@ -568,6 +658,9 @@ const LuggageAssignments = ({ onAssignmentComplete }) => {
   const [detailsContract, setDetailsContract] = useState(null);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [dateFilter, setDateFilter] = useState('all');
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
 
   useEffect(() => {
     setMounted(true);
@@ -684,11 +777,12 @@ const LuggageAssignments = ({ onAssignmentComplete }) => {
     setPage(0);
   };
 
-  // Helper to get paginated assignments
+  // Update getPaginatedAssignments to include date filter
   const getPaginatedAssignments = () => {
+    const dateFiltered = filterByDate(assignments, dateFilter);
     const startIndex = page * rowsPerPage;
     const endIndex = startIndex + rowsPerPage;
-    return assignments.slice(startIndex, endIndex);
+    return dateFiltered.slice(startIndex, endIndex);
   };
 
   if (loading) {
@@ -709,6 +803,29 @@ const LuggageAssignments = ({ onAssignmentComplete }) => {
 
   return (
     <Box sx={{ width: '100%', p: 2 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+          <Typography sx={{ mr: 2 }}>Filter by Date:</Typography>
+          <Select
+            value={dateFilter}
+            onChange={e => setDateFilter(e.target.value)}
+            size="small"
+            sx={{ minWidth: 180, bgcolor: isDark ? theme.palette.background.paper : '#fff', color: theme.palette.text.primary, borderRadius: 1 }}
+            MenuProps={{
+              PaperProps: {
+                sx: {
+                  bgcolor: isDark ? theme.palette.background.paper : '#fff',
+                  color: theme.palette.text.primary,
+                },
+              },
+            }}
+          >
+            {dateOptions.map(opt => (
+              <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
+            ))}
+          </Select>
+        </Box>
+      </Box>
       <TableContainer component={Paper} elevation={3} sx={{ borderRadius: 2 }}>
         <Table>
           <TableHead>
@@ -1053,6 +1170,7 @@ const Page = () => {
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const router = useRouter();
+  const theme = useTheme();
 
   useEffect(() => {
     setMounted(true);

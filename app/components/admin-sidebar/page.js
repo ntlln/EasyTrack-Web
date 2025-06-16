@@ -149,6 +149,11 @@ function AdminSidebarContent() {
                         {!isMinimized && <ListItemText primary="Chat Support" />}
                     </ListItemButton>
 
+                    <ListItemButton onClick={() => handleNavigation("/egc-admin/statistics")} sx={listItemStyles("/egc-admin/statistics")}>
+                        <ListItemIcon><BarChartIcon sx={iconStyles("/egc-admin/statistics")} /></ListItemIcon>
+                        {!isMinimized && <ListItemText primary="Statistics" />}
+                    </ListItemButton>
+
                     <ListItemButton onClick={() => handleNavigation("/egc-admin/logs")} sx={listItemStyles("/egc-admin/logs")}>
                         <ListItemIcon><HistoryIcon sx={iconStyles("/egc-admin/logs")} /></ListItemIcon>
                         {!isMinimized && <ListItemText primary="System Logs" />}
@@ -157,11 +162,6 @@ function AdminSidebarContent() {
                     {/* <ListItemButton onClick={() => handleNavigation("/egc-admin/history-and-reports")} sx={listItemStyles("/egc-admin/history-and-reports")}>
                         <ListItemIcon><AssignmentIcon sx={iconStyles("/egc-admin/history-and-reports")} /></ListItemIcon>
                         {!isMinimized && <ListItemText primary="History and Reports" />}
-                    </ListItemButton> */}
-
-                    {/* <ListItemButton onClick={() => handleNavigation("/egc-admin/statistics")} sx={listItemStyles("/egc-admin/statistics")}>
-                        <ListItemIcon><BarChartIcon sx={iconStyles("/egc-admin/statistics")} /></ListItemIcon>
-                        {!isMinimized && <ListItemText primary="Statistics" />}
                     </ListItemButton> */}
                 </List>
             </Box>
