@@ -30,7 +30,7 @@ const formatDate = (dateString) => {
 };
 
 // Contract List Component
-const ContractList = ({ onTrackContract, initialSearch }) => {
+const ContractList = ({ onTrackContract, initialSearch, setRedirectContractId }) => {
   const [contractList, setContractList] = useState([]);
   const [contractListLoading, setContractListLoading] = useState(false);
   const [contractListError, setContractListError] = useState(null);
@@ -151,10 +151,6 @@ const ContractList = ({ onTrackContract, initialSearch }) => {
         return false;
     }
   });
-
-  const handleTrackContract = (contractId) => {
-    onTrackContract(contractId);
-  };
 
   // Helper to get current filter/search contracts with pagination
   const getFilteredContracts = () => {
@@ -336,7 +332,7 @@ const ContractList = ({ onTrackContract, initialSearch }) => {
                 <Button
                   variant="contained"
                   startIcon={<LocationOnIcon />}
-                  onClick={() => handleTrackContract(contract.id)}
+                  onClick={() => onTrackContract(contract.id)}
                   sx={{ mb: 1, minWidth: '120px' }}
                 >
                   Track
@@ -1068,7 +1064,7 @@ const Page = () => {
 
   const handleTrackContract = (contractId) => {
     setRedirectContractId(contractId.toString());
-    router.push('/egc-admin/luggage-tracking');
+    router.push(`/egc-admin/luggage-tracking?contractId=${contractId}`);
   };
 
   // Handler for assignment completion
@@ -1089,7 +1085,7 @@ const Page = () => {
         <Tab label="Luggage Assignments" />
       </Tabs>
 
-      {selectedTab === 0 && <ContractList onTrackContract={handleTrackContract} initialSearch={redirectContractId} />}
+      {selectedTab === 0 && <ContractList onTrackContract={handleTrackContract} initialSearch={redirectContractId} setRedirectContractId={setRedirectContractId} />}
       {selectedTab === 1 && <LuggageAssignments onAssignmentComplete={handleAssignmentComplete} />}
 
       <Snackbar

@@ -84,32 +84,57 @@ export async function GET(request) {
 
     // Handle contract location request
     if (contractId) {
-      const { data, error } = await supabase
+      const { data: contract, error: contractError } = await supabase
         .from('contract')
-        .select('current_location_geo')
+        .select(`
+          id, created_at, accepted_at, pickup_at, delivered_at, cancelled_at,
+          pickup_location, pickup_location_geo, drop_off_location, drop_off_location_geo,
+          current_location_geo, contract_status_id, contract_status(status_name),
+          airline_id, delivery_id, delivery_charge,
+          surcharge, discount,
+          airline:airline_id (*),
+          delivery:delivery_id (*),
+          route_history
+        `)
         .eq('id', contractId)
         .single();
 
-      if (error) {
-        console.error('Error fetching contract location:', error);
+      if (contractError) {
+        console.error('Error fetching contract:', contractError);
         return NextResponse.json(
-          { error: error.message },
+          { error: contractError.message },
           { status: 500 }
         );
       }
 
-      if (!data) {
+      if (!contract) {
         return NextResponse.json(
           { error: 'Contract not found' },
           { status: 404 }
         );
       }
 
-      return NextResponse.json({ 
-        data: {
-          current_location_geo: data.current_location_geo || null
-        }
-      });
+      // Fetch luggage information
+      const { data: luggage, error: luggageError } = await supabase
+        .from('contract_luggage_information')
+        .select('*')
+        .eq('contract_id', contractId);
+
+      if (luggageError) {
+        console.error('Error fetching luggage:', luggageError);
+        return NextResponse.json(
+          { error: luggageError.message },
+          { status: 500 }
+        );
+      }
+
+      // Combine contract and luggage data
+      const contractWithLuggage = {
+        ...contract,
+        luggage: luggage || []
+      };
+
+      return NextResponse.json({ data: contractWithLuggage });
     }
 
     // Handle delivery personnel request
@@ -143,7 +168,7 @@ export async function GET(request) {
       .select(`
         id, created_at, accepted_at, pickup_at, delivered_at, cancelled_at,
         pickup_location, pickup_location_geo, drop_off_location, drop_off_location_geo,
-        contract_status_id, contract_status(status_name),
+        current_location_geo, contract_status_id, contract_status(status_name),
         airline_id, delivery_id, delivery_charge,
         surcharge, discount,
         airline:airline_id (*),
@@ -620,12 +645,32 @@ export async function POST(request) {
       if (!contractId || !route_history) {
         return NextResponse.json({ error: 'Missing contractId or route_history' }, { status: 400 });
       }
+
+      // Validate route_history format
+      if (!Array.isArray(route_history)) {
+        return NextResponse.json({ error: 'route_history must be an array' }, { status: 400 });
+      }
+
+      // Validate each point in route_history
+      for (const point of route_history) {
+        if (!point || typeof point !== 'object') {
+          return NextResponse.json({ error: 'Invalid route point format' }, { status: 400 });
+        }
+        if (typeof point.lat !== 'number' || typeof point.lng !== 'number') {
+          return NextResponse.json({ error: 'Route points must have numeric lat and lng values' }, { status: 400 });
+        }
+      }
+
+      // Update route history in database
       const { error } = await supabase
         .from('contract')
-        .update({ route_history })
+        .update({ 
+          route_history
+        })
         .eq('id', contractId);
 
       if (error) {
+        console.error('Error updating route history:', error);
         return NextResponse.json({ error: error.message }, { status: 500 });
       }
 
