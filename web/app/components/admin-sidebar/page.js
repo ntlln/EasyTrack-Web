@@ -10,6 +10,7 @@ import InventoryIcon from '@mui/icons-material/Inventory';
 import ExpandLess from '@mui/icons-material/ExpandLess';
 import ExpandMore from '@mui/icons-material/ExpandMore';
 import MyLocationIcon from '@mui/icons-material/MyLocation';
+import LocationOnIcon from '@mui/icons-material/LocationOn';
 import AssignmentIcon from '@mui/icons-material/Assignment';
 import BarChartIcon from '@mui/icons-material/BarChart';
 import SupportAgentIcon from '@mui/icons-material/SupportAgent';
@@ -119,6 +120,10 @@ export default function Page() {
                     {!isMinimized && openPages && (
                         <Collapse in={openPages} timeout="auto" unmountOnExit>
                             <List component="div" disablePadding sx={{ pl: 2 }}>
+                                <ListItemButton sx={{ pl: 4, ...(isActive("/egc-admin/luggage-tracking") ? activeStyles : {}), ...listItemStyles("/egc-admin/luggage-tracking") }} onClick={() => handleNavigation("/egc-admin/luggage-tracking")}>
+                                    <ListItemIcon><LocationOnIcon sx={iconStyles("/egc-admin/luggage-tracking")} /></ListItemIcon>
+                                    <ListItemText primary="Luggage Tracking" />
+                                </ListItemButton>
                                 <ListItemButton sx={{ pl: 4, ...(isActive("/egc-admin/luggage-management") ? activeStyles : {}), ...listItemStyles("/egc-admin/luggage-management") }} onClick={() => handleNavigation("/egc-admin/luggage-management")}>
                                     <ListItemIcon><MyLocationIcon sx={iconStyles("/egc-admin/luggage-management")} /></ListItemIcon>
                                     <ListItemText primary="Luggage Management" />

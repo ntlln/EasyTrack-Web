@@ -12,6 +12,7 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { format as formatDateFns } from 'date-fns';
+import VisibilityIcon from '@mui/icons-material/Visibility';
 
 // Register fonts from local public/fonts directory
 Font.register({
@@ -342,6 +343,25 @@ const TransactionManagement = () => {
     // Add new state for confirmation dialog
     const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
     const [pendingPriceUpdate, setPendingPriceUpdate] = useState(null);
+    const [payments, setPayments] = useState([]);
+    const [loadingPayments, setLoadingPayments] = useState(false);
+    const [paymentsError, setPaymentsError] = useState(null);
+    const [selectedPayments, setSelectedPayments] = useState([]);
+    const [paymentsMenuAnchorEl, setPaymentsMenuAnchorEl] = useState(null);
+    const [paymentsMenuRow, setPaymentsMenuRow] = useState(null);
+    const [confirmMarkPaidOpen, setConfirmMarkPaidOpen] = useState(false);
+    const [markPaidRow, setMarkPaidRow] = useState(null);
+    const [markPaidLoading, setMarkPaidLoading] = useState(false);
+    const [paymentsPage, setPaymentsPage] = useState(0);
+    const [paymentsRowsPerPage, setPaymentsRowsPerPage] = useState(10);
+    // Define paginatedPayments at the top level
+    const paginatedPayments = payments.slice(paymentsPage * paymentsRowsPerPage, paymentsPage * paymentsRowsPerPage + paymentsRowsPerPage);
+    // Pagination handlers
+    const handlePaymentsPageChange = (event, newPage) => setPaymentsPage(newPage);
+    const handlePaymentsRowsPerPageChange = (event) => {
+        setPaymentsRowsPerPage(parseInt(event.target.value, 10));
+        setPaymentsPage(0);
+    };
 
     // Data fetching
     useEffect(() => {
@@ -672,19 +692,6 @@ const TransactionManagement = () => {
 
     // Pagination logic
     const paginatedPricingTable = filteredPricingTable.slice(pricingPage * pricingRowsPerPage, pricingPage * pricingRowsPerPage + pricingRowsPerPage);
-    const pageCount = Math.ceil(filteredPricingTable.length / pricingRowsPerPage);
-
-    // Pagination controls
-    const handleFirstPage = () => setPricingPage(0);
-    const handleLastPage = () => setPricingPage(pageCount - 1);
-    const handlePrevPage = () => setPricingPage(prev => Math.max(prev - 1, 0));
-    const handleNextPage = () => setPricingPage(prev => Math.min(prev + 1, pageCount - 1));
-    const handleSkipBack = () => setPricingPage(prev => Math.max(prev - 10, 0));
-    const handleSkipForward = () => setPricingPage(prev => Math.min(prev + 10, pageCount - 1));
-    const handleRowsPerPageChange = (event) => {
-        setPricingRowsPerPage(parseInt(event.target.value, 10));
-        setPricingPage(0);
-    };
 
     // Modify the edit price handlers
     const handleEditPriceClick = (row) => {
@@ -794,6 +801,156 @@ const TransactionManagement = () => {
         }
     };
 
+    // Add handler for invoice generation/payment creation
+    const handleGenerateInvoice = async () => {
+        const today = new Date();
+        const invoiceNo = formatDateFns(today, 'yyyyMMdd');
+        const createdAt = today.toISOString();
+        const dueDate = endOfMonth(today).toISOString();
+        const contracts = getContractsForInvoice();
+        // Compute total amount (same as in InvoicePDF)
+        const totalAmount = contracts.reduce((sum, c) => {
+            const delivery_charge = Number(c.delivery_charge) || 0;
+            const surcharge = Number(c.surcharge) || 0;
+            const discount = Number(c.discount) || 0;
+            return sum + (delivery_charge + surcharge) * (1 - discount / 100);
+        }, 0);
+        try {
+            const payload = {
+                action: 'createPayment',
+                params: {
+                    invoice_number: invoiceNo,
+                    payment_status_id: 1,
+                    created_at: createdAt,
+                    due_date: dueDate,
+                    total_charge: totalAmount,
+                    invoice_image: ''
+                }
+            };
+            console.log('Sending payment payload:', payload);
+            const res = await fetch('/api/admin', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const json = await res.json();
+            console.log('Payment API response:', json);
+            if (!res.ok) {
+                let errorMsg = json.error || 'Failed to create payment';
+                if (res.status === 400 && typeof json === 'object') {
+                    errorMsg += json.missing ? `\nMissing fields: ${JSON.stringify(json.missing)}` : '';
+                }
+                throw new Error(errorMsg);
+            }
+        } catch (err) {
+            console.error('Payment creation error:', err);
+            setSnackbar({
+                open: true,
+                message: err.message || 'Failed to create payment',
+                severity: 'error'
+            });
+        }
+    };
+
+    // Fetch payments when Payments History tab is selected
+    useEffect(() => {
+        if (tabValue !== 1) return;
+        setLoadingPayments(true);
+        setPaymentsError(null);
+        fetch('/api/admin', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'getPayments', params: {} })
+        })
+            .then(res => res.json())
+            .then(json => {
+                if (json.error) throw new Error(json.error);
+                setPayments(json.data || []);
+            })
+            .catch(err => setPaymentsError(err.message || 'Failed to fetch payments'))
+            .finally(() => setLoadingPayments(false));
+    }, [tabValue]);
+
+    // Payments History: Checkbox logic
+    const isPaymentSelected = (id) => selectedPayments.includes(id);
+    const handleSelectPayment = (id) => {
+        setSelectedPayments((prev) =>
+            prev.includes(id) ? prev.filter((rowId) => rowId !== id) : [...prev, id]
+        );
+    };
+    const handleSelectAllPayments = (event) => {
+        if (event.target.checked) {
+            const allIds = payments.map((row) => row.id);
+            setSelectedPayments(allIds);
+        } else {
+            setSelectedPayments([]);
+        }
+    };
+    const allPaymentsSelected = payments.length > 0 && payments.every((row) => selectedPayments.includes(row.id));
+    const somePaymentsSelected = payments.some((row) => selectedPayments.includes(row.id));
+    // Payments History: Actions menu logic
+    const handleMarkAsPaid = (row) => {
+        setMarkPaidRow(row);
+        setConfirmMarkPaidOpen(true);
+    };
+    const handleConfirmMarkPaid = async () => {
+        if (!markPaidRow) return;
+        setMarkPaidLoading(true);
+        try {
+            const res = await fetch('/api/admin', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'updatePaymentStatus',
+                    params: {
+                        payment_id: markPaidRow.id,
+                        payment_status_id: 2
+                    }
+                })
+            });
+            const json = await res.json();
+            if (!res.ok) throw new Error(json.error || 'Failed to update payment status');
+            // Update UI
+            setPayments((prev) => prev.map(p => p.id === markPaidRow.id ? { ...p, payment_status_id: 2 } : p));
+            setSnackbar({
+                open: true,
+                message: 'Payment marked as paid!',
+                severity: 'success'
+            });
+        } catch (err) {
+            setSnackbar({
+                open: true,
+                message: err.message || 'Failed to update payment status',
+                severity: 'error'
+            });
+        } finally {
+            setMarkPaidLoading(false);
+            setConfirmMarkPaidOpen(false);
+            setMarkPaidRow(null);
+        }
+    };
+    const handleCancelMarkPaid = () => {
+        setConfirmMarkPaidOpen(false);
+        setMarkPaidRow(null);
+    };
+
+    // Transaction Management pagination state
+    const [tmPage, setTmPage] = useState(0);
+    const [tmRowsPerPage, setTmRowsPerPage] = useState(10);
+    const paginatedFilteredData = filteredData.slice(tmPage * tmRowsPerPage, tmPage * tmRowsPerPage + tmRowsPerPage);
+    const handleTmPageChange = (event, newPage) => setTmPage(newPage);
+    const handleTmRowsPerPageChange = (event) => {
+        setTmRowsPerPage(parseInt(event.target.value, 10));
+        setTmPage(0);
+    };
+
+    // Pricing Update pagination handlers
+    const handlePricingPageChange = (event, newPage) => setPricingPage(newPage);
+    const handlePricingRowsPerPageChange = (event) => {
+        setPricingRowsPerPage(parseInt(event.target.value, 10));
+        setPricingPage(0);
+    };
+
     // Render
     if (loading) return (<Box sx={{ p: 3, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '300px' }}><CircularProgress /><Typography sx={{ mt: 2 }}>Loading...</Typography></Box>);
     if (error) return (<Box sx={{ p: 3 }}><Typography color="error">{error}</Typography></Box>);
@@ -807,6 +964,7 @@ const TransactionManagement = () => {
                     centered
                 >
                     <Tab label="Transaction Management" />
+                    <Tab label="Payments History" />
                     <Tab label="Pricing Update" />
                 </Tabs>
             </Box>
@@ -840,10 +998,10 @@ const TransactionManagement = () => {
                                     {({ loading, error }) => (
                                         <Button 
                                             variant="contained" 
-                                            color="secondary"
+                                            color="primary"
                                             disabled={loading || error}
                                         >
-                                            {loading ? 'Generating PDF...' : error ? 'Error generating PDF' : 'Download PDF Receipt'}
+                                            {loading ? 'Generating SOA...' : error ? 'Error generating SOA' : 'Download SOA'}
                                         </Button>
                                     )}
                                 </PDFDownloadLink>
@@ -872,7 +1030,7 @@ const TransactionManagement = () => {
                                         }
                                     }}
                                 >
-                                    Generate PDF Receipt
+                                    Generate SOA
                                 </Button>
                             )}
                             {/* New Invoice Button */}
@@ -882,10 +1040,11 @@ const TransactionManagement = () => {
                             >
                                 {({ loading, error }) => (
                                     <Button
-                                        variant="outlined"
-                                        color="secondary"
+                                        variant="contained"
+                                        color="primary"
                                         disabled={loading || error}
                                         sx={{ ml: 2 }}
+                                        onClick={handleGenerateInvoice}
                                     >
                                         {loading ? 'Generating Invoice...' : error ? 'Error generating Invoice' : 'Generate Invoice'}
                                     </Button>
@@ -918,7 +1077,7 @@ const TransactionManagement = () => {
                                 </TableRow>
                             </TableHead>
                             <TableBody>
-                                {filteredData.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((row) => {
+                                {paginatedFilteredData.map((row) => {
                                     const status = row.contract_status?.status_name || row.contract_status_id || '';
                                     const delivery_charge = Number(row.delivery_charge) || 0;
                                     const surcharge = Number(row.surcharge) || 0;
@@ -948,19 +1107,101 @@ const TransactionManagement = () => {
                             </TableBody>
                         </Table>
                         <TablePagination 
-                            rowsPerPageOptions={[10]} 
+                            rowsPerPageOptions={[10, 25, 50, 100]}
                             component="div" 
                             count={filteredData.length} 
-                            rowsPerPage={rowsPerPage} 
-                            page={page} 
-                            onPageChange={handleChangePage} 
-                            onRowsPerPageChange={handleChangeRowsPerPage} 
+                            rowsPerPage={tmRowsPerPage}
+                            page={tmPage}
+                            onPageChange={handleTmPageChange}
+                            onRowsPerPageChange={handleTmRowsPerPageChange}
+                            labelRowsPerPage="Rows per page:"
                         />
                     </TableContainer>
                 </Box>
             )}
 
             {tabValue === 1 && (
+                <Box sx={{ p: 3 }}>
+                    {loadingPayments ? (
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 200 }}>
+                            <CircularProgress />
+                        </Box>
+                    ) : paymentsError ? (
+                        <Alert severity="error">{paymentsError}</Alert>
+                    ) : (
+                        <TableContainer component={Paper}>
+                            <Table>
+                                <TableHead>
+                                    <TableRow sx={{ backgroundColor: 'primary.main' }}>
+                                        <TableCell padding="checkbox" sx={{ color: 'white' }}>
+                                            <Checkbox
+                                                indeterminate={somePaymentsSelected && !allPaymentsSelected}
+                                                checked={allPaymentsSelected}
+                                                onChange={handleSelectAllPayments}
+                                                inputProps={{ 'aria-label': 'select all payments' }}
+                                                sx={{ color: 'white', '&.Mui-checked': { color: 'white' } }}
+                                            />
+                                        </TableCell>
+                                        <TableCell sx={{ color: 'white' }}>Invoice #</TableCell>
+                                        <TableCell sx={{ color: 'white' }}>Status</TableCell>
+                                        <TableCell sx={{ color: 'white' }}>Created At</TableCell>
+                                        <TableCell sx={{ color: 'white' }}>Due Date</TableCell>
+                                        <TableCell sx={{ color: 'white' }}>Updated At</TableCell>
+                                        <TableCell sx={{ color: 'white' }}>Total Charge</TableCell>
+                                        <TableCell sx={{ color: 'white' }}>Actions</TableCell>
+                                    </TableRow>
+                                </TableHead>
+                                <TableBody>
+                                    {paginatedPayments.length === 0 ? (
+                                        <TableRow>
+                                            <TableCell colSpan={8} align="center">No payments found</TableCell>
+                                        </TableRow>
+                                    ) : paginatedPayments.map((row) => (
+                                        <TableRow key={row.id}>
+                                            <TableCell padding="checkbox">
+                                                <Checkbox
+                                                    checked={isPaymentSelected(row.id)}
+                                                    onChange={() => handleSelectPayment(row.id)}
+                                                    inputProps={{ 'aria-label': `select payment ${row.id}` }}
+                                                />
+                                            </TableCell>
+                                            <TableCell>{row.id}</TableCell>
+                                            <TableCell>{row.payment_status_id === 1 ? 'Unpaid' : row.payment_status_id === 2 ? 'Paid' : row.payment_status_id}</TableCell>
+                                            <TableCell>{row.created_at ? new Date(row.created_at).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }) : ''}</TableCell>
+                                            <TableCell>{row.due_date ? new Date(row.due_date).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }) : ''}</TableCell>
+                                            <TableCell>{row.updated_at ? new Date(row.updated_at).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }) : ''}</TableCell>
+                                            <TableCell>₱{Number(row.total_charge).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
+                                            <TableCell>
+                                                <Button
+                                                    size="small"
+                                                    variant="contained"
+                                                    color="primary"
+                                                    onClick={() => handleMarkAsPaid(row)}
+                                                    disabled={row.payment_status_id === 2}
+                                                >
+                                                    Mark as Paid
+                                                </Button>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                            <TablePagination
+                                rowsPerPageOptions={[10, 25, 50, 100]}
+                                component="div"
+                                count={payments.length}
+                                rowsPerPage={paymentsRowsPerPage}
+                                page={paymentsPage}
+                                onPageChange={handlePaymentsPageChange}
+                                onRowsPerPageChange={handlePaymentsRowsPerPageChange}
+                                labelRowsPerPage="Rows per page:"
+                            />
+                        </TableContainer>
+                    )}
+                </Box>
+            )}
+
+            {tabValue === 2 && (
                 <Box sx={{ p: 3 }}>
                     <Box sx={{ width: '100%', mb: 4 }}>
                         {/* Filters */}
@@ -1057,32 +1298,17 @@ const TransactionManagement = () => {
                                     )}
                                 </TableBody>
                             </Table>
+                            <TablePagination
+                                rowsPerPageOptions={[10, 25, 50, 100]}
+                                component="div"
+                                count={filteredPricingTable.length}
+                                rowsPerPage={pricingRowsPerPage}
+                                page={pricingPage}
+                                onPageChange={handlePricingPageChange}
+                                onRowsPerPageChange={handlePricingRowsPerPageChange}
+                                labelRowsPerPage="Rows per page:"
+                            />
                         </TableContainer>
-                        {/* Custom Pagination Controls */}
-                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mt: 1 }}>
-                            <FormControl size="small" sx={{ minWidth: 100 }}>
-                                <InputLabel id="rows-per-page-label">Rows</InputLabel>
-                                <Select
-                                    labelId="rows-per-page-label"
-                                    value={pricingRowsPerPage}
-                                    label="Rows"
-                                    onChange={handleRowsPerPageChange}
-                                >
-                                    {[10, 25, 50, 100].map(opt => (
-                                        <MenuItem key={opt} value={opt}>{opt}</MenuItem>
-                                    ))}
-                                </Select>
-                            </FormControl>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                <Button onClick={handleFirstPage} disabled={pricingPage === 0}>&laquo; First</Button>
-                                <Button onClick={handleSkipBack} disabled={pricingPage < 10}>&lt;&lt; -10</Button>
-                                <Button onClick={handlePrevPage} disabled={pricingPage === 0}>&lt; Prev</Button>
-                                <Typography sx={{ mx: 1 }}>Page {pageCount === 0 ? 0 : pricingPage + 1} of {pageCount}</Typography>
-                                <Button onClick={handleNextPage} disabled={pricingPage >= pageCount - 1}>Next &gt;</Button>
-                                <Button onClick={handleSkipForward} disabled={pricingPage > pageCount - 11}>+10 &gt;&gt;</Button>
-                                <Button onClick={handleLastPage} disabled={pricingPage >= pageCount - 1}>Last &raquo;</Button>
-                            </Box>
-                        </Box>
                     </Box>
                 </Box>
             )}
@@ -1260,6 +1486,24 @@ const TransactionManagement = () => {
                         variant="contained"
                     >
                         {editPriceLoading ? 'Updating...' : 'Confirm Update'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+            {/* Mark as Paid Confirmation Dialog */}
+            <Dialog
+                open={confirmMarkPaidOpen}
+                onClose={handleCancelMarkPaid}
+                maxWidth="xs"
+                fullWidth
+            >
+                <DialogTitle>Mark as Paid</DialogTitle>
+                <DialogContent dividers>
+                    <Typography>Are you sure you want to mark invoice <b>{markPaidRow?.id}</b> as paid?</Typography>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={handleCancelMarkPaid} disabled={markPaidLoading}>Cancel</Button>
+                    <Button onClick={handleConfirmMarkPaid} color="primary" variant="contained" disabled={markPaidLoading}>
+                        {markPaidLoading ? 'Updating...' : 'Confirm'}
                     </Button>
                 </DialogActions>
             </Dialog>

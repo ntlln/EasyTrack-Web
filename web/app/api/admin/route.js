@@ -314,14 +314,14 @@ export async function POST(request) {
         invoice_image
       });
 
-      if (!invoice_number || !payment_status_id || !created_at || !due_date || !total_charge || !invoice_image) {
+      if (!invoice_number || !payment_status_id || !created_at || !due_date || !total_charge || typeof invoice_image === 'undefined') {
         console.log('Missing fields:', {
           invoice_number: !invoice_number,
           payment_status_id: !payment_status_id,
           created_at: !created_at,
           due_date: !due_date,
           total_charge: !total_charge,
-          invoice_image: !invoice_image
+          invoice_image: typeof invoice_image === 'undefined'
         });
         return NextResponse.json({ error: 'Missing required payment fields' }, { status: 400 });
       }
@@ -630,6 +630,37 @@ export async function POST(request) {
       }
 
       return NextResponse.json({ success: true });
+    }
+
+    // Handle payments fetch
+    if (action === 'getPayments') {
+      const { data, error } = await supabase
+        .from('payment')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+      return NextResponse.json({ data });
+    }
+
+    // Handle payment status update
+    if (action === 'updatePaymentStatus') {
+      const { payment_id, payment_status_id } = params;
+      if (!payment_id || !payment_status_id) {
+        return NextResponse.json({ error: 'Missing payment_id or payment_status_id' }, { status: 400 });
+      }
+      const updated_at = new Date().toISOString();
+      const { data, error } = await supabase
+        .from('payment')
+        .update({ payment_status_id, updated_at })
+        .eq('id', payment_id)
+        .select()
+        .single();
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+      return NextResponse.json({ data });
     }
 
     return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
