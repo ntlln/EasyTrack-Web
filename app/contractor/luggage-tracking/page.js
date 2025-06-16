@@ -34,6 +34,10 @@ function LuggageTrackingContent() {
   const [map, setMap] = useState(null);
   const [isScriptLoaded, setIsScriptLoaded] = useState(false);
   const [mapError, setMapError] = useState(null);
+  const [progress, setProgress] = useState(0);
+  const [routeDetails, setRouteDetails] = useState({ distance: null, duration: null });
+  const [totalRouteDetails, setTotalRouteDetails] = useState({ distance: null, duration: null });
+  const [eta, setEta] = useState(null);
   const mapRef = useRef(null);
   const markerRef = useRef(null);
   const currentLocationMarkerRef = useRef(null);
@@ -168,130 +172,52 @@ function LuggageTrackingContent() {
     }
   };
 
-  // Poll for current location updates (map only)
-  useEffect(() => {
-    let intervalId;
-    const updateMapLocation = async () => {
-      if (!contract?.id) return;
-      try {
-        const { data, error: locationError } = await supabase
-          .from('contract')
-          .select('current_location_geo, route_history')
-          .eq('id', contract.id)
-          .single();
-
-        if (locationError) throw locationError;
-        if (data?.current_location_geo && map) {
-          const newPosition = {
-            lat: data.current_location_geo.coordinates[1],
-            lng: data.current_location_geo.coordinates[0]
-          };
-
-          // Update current location marker
-          if (currentLocationMarkerRef.current) {
-            currentLocationMarkerRef.current.position = newPosition;
-          } else {
-            const currentLocationMarker = document.createElement('div');
-            currentLocationMarker.innerHTML = `
-              <style>
-                @keyframes pulse {
-                  0% {
-                    transform: scale(1);
-                    opacity: 1;
-                  }
-                  50% {
-                    transform: scale(1.2);
-                    opacity: 0.8;
-                  }
-                  100% {
-                    transform: scale(1);
-                    opacity: 1;
-                  }
-                }
-                .location-marker {
-                  animation: pulse 2s infinite;
-                  filter: drop-shadow(0 0 8px rgba(76, 175, 80, 0.8));
-                }
-              </style>
-              <div class="location-marker">
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <circle cx="12" cy="12" r="10" fill="#4CAF50" fill-opacity="0.6"/>
-                  <circle cx="12" cy="12" r="8" fill="#4CAF50" fill-opacity="0.8"/>
-                  <circle cx="12" cy="12" r="6" fill="#4CAF50" fill-opacity="0.9"/>
-                  <circle cx="12" cy="12" r="4" fill="#4CAF50"/>
-                  <circle cx="12" cy="12" r="2" fill="white"/>
-                </svg>
-              </div>
-            `;
-            
-            currentLocationMarkerRef.current = new window.google.maps.marker.AdvancedMarkerElement({
-              map: map,
-              position: newPosition,
-              title: 'Current Location',
-              content: currentLocationMarker,
-              collisionBehavior: window.google.maps.CollisionBehavior.OPTIONAL_AND_HIDES_LOWER_PRIORITY
-            });
-          }
-
-          // Update path and polyline from route_history if available
-          let routeHistory = data.route_history && Array.isArray(data.route_history) ? data.route_history : [];
-          pathRef.current = routeHistory.map(point => ({ lat: point.lat, lng: point.lng }));
-          // Add the new position if it's not already the last point
-          if (!pathRef.current.length || (pathRef.current[pathRef.current.length - 1].lat !== newPosition.lat || pathRef.current[pathRef.current.length - 1].lng !== newPosition.lng)) {
-            pathRef.current.push(newPosition);
-          }
-
-          // If we have at least 2 points, update the polyline
-          if (pathRef.current.length >= 2) {
-            const start = pathRef.current[pathRef.current.length - 2];
-            const end = pathRef.current[pathRef.current.length - 1];
-            await updatePolylineWithDirections(start, end);
-          }
-
-          // Save updated route_history to Supabase
-          await supabase
-            .from('contract')
-            .update({
-              route_history: pathRef.current.map(point => ({ lat: point.lat, lng: point.lng }))
-            })
-            .eq('id', contract.id);
-        }
-      } catch (err) {
-        console.error('Error updating location:', err);
-      }
-    };
-
-    if (contract?.id && map) {
-      updateMapLocation();
-      intervalId = setInterval(updateMapLocation, 5000);
-    }
-
-    return () => {
-      if (intervalId) clearInterval(intervalId);
-    };
-  }, [contract?.id, map]);
-
   // Google Maps script loader
   useEffect(() => {
     if (contract && !isScriptLoaded && !window.google) {
+      console.log('Loading Google Maps script...');
       const script = document.createElement('script');
       script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places,marker`;
       script.async = true;
       script.defer = true;
-      script.onload = () => { setIsScriptLoaded(true); };
-      script.onerror = () => { setMapError('Failed to load Google Maps'); };
+      script.onload = () => {
+        console.log('Google Maps script loaded successfully');
+        setIsScriptLoaded(true);
+      };
+      script.onerror = (error) => {
+        console.error('Failed to load Google Maps:', error);
+        setMapError('Failed to load Google Maps');
+      };
       document.head.appendChild(script);
-      return () => { if (document.head.contains(script)) document.head.removeChild(script); };
+      return () => {
+        if (document.head.contains(script)) {
+          document.head.removeChild(script);
+        }
+      };
     }
   }, [contract, isScriptLoaded]);
 
   // Initialize map
-  useEffect(() => { if (isScriptLoaded && contract && !map) { initMap(); } }, [isScriptLoaded, contract]);
+  useEffect(() => {
+    if (isScriptLoaded && contract && !map) {
+      console.log('Initializing map...');
+      initMap();
+    }
+  }, [isScriptLoaded, contract, map]);
 
   // Map initialization
   const initMap = () => {
-    if (!window.google || !mapRef.current || !contract) return;
+    if (!window.google || !mapRef.current || !contract) {
+      console.log('Map initialization skipped:', {
+        hasGoogle: !!window.google,
+        hasMapRef: !!mapRef.current,
+        hasContract: !!contract
+      });
+      return;
+    }
+    
     try {
+      console.log('Initializing map with contract:', contract);
       // Load route_history if available
       if (contract.route_history && Array.isArray(contract.route_history) && contract.route_history.length > 0) {
         pathRef.current = contract.route_history.map(point => ({ lat: point.lat, lng: point.lng }));
@@ -303,6 +229,7 @@ function LuggageTrackingContent() {
       } else {
         pathRef.current = [];
       }
+      
       if (polylineRef.current) {
         polylineRef.current.forEach(polyline => polyline.setMap(null));
         polylineRef.current = [];
@@ -327,6 +254,7 @@ function LuggageTrackingContent() {
         draggingCursor: 'grabbing'
       };
 
+      console.log('Creating new map instance...');
       const newMap = new window.google.maps.Map(mapRef.current, mapOptions);
       setMap(newMap);
       directionsServiceRef.current = new window.google.maps.DirectionsService();
@@ -334,6 +262,7 @@ function LuggageTrackingContent() {
       const markers = [];
 
       if (contract.current_location_geo?.coordinates) {
+        console.log('Adding current location marker:', contract.current_location_geo.coordinates);
         const currentPosition = {
           lat: contract.current_location_geo.coordinates[1],
           lng: contract.current_location_geo.coordinates[0]
@@ -343,18 +272,9 @@ function LuggageTrackingContent() {
         currentLocationMarker.innerHTML = `
           <style>
             @keyframes pulse {
-              0% {
-                transform: scale(1);
-                opacity: 1;
-              }
-              50% {
-                transform: scale(1.2);
-                opacity: 0.8;
-              }
-              100% {
-                transform: scale(1);
-                opacity: 1;
-              }
+              0% { transform: scale(1); opacity: 1; }
+              50% { transform: scale(1.2); opacity: 0.8; }
+              100% { transform: scale(1); opacity: 1; }
             }
             .location-marker {
               animation: pulse 2s infinite;
@@ -371,7 +291,7 @@ function LuggageTrackingContent() {
             </svg>
           </div>
         `;
-
+        
         currentLocationMarkerRef.current = new window.google.maps.marker.AdvancedMarkerElement({
           map: newMap,
           position: currentPosition,
@@ -384,6 +304,7 @@ function LuggageTrackingContent() {
       }
 
       if (contract.pickup_location_geo?.coordinates) {
+        console.log('Adding pickup location marker:', contract.pickup_location_geo.coordinates);
         const pickupMarker = new window.google.maps.marker.PinElement({
           scale: 1,
           background: '#2196F3',
@@ -408,6 +329,7 @@ function LuggageTrackingContent() {
       }
 
       if (contract.drop_off_location_geo?.coordinates) {
+        console.log('Adding drop-off location marker:', contract.drop_off_location_geo.coordinates);
         const dropoffMarker = new window.google.maps.marker.PinElement({
           scale: 1,
           background: '#FF9800',
@@ -433,6 +355,7 @@ function LuggageTrackingContent() {
 
       // Draw complete route if we have route history
       if (pathRef.current.length >= 2) {
+        console.log('Drawing route history:', pathRef.current);
         drawCompleteRoute();
       }
 
@@ -456,10 +379,145 @@ function LuggageTrackingContent() {
           newMap.fitBounds(bounds);
         }
       }
+
+      console.log('Map initialization completed successfully');
     } catch (error) {
+      console.error('Error initializing map:', error);
       setMapError(error.message);
     }
   };
+
+  // Update map location with improved error handling
+  const updateMapLocation = async () => {
+    if (!map || !window.google || !currentLocationMarkerRef.current) {
+      console.log('Map or marker not initialized yet, skipping location update');
+      return;
+    }
+
+    try {
+      if (contract?.current_location_geo?.coordinates) {
+        const newPosition = {
+          lat: contract.current_location_geo.coordinates[1],
+          lng: contract.current_location_geo.coordinates[0]
+        };
+
+        // Check if the marker is still valid
+        if (currentLocationMarkerRef.current && currentLocationMarkerRef.current.map) {
+          console.log('Updating marker position:', newPosition);
+          currentLocationMarkerRef.current.position = newPosition;
+          
+          // Update map center to follow the marker
+          map.setCenter(newPosition);
+          
+          // Add the new position to the path
+          if (pathRef.current) {
+            pathRef.current.push(newPosition);
+            
+            // Draw the new route segment
+            if (pathRef.current.length >= 2) {
+              const start = pathRef.current[pathRef.current.length - 2];
+              const end = pathRef.current[pathRef.current.length - 1];
+              await updatePolylineWithDirections(start, end);
+            }
+          }
+        } else {
+          console.log('Marker is no longer valid, recreating...');
+          // Recreate the marker if it's no longer valid
+          const currentLocationMarker = document.createElement('div');
+          currentLocationMarker.innerHTML = `
+            <style>
+              @keyframes pulse {
+                0% { transform: scale(1); opacity: 1; }
+                50% { transform: scale(1.2); opacity: 0.8; }
+                100% { transform: scale(1); opacity: 1; }
+              }
+              .location-marker {
+                animation: pulse 2s infinite;
+                filter: drop-shadow(0 0 8px rgba(76, 175, 80, 0.8));
+              }
+            </style>
+            <div class="location-marker">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="12" cy="12" r="10" fill="#4CAF50" fill-opacity="0.6"/>
+                <circle cx="12" cy="12" r="8" fill="#4CAF50" fill-opacity="0.8"/>
+                <circle cx="12" cy="12" r="6" fill="#4CAF50" fill-opacity="0.9"/>
+                <circle cx="12" cy="12" r="4" fill="#4CAF50"/>
+                <circle cx="12" cy="12" r="2" fill="white"/>
+              </svg>
+            </div>
+          `;
+          
+          currentLocationMarkerRef.current = new window.google.maps.marker.AdvancedMarkerElement({
+            map: map,
+            position: newPosition,
+            title: 'Current Location',
+            content: currentLocationMarker,
+            collisionBehavior: window.google.maps.CollisionBehavior.OPTIONAL_AND_HIDES_LOWER_PRIORITY
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error updating location:', error);
+      // If there's an error with the marker, try to recreate it
+      if (error.message.includes('Cannot read properties of undefined')) {
+        console.log('Attempting to recreate marker...');
+        currentLocationMarkerRef.current = null;
+        // The next location update will recreate the marker
+      }
+    }
+  };
+
+  // Update the polling effect with retry mechanism
+  useEffect(() => {
+    let pollInterval;
+    let retryCount = 0;
+    const MAX_RETRIES = 3;
+
+    const startPolling = () => {
+      if (contract?.id) {
+        console.log('Starting location polling for contract:', contract.id);
+        pollInterval = setInterval(async () => {
+          try {
+            const { data, error: locationError } = await supabase
+              .from('contract')
+              .select('current_location_geo, route_history')
+              .eq('id', contract.id)
+              .single();
+
+            if (locationError) throw locationError;
+            
+            if (data) {
+              setContract(prev => ({
+                ...prev,
+                current_location_geo: data.current_location_geo,
+                route_history: data.route_history
+              }));
+              await updateMapLocation();
+              retryCount = 0; // Reset retry count on successful update
+            }
+          } catch (error) {
+            console.error('Error polling location:', error);
+            retryCount++;
+            
+            if (retryCount >= MAX_RETRIES) {
+              console.log('Max retries reached, stopping polling');
+              clearInterval(pollInterval);
+              setMapError('Failed to update location after multiple attempts');
+            }
+          }
+        }, 5000);
+      }
+    };
+
+    startPolling();
+
+    return () => {
+      if (pollInterval) {
+        console.log('Clearing polling interval');
+        clearInterval(pollInterval);
+      }
+    };
+  }, [contract?.id]);
 
   // Replace handleSearch to use fetchData
   const handleSearch = (id = contractId) => fetchData(id);
@@ -481,6 +539,130 @@ function LuggageTrackingContent() {
     }
     setIsScriptLoaded(false);
   };
+
+  // Function to calculate distance between two points
+  const calculateDistance = (point1, point2) => {
+    const R = 6371; // Earth's radius in km
+    const dLat = (point2.lat - point1.lat) * Math.PI / 180;
+    const dLng = (point2.lng - point1.lng) * Math.PI / 180;
+    const a = 
+      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(point1.lat * Math.PI / 180) * Math.cos(point2.lat * Math.PI / 180) * 
+      Math.sin(dLng/2) * Math.sin(dLng/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c; // Distance in km
+  };
+
+  // Function to calculate route details using Google Maps Directions Service
+  const calculateRouteDetails = async (origin, destination) => {
+    if (!directionsServiceRef.current || !origin || !destination) {
+      return { distance: null, duration: null };
+    }
+    
+    try {
+      const result = await directionsServiceRef.current.route({
+        origin: origin,
+        destination: destination,
+        travelMode: window.google.maps.TravelMode.DRIVING,
+        drivingOptions: {
+          departureTime: new Date(),
+          trafficModel: window.google.maps.TrafficModel.BEST_GUESS
+        }
+      });
+
+      if (result.routes && result.routes.length > 0) {
+        const route = result.routes[0].legs[0];
+        return {
+          distance: route.distance.value / 1000, // Convert meters to kilometers
+          duration: route.duration_in_traffic?.value || route.duration.value // Duration in seconds
+        };
+      }
+      return { distance: null, duration: null };
+    } catch (error) {
+      console.error('Error calculating route:', error);
+      return { distance: null, duration: null };
+    }
+  };
+
+  // Function to format duration
+  const formatDuration = (seconds) => {
+    if (!seconds) return 'Calculating...';
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    
+    if (hours === 0) {
+      return `${minutes} min`;
+    } else if (minutes === 0) {
+      return `${hours} hr`;
+    } else {
+      return `${hours} hr ${minutes} min`;
+    }
+  };
+
+  // Update route details when location changes
+  useEffect(() => {
+    const updateRouteDetails = async () => {
+      console.log('Location changed, checking coordinates...');
+      if (!contract?.current_location_geo?.coordinates || 
+          !contract?.drop_off_location_geo?.coordinates || 
+          !contract?.pickup_location_geo?.coordinates) {
+        console.log('Missing coordinates:', {
+          current: !!contract?.current_location_geo?.coordinates,
+          dropoff: !!contract?.drop_off_location_geo?.coordinates,
+          pickup: !!contract?.pickup_location_geo?.coordinates
+        });
+        return;
+      }
+
+      const currentLocation = {
+        lat: contract.current_location_geo.coordinates[1],
+        lng: contract.current_location_geo.coordinates[0]
+      };
+      const dropoffLocation = {
+        lat: contract.drop_off_location_geo.coordinates[1],
+        lng: contract.drop_off_location_geo.coordinates[0]
+      };
+      const pickupLocation = {
+        lat: contract.pickup_location_geo.coordinates[1],
+        lng: contract.pickup_location_geo.coordinates[0]
+      };
+
+      console.log('Calculating route details with coordinates:', {
+        current: currentLocation,
+        dropoff: dropoffLocation,
+        pickup: pickupLocation
+      });
+
+      // Calculate current route details
+      const details = await calculateRouteDetails(currentLocation, dropoffLocation);
+      setRouteDetails(details);
+
+      // Calculate total route details
+      const totalDetails = await calculateRouteDetails(pickupLocation, dropoffLocation);
+      setTotalRouteDetails(totalDetails);
+
+      // Calculate progress
+      if (totalDetails.distance) {
+        const progressPercentage = Math.max(0, Math.min(100, 
+          (1 - (details.distance / totalDetails.distance)) * 100
+        ));
+        console.log('Delivery Progress:', {
+          progress: `${Math.round(progressPercentage)}%`,
+          distanceRemaining: `${details.distance?.toFixed(1)} km`,
+          eta: details.duration ? formatDuration(details.duration) : 'Calculating...'
+        });
+        setProgress(progressPercentage);
+      }
+
+      // Calculate ETA
+      if (details.duration) {
+        const etaTime = new Date(Date.now() + details.duration * 1000);
+        setEta(etaTime);
+      }
+    };
+
+    updateRouteDetails();
+  }, [contract?.current_location_geo?.coordinates]);
 
   // Render
   return (
@@ -768,6 +950,44 @@ function LuggageTrackingContent() {
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <Box sx={{ width: 16, height: 16, borderRadius: '50%', bgcolor: '#4CAF50', border: '2px solid #388E3C' }} />
                 <Typography variant="body2">Current Location</Typography>
+              </Box>
+            </Box>
+            {/* Progress and ETA Section */}
+            <Box sx={{ mb: 2 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                <Typography variant="body2" color="text.secondary">
+                  Delivery Progress
+                </Typography>
+                <Typography variant="body2" color="primary.main" fontWeight="bold">
+                  {Math.round(progress)}%
+                </Typography>
+              </Box>
+              <Box sx={{ width: '100%', bgcolor: 'grey.200', borderRadius: 1, height: 8, mb: 1 }}>
+                <Box
+                  sx={{
+                    height: '100%',
+                    borderRadius: 1,
+                    bgcolor: 'primary.main',
+                    width: `${progress}%`,
+                    transition: 'width 0.5s ease-in-out'
+                  }}
+                />
+              </Box>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                <Typography variant="body2" color="text.secondary">
+                  Distance Remaining
+                </Typography>
+                <Typography variant="body2" color="primary.main" fontWeight="bold">
+                  {routeDetails.distance ? `${routeDetails.distance.toFixed(1)} km` : 'Calculating...'}
+                </Typography>
+              </Box>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Typography variant="body2" color="text.secondary">
+                  Estimated Time of Arrival
+                </Typography>
+                <Typography variant="body2" color="primary.main" fontWeight="bold">
+                  {routeDetails.duration ? formatDuration(routeDetails.duration) : 'Calculating...'}
+                </Typography>
               </Box>
             </Box>
             <MapComponent mapRef={mapRef} mapError={mapError} />

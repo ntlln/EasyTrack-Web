@@ -107,137 +107,130 @@ function LuggageTrackingContent() {
   }, [contractId]);
 
   // Poll for current location updates (map only)
-  useEffect(() => {
-    let intervalId;
-    const updateMapLocation = async () => {
-      if (!contract?.id) return;
-      try {
-        console.log('Polling for location update...');
-        const response = await fetch(`/api/admin?contractId=${contract.id}`);
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || 'Failed to fetch location data');
-        }
-        const { data } = await response.json();
-        
-        if (data?.current_location_geo && map) {
-          console.log('Location update received:', {
-            currentLocation: data.current_location_geo.coordinates,
-            pickupLocation: data.pickup_location_geo?.coordinates,
-            dropoffLocation: data.drop_off_location_geo?.coordinates
-          });
-
-          const newPosition = {
-            lat: data.current_location_geo.coordinates[1],
-            lng: data.current_location_geo.coordinates[0]
-          };
-
-          // Update current location marker
-          if (currentLocationMarkerRef.current) {
-            currentLocationMarkerRef.current.position = newPosition;
-          } else {
-            const currentLocationMarker = document.createElement('div');
-            currentLocationMarker.innerHTML = `
-              <style>
-                @keyframes pulse {
-                  0% {
-                    transform: scale(1);
-                    opacity: 1;
-                  }
-                  50% {
-                    transform: scale(1.2);
-                    opacity: 0.8;
-                  }
-                  100% {
-                    transform: scale(1);
-                    opacity: 1;
-                  }
-                }
-                .location-marker {
-                  animation: pulse 2s infinite;
-                  filter: drop-shadow(0 0 8px rgba(76, 175, 80, 0.8));
-                }
-              </style>
-              <div class="location-marker">
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <circle cx="12" cy="12" r="10" fill="#4CAF50" fill-opacity="0.6"/>
-                  <circle cx="12" cy="12" r="8" fill="#4CAF50" fill-opacity="0.8"/>
-                  <circle cx="12" cy="12" r="6" fill="#4CAF50" fill-opacity="0.9"/>
-                  <circle cx="12" cy="12" r="4" fill="#4CAF50"/>
-                  <circle cx="12" cy="12" r="2" fill="white"/>
-                </svg>
-              </div>
-            `;
-            
-            currentLocationMarkerRef.current = new window.google.maps.marker.AdvancedMarkerElement({
-              map: map,
-              position: newPosition,
-              title: 'Current Location',
-              content: currentLocationMarker,
-              collisionBehavior: window.google.maps.CollisionBehavior.OPTIONAL_AND_HIDES_LOWER_PRIORITY
-            });
-          }
-
-          // Update path and polyline from route_history if available
-          let routeHistory = data.route_history && Array.isArray(data.route_history) ? data.route_history : [];
-          pathRef.current = routeHistory.map(point => ({ lat: point.lat, lng: point.lng }));
-          // Add the new position if it's not already the last point
-          if (!pathRef.current.length || (pathRef.current[pathRef.current.length - 1].lat !== newPosition.lat || pathRef.current[pathRef.current.length - 1].lng !== newPosition.lng)) {
-            pathRef.current.push(newPosition);
-          }
-
-          // If we have at least 2 points, update the polyline
-          if (pathRef.current.length >= 2) {
-            const start = pathRef.current[pathRef.current.length - 2];
-            const end = pathRef.current[pathRef.current.length - 1];
-            await updatePolylineWithDirections(start, end);
-          }
-
-          // Update route history in database
-          const updateResponse = await fetch('/api/admin', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              action: 'updateRouteHistory',
-              params: {
-                contractId: contract.id,
-                route_history: pathRef.current.map(point => ({ lat: point.lat, lng: point.lng }))
-              }
-            }),
-          });
-
-          if (!updateResponse.ok) {
-            const errorData = await updateResponse.json();
-            throw new Error(errorData.error || 'Failed to update route history');
-          }
-
-          // Update contract state to trigger progress/ETA calculations
-          setContract(prev => ({
-            ...prev,
-            current_location_geo: data.current_location_geo,
-            route_history: pathRef.current
-          }));
-        }
-      } catch (err) {
-        console.error('Error updating location:', err);
-      }
-    };
-
-    if (contract?.id && map) {
-      console.log('Starting location polling for contract:', contract.id);
-      updateMapLocation();
-      intervalId = setInterval(updateMapLocation, 5000);
+  const updateMapLocation = async () => {
+    if (!map || !window.google || !currentLocationMarkerRef.current) {
+      console.log('Map or marker not initialized yet, skipping location update');
+      return;
     }
 
-    return () => {
-      if (intervalId) {
-        console.log('Clearing location polling interval');
-        clearInterval(intervalId);
+    try {
+      if (contract?.current_location_geo?.coordinates) {
+        const newPosition = {
+          lat: contract.current_location_geo.coordinates[1],
+          lng: contract.current_location_geo.coordinates[0]
+        };
+
+        // Check if the marker is still valid
+        if (currentLocationMarkerRef.current && currentLocationMarkerRef.current.map) {
+          console.log('Updating marker position:', newPosition);
+          currentLocationMarkerRef.current.position = newPosition;
+          
+          // Update map center to follow the marker
+          map.setCenter(newPosition);
+          
+          // Add the new position to the path
+          if (pathRef.current) {
+            pathRef.current.push(newPosition);
+            
+            // Draw the new route segment
+            if (pathRef.current.length >= 2) {
+              const start = pathRef.current[pathRef.current.length - 2];
+              const end = pathRef.current[pathRef.current.length - 1];
+              await updatePolylineWithDirections(start, end);
+            }
+          }
+        } else {
+          console.log('Marker is no longer valid, recreating...');
+          // Recreate the marker if it's no longer valid
+          const currentLocationMarker = document.createElement('div');
+          currentLocationMarker.innerHTML = `
+            <style>
+              @keyframes pulse {
+                0% { transform: scale(1); opacity: 1; }
+                50% { transform: scale(1.2); opacity: 0.8; }
+                100% { transform: scale(1); opacity: 1; }
+              }
+              .location-marker {
+                animation: pulse 2s infinite;
+                filter: drop-shadow(0 0 8px rgba(76, 175, 80, 0.8));
+              }
+            </style>
+            <div class="location-marker">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="12" cy="12" r="10" fill="#4CAF50" fill-opacity="0.6"/>
+                <circle cx="12" cy="12" r="8" fill="#4CAF50" fill-opacity="0.8"/>
+                <circle cx="12" cy="12" r="6" fill="#4CAF50" fill-opacity="0.9"/>
+                <circle cx="12" cy="12" r="4" fill="#4CAF50"/>
+                <circle cx="12" cy="12" r="2" fill="white"/>
+              </svg>
+            </div>
+          `;
+          
+          currentLocationMarkerRef.current = new window.google.maps.marker.AdvancedMarkerElement({
+            map: map,
+            position: newPosition,
+            title: 'Current Location',
+            content: currentLocationMarker,
+            collisionBehavior: window.google.maps.CollisionBehavior.OPTIONAL_AND_HIDES_LOWER_PRIORITY
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error updating location:', error);
+      // If there's an error with the marker, try to recreate it
+      if (error.message.includes('Cannot read properties of undefined')) {
+        console.log('Attempting to recreate marker...');
+        currentLocationMarkerRef.current = null;
+        // The next location update will recreate the marker
+      }
+    }
+  };
+
+  // Update the polling effect to handle errors
+  useEffect(() => {
+    let pollInterval;
+    let retryCount = 0;
+    const MAX_RETRIES = 3;
+
+    const startPolling = () => {
+      if (contract?.id) {
+        console.log('Starting location polling for contract:', contract.id);
+        pollInterval = setInterval(async () => {
+          try {
+            const response = await fetch(`/api/admin?action=getContract&contractId=${contract.id}`);
+            if (!response.ok) throw new Error('Failed to fetch contract data');
+            
+            const result = await response.json();
+            if (result.error) throw new Error(result.error);
+            
+            if (result.data) {
+              setContract(result.data);
+              await updateMapLocation();
+              retryCount = 0; // Reset retry count on successful update
+            }
+          } catch (error) {
+            console.error('Error polling location:', error);
+            retryCount++;
+            
+            if (retryCount >= MAX_RETRIES) {
+              console.log('Max retries reached, stopping polling');
+              clearInterval(pollInterval);
+              setMapError('Failed to update location after multiple attempts');
+            }
+          }
+        }, 5000);
       }
     };
-  }, [contract?.id, map]);
+
+    startPolling();
+
+    return () => {
+      if (pollInterval) {
+        console.log('Clearing polling interval');
+        clearInterval(pollInterval);
+      }
+    };
+  }, [contract?.id]);
 
   // Real-time subscription for contract changes
   useEffect(() => {
@@ -329,19 +322,35 @@ function LuggageTrackingContent() {
   // Google Maps script loader
   useEffect(() => {
     if (contract && !isScriptLoaded && !window.google) {
+      console.log('Loading Google Maps script...');
       const script = document.createElement('script');
       script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places,marker`;
       script.async = true;
       script.defer = true;
-      script.onload = () => { setIsScriptLoaded(true); };
-      script.onerror = () => { setMapError('Failed to load Google Maps'); };
+      script.onload = () => {
+        console.log('Google Maps script loaded successfully');
+        setIsScriptLoaded(true);
+      };
+      script.onerror = (error) => {
+        console.error('Failed to load Google Maps:', error);
+        setMapError('Failed to load Google Maps');
+      };
       document.head.appendChild(script);
-      return () => { if (document.head.contains(script)) document.head.removeChild(script); };
+      return () => {
+        if (document.head.contains(script)) {
+          document.head.removeChild(script);
+        }
+      };
     }
   }, [contract, isScriptLoaded]);
 
   // Initialize map
-  useEffect(() => { if (isScriptLoaded && contract && !map) { initMap(); } }, [isScriptLoaded, contract]);
+  useEffect(() => {
+    if (isScriptLoaded && contract && !map) {
+      console.log('Initializing map...');
+      initMap();
+    }
+  }, [isScriptLoaded, contract, map]);
 
   // Map initialization
   const initMap = () => {
@@ -392,6 +401,7 @@ function LuggageTrackingContent() {
         draggingCursor: 'grabbing'
       };
 
+      console.log('Creating new map instance...');
       const newMap = new window.google.maps.Map(mapRef.current, mapOptions);
       setMap(newMap);
       directionsServiceRef.current = new window.google.maps.DirectionsService();
@@ -437,7 +447,7 @@ function LuggageTrackingContent() {
             </svg>
           </div>
         `;
-
+        
         currentLocationMarkerRef.current = new window.google.maps.marker.AdvancedMarkerElement({
           map: newMap,
           position: currentPosition,
@@ -525,6 +535,8 @@ function LuggageTrackingContent() {
           newMap.fitBounds(bounds);
         }
       }
+
+      console.log('Map initialization completed successfully');
     } catch (error) {
       console.error('Error initializing map:', error);
       setMapError(error.message);
