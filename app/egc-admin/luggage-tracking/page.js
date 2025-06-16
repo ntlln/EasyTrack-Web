@@ -559,10 +559,21 @@ function LuggageTrackingContent() {
   // Function to calculate route details using Google Maps Directions Service
   const calculateRouteDetails = async (origin, destination) => {
     if (!directionsServiceRef.current || !origin || !destination) {
+      console.log('Missing required parameters for route calculation:', {
+        hasDirectionsService: !!directionsServiceRef.current,
+        origin,
+        destination
+      });
       return { distance: null, duration: null };
     }
     
     try {
+      console.log('Calculating route details with coordinates:', {
+        current: origin,
+        dropoff: destination,
+        pickup: contract?.pickup_location_geo?.coordinates
+      });
+
       const result = await directionsServiceRef.current.route({
         origin: origin,
         destination: destination,
@@ -573,14 +584,16 @@ function LuggageTrackingContent() {
         }
       });
 
-      if (result.routes && result.routes.length > 0) {
-        const route = result.routes[0].legs[0];
-        return {
-          distance: route.distance.value / 1000, // Convert meters to kilometers
-          duration: route.duration_in_traffic?.value || route.duration.value // Duration in seconds
-        };
+      if (!result || !result.routes || result.routes.length === 0) {
+        console.warn('No routes found in the response:', result);
+        return { distance: null, duration: null };
       }
-      return { distance: null, duration: null };
+
+      const route = result.routes[0].legs[0];
+      return {
+        distance: route.distance.value / 1000, // Convert meters to kilometers
+        duration: route.duration_in_traffic?.value || route.duration.value // Duration in seconds
+      };
     } catch (error) {
       console.error('Error calculating route:', error);
       return { distance: null, duration: null };
