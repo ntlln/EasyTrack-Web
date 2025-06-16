@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import { Box, Typography, TextField, Paper, Divider, IconButton, Collapse, CircularProgress } from "@mui/material";
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
@@ -15,6 +15,14 @@ const MapComponent = dynamic(() => Promise.resolve(({ mapRef, mapError }) => (
 )), { ssr: false });
 
 export default function Page() {
+    return (
+        <Suspense fallback={<div>Loading...</div>}>
+            <LuggageTrackingContent />
+        </Suspense>
+    );
+}
+
+function LuggageTrackingContent() {
   // State and hooks
   const searchParams = useSearchParams();
   const router = useRouter();

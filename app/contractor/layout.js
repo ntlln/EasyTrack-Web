@@ -2,11 +2,19 @@
 
 import Sidebar from "../components/contractor-sidebar/page";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { Box } from "@mui/material";
 
 export default function Layout({ children }) {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <ContractorLayoutContent>{children}</ContractorLayoutContent>
+    </Suspense>
+  );
+}
+
+function ContractorLayoutContent({ children }) {
   // Client and state setup
   const pathname = usePathname();
   const router = useRouter();

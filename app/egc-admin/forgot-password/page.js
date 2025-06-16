@@ -3,10 +3,18 @@
 import { Box, Typography, Button, TextField, Snackbar, Alert, CircularProgress } from "@mui/material";
 import { Global } from '@emotion/react';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useState, Suspense } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
 export default function Page() {
+    return (
+        <Suspense fallback={<div>Loading...</div>}>
+            <ForgotPasswordContent />
+        </Suspense>
+    );
+}
+
+function ForgotPasswordContent() {
     // Client and state setup
     const router = useRouter();
     const supabase = createClientComponentClient();

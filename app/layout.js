@@ -3,12 +3,20 @@
 import { ThemeProvider } from "@mui/material/styles";
 import { CssBaseline, Box, CircularProgress } from "@mui/material";
 import { getTheme } from "./theme";
-import { useState, useEffect, createContext, useContext } from "react";
+import { useState, useEffect, createContext, useContext, Suspense } from "react";
 import { usePathname, useSearchParams } from 'next/navigation';
 
 export const ColorModeContext = createContext({ toggleMode: () => {}, mode: "light" });
 
 export default function Layout({ children }) {
+    return (
+        <Suspense fallback={<div>Loading...</div>}>
+            <LayoutContent>{children}</LayoutContent>
+        </Suspense>
+    );
+}
+
+function LayoutContent({ children }) {
     // State setup
     const [mode, setMode] = useState("light");
     const [isLoading, setIsLoading] = useState(false);
