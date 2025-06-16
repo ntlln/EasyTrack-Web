@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import dynamic from 'next/dynamic';
-import { Box, Tabs, Tab, Typography, Paper, Button, IconButton, CircularProgress, Divider, Collapse, TextField, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Dialog, DialogTitle, DialogContent, DialogActions, Radio, Snackbar } from "@mui/material";
+import { Box, Tabs, Tab, Typography, Paper, Button, IconButton, CircularProgress, Divider, Collapse, TextField, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Dialog, DialogTitle, DialogContent, DialogActions, Radio, Snackbar, TablePagination } from "@mui/material";
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import { useRouter } from 'next/navigation';
@@ -40,12 +40,12 @@ const ContractList = ({ onTrackContract, initialSearch }) => {
   const [activeSearch, setActiveSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [selectedContractId, setSelectedContractId] = useState(null);
   const [cancelling, setCancelling] = useState(false);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
-  const rowsPerPage = 10;
   const supabase = createClientComponentClient();
   const router = useRouter();
 
@@ -166,6 +166,15 @@ const ContractList = ({ onTrackContract, initialSearch }) => {
     const startIndex = page * rowsPerPage;
     const endIndex = startIndex + rowsPerPage;
     return filtered.slice(startIndex, endIndex);
+  };
+
+  const handleChangePage = (event, newPage) => {
+    setPage(newPage);
+  };
+
+  const handleChangeRowsPerPage = (event) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
   };
 
   const handleCancelClick = (contractId) => {
@@ -490,42 +499,17 @@ const ContractList = ({ onTrackContract, initialSearch }) => {
 
       {/* Update pagination controls */}
       {!contractListLoading && !contractListError && filteredContracts.length > 0 && (
-        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Typography variant="body2" color="text.secondary">
-              {`Page ${page + 1} of ${Math.ceil(filteredContracts.length / rowsPerPage)}`}
-            </Typography>
-            <Box sx={{ display: 'flex', gap: 1 }}>
-              <Button
-                onClick={() => setPage(0)}
-                disabled={page === 0}
-                size="small"
-              >
-                First
-              </Button>
-              <Button
-                onClick={() => setPage(page - 1)}
-                disabled={page === 0}
-                size="small"
-              >
-                Previous
-              </Button>
-              <Button
-                onClick={() => setPage(page + 1)}
-                disabled={page >= Math.ceil(filteredContracts.length / rowsPerPage) - 1}
-                size="small"
-              >
-                Next
-              </Button>
-              <Button
-                onClick={() => setPage(Math.ceil(filteredContracts.length / rowsPerPage) - 1)}
-                disabled={page >= Math.ceil(filteredContracts.length / rowsPerPage) - 1}
-                size="small"
-              >
-                Last
-              </Button>
-            </Box>
-          </Box>
+        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
+          <TablePagination
+            rowsPerPageOptions={[10, 25, 50, 100]}
+            component="div"
+            count={filteredContracts.length}
+            rowsPerPage={rowsPerPage}
+            page={page}
+            onPageChange={handleChangePage}
+            onRowsPerPageChange={handleChangeRowsPerPage}
+            labelRowsPerPage="Rows per page:"
+          />
         </Box>
       )}
 
@@ -586,6 +570,8 @@ const LuggageAssignments = ({ onAssignmentComplete }) => {
   const [assigning, setAssigning] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [detailsContract, setDetailsContract] = useState(null);
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
 
   useEffect(() => {
     setMounted(true);
@@ -693,6 +679,22 @@ const LuggageAssignments = ({ onAssignmentComplete }) => {
     setDetailsContract(null);
   };
 
+  const handleChangePage = (event, newPage) => {
+    setPage(newPage);
+  };
+
+  const handleChangeRowsPerPage = (event) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
+
+  // Helper to get paginated assignments
+  const getPaginatedAssignments = () => {
+    const startIndex = page * rowsPerPage;
+    const endIndex = startIndex + rowsPerPage;
+    return assignments.slice(startIndex, endIndex);
+  };
+
   if (loading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
@@ -727,12 +729,12 @@ const LuggageAssignments = ({ onAssignmentComplete }) => {
           <TableBody>
             {assignments.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} align="center">
+                <TableCell colSpan={7} align="center">
                   <Typography color="text.secondary">No available contracts for assignment</Typography>
                 </TableCell>
               </TableRow>
             ) : (
-              assignments.map((assignment) => (
+              getPaginatedAssignments().map((assignment) => (
                 <TableRow 
                   key={assignment.id} 
                   hover
@@ -805,6 +807,22 @@ const LuggageAssignments = ({ onAssignmentComplete }) => {
           </TableBody>
         </Table>
       </TableContainer>
+
+      {/* Add pagination for assignments */}
+      {assignments.length > 0 && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
+          <TablePagination
+            rowsPerPageOptions={[10, 25, 50, 100]}
+            component="div"
+            count={assignments.length}
+            rowsPerPage={rowsPerPage}
+            page={page}
+            onPageChange={handleChangePage}
+            onRowsPerPageChange={handleChangeRowsPerPage}
+            labelRowsPerPage="Rows per page:"
+          />
+        </Box>
+      )}
 
       {/* Assignment Dialog */}
       <Dialog 

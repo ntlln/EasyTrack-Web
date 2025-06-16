@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Box, MenuItem, TextField, Typography, Button, TableContainer, Table, TableHead, TableRow, TableCell, TableBody, Paper, IconButton, Menu, Pagination, TableSortLabel, Snackbar, Alert, Dialog, DialogTitle, DialogContent, DialogActions } from "@mui/material";
+import { Box, MenuItem, TextField, Typography, Button, TableContainer, Table, TableHead, TableRow, TableCell, TableBody, Paper, IconButton, Menu, TablePagination, TableSortLabel, Snackbar, Alert, Dialog, DialogTitle, DialogContent, DialogActions } from "@mui/material";
 import { MoreVert as MoreVertIcon, Edit as EditIcon, Delete as DeleteIcon, LockReset as LockResetIcon, ChevronLeft as ChevronLeftIcon, Person as PersonIcon } from "@mui/icons-material";
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
@@ -13,7 +13,7 @@ export default function Page() {
 
   // State setup
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(5);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
   const [anchorEl, setAnchorEl] = useState(null);
   const [selectedAccount, setSelectedAccount] = useState(null);
   const [accounts, setAccounts] = useState([]);
@@ -116,7 +116,7 @@ export default function Page() {
   };
 
   // Event handlers
-  const handleChangePage = (event, newPage) => setPage(newPage - 1);
+  const handleChangePage = (event, newPage) => setPage(newPage);
   const handleChangeRowsPerPage = (event) => { setRowsPerPage(parseInt(event.target.value, 10)); setPage(0); };
   const handleOpenMenu = (event, account) => { setAnchorEl(event.currentTarget); setSelectedAccount(account); };
   const handleCloseMenu = () => { setAnchorEl(null); setSelectedAccount(null); };
@@ -267,12 +267,17 @@ export default function Page() {
               ))}
             </TableBody>
           </Table>
-
-          <Box sx={paginationContainerStyles}>
-            <TextField select label="Rows per page" value={rowsPerPage} onChange={handleChangeRowsPerPage} size="small" sx={rowsPerPageStyles}>
-              {[5, 10, 15].map((rows) => <MenuItem key={rows} value={rows}>{rows}</MenuItem>)}
-            </TextField>
-            <Pagination count={totalPages} page={page + 1} onChange={handleChangePage} color="primary" shape="rounded" showFirstButton showLastButton />
+          <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
+            <TablePagination
+              rowsPerPageOptions={[10, 25, 50, 100]}
+              component="div"
+              count={filteredAndSortedAccounts.length}
+              rowsPerPage={rowsPerPage}
+              page={page}
+              onPageChange={handleChangePage}
+              onRowsPerPageChange={handleChangeRowsPerPage}
+              labelRowsPerPage="Rows per page:"
+            />
           </Box>
         </TableContainer>
       </Box>

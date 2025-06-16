@@ -9,6 +9,7 @@ import MyLocationIcon from '@mui/icons-material/MyLocation';
 import AssignmentIcon from '@mui/icons-material/Assignment';
 import BarChartIcon from '@mui/icons-material/BarChart';
 import SupportAgentIcon from '@mui/icons-material/SupportAgent';
+import LocationOnIcon from '@mui/icons-material/LocationOn';
 import { Gauge } from '@mui/x-charts/Gauge';
 import { useEffect, useState } from 'react';
 
@@ -21,10 +22,10 @@ export default function Page() {
   const cards = [
     { title: "Profile", route: "/egc-admin/profile", icon: AccountCircleIcon },
     { title: "User Management", route: "/egc-admin/user-management", icon: GroupsIcon },
+    { title: "Luggage Tracking", route: "/egc-admin/luggage-tracking", icon: LocationOnIcon },
     { title: "Luggage Management", route: "/egc-admin/luggage-management", icon: MyLocationIcon },
     { title: "Transaction Management", route: "/egc-admin/transaction-management", icon: AssignmentIcon },
-    // { title: "History and Reports", route: "/egc-admin/history-and-reports", icon: AssignmentIcon },
-    // { title: "Statistics", route: "/egc-admin/statistics", icon: BarChartIcon },
+    { title: "Statistics", route: "/egc-admin/statistics", icon: BarChartIcon },
     { title: "Chat Support", route: "/egc-admin/chat-support", icon: SupportAgentIcon },
   ];
 
