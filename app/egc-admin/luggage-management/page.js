@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import dynamic from 'next/dynamic';
-import { Box, Tabs, Tab, Typography, Paper, Button, IconButton, CircularProgress, Divider, Collapse, TextField, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Dialog, DialogTitle, DialogContent, DialogActions, Radio, Snackbar, TablePagination, Select, MenuItem, useTheme } from "@mui/material";
+import { Box, Tabs, Tab, Typography, Paper, Button, IconButton, CircularProgress, Divider, Collapse, TextField, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Dialog, DialogTitle, DialogContent, DialogActions, Radio, Snackbar, TablePagination, Select, MenuItem, useTheme, FormControl, InputLabel } from "@mui/material";
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import { useRouter } from 'next/navigation';
@@ -101,8 +101,6 @@ const ContractList = ({ onTrackContract, initialSearch, setRedirectContractId })
   const [contractListError, setContractListError] = useState(null);
   const [expandedContracts, setExpandedContracts] = useState([]);
   const [mounted, setMounted] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [activeSearch, setActiveSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
@@ -132,14 +130,6 @@ const ContractList = ({ onTrackContract, initialSearch, setRedirectContractId })
     setMounted(true);
   }, []);
 
-  // Autofill search if initialSearch is provided
-  useEffect(() => {
-    if (initialSearch) {
-      setSearchQuery(initialSearch);
-      setActiveSearch(initialSearch);
-    }
-  }, [initialSearch]);
-
   // Fetch contract list
   useEffect(() => {
     if (!mounted) return;
@@ -167,35 +157,12 @@ const ContractList = ({ onTrackContract, initialSearch, setRedirectContractId })
     fetchContracts();
   }, [mounted]);
 
-  const handleTabChange = (event, newValue) => {
-    setSelectedTab(newValue);
-    // Reset search state when switching tabs
-    if (newValue === 0) {
-      setSearchQuery('');
-      setActiveSearch('');
-    }
-  };
-
   const handleExpandClick = (contractId) => {
     setExpandedContracts((prev) =>
       prev.includes(contractId)
         ? prev.filter((id) => id !== contractId)
         : [...prev, contractId]
     );
-  };
-
-  const handleSearch = () => {
-    if (!searchQuery.trim()) {
-      setActiveSearch('');
-      return;
-    }
-    setActiveSearch(searchQuery);
-  };
-
-  const handleKeyPress = (event) => {
-    if (event.key === 'Enter') {
-      handleSearch();
-    }
   };
 
   // Filter contracts based on status
@@ -223,14 +190,11 @@ const ContractList = ({ onTrackContract, initialSearch, setRedirectContractId })
   // Update getFilteredContracts to include date filter
   const getFilteredContracts = () => {
     const dateFiltered = filterByDate(filteredContracts, dateFilter);
-    const filtered = dateFiltered.filter(contract =>
-      !activeSearch || String(contract.id).toLowerCase().includes(activeSearch.toLowerCase())
-    );
     
     // Apply pagination
     const startIndex = page * rowsPerPage;
     const endIndex = startIndex + rowsPerPage;
-    return filtered.slice(startIndex, endIndex);
+    return dateFiltered.slice(startIndex, endIndex);
   };
 
   const handleChangePage = (event, newPage) => {
@@ -292,72 +256,52 @@ const ContractList = ({ onTrackContract, initialSearch, setRedirectContractId })
 
   return (
     <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
-        <TextField
-          label="Search Contract ID"
-          variant="outlined"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          onKeyPress={handleKeyPress}
-          sx={{ width: '100%', maxWidth: '400px' }}
-          size="small"
-          InputProps={{
-            endAdornment: (
-              <IconButton 
-                onClick={handleSearch}
-                size="small"
+      <Box sx={{ maxWidth: '800px', mx: 'auto', width: '100%', mb: 3 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 2, p: 1 }}>
+          <Box sx={{ display: 'flex', gap: 1, whiteSpace: 'nowrap' }}>
+            {filterOptions.map((option) => (
+              <Button
+                key={option.value}
+                variant={statusFilter === option.value ? "contained" : "outlined"}
+                onClick={() => setStatusFilter(option.value)}
+                sx={{
+                  borderRadius: '20px',
+                  textTransform: 'none',
+                  px: 2,
+                  whiteSpace: 'nowrap',
+                  minWidth: '100px',
+                  borderColor: statusFilter === option.value ? 'primary.main' : 'divider',
+                  '&:hover': {
+                    borderColor: 'primary.main',
+                    bgcolor: statusFilter === option.value ? 'primary.main' : 'transparent'
+                  }
+                }}
               >
-                <SearchIcon />
-              </IconButton>
-            ),
-          }}
-        />
-        <Box sx={{ display: 'flex', alignItems: 'center' }}>
-          <Typography sx={{ mr: 2 }}>Filter by Date:</Typography>
-          <Select
-            value={dateFilter}
-            onChange={e => setDateFilter(e.target.value)}
-            size="small"
-            sx={{ minWidth: 180, bgcolor: isDark ? theme.palette.background.paper : '#fff', color: theme.palette.text.primary, borderRadius: 1 }}
-            MenuProps={{
-              PaperProps: {
-                sx: {
-                  bgcolor: isDark ? theme.palette.background.paper : '#fff',
-                  color: theme.palette.text.primary,
-                },
-              },
-            }}
-          >
-            {dateOptions.map(opt => (
-              <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
+                {option.label}
+              </Button>
             ))}
-          </Select>
-        </Box>
-      </Box>
-
-      <Box sx={{ maxWidth: '800px', mx: 'auto', width: '100%', mb: 3, overflowX: 'auto' }}>
-        <Box sx={{ display: 'flex', gap: 1, p: 1, minWidth: 'max-content', justifyContent: 'center' }}>
-          {filterOptions.map((option) => (
-            <Button
-              key={option.value}
-              variant={statusFilter === option.value ? "contained" : "outlined"}
-              onClick={() => setStatusFilter(option.value)}
+          </Box>
+          <Divider orientation="vertical" flexItem />
+          <FormControl size="small" sx={{ minWidth: 180, flexShrink: 0 }}>
+            <InputLabel>Filter by Date</InputLabel>
+            <Select
+              value={dateFilter}
+              onChange={(e) => setDateFilter(e.target.value)}
+              label="Filter by Date"
               sx={{
                 borderRadius: '20px',
-                textTransform: 'none',
-                px: 2,
-                whiteSpace: 'nowrap',
-                minWidth: '100px',
-                borderColor: statusFilter === option.value ? 'primary.main' : 'divider',
-                '&:hover': {
-                  borderColor: 'primary.main',
-                  bgcolor: statusFilter === option.value ? 'primary.main' : 'transparent'
+                '& .MuiSelect-select': {
+                  textTransform: 'none'
                 }
               }}
             >
-              {option.label}
-            </Button>
-          ))}
+              {dateOptions.map((option) => (
+                <MenuItem key={option.value} value={option.value}>
+                  {option.label}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
         </Box>
       </Box>
 

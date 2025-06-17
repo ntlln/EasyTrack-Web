@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Box, Typography, TextField, Button, Paper, useTheme, IconButton, Grid, Select, MenuItem, FormControl, InputLabel, Tabs, Tab, Autocomplete, CircularProgress, Snackbar, Divider, Collapse, Dialog, DialogTitle, DialogContent, DialogActions } from "@mui/material";
+import { Box, Typography, TextField, Button, Paper, useTheme, IconButton, Grid, Select, MenuItem, FormControl, InputLabel, Tabs, Tab, Autocomplete, CircularProgress, Snackbar, Divider, Collapse, Dialog, DialogTitle, DialogContent, DialogActions, TablePagination } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
@@ -9,6 +9,71 @@ import Image from "next/image";
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
+
+// Add dateOptions constant
+const dateOptions = [
+  { label: 'All Time', value: 'all' },
+  { label: 'Today', value: 'today' },
+  { label: 'Yesterday', value: 'yesterday' },
+  { label: 'This Week', value: 'thisWeek' },
+  { label: 'Last Week', value: 'lastWeek' },
+  { label: 'This Month', value: 'thisMonth' },
+  { label: 'Last Month', value: 'lastMonth' },
+  { label: 'This Year', value: 'thisYear' },
+  { label: 'Last Year', value: 'lastYear' },
+];
+
+// Add filterByDate helper function
+function filterByDate(contracts, filter) {
+  if (filter === 'all') return contracts;
+  const now = new Date();
+  return contracts.filter(contract => {
+    const createdAt = contract.created_at ? new Date(contract.created_at) : null;
+    if (!createdAt) return false;
+    switch (filter) {
+      case 'today':
+        return createdAt.toDateString() === now.toDateString();
+      case 'yesterday': {
+        const yesterday = new Date(now);
+        yesterday.setDate(now.getDate() - 1);
+        return createdAt.toDateString() === yesterday.toDateString();
+      }
+      case 'thisWeek': {
+        const firstDayOfWeek = new Date(now);
+        firstDayOfWeek.setDate(now.getDate() - now.getDay());
+        firstDayOfWeek.setHours(0,0,0,0);
+        const lastDayOfWeek = new Date(firstDayOfWeek);
+        lastDayOfWeek.setDate(firstDayOfWeek.getDate() + 6);
+        lastDayOfWeek.setHours(23,59,59,999);
+        return createdAt >= firstDayOfWeek && createdAt <= lastDayOfWeek;
+      }
+      case 'lastWeek': {
+        const firstDayOfThisWeek = new Date(now);
+        firstDayOfThisWeek.setDate(now.getDate() - now.getDay());
+        firstDayOfThisWeek.setHours(0,0,0,0);
+        const firstDayOfLastWeek = new Date(firstDayOfThisWeek);
+        firstDayOfLastWeek.setDate(firstDayOfThisWeek.getDate() - 7);
+        const lastDayOfLastWeek = new Date(firstDayOfLastWeek);
+        lastDayOfLastWeek.setDate(firstDayOfLastWeek.getDate() + 6);
+        lastDayOfLastWeek.setHours(23,59,59,999);
+        return createdAt >= firstDayOfLastWeek && createdAt <= lastDayOfLastWeek;
+      }
+      case 'thisMonth':
+        return createdAt.getMonth() === now.getMonth() && createdAt.getFullYear() === now.getFullYear();
+      case 'lastMonth': {
+        const lastMonth = new Date(now);
+        lastMonth.setMonth(now.getMonth() - 1);
+        return createdAt.getMonth() === lastMonth.getMonth() && createdAt.getFullYear() === lastMonth.getFullYear();
+      }
+      case 'thisYear':
+        return createdAt.getFullYear() === now.getFullYear();
+      case 'lastYear':
+        return createdAt.getFullYear() === now.getFullYear() - 1;
+      default:
+        return true;
+    }
+  });
+}
 
 // Map component
 const MapComponent = dynamic(() => Promise.resolve(({ mapRef, mapError }) => (
@@ -39,9 +104,12 @@ export default function Page() {
     const [snackbarOpen, setSnackbarOpen] = useState(false);
     const [snackbarMessage, setSnackbarMessage] = useState('');
     const [statusFilter, setStatusFilter] = useState('all');
+    const [dateFilter, setDateFilter] = useState('all');
     const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
     const [selectedContractId, setSelectedContractId] = useState(null);
     const [cancelling, setCancelling] = useState(false);
+    const [page, setPage] = useState(0);
+    const [rowsPerPage, setRowsPerPage] = useState(10);
 
     // Mount
     useEffect(() => { setMounted(true); setIsFormMounted(true); }, []);
@@ -576,27 +644,55 @@ export default function Page() {
         router.push(`/contractor/luggage-tracking?contractId=${contractId}`);
     };
 
-    // Filter contracts based on status
+    // Filter contracts based on status and date
     const filteredContracts = contractList.filter(contract => {
-        if (statusFilter === 'all') return true;
-        const status = contract.contract_status?.status_name?.toLowerCase();
-        switch (statusFilter) {
-            case 'available':
-                return status === 'available for pickup';
-            case 'accepted':
-                return status === 'accepted - awaiting pickup';
-            case 'transit':
-                return status === 'in transit';
-            case 'delivered':
-                return status === 'delivered';
-            case 'failed':
-                return status === 'delivery failed';
-            case 'cancelled':
-                return status === 'cancelled';
-            default:
-                return false;
+        // First apply status filter
+        if (statusFilter !== 'all') {
+            const status = contract.contract_status?.status_name?.toLowerCase();
+            switch (statusFilter) {
+                case 'available':
+                    if (status !== 'available for pickup') return false;
+                    break;
+                case 'accepted':
+                    if (status !== 'accepted - awaiting pickup') return false;
+                    break;
+                case 'transit':
+                    if (status !== 'in transit') return false;
+                    break;
+                case 'delivered':
+                    if (status !== 'delivered') return false;
+                    break;
+                case 'failed':
+                    if (status !== 'delivery failed') return false;
+                    break;
+                case 'cancelled':
+                    if (status !== 'cancelled') return false;
+                    break;
+                default:
+                    return false;
+            }
         }
+        return true;
     });
+
+    // Apply date filter
+    const dateFilteredContracts = filterByDate(filteredContracts, dateFilter);
+
+    // Get paginated contracts
+    const getPaginatedContracts = () => {
+        const startIndex = page * rowsPerPage;
+        const endIndex = startIndex + rowsPerPage;
+        return dateFilteredContracts.slice(startIndex, endIndex);
+    };
+
+    const handleChangePage = (event, newPage) => {
+        setPage(newPage);
+    };
+
+    const handleChangeRowsPerPage = (event) => {
+        setRowsPerPage(parseInt(event.target.value, 10));
+        setPage(0);
+    };
 
     const filterOptions = [
         { value: 'all', label: 'All' },
@@ -699,35 +795,58 @@ export default function Page() {
                     <Box>
                         {contractListLoading && (<Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}><CircularProgress /></Box>)}
                         {contractListError && (<Typography color="error" align="center">{contractListError}</Typography>)}
-                        <Box sx={{ maxWidth: '800px', mx: 'auto', width: '100%', mb: 3, overflowX: 'auto' }}>
-                            <Box sx={{ display: 'flex', gap: 1, p: 1, minWidth: 'max-content', justifyContent: 'center' }}>
-                                {filterOptions.map((option) => (
-                                    <Button
-                                        key={option.value}
-                                        variant={statusFilter === option.value ? "contained" : "outlined"}
-                                        onClick={() => setStatusFilter(option.value)}
+                        <Box sx={{ maxWidth: '800px', mx: 'auto', width: '100%', mb: 3 }}>
+                            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 2, p: 1 }}>
+                                <Box sx={{ display: 'flex', gap: 1, whiteSpace: 'nowrap' }}>
+                                    {filterOptions.map((option) => (
+                                        <Button
+                                            key={option.value}
+                                            variant={statusFilter === option.value ? "contained" : "outlined"}
+                                            onClick={() => setStatusFilter(option.value)}
+                                            sx={{
+                                                borderRadius: '20px',
+                                                textTransform: 'none',
+                                                px: 2,
+                                                whiteSpace: 'nowrap',
+                                                minWidth: '100px',
+                                                borderColor: statusFilter === option.value ? 'primary.main' : 'divider',
+                                                '&:hover': {
+                                                    borderColor: 'primary.main',
+                                                    bgcolor: statusFilter === option.value ? 'primary.main' : 'transparent'
+                                                }
+                                            }}
+                                        >
+                                            {option.label}
+                                        </Button>
+                                    ))}
+                                </Box>
+                                <Divider orientation="vertical" flexItem />
+                                <FormControl size="small" sx={{ minWidth: 180, flexShrink: 0 }}>
+                                    <InputLabel>Filter by Date</InputLabel>
+                                    <Select
+                                        value={dateFilter}
+                                        onChange={(e) => setDateFilter(e.target.value)}
+                                        label="Filter by Date"
                                         sx={{
                                             borderRadius: '20px',
-                                            textTransform: 'none',
-                                            px: 2,
-                                            whiteSpace: 'nowrap',
-                                            minWidth: '100px',
-                                            borderColor: statusFilter === option.value ? 'primary.main' : 'divider',
-                                            '&:hover': {
-                                                borderColor: 'primary.main',
-                                                bgcolor: statusFilter === option.value ? 'primary.main' : 'transparent'
+                                            '& .MuiSelect-select': {
+                                                textTransform: 'none'
                                             }
                                         }}
                                     >
-                                        {option.label}
-                                    </Button>
-                                ))}
+                                        {dateOptions.map((option) => (
+                                            <MenuItem key={option.value} value={option.value}>
+                                                {option.label}
+                                            </MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
                             </Box>
                         </Box>
                         {!contractListLoading && !contractListError && contractList.length === 0 && (<Typography align="center" sx={{ mb: 4 }}>No contracts found</Typography>)}
                         {mounted && (
                             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4, maxWidth: '800px', mx: 'auto', width: '100%' }}>
-                                {filteredContracts.map((contract, idx) => (
+                                {getPaginatedContracts().map((contract, idx) => (
                                     <Paper key={`contract-${contract.id}`} elevation={3} sx={{ p: 3, borderRadius: 3, mb: 2, width: '100%' }}>
                                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', position: 'relative' }}>
                                             <Box sx={{ flex: 1 }}>
@@ -942,6 +1061,21 @@ export default function Page() {
                                         </Collapse>
                                     </Paper>
                                 ))}
+                            </Box>
+                        )}
+                        {/* Add pagination controls */}
+                        {!contractListLoading && !contractListError && dateFilteredContracts.length > 0 && (
+                            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
+                                <TablePagination
+                                    rowsPerPageOptions={[10, 25, 50, 100]}
+                                    component="div"
+                                    count={dateFilteredContracts.length}
+                                    rowsPerPage={rowsPerPage}
+                                    page={page}
+                                    onPageChange={handleChangePage}
+                                    onRowsPerPageChange={handleChangeRowsPerPage}
+                                    labelRowsPerPage="Rows per page:"
+                                />
                             </Box>
                         )}
                     </Box>
