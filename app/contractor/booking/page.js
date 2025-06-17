@@ -9,6 +9,7 @@ import Image from "next/image";
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
+import AddIcon from '@mui/icons-material/Add';
 
 // Add dateOptions constant
 const dateOptions = [
@@ -95,7 +96,8 @@ export default function Page() {
     const [map, setMap] = useState(null); const [isScriptLoaded, setIsScriptLoaded] = useState(false); const [mapError, setMapError] = useState(null); const updateTimeoutRef = useRef(null);
     const [mounted, setMounted] = useState(false); const [isFormMounted, setIsFormMounted] = useState(false);
     const [activeTab, setActiveTab] = useState(0); const [isGoogleMapsReady, setIsGoogleMapsReady] = useState(false);
-    const [contract, setContract] = useState({ name: "", caseNumber: "", itemDescription: "", address: "", contact: "", weight: "", quantity: "", flightNo: "" });
+    const [contract, setContract] = useState({ address: "", contact: "" });
+    const [luggageForms, setLuggageForms] = useState([{ name: "", caseNumber: "", flightNo: "", itemDescription: "", weight: "", quantity: "" }]);
     const [pickupAddress, setPickupAddress] = useState({ location: "", addressLine1: "", addressLine2: "", province: "", city: "", barangay: "", postalCode: "" });
     const [dropoffAddress, setDropoffAddress] = useState({ location: null, lat: null, lng: null });
     const [placeOptions, setPlaceOptions] = useState([]); const [placeLoading, setPlaceLoading] = useState(false); const autocompleteServiceRef = useRef(null); const placesServiceRef = useRef(null);
@@ -441,7 +443,26 @@ export default function Page() {
         }
     };
 
-    // Submit contract
+    // Add new function to handle luggage form changes
+    const handleLuggageFormChange = (index, field, value) => {
+        setLuggageForms(prev => {
+            const newForms = [...prev];
+            newForms[index] = { ...newForms[index], [field]: value };
+            return newForms;
+        });
+    };
+
+    // Add function to add new luggage form
+    const handleAddLuggageForm = () => {
+        setLuggageForms(prev => [...prev, { name: "", caseNumber: "", flightNo: "", itemDescription: "", weight: "", quantity: "" }]);
+    };
+
+    // Add function to remove luggage form
+    const handleRemoveLuggageForm = (index) => {
+        setLuggageForms(prev => prev.filter((_, i) => i !== index));
+    };
+
+    // Modify handleSubmit to handle multiple luggage forms
     const handleSubmit = async () => { 
         try { 
             const { data: { user }, error: userError } = await supabase.auth.getUser(); 
@@ -450,9 +471,9 @@ export default function Page() {
                 return;
             }
 
-            // Generate tracking IDs
-            const contractTrackingID = generateTrackingID();
-            const luggageTrackingIDs = [generateLuggageTrackingID()];
+            // Generate tracking IDs for each luggage form
+            const contractTrackingIDs = luggageForms.map(() => generateTrackingID());
+            const luggageTrackingIDs = luggageForms.map(() => generateLuggageTrackingID());
 
             // Step 1: Determine the city from coordinates
             let city = null;
@@ -512,67 +533,63 @@ export default function Page() {
                 console.warn('Could not determine city for price lookup');
             }
 
-            // Step 3: Calculate total delivery charge based on number of forms
-            const numberOfForms = 1;
-            const totalDeliveryCharge = deliveryCharge ? deliveryCharge * numberOfForms : null;
-            console.log('Price calculation:', {
-                numberOfForms,
-                pricePerForm: deliveryCharge,
-                totalDeliveryCharge
-            });
+            // Step 3: Create contracts and luggage entries for each form
+            for (let i = 0; i < luggageForms.length; i++) {
+                const form = luggageForms[i];
+                
+                // Prepare contract data for this luggage
+                const contractData = { 
+                    id: contractTrackingIDs[i],
+                    luggage_quantity: Number(form.quantity || 0), 
+                    airline_id: user.id, 
+                    pickup_location: pickupAddress.location, 
+                    drop_off_location: dropoffAddress.location, 
+                    drop_off_location_geo: { type: 'Point', coordinates: [dropoffAddress.lng, dropoffAddress.lat] },
+                    delivery_charge: deliveryCharge
+                }; 
 
-            // Step 4: Prepare contract data with the total delivery charge
-            const totalLuggageQuantity = Number(contract.quantity || 0); 
-            const contractData = { 
-                id: contractTrackingID,
-                luggage_quantity: totalLuggageQuantity, 
-                airline_id: user.id, 
-                pickup_location: pickupAddress.location, 
-                drop_off_location: dropoffAddress.location, 
-                drop_off_location_geo: { type: 'Point', coordinates: [dropoffAddress.lng, dropoffAddress.lat] },
-                delivery_charge: totalDeliveryCharge
-            }; 
+                console.log('Submitting contract data:', contractData);
 
-            console.log('Submitting contract data:', contractData);
+                // Insert contract data
+                const { data: insertedContract, error: contractError } = await supabase
+                    .from('contract')
+                    .insert(contractData)
+                    .select()
+                    .single(); 
 
-            // Step 5: Insert contract data
-            const { data: insertedContract, error: contractError } = await supabase
-                .from('contract')
-                .insert(contractData)
-                .select()
-                .single(); 
+                if (contractError) {
+                    console.error('Error inserting contract:', contractError);
+                    return;
+                }
 
-            if (contractError) {
-                console.error('Error inserting contract:', contractError);
-                return;
-            }
+                // Insert luggage information for this contract
+                const luggageData = { 
+                    id: luggageTrackingIDs[i],
+                    case_number: form.caseNumber, 
+                    flight_number: form.flightNo,
+                    luggage_owner: form.name,
+                    contact_number: contract.contact, 
+                    item_description: form.itemDescription,
+                    address: contract.address,
+                    weight: form.weight, 
+                    quantity: form.quantity, 
+                    contract_id: contractData.id
+                }; 
 
-            // Step 6: Insert luggage information
-            const formattedData = luggageTrackingIDs.map((id, index) => ({ 
-                id,
-                case_number: contract.caseNumber, 
-                flight_number: contract.flightNo,
-                luggage_owner: contract.name, 
-                contact_number: contract.contact, 
-                item_description: contract.itemDescription,
-                address: contract.address,
-                weight: contract.weight, 
-                quantity: contract.quantity, 
-                contract_id: contractTrackingID
-            })); 
+                const { error: luggageError } = await supabase
+                    .from('contract_luggage_information')
+                    .insert(luggageData); 
 
-            const { data, error } = await supabase
-                .from('contract_luggage_information')
-                .insert(formattedData); 
-
-            if (error) {
-                console.error('Error inserting luggage information:', error);
-                return;
+                if (luggageError) {
+                    console.error('Error inserting luggage information:', luggageError);
+                    return;
+                }
             }
 
             setSnackbarOpen(true);
             // Reset form
-            setContract({ name: "", caseNumber: "", itemDescription: "", address: "", contact: "", weight: "", quantity: "", flightNo: "" });
+            setContract({ address: "", contact: "" }); // Only keep address and contact in the main contract
+            setLuggageForms([{ name: "", caseNumber: "", flightNo: "", itemDescription: "", weight: "", quantity: "" }]);
             setPickupAddress({ location: "", addressLine1: "", addressLine2: "", province: "", city: "", barangay: "", postalCode: "" });
             setDropoffAddress({ location: null, lat: null, lng: null });
             // Switch to contract list tab and refresh
@@ -999,13 +1016,10 @@ export default function Page() {
                                                             Luggage {lidx + 1}
                                                         </Typography>
                                                         <Typography variant="body2">
-                                                            Case Number: <span>{l.case_number || 'N/A'}</span>
-                                                        </Typography>
-                                                        <Typography variant="body2">
-                                                            Flight Number: <span>{l.flight_number || 'N/A'}</span>
-                                                        </Typography>
-                                                        <Typography variant="body2">
                                                             Name: <span>{l.luggage_owner || 'N/A'}</span>
+                                                        </Typography>
+                                                        <Typography variant="body2">
+                                                            Case Number: <span>{l.case_number || 'N/A'}</span>
                                                         </Typography>
                                                         <Typography variant="body2">
                                                             Contact Number: <span>{l.contact_number || 'N/A'}</span>
@@ -1149,38 +1163,6 @@ export default function Page() {
                         <Typography variant="h6" fontWeight="bold" align="center" mb={3}>Delivery Information</Typography>
                         <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mb: 2 }}>
                             <TextField 
-                                label="Name" 
-                                fullWidth 
-                                size="small" 
-                                value={contract.name} 
-                                onChange={(e) => handleInputChange("name", e.target.value.slice(0, 100))} 
-                                required 
-                                inputProps={{ maxLength: 100 }}
-                                InputProps={{ 
-                                    endAdornment: contract.name ? (
-                                        <IconButton size="small" onClick={() => handleInputChange("name", "")} edge="end">
-                                            <CloseIcon fontSize="small" />
-                                        </IconButton>
-                                    ) : null, 
-                                }} 
-                            />
-                            <TextField 
-                                label="Item Description" 
-                                fullWidth 
-                                size="small" 
-                                value={contract.itemDescription} 
-                                onChange={(e) => handleInputChange("itemDescription", e.target.value.slice(0, 200))} 
-                                required 
-                                inputProps={{ maxLength: 200 }}
-                                InputProps={{ 
-                                    endAdornment: contract.itemDescription ? (
-                                        <IconButton size="small" onClick={() => handleInputChange("itemDescription", "")} edge="end">
-                                            <CloseIcon fontSize="small" />
-                                        </IconButton>
-                                    ) : null, 
-                                }} 
-                            />
-                            <TextField 
                                 label="Address" 
                                 fullWidth 
                                 size="small" 
@@ -1196,118 +1178,149 @@ export default function Page() {
                                     ) : null, 
                                 }} 
                             />
-                            <Box sx={{ display: 'flex', gap: 2, width: '100%' }}>
-                                <TextField 
-                                    label="Case Number" 
-                                    fullWidth 
-                                    size="small" 
-                                    value={contract.caseNumber} 
-                                    onChange={(e) => handleInputChange("caseNumber", e.target.value.slice(0, 20))} 
-                                    required 
-                                    sx={{ width: '50%' }} 
-                                    inputProps={{ maxLength: 20 }}
-                                    InputProps={{ 
-                                        endAdornment: contract.caseNumber ? (
-                                            <IconButton size="small" onClick={() => handleInputChange("caseNumber", "")} edge="end">
-                                                <CloseIcon fontSize="small" />
-                                            </IconButton>
-                                        ) : null, 
-                                    }} 
-                                />
-                                <TextField 
-                                    label="Flight No." 
-                                    fullWidth 
-                                    size="small" 
-                                    value={contract.flightNo} 
-                                    onChange={(e) => handleInputChange("flightNo", e.target.value.slice(0, 10))} 
-                                    required 
-                                    sx={{ width: '50%' }} 
-                                    inputProps={{ maxLength: 10 }}
-                                    InputProps={{ 
-                                        endAdornment: contract.flightNo ? (
-                                            <IconButton size="small" onClick={() => handleInputChange("flightNo", "")} edge="end">
-                                                <CloseIcon fontSize="small" />
-                                            </IconButton>
-                                        ) : null, 
-                                    }} 
-                                />
-                            </Box>
-                            <Box sx={{ display: 'flex', gap: 2, width: '100%' }}>
-                                <TextField 
-                                    label="Contact Number" 
-                                    fullWidth 
-                                    size="small" 
-                                    value={contract.contact} 
-                                    onChange={(e) => handleInputChange("contact", e.target.value)} 
-                                    onFocus={handlePhoneFocus}
-                                    required 
-                                    placeholder="+63 XXX XXX XXXX"
-                                    inputProps={{
-                                        pattern: '^\\+63\\s\\d{3}\\s\\d{3}\\s\\d{4}$',
-                                        maxLength: 17 // +63 XXX XXX XXXX format
-                                    }}
-                                    InputProps={{ 
-                                        endAdornment: contract.contact ? (
-                                            <IconButton size="small" onClick={() => handleInputChange("contact", "")} edge="end">
-                                                <CloseIcon fontSize="small" />
-                                            </IconButton>
-                                        ) : null, 
-                                    }}
-                                />
-                                <TextField 
-                                    label="Weight (kg)" 
-                                    fullWidth 
-                                    size="small" 
-                                    type="number" 
-                                    value={contract.weight} 
-                                    onChange={(e) => {
-                                        const value = e.target.value;
-                                        if (value === '' || (Number(value) >= 0 && Number(value) <= 100)) {
-                                            handleInputChange("weight", value);
-                                        }
-                                    }} 
-                                    required 
-                                    inputProps={{ 
-                                        min: 0,
-                                        max: 100,
-                                        step: 0.1
-                                    }}
-                                    InputProps={{ 
-                                        endAdornment: contract.weight ? (
-                                            <IconButton size="small" onClick={() => handleInputChange("weight", "")} edge="end">
-                                                <CloseIcon fontSize="small" />
-                                            </IconButton>
-                                        ) : null, 
-                                    }} 
-                                />
-                                <TextField 
-                                    label="Luggage Quantity" 
-                                    fullWidth 
-                                    size="small" 
-                                    type="number" 
-                                    value={contract.quantity} 
-                                    onChange={(e) => {
-                                        const value = e.target.value;
-                                        if (value === '' || (Number(value) >= 1 && Number(value) <= 10)) {
-                                            handleInputChange("quantity", value);
-                                        }
-                                    }} 
-                                    required 
-                                    inputProps={{ 
-                                        min: 1,
-                                        max: 10,
-                                        step: 1
-                                    }}
-                                    InputProps={{ 
-                                        endAdornment: contract.quantity ? (
-                                            <IconButton size="small" onClick={() => handleInputChange("quantity", "")} edge="end">
-                                                <CloseIcon fontSize="small" />
-                                            </IconButton>
-                                        ) : null, 
-                                    }} 
-                                />
-                            </Box>
                         </Box>
+                    </Paper>
+                    <Paper elevation={3} sx={{ maxWidth: 700, mx: "auto", mt: 3, p: 4, pt: 2, borderRadius: 3, backgroundColor: theme.palette.background.paper, position: "relative" }}>
+                        <Typography variant="h6" fontWeight="bold" align="center" mb={3}>Luggage Information</Typography>
+                        {luggageForms.map((form, index) => (
+                            <Box key={index} sx={{ mb: 4, position: 'relative' }}>
+                                {index > 0 && (
+                                    <IconButton
+                                        size="small"
+                                        onClick={() => handleRemoveLuggageForm(index)}
+                                        sx={{
+                                            position: 'absolute',
+                                            right: 0,
+                                            top: 0,
+                                            color: 'error.main'
+                                        }}
+                                    >
+                                        <CloseIcon />
+                                    </IconButton>
+                                )}
+                                <Typography variant="subtitle1" sx={{ mb: 2, color: 'primary.main' }}>
+                                    Luggage {index + 1}
+                                </Typography>
+                                <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                                    <TextField 
+                                        label="Name" 
+                                        fullWidth 
+                                        size="small" 
+                                        value={form.name} 
+                                        onChange={(e) => handleLuggageFormChange(index, "name", e.target.value.slice(0, 100))} 
+                                        required 
+                                        inputProps={{ maxLength: 100 }}
+                                        InputProps={{ 
+                                            endAdornment: form.name ? (
+                                                <IconButton size="small" onClick={() => handleLuggageFormChange(index, "name", "")} edge="end">
+                                                    <CloseIcon fontSize="small" />
+                                                </IconButton>
+                                            ) : null, 
+                                        }} 
+                                    />
+                                    <TextField 
+                                        label="Case Number" 
+                                        fullWidth 
+                                        size="small" 
+                                        value={form.caseNumber} 
+                                        onChange={(e) => handleLuggageFormChange(index, "caseNumber", e.target.value.slice(0, 20))} 
+                                        required 
+                                        inputProps={{ maxLength: 20 }}
+                                    />
+                                    <TextField 
+                                        label="Item Description" 
+                                        fullWidth 
+                                        size="small" 
+                                        value={form.itemDescription} 
+                                        onChange={(e) => handleLuggageFormChange(index, "itemDescription", e.target.value.slice(0, 200))} 
+                                        required 
+                                        inputProps={{ maxLength: 200 }}
+                                    />
+                                    <Box sx={{ display: 'flex', gap: 2, width: '100%' }}>
+                                        <TextField 
+                                            label="Contact Number" 
+                                            fullWidth 
+                                            size="small" 
+                                            value={contract.contact} 
+                                            onChange={(e) => handleInputChange("contact", e.target.value)} 
+                                            onFocus={handlePhoneFocus}
+                                            required 
+                                            placeholder="+63 XXX XXX XXXX"
+                                            sx={{ width: '30%' }}
+                                            inputProps={{
+                                                pattern: '^\\+63\\s\\d{3}\\s\\d{3}\\s\\d{4}$',
+                                                maxLength: 17 // +63 XXX XXX XXXX format
+                                            }}
+                                            InputProps={{ 
+                                                endAdornment: contract.contact ? (
+                                                    <IconButton size="small" onClick={() => handleInputChange("contact", "")} edge="end">
+                                                        <CloseIcon fontSize="small" />
+                                                    </IconButton>
+                                                ) : null, 
+                                            }}
+                                        />
+                                        <TextField 
+                                            label="Flight No." 
+                                            fullWidth 
+                                            size="small" 
+                                            value={form.flightNo} 
+                                            onChange={(e) => handleLuggageFormChange(index, "flightNo", e.target.value.slice(0, 10))} 
+                                            required 
+                                            sx={{ width: '25%' }} 
+                                            inputProps={{ maxLength: 10 }}
+                                        />
+                                        <TextField 
+                                            label="Weight (kg)" 
+                                            fullWidth 
+                                            size="small" 
+                                            type="number" 
+                                            value={form.weight} 
+                                            onChange={(e) => {
+                                                const value = e.target.value;
+                                                if (value === '' || (Number(value) >= 0 && Number(value) <= 100)) {
+                                                    handleLuggageFormChange(index, "weight", value);
+                                                }
+                                            }} 
+                                            required 
+                                            sx={{ width: '20%' }}
+                                            inputProps={{ 
+                                                min: 0,
+                                                max: 100,
+                                                step: 0.1
+                                            }}
+                                        />
+                                        <TextField 
+                                            label="Luggage Quantity" 
+                                            fullWidth 
+                                            size="small" 
+                                            type="number" 
+                                            value={form.quantity} 
+                                            onChange={(e) => {
+                                                const value = e.target.value;
+                                                if (value === '' || (Number(value) >= 1 && Number(value) <= 10)) {
+                                                    handleLuggageFormChange(index, "quantity", value);
+                                                }
+                                            }} 
+                                            required 
+                                            sx={{ width: '25%' }}
+                                            inputProps={{ 
+                                                min: 1,
+                                                max: 10,
+                                                step: 1
+                                            }}
+                                        />
+                                    </Box>
+                                </Box>
+                            </Box>
+                        ))}
+                        <Button
+                            variant="outlined"
+                            onClick={handleAddLuggageForm}
+                            startIcon={<AddIcon />}
+                            sx={{ mt: 2 }}
+                        >
+                            Add Another Luggage
+                        </Button>
                     </Paper>
                     <Box sx={{ display: "flex", justifyContent: "center", mt: 4, gap: 2 }}><Button variant="contained" onClick={handleSubmit}>Create Booking</Button></Box>
                     <Box sx={{ textAlign: "center", mt: 6 }}><Typography variant="h6" fontWeight="bold">Partnered with:</Typography><Box sx={{ display: "flex", justifyContent: "center", gap: 4, mt: 2 }}><Image src="/brand-3.png" alt="AirAsia" width={60} height={60} /></Box></Box>
