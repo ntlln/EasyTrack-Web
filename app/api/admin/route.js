@@ -504,7 +504,7 @@ export async function POST(req) {
 
     // Handle contract assignment
     if (action === 'assignContract') {
-      const { contractId, deliveryId } = params;
+      const { contractId, deliveryId, accepted_at } = params;
 
       if (!contractId || !deliveryId) {
         return NextResponse.json(
@@ -517,7 +517,8 @@ export async function POST(req) {
         .from('contract')
         .update({
           delivery_id: deliveryId,
-          contract_status_id: 3 // 'Accepted - Awaiting Pickup'
+          contract_status_id: 3, // 'Accepted - Awaiting Pickup'
+          accepted_at: accepted_at || new Date().toISOString()
         })
         .eq('id', contractId)
         .select()

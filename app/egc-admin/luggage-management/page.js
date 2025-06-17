@@ -680,7 +680,8 @@ const LuggageAssignments = ({ onAssignmentComplete }) => {
           action: 'assignContract',
           params: {
             contractId: selectedContract.id,
-            deliveryId: selectedPersonnel.id
+            deliveryId: selectedPersonnel.id,
+            accepted_at: new Date().toISOString()
           }
         }),
       });
