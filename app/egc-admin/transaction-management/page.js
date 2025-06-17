@@ -169,15 +169,14 @@ const InvoicePDF = ({ contracts = [] }) => {
     const dueDate = formatDateFns(monthEnd, 'MMMM d, yyyy');
     const desc = `PIR Luggage Delivery – ${formatDateFns(monthStart, 'MMMM d, yyyy')} to ${formatDateFns(monthEnd, 'MMMM d, yyyy')}`;
     // Compute total amount
-    const totalAmount = contracts.reduce((sum, c) => {
+    const subtotal = contracts.reduce((sum, c) => {
         const delivery_charge = Number(c.delivery_charge) || 0;
         const surcharge = Number(c.surcharge) || 0;
         const discount = Number(c.discount) || 0;
         return sum + (delivery_charge + surcharge) * (1 - discount / 100);
     }, 0);
-    const vatable = totalAmount;
-    const vat = 6360.00;
-    const amountDue = vatable + vat;
+    const vat = subtotal * 0.12;
+    const totalAmount = subtotal + vat;
     return (
         <Document>
             <PDFPage size="A4" style={{ padding: 24, fontSize: 10, fontFamily: 'Roboto', position: 'relative' }}>
@@ -222,7 +221,7 @@ const InvoicePDF = ({ contracts = [] }) => {
                         <Text style={{ flex: 0.5, padding: 4, backgroundColor: '#f7f3d6' }}>{contracts.length}</Text>
                         <Text style={{ flex: 1, padding: 4, backgroundColor: '#f7f3d6' }}>PCS</Text>
                         <Text style={{ flex: 4, padding: 4, backgroundColor: '#f7f3d6' }}>{desc}</Text>
-                        <Text style={{ flex: 1, padding: 4, backgroundColor: '#f7f3d6' }}>₱{totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+                        <Text style={{ flex: 1, padding: 4, backgroundColor: '#f7f3d6' }}>₱{subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
                     </View>
                     {/* Empty rows for formatting */}
                     {[...Array(7)].map((_, i) => (
@@ -250,12 +249,12 @@ const InvoicePDF = ({ contracts = [] }) => {
                 <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 8 }}>
                     <View style={{ width: 180, borderWidth: 1, borderColor: '#2d3991', padding: 8 }}>
                         <Text style={{ fontSize: 9 }}>RCBC ACCT NUMBER: 7591033191</Text>
-                        <Text style={{ fontSize: 9 }}>VATABLE: {`₱${vatable.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</Text>
+                        <Text style={{ fontSize: 9 }}>VATABLE: {`₱${subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</Text>
                         <Text style={{ fontSize: 9 }}>VAT EXEMPT:</Text>
                         <Text style={{ fontSize: 9 }}>ZERO RATED:</Text>
                         <Text style={{ fontSize: 9 }}>TOTAL SALES:</Text>
-                        <Text style={{ fontSize: 9 }}>TOTAL VAT: ₱6,360.00</Text>
-                        <Text style={{ fontSize: 9 }}>AMOUNT DUE: {`₱${amountDue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</Text>
+                        <Text style={{ fontSize: 9 }}>TOTAL VAT: {`₱${vat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</Text>
+                        <Text style={{ fontSize: 9 }}>AMOUNT DUE: {`₱${totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</Text>
                     </View>
                 </View>
                 {/* Footer Signature Block - Always at the bottom */}
@@ -362,6 +361,11 @@ const TransactionManagement = () => {
         setPaymentsRowsPerPage(parseInt(event.target.value, 10));
         setPaymentsPage(0);
     };
+    const [podOpen, setPodOpen] = useState(false);
+    const [podContract, setPodContract] = useState(null);
+    const [podImage, setPodImage] = useState(null);
+    const [podLoading, setPodLoading] = useState(false);
+    const [podError, setPodError] = useState(null);
 
     // Data fetching
     useEffect(() => {
@@ -535,6 +539,11 @@ const TransactionManagement = () => {
         if (action === 'view' && selectedRow) { setDetailsContract(selectedRow); setDetailsOpen(true); }
         else if (action === 'surcharge' && selectedRow) { setSurchargeContract(selectedRow); setSurchargeValue(selectedRow.surcharge || ''); setSurchargeError(''); setSurchargeOpen(true); }
         else if (action === 'discount' && selectedRow) { setDiscountContract(selectedRow); setDiscountValue(selectedRow.discount || ''); setDiscountError(''); setDiscountOpen(true); }
+        else if (action === 'pod' && selectedRow) { 
+            setPodContract(selectedRow); 
+            setPodOpen(true);
+            fetchProofOfDelivery(selectedRow.id);
+        }
         handleMenuClose();
     };
     const handleDetailsClose = () => { setDetailsOpen(false); setDetailsContract(null); };
@@ -792,12 +801,9 @@ const TransactionManagement = () => {
     // Get contracts for invoice: if none selected, use all for the month (not cancelled)
     const getContractsForInvoice = () => {
         if (selectedRows.length > 0) {
-            return getSelectedContracts();
+            return getSelectedContracts().filter(contract => Number(contract.contract_status_id) === 5 || Number(contract.contract_status_id) === 6);
         } else {
-            return filteredData.filter(contract => {
-                const status = contract.contract_status?.status_name?.toLowerCase() || '';
-                return status !== 'cancelled';
-            });
+            return filteredData.filter(contract => Number(contract.contract_status_id) === 5 || Number(contract.contract_status_id) === 6);
         }
     };
 
@@ -808,13 +814,17 @@ const TransactionManagement = () => {
         const createdAt = today.toISOString();
         const dueDate = endOfMonth(today).toISOString();
         const contracts = getContractsForInvoice();
-        // Compute total amount (same as in InvoicePDF)
-        const totalAmount = contracts.reduce((sum, c) => {
+        // Compute total amount with VAT
+        const subtotal = contracts.reduce((sum, c) => {
             const delivery_charge = Number(c.delivery_charge) || 0;
             const surcharge = Number(c.surcharge) || 0;
             const discount = Number(c.discount) || 0;
             return sum + (delivery_charge + surcharge) * (1 - discount / 100);
         }, 0);
+        
+        // Calculate VAT (12% of subtotal)
+        const vat = subtotal * 0.12;
+        const totalAmount = subtotal + vat;
         try {
             const payload = {
                 action: 'createPayment',
@@ -951,6 +961,44 @@ const TransactionManagement = () => {
         setPricingPage(0);
     };
 
+    const handlePodClose = () => {
+        setPodOpen(false);
+        setPodContract(null);
+        setPodImage(null);
+        setPodError(null);
+    };
+
+    const fetchProofOfDelivery = async (contractId) => {
+        setPodLoading(true);
+        setPodError(null);
+        try {
+            const response = await fetch('/api/admin', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'getProofOfDelivery',
+                    params: { contract_id: contractId }
+                })
+            });
+            
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Failed to fetch proof of delivery');
+            }
+            
+            const data = await response.json();
+            if (data.proof_of_delivery) {
+                setPodImage(data.proof_of_delivery);
+            } else {
+                setPodError('No proof of delivery available');
+            }
+        } catch (error) {
+            setPodError(error.message || 'Failed to load proof of delivery');
+        } finally {
+            setPodLoading(false);
+        }
+    };
+
     // Render
     if (loading) return (<Box sx={{ p: 3, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '300px' }}><CircularProgress /><Typography sx={{ mt: 2 }}>Loading...</Typography></Box>);
     if (error) return (<Box sx={{ p: 3 }}><Typography color="error">{error}</Typography></Box>);
@@ -990,7 +1038,7 @@ const TransactionManagement = () => {
                             {shouldRenderPDF ? (
                                 <PDFDownloadLink 
                                     document={<ReceiptPDF 
-                                        contracts={getSelectedContracts()} 
+                                        contracts={getContractsForInvoice()} 
                                         dateRange={handleGeneratePDF()} 
                                     />}
                                     fileName={`GHE-Transmittal-Report-${format(selectedMonth, 'MMMM-yyyy')}.pdf`}
@@ -1317,6 +1365,7 @@ const TransactionManagement = () => {
                 <MenuItem onClick={() => handleAction('view')}>View Details</MenuItem>
                 <MenuItem onClick={() => handleAction('surcharge')}>Surcharge</MenuItem>
                 <MenuItem onClick={() => handleAction('discount')}>Discount</MenuItem>
+                <MenuItem onClick={() => handleAction('pod')}>View Proof of Delivery</MenuItem>
             </Menu>
             <Dialog open={detailsOpen} onClose={handleDetailsClose} maxWidth="md" fullWidth>
                 <DialogTitle>Contract Details</DialogTitle>
@@ -1505,6 +1554,53 @@ const TransactionManagement = () => {
                     <Button onClick={handleConfirmMarkPaid} color="primary" variant="contained" disabled={markPaidLoading}>
                         {markPaidLoading ? 'Updating...' : 'Confirm'}
                     </Button>
+                </DialogActions>
+            </Dialog>
+            {/* Add Proof of Delivery Dialog */}
+            <Dialog open={podOpen} onClose={handlePodClose} maxWidth="md" fullWidth>
+                <DialogTitle>Proof of Delivery</DialogTitle>
+                <DialogContent dividers>
+                    {podContract && (
+                        <Box sx={{ minWidth: 400 }}>
+                            <Typography variant="subtitle1" sx={{ color: 'primary.main', fontWeight: 700, mb: 1 }}>
+                                Contract ID: <span style={{ color: '#bdbdbd', fontWeight: 400 }}>{podContract.id}</span>
+                            </Typography>
+                            <Divider sx={{ my: 1 }} />
+                            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, minHeight: '300px', justifyContent: 'center' }}>
+                                {podLoading ? (
+                                    <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '300px' }}>
+                                        <CircularProgress />
+                                    </Box>
+                                ) : podError ? (
+                                    <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '300px' }}>
+                                        <Typography color="error">{podError}</Typography>
+                                    </Box>
+                                ) : podImage ? (
+                                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                                        <img 
+                                            src={podImage} 
+                                            alt="Proof of Delivery" 
+                                            style={{ 
+                                                maxWidth: '100%', 
+                                                maxHeight: '500px', 
+                                                objectFit: 'contain' 
+                                            }} 
+                                        />
+                                        <Typography variant="body2" color="text.secondary">
+                                            Delivered at: {new Date(podContract?.delivery_timestamp).toLocaleString()}
+                                        </Typography>
+                                    </Box>
+                                ) : (
+                                    <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '300px' }}>
+                                        <Typography>No proof of delivery available</Typography>
+                                    </Box>
+                                )}
+                            </Box>
+                        </Box>
+                    )}
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={handlePodClose} color="primary">Close</Button>
                 </DialogActions>
             </Dialog>
         </Box>

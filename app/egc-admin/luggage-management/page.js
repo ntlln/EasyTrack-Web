@@ -485,6 +485,9 @@ const ContractList = ({ onTrackContract, initialSearch, setRedirectContractId })
                     <Typography variant="body2">
                       Contact: <span>{l.contact_number || 'N/A'}</span>
                     </Typography>
+                    <Typography variant="body2">
+                      Address: <span>{l.address || 'N/A'}</span>
+                    </Typography>
                   </Box>
                 ))}
               </Box>
@@ -778,6 +781,7 @@ const LuggageAssignments = ({ onAssignmentComplete }) => {
               <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Pickup Location</TableCell>
               <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Drop-off Location</TableCell>
               <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Flight Number</TableCell>
+              <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Address</TableCell>
               <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Airline Name</TableCell>
               <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Luggage Details</TableCell>
               <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Actions</TableCell>
@@ -806,6 +810,7 @@ const LuggageAssignments = ({ onAssignmentComplete }) => {
                   <TableCell>{assignment.pickup_location || 'N/A'}</TableCell>
                   <TableCell>{assignment.drop_off_location || 'N/A'}</TableCell>
                   <TableCell>{assignment.luggage?.[0]?.flight_number || 'N/A'}</TableCell>
+                  <TableCell>{assignment.luggage?.[0]?.address || 'N/A'}</TableCell>
                   <TableCell>
                     {assignment.airline
                       ? `${assignment.airline.first_name || ''} ${assignment.airline.middle_initial || ''} ${
@@ -1040,23 +1045,26 @@ const LuggageAssignments = ({ onAssignmentComplete }) => {
                     <Typography variant="subtitle2" sx={{ color: 'primary.main', fontWeight: 700 }}>
                       Luggage {lidx + 1}
                     </Typography>
-                    <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
-                      Owner: <span style={{ color: 'text.primary' }}>{l.luggage_owner || 'N/A'}</span>
+                    <Typography variant="body2">
+                      Owner: <span>{l.luggage_owner || 'N/A'}</span>
                     </Typography>
-                    <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
-                      Flight Number: <span style={{ color: 'text.primary' }}>{l.flight_number || 'N/A'}</span>
+                    <Typography variant="body2">
+                      Flight Number: <span>{l.flight_number || 'N/A'}</span>
                     </Typography>
-                    <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
-                      Case Number: <span style={{ color: 'text.primary' }}>{l.case_number || 'N/A'}</span>
+                    <Typography variant="body2">
+                      Case Number: <span>{l.case_number || 'N/A'}</span>
                     </Typography>
-                    <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
-                      Description: <span style={{ color: 'text.primary' }}>{l.item_description || 'N/A'}</span>
+                    <Typography variant="body2">
+                      Description: <span>{l.item_description || 'N/A'}</span>
                     </Typography>
-                    <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
-                      Weight: <span style={{ color: 'text.primary' }}>{l.weight ? `${l.weight} kg` : 'N/A'}</span>
+                    <Typography variant="body2">
+                      Weight: <span>{l.weight ? `${l.weight} kg` : 'N/A'}</span>
                     </Typography>
-                    <Typography variant="body2" sx={{ color: '#bdbdbd' }}>
-                      Contact: <span style={{ color: 'text.primary' }}>{l.contact_number || 'N/A'}</span>
+                    <Typography variant="body2">
+                      Contact: <span>{l.contact_number || 'N/A'}</span>
+                    </Typography>
+                    <Typography variant="body2">
+                      Address: <span>{l.address || 'N/A'}</span>
                     </Typography>
                   </Box>
                 ))}

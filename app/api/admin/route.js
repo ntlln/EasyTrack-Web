@@ -129,7 +129,7 @@ export async function GET(request) {
       // Fetch luggage information
       const { data: luggage, error: luggageError } = await supabase
         .from('contract_luggage_information')
-        .select('*')
+        .select('*, address')
         .eq('contract_id', contractId);
 
       if (luggageError) {
@@ -227,7 +227,7 @@ export async function GET(request) {
 export async function POST(req) {
   try {
     const contentType = req.headers.get('content-type') || '';
-    
+
     // Handle multipart form data (file uploads)
     if (contentType.includes('multipart/form-data')) {
       const formData = await req.formData();
@@ -319,7 +319,7 @@ export async function POST(req) {
       let filteredLogs = logs || [];
       if (search) {
         const searchLower = search.toLowerCase();
-        filteredLogs = logs.filter(log => 
+        filteredLogs = logs.filter(log =>
           JSON.stringify(log).toLowerCase().includes(searchLower)
         );
       }
@@ -515,7 +515,7 @@ export async function POST(req) {
 
       const { data, error } = await supabase
         .from('contract')
-        .update({ 
+        .update({
           delivery_id: deliveryId,
           contract_status_id: 3 // 'Accepted - Awaiting Pickup'
         })
@@ -618,7 +618,7 @@ export async function POST(req) {
 
       const { data, error } = await supabase
         .from('pricing')
-        .update({ 
+        .update({
           price: price,
           updated_at: new Date().toISOString()
         })
@@ -676,7 +676,7 @@ export async function POST(req) {
       // Update route history in database
       const { error } = await supabase
         .from('contract')
-        .update({ 
+        .update({
           route_history
         })
         .eq('id', contractId);
@@ -720,6 +720,30 @@ export async function POST(req) {
       return NextResponse.json({ data });
     }
 
+    // Handle proof of delivery fetch
+    if (action === 'getProofOfDelivery') {
+      const { contract_id } = params;
+      if (!contract_id) {
+        return NextResponse.json({ error: 'Missing contract_id' }, { status: 400 });
+      }
+
+      const { data, error } = await supabase
+        .from('contract')
+        .select('proof_of_delivery')
+        .eq('id', contract_id)
+        .single();
+
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+
+      if (!data || !data.proof_of_delivery) {
+        return NextResponse.json({ error: 'No proof of delivery found' }, { status: 404 });
+      }
+
+      return NextResponse.json({ proof_of_delivery: data.proof_of_delivery });
+    }
+
     // If this is a Gemini insight request
     if (action === 'geminiInsight') {
       const { stats } = params;
@@ -731,7 +755,7 @@ export async function POST(req) {
 
           // Configure the model
           const model = genAI.getGenerativeModel({
-            model: "gemini-1.5-pro-latest",
+            model: "gemini-2.0-flash",
             safetySettings: [
               {
                 category: HarmCategory.HARM_CATEGORY_HARASSMENT,
@@ -751,7 +775,7 @@ export async function POST(req) {
               },
             ],
           });
-          
+
           const prompt = `Analyze the following delivery statistics and provide actionable insights and recommendations in a clear, concise format. Focus on key trends, potential improvements, and specific actions that could be taken to enhance delivery performance.
 
 Statistics:
@@ -777,7 +801,7 @@ Please provide:
           const response = await result.response;
           let text = response.text();
           text = text.replace(/\*\*/g, ''); // Remove all **
-          
+
           return NextResponse.json({ insight: text });
         } catch (error) {
           console.error('Gemini API error:', error);
@@ -785,7 +809,7 @@ Please provide:
           if (error.response) {
             console.error('Error response:', await error.response.text());
           }
-          return NextResponse.json({ 
+          return NextResponse.json({
             error: 'Failed to generate insight. Please check your API key and try again.',
             details: error.message,
             apiKeyPresent: !!apiKey,
