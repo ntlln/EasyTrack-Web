@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, Suspense } from "react";
-import { Box, Typography, TextField, Paper, Divider, IconButton, Collapse, CircularProgress } from "@mui/material";
+import { Box, Typography, TextField, Paper, Divider, IconButton, Collapse, CircularProgress, Snackbar, Alert } from "@mui/material";
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import CloseIcon from '@mui/icons-material/Close';
@@ -47,6 +47,9 @@ function LuggageTrackingContent() {
   const routeSegmentsRef = useRef([]);
   const supabase = createClientComponentClient();
   const previousValidContractIdRef = useRef("");
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState("");
+  const [snackbarSeverity, setSnackbarSeverity] = useState("info");
 
   // Handle contract ID from URL
   useEffect(() => {
@@ -100,12 +103,20 @@ function LuggageTrackingContent() {
       } else {
         if (shouldShowErrors) {
           setError('No contract data found');
+          // Show toast notification for invalid contract ID
+          setSnackbarMessage('Invalid luggage tracking ID. No contract found.');
+          setSnackbarSeverity('error');
+          setSnackbarOpen(true);
         }
       }
     } catch (err) {
       console.error('Error fetching contract:', err);
       if (shouldShowErrors) {
         setError(err.message || 'Failed to fetch contract');
+        // Show toast notification for invalid contract ID
+        setSnackbarMessage('Invalid luggage tracking ID. No contract found.');
+        setSnackbarSeverity('error');
+        setSnackbarOpen(true);
       }
     }
   };
@@ -752,7 +763,9 @@ function LuggageTrackingContent() {
   }, [contract?.current_location_geo?.coordinates]);
 
   // Replace handleSearch to use fetchData
-  const handleSearch = (id = contractId) => fetchData(id);
+  const handleSearch = (id = contractId) => {
+    fetchData(id);
+  };
 
   // Expand/collapse
   const handleExpandClick = () => { setExpanded(!expanded); };
@@ -772,6 +785,15 @@ function LuggageTrackingContent() {
       currentLocationMarkerRef.current = null;
     }
     setIsScriptLoaded(false);
+    setSnackbarOpen(false); // Close snackbar on clear
+  };
+
+  // Show snackbar
+  const handleSnackbarClose = (event, reason) => {
+    if (reason === 'clickaway') {
+      return;
+    }
+    setSnackbarOpen(false);
   };
 
   // Render
@@ -823,6 +845,12 @@ function LuggageTrackingContent() {
               }}
             />
           </Box>
+          {error && (<Typography color="error" align="center">{error}</Typography>)}
+          <Snackbar open={snackbarOpen} autoHideDuration={6000} onClose={handleSnackbarClose}>
+            <Alert onClose={handleSnackbarClose} severity={snackbarSeverity} sx={{ width: '100%' }}>
+              {snackbarMessage}
+            </Alert>
+          </Snackbar>
         </Box>
       ) : (
         <>
@@ -1104,6 +1132,16 @@ function LuggageTrackingContent() {
           </Paper>
         </>
       )}
+      <Snackbar 
+        open={snackbarOpen} 
+        autoHideDuration={6000} 
+        onClose={handleSnackbarClose}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert onClose={handleSnackbarClose} severity={snackbarSeverity} sx={{ width: '100%' }}>
+          {snackbarMessage}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }

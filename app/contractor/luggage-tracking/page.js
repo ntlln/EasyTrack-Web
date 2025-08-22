@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, Suspense } from "react";
-import { Box, Typography, TextField, Paper, Divider, IconButton, Collapse, CircularProgress } from "@mui/material";
+import { Box, Typography, TextField, Paper, Divider, IconButton, Collapse, CircularProgress, Snackbar, Alert } from "@mui/material";
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import CloseIcon from '@mui/icons-material/Close';
@@ -48,6 +48,9 @@ function LuggageTrackingContent() {
   const routeSegmentsRef = useRef([]);
   const supabase = createClientComponentClient();
   const previousValidContractIdRef = useRef("");
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState("");
+  const [snackbarSeverity, setSnackbarSeverity] = useState("info");
 
   // Mount effect
   useEffect(() => {
@@ -109,12 +112,20 @@ function LuggageTrackingContent() {
       } else {
         if (shouldShowErrors) {
           setError('No contract data found');
+          // Show toast notification for invalid contract ID
+          setSnackbarMessage('Invalid luggage tracking ID. No contract found.');
+          setSnackbarSeverity('error');
+          setSnackbarOpen(true);
         }
       }
     } catch (err) { 
       console.error('Error fetching contract:', err);
       if (shouldShowErrors) {
-        setError(err.message || 'Failed to fetch contract'); 
+        setError(err.message || 'Failed to fetch contract');
+        // Show toast notification for invalid contract ID
+        setSnackbarMessage('Invalid luggage tracking ID. No contract found.');
+        setSnackbarSeverity('error');
+        setSnackbarOpen(true);
       }
     } finally {
       setLoading(false);
@@ -616,7 +627,15 @@ function LuggageTrackingContent() {
   }, [contract?.id]);
 
   // Replace handleSearch to use fetchData
-  const handleSearch = (id = contractId) => fetchData(id);
+  const handleSearch = (id = contractId) => {
+    if (!id.trim()) {
+      setSnackbarMessage("Contract ID cannot be empty.");
+      setSnackbarSeverity("warning");
+      setSnackbarOpen(true);
+      return;
+    }
+    fetchData(id);
+  };
 
   // Expand/collapse
   const handleExpandClick = () => { setExpanded(!expanded); };
@@ -636,6 +655,15 @@ function LuggageTrackingContent() {
       currentLocationMarkerRef.current = null;
     }
     setIsScriptLoaded(false);
+    setSnackbarOpen(false); // Close snackbar on clear
+  };
+
+  // Show snackbar
+  const handleSnackbarClose = (event, reason) => {
+    if (reason === 'clickaway') {
+      return;
+    }
+    setSnackbarOpen(false);
   };
 
   // Function to calculate distance between two points
@@ -1120,6 +1148,11 @@ function LuggageTrackingContent() {
           </Paper>
         </>
       )}
+      <Snackbar open={snackbarOpen} autoHideDuration={6000} onClose={handleSnackbarClose} anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}>
+        <Alert onClose={handleSnackbarClose} severity={snackbarSeverity} sx={{ width: '100%' }}>
+          {snackbarMessage}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }

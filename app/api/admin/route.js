@@ -94,6 +94,81 @@ export async function GET(request) {
       }
     }
 
+    // Handle getContract action for polling
+    if (action === 'getContract') {
+      const contractId = searchParams.get('contractId');
+      if (!contractId) {
+        return NextResponse.json(
+          { error: 'Contract ID is required' },
+          { status: 400 }
+        );
+      }
+
+      const { data: contract, error: contractError } = await supabase
+        .from('contracts')
+        .select(`
+          id, created_at, accepted_at, pickup_at, delivered_at, cancelled_at,
+          pickup_location, pickup_location_geo, drop_off_location, drop_off_location_geo,
+          current_location_geo, contract_status_id,
+          airline_id, delivery_id, delivery_charge,
+          delivery_surcharge, delivery_discount,
+          airline:airline_id (*),
+          delivery:delivery_id (*)
+        `)
+        .eq('id', contractId)
+        .single();
+
+      if (contractError) {
+        console.error('Error fetching contract for polling:', contractError);
+        
+        // Handle the specific "multiple (or no) rows returned" error
+        if (contractError.message && contractError.message.includes('multiple (or no) rows returned')) {
+          return NextResponse.json(
+            { error: 'Contract not found' },
+            { status: 404 }
+          );
+        }
+        
+        return NextResponse.json(
+          { error: 'Contract not found' },
+          { status: 404 }
+        );
+      }
+
+      if (!contract) {
+        return NextResponse.json(
+          { error: 'Contract not found' },
+          { status: 404 }
+        );
+      }
+
+      // Fetch status for this contract and attach
+      let statusObj = null;
+      if (contract.contract_status_id != null) {
+        const { data: statusRow, error: statusError } = await supabase
+          .from('contract_status')
+          .select('id, status_name')
+          .eq('id', contract.contract_status_id)
+          .single();
+        
+        if (statusError) {
+          console.error('Error fetching contract status:', statusError);
+          statusObj = null;
+        } else {
+          statusObj = statusRow || null;
+        }
+      }
+
+      // Combine contract data (no luggage table)
+      const contractWithLuggage = {
+        ...contract,
+        contract_status: statusObj,
+        luggage: []
+      };
+
+      return NextResponse.json({ data: contractWithLuggage });
+    }
+
     // Handle contract location request
     if (contractId) {
       const { data: contract, error: contractError } = await supabase
@@ -112,9 +187,18 @@ export async function GET(request) {
 
       if (contractError) {
         console.error('Error fetching contract:', contractError);
+        
+        // Handle the specific "multiple (or no) rows returned" error
+        if (contractError.message && contractError.message.includes('multiple (or no) rows returned')) {
+          return NextResponse.json(
+            { error: 'Contract not found' },
+            { status: 404 }
+          );
+        }
+        
         return NextResponse.json(
-          { error: contractError.message },
-          { status: 500 }
+          { error: 'Contract not found' },
+          { status: 404 }
         );
       }
 
@@ -128,12 +212,18 @@ export async function GET(request) {
       // Fetch status for this contract and attach
       let statusObj = null;
       if (contract.contract_status_id != null) {
-        const { data: statusRow } = await supabase
+        const { data: statusRow, error: statusError } = await supabase
           .from('contract_status')
           .select('id, status_name')
           .eq('id', contract.contract_status_id)
           .single();
-        statusObj = statusRow || null;
+        
+        if (statusError) {
+          console.error('Error fetching contract status:', statusError);
+          statusObj = null;
+        } else {
+          statusObj = statusRow || null;
+        }
       }
 
       // Combine contract data (no luggage table)
