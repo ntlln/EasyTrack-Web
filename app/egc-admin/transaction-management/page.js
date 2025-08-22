@@ -418,13 +418,11 @@ const TransactionManagement = () => {
     const [discountLoading, setDiscountLoading] = useState(false);
     const [discountError, setDiscountError] = useState('');
     const [discountContract, setDiscountContract] = useState(null);
-    const [shouldRenderPDF, setShouldRenderPDF] = useState(false);
     const [snackbar, setSnackbar] = useState({
         open: false,
         message: '',
         severity: 'success'
     });
-    const [pdfDownloadRef, setPdfDownloadRef] = useState(null);
     const [pricingTable, setPricingTable] = useState([]);
     const [loadingPricingTable, setLoadingPricingTable] = useState(true);
     const [pricingPage, setPricingPage] = useState(0);
@@ -752,7 +750,6 @@ const TransactionManagement = () => {
             const newSelection = prev.includes(id) 
                 ? prev.filter((rowId) => rowId !== id)
                 : [...prev, id];
-            setShouldRenderPDF(false);
             return newSelection;
         });
     };
@@ -764,7 +761,6 @@ const TransactionManagement = () => {
             const monthIds = filteredData.map((row) => row.id);
             setSelectedRows((prev) => prev.filter((id) => !monthIds.includes(id)));
         }
-        setShouldRenderPDF(false);
     };
     const allPageRowsSelected = filteredData.length > 0 && filteredData.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).every((row) => selectedRows.includes(row.id));
     const somePageRowsSelected = filteredData.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).some((row) => selectedRows.includes(row.id));
@@ -780,35 +776,11 @@ const TransactionManagement = () => {
             return [];
         }
     };
-    const handleGeneratePDF = () => {
-        const contracts = getSelectedContracts();
-        if (contracts.length > 0) {
-            const minDate = contracts.reduce((min, c) => c.created_at && c.created_at < min ? c.created_at : min, contracts[0].created_at);
-            const maxDate = contracts.reduce((max, c) => c.created_at && c.created_at > max ? c.created_at : max, contracts[0].created_at);
-            return `${formatDate(minDate)} TO ${formatDate(maxDate)}`;
-        } else {
-            return 'No Data';
-        }
-    };
 
     const handleMonthChange = (newDate) => {
         setSelectedMonth(newDate);
         setSelectedRows([]); // Reset selection when month changes
         setPage(0); // Reset to first page when month changes
-    };
-
-    // Modify the existing PDF button click handler
-    const handlePDFButtonClick = () => {
-        const contracts = getSelectedContracts();
-        if (contracts.length === 0) {
-            setSnackbar({
-                open: true,
-                message: 'Please select at least one delivered or delivery failed contract',
-                severity: 'warning'
-            });
-            return;
-        }
-        setShouldRenderPDF(true);
     };
 
     const handleTabChange = (event, newValue) => {
@@ -949,147 +921,9 @@ const TransactionManagement = () => {
         setPendingPriceUpdate(null);
     };
 
-    // Get contracts for invoice: if none selected, use all for the month (not cancelled)
-    const getContractsForInvoice = () => {
-        if (tabValue === 0) {
-            // Pending tab - use selected contracts or all filtered contracts
-            if (selectedRows.length > 0) {
-                return getSelectedContracts().filter(contract => Number(contract.contract_status_id) === 5 || Number(contract.contract_status_id) === 6);
-            } else {
-                return filteredData.filter(contract => Number(contract.contract_status_id) === 5 || Number(contract.contract_status_id) === 6);
-            }
-        } else if (tabValue === 1) {
-            // Summarized tab - get contracts from selected summaries
-            if (selectedSummaries.length > 0) {
-                // Return contracts from selected summaries
-                return summaryContracts.filter(contract => Number(contract.contract_status_id) === 5 || Number(contract.contract_status_id) === 6);
-            } else {
-                // If no summaries selected, return empty array
-                return [];
-            }
-        }
-        return [];
-    };
 
-    // Add handler for invoice generation/payment creation
-    const handleGenerateInvoice = async () => {
-        const contracts = getContractsForInvoice();
-        
-        // Validate based on current tab
-        if (tabValue === 0) {
-            // Pending tab validation
-            if (contracts.length === 0) {
-                setSnackbar({
-                    open: true,
-                    message: 'Please select at least one delivered or delivery failed contract',
-                    severity: 'warning'
-                });
-                return;
-            }
-        } else if (tabValue === 1) {
-            // Summarized tab validation
-            if (selectedSummaries.length === 0) {
-                setSnackbar({
-                    open: true,
-                    message: 'Please select at least one summary to generate invoice',
-                    severity: 'warning'
-                });
-                return;
-            }
-            if (contracts.length === 0) {
-                setSnackbar({
-                    open: true,
-                    message: 'No delivered or delivery failed contracts found in selected summaries',
-                    severity: 'warning'
-                });
-                return;
-            }
-        }
 
-        const today = new Date();
-        const invoiceNo = formatDateFns(today, 'yyyyMMdd');
-        const createdAt = today.toISOString();
-        const dueDate = endOfMonth(today).toISOString();
-        
-        // Compute total amount with VAT
-        const subtotal = contracts.reduce((sum, c) => {
-            const delivery_charge = Number(c.delivery_charge) || 0;
-            const delivery_surcharge = Number(c.delivery_surcharge || c.surcharge) || 0;
-            const delivery_discount = Number(c.delivery_discount || c.discount) || 0;
-            return sum + Math.max(0, (delivery_charge + delivery_surcharge) - delivery_discount);
-        }, 0);
-        
-        // Calculate VAT (12% of subtotal)
-        const vat = subtotal * 0.12;
-        const totalAmount = subtotal + vat;
-        try {
-            const payload = {
-                action: 'createPayment',
-                params: {
-                    invoice_number: invoiceNo,
-                    summary_stat: 1,
-                    created_at: createdAt,
-                    due_date: dueDate,
-                    total_charge: totalAmount,
-                    invoice_image: '',
-                    invoice_id: invoiceNo
-                }
-            };
-            console.log('Sending payment payload:', payload);
-            const res = await fetch('/api/admin', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-            const json = await res.json();
-            console.log('Payment API response:', json);
-            if (!res.ok) {
-                let errorMsg = json.error || 'Failed to create payment';
-                if (res.status === 400 && typeof json === 'object') {
-                    errorMsg += json.missing ? `\nMissing fields: ${JSON.stringify(json.missing)}` : '';
-                }
-                throw new Error(errorMsg);
-            }
 
-            // Update the summary_id for the contracts included in this payment
-            if (contracts.length > 0) {
-                const contractIds = contracts.map(c => c.id);
-                const updatePayload = {
-                    action: 'updateContractSummaryId',
-                    params: {
-                        contractIds: contractIds,
-                        summaryId: invoiceNo
-                    }
-                };
-                
-                const updateRes = await fetch('/api/admin', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(updatePayload)
-                });
-                
-                if (!updateRes.ok) {
-                    console.error('Failed to update contract summary IDs:', await updateRes.text());
-                } else {
-                    // Refresh the data to reflect the changes
-                    window.location.reload();
-                }
-            }
-
-            setSnackbar({
-                open: true,
-                message: 'Invoice generated successfully!',
-                severity: 'success'
-            });
-        } catch (err) {
-            console.error('Payment creation error:', err);
-            setSnackbar({
-                open: true,
-                message: err.message || 'Failed to create payment',
-                severity: 'error'
-            });
-        }
-    };
 
     const handlePodClose = () => {
         setPodOpen(false);
@@ -1312,79 +1146,13 @@ const TransactionManagement = () => {
                                     }}
                                 />
                             </LocalizationProvider>
-                            {shouldRenderPDF ? (
-                                <PDFDownloadLink 
-                                    document={<ReceiptPDF 
-                                        contracts={getContractsForInvoice()} 
-                                        dateRange={handleGeneratePDF()} 
-                                    />}
-                                    fileName={`GHE-Transmittal-Report-${format(selectedMonth, 'MMMM-yyyy')}.pdf`}
-                                >
-                                    {({ loading, error }) => (
-                                        <Button 
-                                            variant="contained" 
-                                            color="primary"
-                                            disabled={loading || error}
-                                        >
-                                            {loading ? 'Generating SOA...' : error ? 'Error generating SOA' : 'Download SOA'}
-                                        </Button>
-                                    )}
-                                </PDFDownloadLink>
-                            ) : (
-                                <>
-                                    <Button 
-                                        variant="outlined" 
-                                        color="primary"
-                                        onClick={handleSummarize}
-                                        sx={{ mr: 1 }}
-                                    >
-                                        Summarize
-                                    </Button>
-                                    <Button 
-                                        variant="contained" 
-                                        color={selectedRows.length > 0 ? "primary" : "secondary"}
-                                        onClick={handlePDFButtonClick}
-                                        sx={{ 
-                                            position: 'relative',
-                                            '&::after': {
-                                                content: `"${getSelectedContracts().length}"`,
-                                                position: 'absolute',
-                                                top: -8,
-                                                right: -8,
-                                                backgroundColor: 'primary.main',
-                                                color: 'white',
-                                                borderRadius: '50%',
-                                                width: 20,
-                                                height: 20,
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                                fontSize: '0.75rem',
-                                                fontWeight: 'bold'
-                                            }
-                                        }}
-                                    >
-                                        Generate SOA
-                                    </Button>
-                                </>
-                            )}
-                            {/* New Invoice Button */}
-                            <PDFDownloadLink
-                                document={<InvoicePDF contracts={getContractsForInvoice()} />}
-                                fileName={`Invoice-${format(selectedMonth, 'MMMM-yyyy')}.pdf`}
+                            <Button 
+                                variant="outlined" 
+                                color="primary"
+                                onClick={handleSummarize}
                             >
-                                {({ loading, error }) => (
-                                    <Button
-                                        variant="contained"
-                                        color="primary"
-                                        disabled={loading || error}
-                                        sx={{ ml: 2 }}
-                                        onClick={handleGenerateInvoice}
-                                    >
-                                        {loading ? 'Generating Invoice...' : error ? 'Error generating Invoice' : 'Generate Invoice'}
-                                    </Button>
-                                )}
-                            </PDFDownloadLink>
+                                Summarize
+                            </Button>
                         </Box>
                     </Box>
                     <TableContainer component={Paper}>
@@ -1462,25 +1230,6 @@ const TransactionManagement = () => {
 
             {tabValue === 1 && (
                 <Box sx={{ p: 3 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', mb: 3 }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                            <PDFDownloadLink
-                                document={<InvoicePDF contracts={getContractsForInvoice()} />}
-                                fileName={`Invoice-${format(new Date(), 'MMMM-yyyy')}.pdf`}
-                            >
-                                {({ loading, error }) => (
-                                    <Button
-                                        variant="contained"
-                                        color="primary"
-                                        disabled={loading || error}
-                                        onClick={handleGenerateInvoice}
-                                    >
-                                        {loading ? 'Generating Invoice...' : error ? 'Error generating Invoice' : 'Generate Invoice'}
-                                    </Button>
-                                )}
-                            </PDFDownloadLink>
-                        </Box>
-                    </Box>
                     {loadingSummaries ? (
                         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 200 }}>
                             <CircularProgress />

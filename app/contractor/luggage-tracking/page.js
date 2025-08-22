@@ -51,9 +51,15 @@ function LuggageTrackingContent() {
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState("");
   const [snackbarSeverity, setSnackbarSeverity] = useState("info");
+  
+  // Add refs to prevent loops
+  const scriptLoadingRef = useRef(false);
+  const mapInitializedRef = useRef(false);
+  const currentContractIdRef = useRef("");
 
   // Mount effect
   useEffect(() => {
+    console.log('Component mounted');
     setMounted(true);
   }, []);
 
@@ -61,14 +67,17 @@ function LuggageTrackingContent() {
   useEffect(() => {
     const idFromUrl = searchParams.get('contractId');
     if (idFromUrl) {
+      console.log('Contract ID from URL:', idFromUrl);
       setContractId(idFromUrl);
-      handleSearch(idFromUrl);
+      // Don't call handleSearch here, let the contractId effect handle it
     }
   }, [searchParams]);
 
   // Fetch contract and luggage info (mirror admin API behavior)
   const fetchData = async (id = contractId) => {
     if (!id.trim()) return;
+    
+    console.log('fetchData called with ID:', id);
     
     // Only show errors if the current ID is longer than the previous valid ID
     // This prevents showing errors when user is reducing the contract ID
@@ -107,7 +116,9 @@ function LuggageTrackingContent() {
         };
         console.log('Processed contract data:', newContract);
         setContract(prev => {
-          return JSON.stringify(prev) !== JSON.stringify(newContract) ? newContract : prev;
+          const shouldUpdate = JSON.stringify(prev) !== JSON.stringify(newContract);
+          console.log('Contract state update:', { shouldUpdate, prevContract: prev, newContract });
+          return shouldUpdate ? newContract : prev;
         });
       } else {
         if (shouldShowErrors) {
@@ -135,11 +146,19 @@ function LuggageTrackingContent() {
   // Reset map/markers only when contractId changes
   useEffect(() => {
     if (!contractId) return;
+    
+    console.log('Contract ID changed, resetting map and fetching data:', contractId);
+    
+    // Reset initialization flags for new contract
+    mapInitializedRef.current = false;
+    currentContractIdRef.current = contractId;
+    
     // Reset map and markers
     if (map) setMap(null);
     if (markerRef.current) { markerRef.current.map = null; markerRef.current = null; }
     if (currentLocationMarkerRef.current) { currentLocationMarkerRef.current.map = null; currentLocationMarkerRef.current = null; }
-    setIsScriptLoaded(false);
+    
+    // Don't reset isScriptLoaded - keep the script loaded
     fetchData(contractId);
   }, [contractId]);
 
@@ -172,7 +191,8 @@ function LuggageTrackingContent() {
             }
           }
 
-          if (map) {
+          // Only update map location if map is initialized and we have current location data
+          if (map && updatedRow.current_location_geo?.coordinates) {
             await updateMapLocation();
           }
         }
@@ -213,7 +233,7 @@ function LuggageTrackingContent() {
       channelContract.unsubscribe();
       channelContracts.unsubscribe();
     };
-  }, [contractId, supabase, map]);
+  }, [contractId, supabase]); // Removed map from dependencies to prevent re-subscription
 
   // Update polyline with directions
   const updatePolylineWithDirections = async (start, end) => {
@@ -283,10 +303,14 @@ function LuggageTrackingContent() {
     }
   };
 
-  // Google Maps script loader
+  // Google Maps script loader - only load once
   useEffect(() => {
-    if (mounted && !isScriptLoaded && !window.google) {
+    console.log('Script loader effect:', { mounted, isScriptLoaded, hasGoogle: !!window.google, scriptLoading: scriptLoadingRef.current });
+    
+    if (mounted && !isScriptLoaded && !window.google && !scriptLoadingRef.current) {
       console.log('Loading Google Maps script...');
+      scriptLoadingRef.current = true;
+      
       const script = document.createElement('script');
       script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places,marker`;
       script.async = true;
@@ -294,39 +318,112 @@ function LuggageTrackingContent() {
       script.onload = () => {
         console.log('Google Maps script loaded successfully');
         setIsScriptLoaded(true);
+        scriptLoadingRef.current = false;
       };
       script.onerror = (error) => {
         console.error('Failed to load Google Maps:', error);
         setMapError('Failed to load Google Maps');
+        scriptLoadingRef.current = false;
       };
       document.head.appendChild(script);
-      return () => {
-        if (document.head.contains(script)) {
-          document.head.removeChild(script);
-        }
-      };
     }
   }, [mounted, isScriptLoaded]);
 
-  // Initialize map when script is loaded and contract is available
+  // Initialize map when script is loaded and contract is available - only once per contract
   useEffect(() => {
-    if (isScriptLoaded && contract && !map && mapRef.current) {
-      console.log('Initializing map...');
-      const timer = setTimeout(() => {
-        initMap();
-      }, 100);
-      return () => clearTimeout(timer);
+    console.log('Map initialization effect triggered:', {
+      isScriptLoaded,
+      hasContract: !!contract,
+      hasMap: !!map,
+      hasMapRef: !!mapRef.current,
+      mapInitialized: mapInitializedRef.current,
+      currentContractId: currentContractIdRef.current,
+      contractId: contract?.id
+    });
+
+    if (isScriptLoaded && contract && !map && mapRef.current && !mapInitializedRef.current && currentContractIdRef.current === contract.id) {
+      // Check if we have at least pickup or dropoff location coordinates
+      const hasLocationData = contract.pickup_location_geo?.coordinates || 
+                             contract.drop_off_location_geo?.coordinates || 
+                             contract.current_location_geo?.coordinates;
+      
+      if (hasLocationData) {
+        console.log('Initializing map with location data...');
+        mapInitializedRef.current = true;
+        const timer = setTimeout(() => {
+          initMap();
+        }, 100);
+        return () => clearTimeout(timer);
+      } else {
+        console.log('No location data available, skipping map initialization');
+        // Mark as initialized even without location data to prevent infinite waiting
+        mapInitializedRef.current = true;
+      }
     }
   }, [isScriptLoaded, contract, map]);
 
+  // Additional effect to trigger map initialization when all conditions are met
+  useEffect(() => {
+    if (isScriptLoaded && contract && mapRef.current && !map && !mapInitializedRef.current) {
+      console.log('Additional map initialization check triggered');
+      
+      // Force a small delay to ensure DOM is ready
+      const timer = setTimeout(() => {
+        if (isScriptLoaded && contract && mapRef.current && !map && !mapInitializedRef.current) {
+          console.log('Forcing map initialization...');
+          mapInitializedRef.current = true;
+          initMap();
+        }
+      }, 200);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [isScriptLoaded, contract, mapRef.current]);
+
+  // Debug effect to track initialization state
+  useEffect(() => {
+    console.log('Debug - Current state:', {
+      mounted,
+      isScriptLoaded,
+      hasContract: !!contract,
+      contractId: contract?.id,
+      hasMap: !!map,
+      hasMapRef: !!mapRef.current,
+      mapInitialized: mapInitializedRef.current,
+      currentContractId: currentContractIdRef.current,
+      hasLocationData: !!(contract?.pickup_location_geo?.coordinates || contract?.drop_off_location_geo?.coordinates || contract?.current_location_geo?.coordinates)
+    });
+  }, [mounted, isScriptLoaded, contract, map, mapRef.current]);
+
   // Map initialization
   const initMap = () => {
-    if (!window.google || !mapRef.current || !contract) {
+    console.log('initMap called with:', {
+      hasGoogle: !!window.google,
+      hasMapRef: !!mapRef.current,
+      hasContract: !!contract,
+      currentContractId: currentContractIdRef.current,
+      contractId: contract?.id,
+      contractData: contract
+    });
+
+    if (!window.google || !mapRef.current || !contract || currentContractIdRef.current !== contract.id) {
       console.log('Map initialization skipped:', {
         hasGoogle: !!window.google,
         hasMapRef: !!mapRef.current,
-        hasContract: !!contract
+        hasContract: !!contract,
+        currentContractId: currentContractIdRef.current,
+        contractId: contract?.id
       });
+      return;
+    }
+    
+    // Check if we have any location data to display
+    const hasLocationData = contract.pickup_location_geo?.coordinates || 
+                           contract.drop_off_location_geo?.coordinates || 
+                           contract.current_location_geo?.coordinates;
+    
+    if (!hasLocationData) {
+      console.log('No location data available for map initialization');
       return;
     }
     
@@ -475,6 +572,7 @@ function LuggageTrackingContent() {
 
       if (markers.length > 0) {
         if (contract.current_location_geo?.coordinates) {
+          // If we have current location, center on it
           const currentPosition = {
             lat: contract.current_location_geo.coordinates[1],
             lng: contract.current_location_geo.coordinates[0]
@@ -482,6 +580,7 @@ function LuggageTrackingContent() {
           newMap.setCenter(currentPosition);
           newMap.setZoom(15);
         } else {
+          // If no current location, fit bounds to show pickup and dropoff locations
           const bounds = new window.google.maps.LatLngBounds();
           markers.forEach(marker => bounds.extend(marker));
           newMap.fitBounds(bounds);
@@ -492,6 +591,11 @@ function LuggageTrackingContent() {
           bounds.extend({ lat: sw.lat() - padding, lng: sw.lng() - padding });
           newMap.fitBounds(bounds);
         }
+      } else {
+        // If no markers at all, use default center
+        console.log('No markers to display, using default center');
+        newMap.setCenter(defaultCenter);
+        newMap.setZoom(10);
       }
 
       console.log('Map initialization completed successfully');
@@ -503,8 +607,14 @@ function LuggageTrackingContent() {
 
   // Update map location with improved error handling
   const updateMapLocation = async () => {
-    if (!map || !window.google || !currentLocationMarkerRef.current) {
-      console.log('Map or marker not initialized yet, skipping location update');
+    if (!map || !window.google) {
+      console.log('Map not initialized yet, skipping location update');
+      return;
+    }
+    
+    // Only update if we have a current location marker and current location data
+    if (!currentLocationMarkerRef.current || !contract?.current_location_geo?.coordinates) {
+      console.log('No current location marker or location data, skipping update');
       return;
     }
 
@@ -599,7 +709,10 @@ function LuggageTrackingContent() {
 
             if (result.data) {
               setContract(result.data);
-              await updateMapLocation();
+              // Only update map location if we have current location data
+              if (result.data.current_location_geo?.coordinates) {
+                await updateMapLocation();
+              }
               retryCount = 0; // Reset retry count on successful update
             }
           } catch (error) {
@@ -645,6 +758,8 @@ function LuggageTrackingContent() {
     setContract(null);
     setError(null);
     previousValidContractIdRef.current = "";
+    currentContractIdRef.current = "";
+    mapInitializedRef.current = false;
     if (map) setMap(null);
     if (markerRef.current) {
       markerRef.current.map = null;
@@ -654,7 +769,7 @@ function LuggageTrackingContent() {
       currentLocationMarkerRef.current.map = null;
       currentLocationMarkerRef.current = null;
     }
-    setIsScriptLoaded(false);
+    // Don't reset isScriptLoaded - keep the script loaded for future use
     setSnackbarOpen(false); // Close snackbar on clear
   };
 
@@ -729,14 +844,37 @@ function LuggageTrackingContent() {
   useEffect(() => {
     const updateRouteDetails = async () => {
       console.log('Location changed, checking coordinates...');
-      if (!contract?.current_location_geo?.coordinates || 
-          !contract?.drop_off_location_geo?.coordinates || 
-          !contract?.pickup_location_geo?.coordinates) {
-        console.log('Missing coordinates:', {
-          current: !!contract?.current_location_geo?.coordinates,
-          dropoff: !!contract?.drop_off_location_geo?.coordinates,
-          pickup: !!contract?.pickup_location_geo?.coordinates
+      
+      // Check if we have the minimum required coordinates
+      const hasCurrentLocation = contract?.current_location_geo?.coordinates;
+      const hasDropoffLocation = contract?.drop_off_location_geo?.coordinates;
+      const hasPickupLocation = contract?.pickup_location_geo?.coordinates;
+      
+      if (!hasDropoffLocation || !hasPickupLocation) {
+        console.log('Missing required coordinates:', {
+          dropoff: !!hasDropoffLocation,
+          pickup: !!hasPickupLocation
         });
+        return;
+      }
+      
+      // If no current location, show total route only
+      if (!hasCurrentLocation) {
+        console.log('No current location, showing total route only');
+        const pickupLocation = {
+          lat: contract.pickup_location_geo.coordinates[1],
+          lng: contract.pickup_location_geo.coordinates[0]
+        };
+        const dropoffLocation = {
+          lat: contract.drop_off_location_geo.coordinates[1],
+          lng: contract.drop_off_location_geo.coordinates[0]
+        };
+        
+        // Calculate total route details
+        const totalDetails = await calculateRouteDetails(pickupLocation, dropoffLocation);
+        setTotalRouteDetails(totalDetails);
+        setRouteDetails({ distance: totalDetails.distance, duration: totalDetails.duration });
+        setProgress(0); // No progress since delivery hasn't started
         return;
       }
 
@@ -1085,48 +1223,83 @@ function LuggageTrackingContent() {
                 <Box sx={{ width: 16, height: 16, borderRadius: '50%', bgcolor: '#2196F3', border: '2px solid #1976D2' }} />
                 <Typography variant="body2">Pickup Location</Typography>
               </Box>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Box sx={{ width: 16, height: 16, borderRadius: '50%', bgcolor: '#4CAF50', border: '2px solid #388E3C' }} />
-                <Typography variant="body2">Current Location</Typography>
-              </Box>
+              {contract?.current_location_geo?.coordinates && (
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Box sx={{ width: 16, height: 16, borderRadius: '50%', bgcolor: '#4CAF50', border: '2px solid #388E3C' }} />
+                  <Typography variant="body2">Current Location</Typography>
+                </Box>
+              )}
             </Box>
             {/* Progress and ETA Section */}
             <Box sx={{ mb: 2 }}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                <Typography variant="body2" color="text.secondary">
-                  Delivery Progress
-                </Typography>
-                <Typography variant="body2" color="primary.main" fontWeight="bold">
-                  {Math.round(progress)}%
-                </Typography>
-              </Box>
-              <Box sx={{ width: '100%', bgcolor: 'grey.200', borderRadius: 1, height: 8, mb: 1 }}>
-                <Box
-                  sx={{
-                    height: '100%',
-                    borderRadius: 1,
-                    bgcolor: 'primary.main',
-                    width: `${progress}%`,
-                    transition: 'width 0.5s ease-in-out'
-                  }}
-                />
-              </Box>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                <Typography variant="body2" color="text.secondary">
-                  Distance Remaining
-                </Typography>
-                <Typography variant="body2" color="primary.main" fontWeight="bold">
-                  {routeDetails.distance ? `${routeDetails.distance.toFixed(1)} km` : 'Calculating...'}
-                </Typography>
-              </Box>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Typography variant="body2" color="text.secondary">
-                  Estimated Time of Arrival
-                </Typography>
-                <Typography variant="body2" color="primary.main" fontWeight="bold">
-                  {routeDetails.duration ? formatDuration(routeDetails.duration) : 'Calculating...'}
-                </Typography>
-              </Box>
+              {contract?.current_location_geo?.coordinates ? (
+                // Show progress when we have current location
+                <>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                    <Typography variant="body2" color="text.secondary">
+                      Delivery Progress
+                    </Typography>
+                    <Typography variant="body2" color="primary.main" fontWeight="bold">
+                      {Math.round(progress)}%
+                    </Typography>
+                  </Box>
+                  <Box sx={{ width: '100%', bgcolor: 'grey.200', borderRadius: 1, height: 8, mb: 1 }}>
+                    <Box
+                      sx={{
+                        height: '100%',
+                        borderRadius: 1,
+                        bgcolor: 'primary.main',
+                        width: `${progress}%`,
+                        transition: 'width 0.5s ease-in-out'
+                      }}
+                    />
+                  </Box>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                    <Typography variant="body2" color="text.secondary">
+                      Distance Remaining
+                    </Typography>
+                    <Typography variant="body2" color="primary.main" fontWeight="bold">
+                      {routeDetails.distance ? `${routeDetails.distance.toFixed(1)} km` : 'Calculating...'}
+                    </Typography>
+                  </Box>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Typography variant="body2" color="text.secondary">
+                      Estimated Time of Arrival
+                    </Typography>
+                    <Typography variant="body2" color="primary.main" fontWeight="bold">
+                      {routeDetails.duration ? formatDuration(routeDetails.duration) : 'Calculating...'}
+                    </Typography>
+                  </Box>
+                </>
+              ) : (
+                // Show total route info when no current location
+                <>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                    <Typography variant="body2" color="text.secondary">
+                      Total Route Distance
+                    </Typography>
+                    <Typography variant="body2" color="primary.main" fontWeight="bold">
+                      {totalRouteDetails.distance ? `${totalRouteDetails.distance.toFixed(1)} km` : 'Calculating...'}
+                    </Typography>
+                  </Box>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                    <Typography variant="body2" color="text.secondary">
+                      Estimated Travel Time
+                    </Typography>
+                    <Typography variant="body2" color="primary.main" fontWeight="bold">
+                      {totalRouteDetails.duration ? formatDuration(totalRouteDetails.duration) : 'Calculating...'}
+                    </Typography>
+                  </Box>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Typography variant="body2" color="text.secondary">
+                      Status
+                    </Typography>
+                    <Typography variant="body2" color="warning.main" fontWeight="bold">
+                      Awaiting pickup
+                    </Typography>
+                  </Box>
+                </>
+              )}
             </Box>
             {mounted ? (
               <>
@@ -1138,7 +1311,16 @@ function LuggageTrackingContent() {
                     </Typography>
                   </Box>
                 )}
-                {isScriptLoaded && <MapComponent mapRef={mapRef} mapError={mapError} />}
+                {isScriptLoaded && contract && (
+                  <MapComponent mapRef={mapRef} mapError={mapError} />
+                )}
+                {isScriptLoaded && !contract && (
+                  <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '500px', flexDirection: 'column', gap: 2 }}>
+                    <Typography variant="body2" color="text.secondary">
+                      No contract data available for map display
+                    </Typography>
+                  </Box>
+                )}
               </>
             ) : (
               <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '500px' }}>
