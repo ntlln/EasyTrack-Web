@@ -112,8 +112,8 @@ const ReceiptPDF = ({ contracts = [], dateRange }) => {
                         <View key={c.id || idx} style={{ flexDirection: 'row', borderBottomWidth: 1, borderColor: '#000' }}>
                             <Text style={{ flex: 0.5, padding: 2, fontSize: 8 }}>{idx + 1}</Text>
                             <Text style={{ flex: 1, padding: 2, fontSize: 8 }}>{c.id}</Text>
-                            <Text style={{ flex: 2, padding: 2, fontSize: 8 }}>{c.luggage?.[0]?.luggage_owner || 'N/A'}</Text>
-                            <Text style={{ flex: 1, padding: 2, fontSize: 8 }}>{c.luggage?.[0]?.flight_number || 'N/A'}</Text>
+                            <Text style={{ flex: 2, padding: 2, fontSize: 8 }}>{c.owner_first_name || c.owner_middle_initial || c.owner_last_name ? `${c.owner_first_name || ''} ${c.owner_middle_initial || ''} ${c.owner_last_name || ''}`.replace(/  +/g, ' ').trim() : 'N/A'}</Text>
+                            <Text style={{ flex: 1, padding: 2, fontSize: 8 }}>{c.flight_number || 'N/A'}</Text>
                             <Text style={{ flex: 3, padding: 2, fontSize: 8 }}>{c.drop_off_location || 'N/A'}</Text>
                             <Text style={{ flex: 2, padding: 2, fontSize: 8 }}>{formatDate(c.delivered_at || c.created_at)}</Text>
                             <Text style={{ flex: 1.5, padding: 2, fontSize: 8 }}>{c.contract_status?.status_name || 'N/A'}</Text>
@@ -364,6 +364,11 @@ const TransactionManagement = () => {
     const [podImage, setPodImage] = useState(null);
     const [podLoading, setPodLoading] = useState(false);
     const [podError, setPodError] = useState(null);
+    const [summaryOpen, setSummaryOpen] = useState(false);
+    const [summaryData, setSummaryData] = useState(null);
+    const [summaries, setSummaries] = useState([]);
+    const [loadingSummaries, setLoadingSummaries] = useState(false);
+    const [summariesError, setSummariesError] = useState(null);
 
     // Data fetching
     useEffect(() => {
@@ -865,6 +870,37 @@ const TransactionManagement = () => {
                 }
                 throw new Error(errorMsg);
             }
+
+            // Update the summary_id for the contracts included in this payment
+            if (contracts.length > 0) {
+                const contractIds = contracts.map(c => c.id);
+                const updatePayload = {
+                    action: 'updateContractSummaryId',
+                    params: {
+                        contractIds: contractIds,
+                        summaryId: invoiceNo
+                    }
+                };
+                
+                const updateRes = await fetch('/api/admin', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(updatePayload)
+                });
+                
+                if (!updateRes.ok) {
+                    console.error('Failed to update contract summary IDs:', await updateRes.text());
+                } else {
+                    // Refresh the data to reflect the changes
+                    window.location.reload();
+                }
+            }
+
+            setSnackbar({
+                open: true,
+                message: 'Invoice generated successfully!',
+                severity: 'success'
+            });
         } catch (err) {
             console.error('Payment creation error:', err);
             setSnackbar({
@@ -892,6 +928,25 @@ const TransactionManagement = () => {
             })
             .catch(err => setPaymentsError(err.message || 'Failed to fetch payments'))
             .finally(() => setLoadingPayments(false));
+    }, [tabValue]);
+
+    // Fetch summaries when Summaries tab is selected
+    useEffect(() => {
+        if (tabValue !== 3) return;
+        setLoadingSummaries(true);
+        setSummariesError(null);
+        fetch('/api/admin', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'getSummaries', params: {} })
+        })
+            .then(res => res.json())
+            .then(json => {
+                if (json.error) throw new Error(json.error);
+                setSummaries(json.summaries || []);
+            })
+            .catch(err => setSummariesError(err.message || 'Failed to fetch summaries'))
+            .finally(() => setLoadingSummaries(false));
     }, [tabValue]);
 
     // Payments History: Checkbox logic
@@ -981,6 +1036,99 @@ const TransactionManagement = () => {
         setPodError(null);
     };
 
+    const handleSummarize = async () => {
+        const contracts = getSelectedContracts();
+        if (contracts.length === 0) {
+            setSnackbar({
+                open: true,
+                message: 'Please select at least one contract to summarize',
+                severity: 'warning'
+            });
+            return;
+        }
+
+        // Generate summary ID with format SUMyyyymmdd + 4 random alphanumeric characters
+        const today = new Date();
+        const datePart = formatDateFns(today, 'yyyyMMdd');
+        const randomPart = Math.random().toString(36).substring(2, 6).toUpperCase(); // 4 random alphanumeric characters
+        const summaryId = `SUM${datePart}${randomPart}`;
+
+        try {
+            // Calculate summary statistics
+            const totalContracts = contracts.length;
+            const totalAmount = contracts.reduce((sum, c) => {
+                const delivery_charge = Number(c.delivery_charge) || 0;
+                const delivery_surcharge = Number(c.delivery_surcharge || c.surcharge) || 0;
+                const delivery_discount = Number(c.delivery_discount || c.discount) || 0;
+                return sum + Math.max(0, (delivery_charge + delivery_surcharge) - delivery_discount);
+            }, 0);
+            
+            const deliveredContracts = contracts.filter(c => c.contract_status?.status_name === 'Delivered').length;
+            const failedContracts = contracts.filter(c => c.contract_status?.status_name === 'Delivery Failed').length;
+            
+            // Create summary record and update contracts
+            const contractIds = contracts.map(c => c.id);
+            const createSummaryPayload = {
+                action: 'createSummary',
+                params: {
+                    summaryId,
+                    totalContracts,
+                    totalAmount,
+                    deliveredContracts,
+                    failedContracts,
+                    contractIds
+                }
+            };
+            
+            const createSummaryRes = await fetch('/api/admin', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(createSummaryPayload)
+            });
+            
+            if (!createSummaryRes.ok) {
+                const errorData = await createSummaryRes.json();
+                throw new Error(errorData.error || 'Failed to create summary');
+            }
+
+            const result = await createSummaryRes.json();
+            
+            const summary = {
+                summaryId,
+                totalContracts,
+                totalAmount,
+                deliveredContracts,
+                failedContracts,
+                contracts: contracts,
+                summaryRecord: result.summary
+            };
+            
+            setSummaryData(summary);
+            setSummaryOpen(true);
+
+            setSnackbar({
+                open: true,
+                message: `Summary created successfully with ID: ${summaryId}`,
+                severity: 'success'
+            });
+
+            // Refresh the data to reflect the changes
+            window.location.reload();
+        } catch (error) {
+            console.error('Error creating summary:', error);
+            setSnackbar({
+                open: true,
+                message: error.message || 'Failed to create summary',
+                severity: 'error'
+            });
+        }
+    };
+
+    const handleSummaryClose = () => {
+        setSummaryOpen(false);
+        setSummaryData(null);
+    };
+
     const fetchProofOfDelivery = async (contractId) => {
         setPodLoading(true);
         setPodError(null);
@@ -1027,6 +1175,7 @@ const TransactionManagement = () => {
                     <Tab label="Transaction Management" />
                     <Tab label="Payments History" />
                     <Tab label="Pricing Update" />
+                    <Tab label="Summaries" />
                 </Tabs>
             </Box>
 
@@ -1067,32 +1216,42 @@ const TransactionManagement = () => {
                                     )}
                                 </PDFDownloadLink>
                             ) : (
-                                <Button 
-                                    variant="contained" 
-                                    color={selectedRows.length > 0 ? "primary" : "secondary"}
-                                    onClick={handlePDFButtonClick}
-                                    sx={{ 
-                                        position: 'relative',
-                                        '&::after': {
-                                            content: `"${getSelectedContracts().length}"`,
-                                            position: 'absolute',
-                                            top: -8,
-                                            right: -8,
-                                            backgroundColor: 'primary.main',
-                                            color: 'white',
-                                            borderRadius: '50%',
-                                            width: 20,
-                                            height: 20,
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            fontSize: '0.75rem',
-                                            fontWeight: 'bold'
-                                        }
-                                    }}
-                                >
-                                    Generate SOA
-                                </Button>
+                                <>
+                                    <Button 
+                                        variant="outlined" 
+                                        color="primary"
+                                        onClick={handleSummarize}
+                                        sx={{ mr: 1 }}
+                                    >
+                                        Summarize
+                                    </Button>
+                                    <Button 
+                                        variant="contained" 
+                                        color={selectedRows.length > 0 ? "primary" : "secondary"}
+                                        onClick={handlePDFButtonClick}
+                                        sx={{ 
+                                            position: 'relative',
+                                            '&::after': {
+                                                content: `"${getSelectedContracts().length}"`,
+                                                position: 'absolute',
+                                                top: -8,
+                                                right: -8,
+                                                backgroundColor: 'primary.main',
+                                                color: 'white',
+                                                borderRadius: '50%',
+                                                width: 20,
+                                                height: 20,
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                fontSize: '0.75rem',
+                                                fontWeight: 'bold'
+                                            }
+                                        }}
+                                    >
+                                        Generate SOA
+                                    </Button>
+                                </>
                             )}
                             {/* New Invoice Button */}
                             <PDFDownloadLink
@@ -1146,14 +1305,19 @@ const TransactionManagement = () => {
                                     const total = Math.max(0, (delivery_charge + delivery_surcharge) - delivery_discount);
                                     const remarks = status === 'Delivery Failed' ? 'Delivery Failed' : '';
                                     
+                                    // Format luggage owner name from contracts table fields
+                                    const luggageOwner = row.owner_first_name || row.owner_middle_initial || row.owner_last_name 
+                                        ? `${row.owner_first_name || ''} ${row.owner_middle_initial || ''} ${row.owner_last_name || ''}`.replace(/  +/g, ' ').trim()
+                                        : 'N/A';
+                                    
                                     return (
                                         <TableRow key={row.id} selected={isRowSelected(row.id)}>
                                             <TableCell padding="checkbox">
                                                 <Checkbox checked={isRowSelected(row.id)} onChange={() => handleSelectRow(row.id)} inputProps={{ 'aria-label': `select contract ${row.id}` }} />
                                             </TableCell>
                                             <TableCell>{row.id}</TableCell>
-                                            <TableCell>{row.luggage?.[0]?.luggage_owner || 'N/A'}</TableCell>
-                                            <TableCell>{row.luggage?.[0]?.flight_number || 'N/A'}</TableCell>
+                                            <TableCell>{luggageOwner}</TableCell>
+                                            <TableCell>{row.flight_number || 'N/A'}</TableCell>
                                             <TableCell>{row.drop_off_location || 'N/A'}</TableCell>
                                             <TableCell>{formatDate(row.delivered_at || row.created_at)}</TableCell>
                                             <TableCell>{status}</TableCell>
@@ -1376,6 +1540,57 @@ const TransactionManagement = () => {
                 </Box>
             )}
 
+            {tabValue === 3 && (
+                <Box sx={{ p: 3 }}>
+                    {loadingSummaries ? (
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 200 }}>
+                            <CircularProgress />
+                        </Box>
+                    ) : summariesError ? (
+                        <Alert severity="error">{summariesError}</Alert>
+                    ) : (
+                        <TableContainer component={Paper}>
+                            <Table>
+                                <TableHead>
+                                    <TableRow sx={{ backgroundColor: 'primary.main' }}>
+                                        <TableCell sx={{ color: 'white' }}>Summary ID</TableCell>
+                                        <TableCell sx={{ color: 'white' }}>Created At</TableCell>
+                                        <TableCell sx={{ color: 'white' }}>Due Date</TableCell>
+                                    </TableRow>
+                                </TableHead>
+                                <TableBody>
+                                    {summaries.length === 0 ? (
+                                        <TableRow>
+                                            <TableCell colSpan={3} align="center">No summaries found</TableCell>
+                                        </TableRow>
+                                    ) : summaries.map((summary) => (
+                                        <TableRow key={summary.id}>
+                                            <TableCell>{summary.id}</TableCell>
+                                            <TableCell>
+                                                {summary.created_at ? new Date(summary.created_at).toLocaleDateString(undefined, { 
+                                                    year: 'numeric', 
+                                                    month: 'long', 
+                                                    day: 'numeric',
+                                                    hour: '2-digit',
+                                                    minute: '2-digit'
+                                                }) : ''}
+                                            </TableCell>
+                                            <TableCell>
+                                                {summary.due_date ? new Date(summary.due_date).toLocaleDateString(undefined, { 
+                                                    year: 'numeric', 
+                                                    month: 'long', 
+                                                    day: 'numeric'
+                                                }) : ''}
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </TableContainer>
+                    )}
+                </Box>
+            )}
+
             <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleMenuClose}>
                 <MenuItem onClick={() => handleAction('view')}>View Details</MenuItem>
                 <MenuItem onClick={() => handleAction('surcharge')}>Surcharge</MenuItem>
@@ -1411,8 +1626,13 @@ const TransactionManagement = () => {
                             <Divider sx={{ my: 2 }} />
                             <Typography variant="subtitle2" sx={{ color: 'primary.main', fontWeight: 700, mb: 1 }}>Luggage Information</Typography>
                             <Box sx={{ ml: 1, mb: 1 }}>
-                                {detailsContract.luggage && detailsContract.luggage.length === 0 && (<Typography variant="body2" sx={{ color: '#bdbdbd' }}>No luggage info.</Typography>)}
-                                {detailsContract.luggage && detailsContract.luggage.map((l, lidx) => (<Box key={`luggage-${detailsContract.id}-${lidx}`} sx={{ mb: 2, pl: 1 }}><Typography variant="subtitle2" sx={{ color: 'primary.main', fontWeight: 700 }}>Luggage {lidx + 1}</Typography><Typography variant="body2" sx={{ color: '#bdbdbd' }}>Owner: <span style={{ color: 'text.primary' }}>{l.luggage_owner || 'N/A'}</span></Typography><Typography variant="body2" sx={{ color: '#bdbdbd' }}>Case Number: <span style={{ color: 'text.primary' }}>{l.case_number || 'N/A'}</span></Typography><Typography variant="body2" sx={{ color: '#bdbdbd' }}>Description: <span style={{ color: 'text.primary' }}>{l.item_description || 'N/A'}</span></Typography><Typography variant="body2" sx={{ color: '#bdbdbd' }}>Weight: <span style={{ color: 'text.primary' }}>{l.weight ? `${l.weight} kg` : 'N/A'}</span></Typography><Typography variant="body2" sx={{ color: '#bdbdbd' }}>Contact: <span style={{ color: 'text.primary' }}>{l.contact_number || 'N/A'}</span></Typography></Box>))}
+                                <Typography variant="body2" sx={{ color: '#bdbdbd' }}><b>Owner:</b> <span style={{ color: 'text.primary' }}>{detailsContract.owner_first_name || detailsContract.owner_middle_initial || detailsContract.owner_last_name ? `${detailsContract.owner_first_name || ''} ${detailsContract.owner_middle_initial || ''} ${detailsContract.owner_last_name || ''}`.replace(/  +/g, ' ').trim() : 'N/A'}</span></Typography>
+                                <Typography variant="body2" sx={{ color: '#bdbdbd' }}><b>Flight Number:</b> <span style={{ color: 'text.primary' }}>{detailsContract.flight_number || 'N/A'}</span></Typography>
+                                <Typography variant="body2" sx={{ color: '#bdbdbd' }}><b>Case Number:</b> <span style={{ color: 'text.primary' }}>{detailsContract.case_number || 'N/A'}</span></Typography>
+                                <Typography variant="body2" sx={{ color: '#bdbdbd' }}><b>Description:</b> <span style={{ color: 'text.primary' }}>{detailsContract.luggage_description || 'N/A'}</span></Typography>
+                                <Typography variant="body2" sx={{ color: '#bdbdbd' }}><b>Weight:</b> <span style={{ color: 'text.primary' }}>{detailsContract.luggage_weight ? `${detailsContract.luggage_weight} kg` : 'N/A'}</span></Typography>
+                                <Typography variant="body2" sx={{ color: '#bdbdbd' }}><b>Quantity:</b> <span style={{ color: 'text.primary' }}>{detailsContract.luggage_quantity || 'N/A'}</span></Typography>
+                                <Typography variant="body2" sx={{ color: '#bdbdbd' }}><b>Contact:</b> <span style={{ color: 'text.primary' }}>{detailsContract.owner_contact || 'N/A'}</span></Typography>
                             </Box>
                             <Divider sx={{ my: 2 }} />
                             <Typography variant="subtitle2" sx={{ color: 'primary.main', fontWeight: 700, mb: 1 }}>Timeline</Typography>
@@ -1616,6 +1836,80 @@ const TransactionManagement = () => {
                 </DialogContent>
                 <DialogActions>
                     <Button onClick={handlePodClose} color="primary">Close</Button>
+                </DialogActions>
+            </Dialog>
+            {/* Summary Dialog */}
+            <Dialog open={summaryOpen} onClose={handleSummaryClose} maxWidth="md" fullWidth>
+                <DialogTitle>Contract Summary</DialogTitle>
+                <DialogContent dividers>
+                    {summaryData && (
+                        <Box sx={{ minWidth: 400 }}>
+                            <Typography variant="h6" sx={{ color: 'primary.main', fontWeight: 700, mb: 2 }}>Summary Overview</Typography>
+                            <Box sx={{ p: 2, bgcolor: 'primary.main', color: 'white', borderRadius: 1, mb: 3 }}>
+                                <Typography variant="body2" sx={{ mb: 1 }}>Summary ID</Typography>
+                                <Typography variant="h5" sx={{ fontWeight: 700, fontFamily: 'monospace' }}>{summaryData.summaryId}</Typography>
+                            </Box>
+                            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 2, mb: 3 }}>
+                                <Box sx={{ p: 2, bgcolor: 'background.paper', borderRadius: 1, border: 1, borderColor: 'divider' }}>
+                                    <Typography variant="body2" color="text.secondary">Total Contracts</Typography>
+                                    <Typography variant="h4" sx={{ color: 'primary.main', fontWeight: 700 }}>{summaryData.totalContracts}</Typography>
+                                </Box>
+                                <Box sx={{ p: 2, bgcolor: 'background.paper', borderRadius: 1, border: 1, borderColor: 'divider' }}>
+                                    <Typography variant="body2" color="text.secondary">Total Amount</Typography>
+                                    <Typography variant="h4" sx={{ color: 'primary.main', fontWeight: 700 }}>₱{summaryData.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Typography>
+                                </Box>
+                                <Box sx={{ p: 2, bgcolor: 'background.paper', borderRadius: 1, border: 1, borderColor: 'divider' }}>
+                                    <Typography variant="body2" color="text.secondary">Delivered</Typography>
+                                    <Typography variant="h4" sx={{ color: 'success.main', fontWeight: 700 }}>{summaryData.deliveredContracts}</Typography>
+                                </Box>
+                                <Box sx={{ p: 2, bgcolor: 'background.paper', borderRadius: 1, border: 1, borderColor: 'divider' }}>
+                                    <Typography variant="body2" color="text.secondary">Failed</Typography>
+                                    <Typography variant="h4" sx={{ color: 'error.main', fontWeight: 700 }}>{summaryData.failedContracts}</Typography>
+                                </Box>
+                            </Box>
+                            <Divider sx={{ my: 2 }} />
+                            <Typography variant="subtitle1" sx={{ color: 'primary.main', fontWeight: 700, mb: 1 }}>Selected Contracts:</Typography>
+                            <Box sx={{ maxHeight: 300, overflow: 'auto' }}>
+                                <TableContainer component={Paper} variant="outlined">
+                                    <Table size="small">
+                                        <TableHead>
+                                            <TableRow>
+                                                <TableCell>ID</TableCell>
+                                                <TableCell>Owner</TableCell>
+                                                <TableCell>Flight</TableCell>
+                                                <TableCell>Status</TableCell>
+                                                <TableCell align="right">Amount</TableCell>
+                                            </TableRow>
+                                        </TableHead>
+                                        <TableBody>
+                                            {summaryData.contracts.map((contract) => {
+                                                const delivery_charge = Number(contract.delivery_charge) || 0;
+                                                const delivery_surcharge = Number(contract.delivery_surcharge || contract.surcharge) || 0;
+                                                const delivery_discount = Number(contract.delivery_discount || contract.discount) || 0;
+                                                const total = Math.max(0, (delivery_charge + delivery_surcharge) - delivery_discount);
+                                                const ownerName = contract.owner_first_name || contract.owner_middle_initial || contract.owner_last_name 
+                                                    ? `${contract.owner_first_name || ''} ${contract.owner_middle_initial || ''} ${contract.owner_last_name || ''}`.replace(/  +/g, ' ').trim()
+                                                    : 'N/A';
+                                                
+                                                return (
+                                                    <TableRow key={contract.id}>
+                                                        <TableCell>{contract.id}</TableCell>
+                                                        <TableCell>{ownerName}</TableCell>
+                                                        <TableCell>{contract.flight_number || 'N/A'}</TableCell>
+                                                        <TableCell>{contract.contract_status?.status_name || 'N/A'}</TableCell>
+                                                        <TableCell align="right">₱{total.toFixed(2)}</TableCell>
+                                                    </TableRow>
+                                                );
+                                            })}
+                                        </TableBody>
+                                    </Table>
+                                </TableContainer>
+                            </Box>
+                        </Box>
+                    )}
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={handleSummaryClose} color="primary">Close</Button>
                 </DialogActions>
             </Dialog>
         </Box>

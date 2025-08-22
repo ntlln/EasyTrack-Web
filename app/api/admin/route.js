@@ -112,10 +112,12 @@ export async function GET(request) {
           current_location_geo, contract_status_id,
           airline_id, delivery_id, delivery_charge,
           delivery_surcharge, delivery_discount,
+          summary_id,
           airline:airline_id (*),
           delivery:delivery_id (*)
         `)
         .eq('id', contractId)
+        .is('summary_id', null)
         .single();
 
       if (contractError) {
@@ -179,10 +181,12 @@ export async function GET(request) {
           current_location_geo, contract_status_id,
           airline_id, delivery_id, delivery_charge,
           delivery_surcharge, delivery_discount,
+          summary_id,
           airline:airline_id (*),
           delivery:delivery_id (*)
         `)
         .eq('id', contractId)
+        .is('summary_id', null)
         .single();
 
       if (contractError) {
@@ -270,9 +274,13 @@ export async function GET(request) {
         current_location_geo, contract_status_id,
         airline_id, delivery_id, delivery_charge,
         delivery_surcharge, delivery_discount,
+        owner_first_name, owner_middle_initial, owner_last_name, owner_contact,
+        flight_number, case_number, luggage_description, luggage_weight, luggage_quantity,
+        summary_id,
         airline:airline_id (*),
         delivery:delivery_id (*)
       `)
+      .is('summary_id', null)
       .order('created_at', { ascending: false });
 
     if (contractError) {
@@ -613,6 +621,82 @@ export async function POST(req) {
       return NextResponse.json({ data });
     }
 
+    // Handle updating summary_id for contracts
+    if (action === 'updateContractSummaryId') {
+      const { contractIds, summaryId } = params;
+
+      if (!contractIds || !Array.isArray(contractIds) || !summaryId) {
+        return NextResponse.json(
+          { error: 'Missing required fields: contractIds (array) and summaryId' },
+          { status: 400 }
+        );
+      }
+
+      const { data, error } = await supabase
+        .from('contracts')
+        .update({ summary_id: summaryId })
+        .in('id', contractIds)
+        .select();
+
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+
+      return NextResponse.json({ data });
+    }
+
+    // Handle creating summary record and updating contracts
+    if (action === 'createSummary') {
+      const { summaryId, totalContracts, totalAmount, deliveredContracts, failedContracts, contractIds } = params;
+
+      if (!summaryId || !contractIds || !Array.isArray(contractIds)) {
+        return NextResponse.json(
+          { error: 'Missing required fields: summaryId and contractIds (array)' },
+          { status: 400 }
+        );
+      }
+
+      try {
+        // Create summary record with only existing columns
+        const summaryData = {
+          id: summaryId,
+          created_at: new Date().toISOString(),
+          due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 days from now
+        };
+
+        const { data: summaryRecord, error: summaryError } = await supabase
+          .from('summary')
+          .insert(summaryData)
+          .select()
+          .single();
+
+        if (summaryError) {
+          console.error('Error creating summary record:', summaryError);
+          return NextResponse.json({ error: summaryError.message }, { status: 500 });
+        }
+
+        // Update contracts with summary_id
+        const { data: updatedContracts, error: contractError } = await supabase
+          .from('contracts')
+          .update({ summary_id: summaryId })
+          .in('id', contractIds)
+          .select();
+
+        if (contractError) {
+          console.error('Error updating contracts:', contractError);
+          return NextResponse.json({ error: contractError.message }, { status: 500 });
+        }
+
+        return NextResponse.json({ 
+          summary: summaryRecord, 
+          contracts: updatedContracts 
+        });
+      } catch (error) {
+        console.error('Error in createSummary:', error);
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+    }
+
     // Handle fetching pricing regions
     if (action === 'getPricingRegion') {
       const { data, error } = await supabase
@@ -690,6 +774,20 @@ export async function POST(req) {
       }));
 
       return NextResponse.json({ pricing });
+    }
+
+    // Handle fetching summaries
+    if (action === 'getSummaries') {
+      const { data, error } = await supabase
+        .from('summary')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+
+      return NextResponse.json({ summaries: data || [] });
     }
 
     // Handle price update
