@@ -96,7 +96,15 @@ export default function Page() {
     const [map, setMap] = useState(null); const [isScriptLoaded, setIsScriptLoaded] = useState(false); const [mapError, setMapError] = useState(null); const updateTimeoutRef = useRef(null);
     const [mounted, setMounted] = useState(false); const [isFormMounted, setIsFormMounted] = useState(false);
     const [activeTab, setActiveTab] = useState(0); const [isGoogleMapsReady, setIsGoogleMapsReady] = useState(false);
-    const [contract, setContract] = useState({ address: "", contact: "" });
+    const [contract, setContract] = useState({ 
+        province: "", 
+        city: "", 
+        addressLine1: "", 
+        addressLine2: "", 
+        barangay: "", 
+        postalCode: "", 
+        contact: "" 
+    });
     const [luggageForms, setLuggageForms] = useState([{ name: "", caseNumber: "", flightNo: "", itemDescription: "", weight: "", quantity: "" }]);
     const [pickupAddress, setPickupAddress] = useState({ location: "", addressLine1: "", addressLine2: "", province: "", city: "", barangay: "", postalCode: "" });
     const [dropoffAddress, setDropoffAddress] = useState({ location: null, lat: null, lng: null });
@@ -565,8 +573,15 @@ export default function Page() {
                     luggage_quantity: form.quantity,
                     case_number: form.caseNumber,
                     flight_number: form.flightNo,
-                    // Delivery address and pricing
-                    delivery_address: contract.address,
+                    // Delivery address fields
+                    delivery_address: [
+                        contract.province,
+                        contract.city,
+                        contract.barangay,
+                        contract.postalCode
+                    ].filter(Boolean).join(', '),
+                    address_line_1: contract.addressLine1 || null,
+                    address_line_2: contract.addressLine2 || null,
                     delivery_charge: deliveryCharge
                 }; 
 
@@ -587,7 +602,15 @@ export default function Page() {
 
             setSnackbarOpen(true);
             // Reset form
-            setContract({ address: "", contact: "" }); // Only keep address and contact in the main contract
+            setContract({ 
+                province: "", 
+                city: "", 
+                addressLine1: "", 
+                addressLine2: "", 
+                barangay: "", 
+                postalCode: "", 
+                contact: "" 
+            }); // Only keep address and contact in the main contract
             setLuggageForms([{ name: "", caseNumber: "", flightNo: "", itemDescription: "", weight: "", quantity: "" }]);
             setPickupAddress({ location: "", addressLine1: "", addressLine2: "", province: "", city: "", barangay: "", postalCode: "" });
             setDropoffAddress({ location: null, lat: null, lng: null });
@@ -642,6 +665,8 @@ export default function Page() {
                         case_number,
                         flight_number,
                         delivery_address,
+                        address_line_1,
+                        address_line_2,
                         airline:airline_id (*),
                         delivery:delivery_id (*)
                     `)
@@ -1182,17 +1207,100 @@ export default function Page() {
                     <Paper elevation={3} sx={{ maxWidth: 700, mx: "auto", mt: 4, p: 4, pt: 2, borderRadius: 3, backgroundColor: theme.palette.background.paper, position: "relative" }}>
                         <Typography variant="h6" fontWeight="bold" align="center" mb={3}>Delivery Information</Typography>
                         <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mb: 2 }}>
+                            <Box sx={{ display: 'flex', gap: 2, width: '100%' }}>
+                                <TextField 
+                                    label="Province" 
+                                    fullWidth 
+                                    size="small" 
+                                    value={contract.province || ""} 
+                                    onChange={(e) => handleInputChange("province", e.target.value.slice(0, 100))} 
+                                    required 
+                                    inputProps={{ maxLength: 100 }}
+                                    InputProps={{ 
+                                        endAdornment: contract.province ? (
+                                            <IconButton size="small" onClick={() => handleInputChange("province", "")} edge="end">
+                                                <CloseIcon fontSize="small" />
+                                            </IconButton>
+                                        ) : null, 
+                                    }} 
+                                />
+                                <TextField 
+                                    label="City/Municipality" 
+                                    fullWidth 
+                                    size="small" 
+                                    value={contract.city || ""} 
+                                    onChange={(e) => handleInputChange("city", e.target.value.slice(0, 100))} 
+                                    required 
+                                    inputProps={{ maxLength: 100 }}
+                                    InputProps={{ 
+                                        endAdornment: contract.city ? (
+                                            <IconButton size="small" onClick={() => handleInputChange("city", "")} edge="end">
+                                                <CloseIcon fontSize="small" />
+                                            </IconButton>
+                                        ) : null, 
+                                    }} 
+                                />
+                            </Box>
+                            <Box sx={{ display: 'flex', gap: 2, width: '100%' }}>
+                                <TextField 
+                                    label="Barangay" 
+                                    fullWidth 
+                                    size="small" 
+                                    value={contract.barangay || ""} 
+                                    onChange={(e) => handleInputChange("barangay", e.target.value.slice(0, 100))} 
+                                    required 
+                                    inputProps={{ maxLength: 100 }}
+                                    InputProps={{ 
+                                        endAdornment: contract.barangay ? (
+                                            <IconButton size="small" onClick={() => handleInputChange("barangay", "")} edge="end">
+                                                <CloseIcon fontSize="small" />
+                                            </IconButton>
+                                        ) : null, 
+                                    }} 
+                                />
+                                <TextField 
+                                    label="Postal Code" 
+                                    fullWidth 
+                                    size="small" 
+                                    value={contract.postalCode || ""} 
+                                    onChange={(e) => handleInputChange("postalCode", e.target.value.slice(0, 10))} 
+                                    required 
+                                    inputProps={{ maxLength: 10 }}
+                                    InputProps={{ 
+                                        endAdornment: contract.postalCode ? (
+                                            <IconButton size="small" onClick={() => handleInputChange("postalCode", "")} edge="end">
+                                                <CloseIcon fontSize="small" />
+                                            </IconButton>
+                                        ) : null, 
+                                    }} 
+                                />
+                            </Box>
                             <TextField 
-                                label="Address" 
+                                label="Address Line 1" 
                                 fullWidth 
                                 size="small" 
-                                value={contract.address} 
-                                onChange={(e) => handleInputChange("address", e.target.value.slice(0, 200))} 
+                                value={contract.addressLine1 || ""} 
+                                onChange={(e) => handleInputChange("addressLine1", e.target.value.slice(0, 200))} 
                                 required 
                                 inputProps={{ maxLength: 200 }}
                                 InputProps={{ 
-                                    endAdornment: contract.address ? (
-                                        <IconButton size="small" onClick={() => handleInputChange("address", "")} edge="end">
+                                    endAdornment: contract.addressLine1 ? (
+                                        <IconButton size="small" onClick={() => handleInputChange("addressLine1", "")} edge="end">
+                                            <CloseIcon fontSize="small" />
+                                        </IconButton>
+                                    ) : null, 
+                                }} 
+                            />
+                            <TextField 
+                                label="Address Line 2 (Optional)" 
+                                fullWidth 
+                                size="small" 
+                                value={contract.addressLine2 || ""} 
+                                onChange={(e) => handleInputChange("addressLine2", e.target.value.slice(0, 200))} 
+                                inputProps={{ maxLength: 200 }}
+                                InputProps={{ 
+                                    endAdornment: contract.addressLine2 ? (
+                                        <IconButton size="small" onClick={() => handleInputChange("addressLine2", "")} edge="end">
                                             <CloseIcon fontSize="small" />
                                         </IconButton>
                                     ) : null, 

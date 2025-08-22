@@ -46,6 +46,7 @@ function LuggageTrackingContent() {
   const directionsServiceRef = useRef(null);
   const routeSegmentsRef = useRef([]);
   const supabase = createClientComponentClient();
+  const previousValidContractIdRef = useRef("");
 
   // Handle contract ID from URL
   useEffect(() => {
@@ -59,7 +60,15 @@ function LuggageTrackingContent() {
   // Fetch contract and luggage info (moved out for reuse)
   const fetchData = async (id = contractId) => {
     if (!id.trim()) return;
-    setError(null);
+    
+    // Only show errors if the current ID is longer than the previous valid ID
+    // This prevents showing errors when user is reducing the contract ID
+    const shouldShowErrors = id.length >= previousValidContractIdRef.current.length;
+    
+    if (shouldShowErrors) {
+      setError(null);
+    }
+    
     try {
       console.log('Fetching contract data for ID:', id);
       const response = await fetch(`/api/admin?contractId=${id}`);
@@ -71,6 +80,9 @@ function LuggageTrackingContent() {
       console.log('Received contract data:', data);
       
       if (data) {
+        // Update the previous valid contract ID
+        previousValidContractIdRef.current = id;
+        
         // Ensure all required fields are present
         const newContract = {
           ...data,
@@ -86,11 +98,15 @@ function LuggageTrackingContent() {
           return JSON.stringify(prev) !== JSON.stringify(newContract) ? newContract : prev;
         });
       } else {
-        setError('No contract data found');
+        if (shouldShowErrors) {
+          setError('No contract data found');
+        }
       }
     } catch (err) {
       console.error('Error fetching contract:', err);
-      setError(err.message || 'Failed to fetch contract');
+      if (shouldShowErrors) {
+        setError(err.message || 'Failed to fetch contract');
+      }
     }
   };
 
@@ -744,6 +760,8 @@ function LuggageTrackingContent() {
   const handleClearSearch = () => {
     setContractId("");
     setContract(null);
+    setError(null);
+    previousValidContractIdRef.current = "";
     if (map) setMap(null);
     if (markerRef.current) {
       markerRef.current.map = null;

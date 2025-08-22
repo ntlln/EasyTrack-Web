@@ -26,6 +26,7 @@ function LuggageTrackingContent() {
   // State and hooks
   const searchParams = useSearchParams();
   const router = useRouter();
+  const [mounted, setMounted] = useState(false);
   const [contractId, setContractId] = useState("");
   const [contract, setContract] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -46,6 +47,12 @@ function LuggageTrackingContent() {
   const directionsServiceRef = useRef(null);
   const routeSegmentsRef = useRef([]);
   const supabase = createClientComponentClient();
+  const previousValidContractIdRef = useRef("");
+
+  // Mount effect
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Handle contract ID from URL
   useEffect(() => {
@@ -59,16 +66,34 @@ function LuggageTrackingContent() {
   // Fetch contract and luggage info (mirror admin API behavior)
   const fetchData = async (id = contractId) => {
     if (!id.trim()) return;
-    setError(null);
+    
+    // Only show errors if the current ID is longer than the previous valid ID
+    // This prevents showing errors when user is reducing the contract ID
+    const shouldShowErrors = id.length >= previousValidContractIdRef.current.length;
+    
+    if (shouldShowErrors) {
+      setError(null);
+    }
+    
+    setLoading(true);
     try {
+      console.log('Fetching contract data for ID:', id);
       const response = await fetch(`/api/admin?contractId=${id}`);
+      console.log('Response status:', response.status);
+      
       if (!response.ok) {
         const errorData = await response.json();
+        console.error('API Error:', errorData);
         throw new Error(errorData.error || 'Failed to fetch contract data');
       }
+      
       const { data } = await response.json();
+      console.log('Received contract data:', data);
 
       if (data) {
+        // Update the previous valid contract ID
+        previousValidContractIdRef.current = id;
+        
         const newContract = {
           ...data,
           luggage: data.luggage || [],
@@ -77,13 +102,23 @@ function LuggageTrackingContent() {
           current_location_geo: data.current_location_geo || null,
           route_history: data.route_history || []
         };
+        console.log('Processed contract data:', newContract);
         setContract(prev => {
           return JSON.stringify(prev) !== JSON.stringify(newContract) ? newContract : prev;
         });
       } else {
-        setError('No contract data found');
+        if (shouldShowErrors) {
+          setError('No contract data found');
+        }
       }
-    } catch (err) { setError(err.message || 'Failed to fetch contract'); }
+    } catch (err) { 
+      console.error('Error fetching contract:', err);
+      if (shouldShowErrors) {
+        setError(err.message || 'Failed to fetch contract'); 
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Reset map/markers only when contractId changes
@@ -239,7 +274,7 @@ function LuggageTrackingContent() {
 
   // Google Maps script loader
   useEffect(() => {
-    if (contract && !isScriptLoaded && !window.google) {
+    if (mounted && !isScriptLoaded && !window.google) {
       console.log('Loading Google Maps script...');
       const script = document.createElement('script');
       script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places,marker`;
@@ -260,13 +295,16 @@ function LuggageTrackingContent() {
         }
       };
     }
-  }, [contract, isScriptLoaded]);
+  }, [mounted, isScriptLoaded]);
 
-  // Initialize map
+  // Initialize map when script is loaded and contract is available
   useEffect(() => {
-    if (isScriptLoaded && contract && !map) {
+    if (isScriptLoaded && contract && !map && mapRef.current) {
       console.log('Initializing map...');
-      initMap();
+      const timer = setTimeout(() => {
+        initMap();
+      }, 100);
+      return () => clearTimeout(timer);
     }
   }, [isScriptLoaded, contract, map]);
 
@@ -586,6 +624,8 @@ function LuggageTrackingContent() {
   const handleClearSearch = () => {
     setContractId("");
     setContract(null);
+    setError(null);
+    previousValidContractIdRef.current = "";
     if (map) setMap(null);
     if (markerRef.current) {
       markerRef.current.map = null;
@@ -753,20 +793,26 @@ function LuggageTrackingContent() {
               onChange={(e) => setContractId(e.target.value)} 
               onKeyPress={(e) => e.key === 'Enter' && handleSearch()} 
               sx={{ width: "100%" }}
+              disabled={loading}
               InputProps={{
-                endAdornment: contractId && (
-                  <IconButton
-                    size="small"
-                    onClick={handleClearSearch}
-                    sx={{ 
-                      color: 'text.secondary',
-                      '&:hover': {
-                        color: 'text.primary'
-                      }
-                    }}
-                  >
-                    <CloseIcon fontSize="small" />
-                  </IconButton>
+                endAdornment: (
+                  <>
+                    {loading && <CircularProgress size={20} />}
+                    {contractId && !loading && (
+                      <IconButton
+                        size="small"
+                        onClick={handleClearSearch}
+                        sx={{ 
+                          color: 'text.secondary',
+                          '&:hover': {
+                            color: 'text.primary'
+                          }
+                        }}
+                      >
+                        <CloseIcon fontSize="small" />
+                      </IconButton>
+                    )}
+                  </>
                 )
               }}
             />
@@ -789,20 +835,26 @@ function LuggageTrackingContent() {
                 onChange={(e) => setContractId(e.target.value)} 
                 onKeyPress={(e) => e.key === 'Enter' && handleSearch()} 
                 sx={{ width: "300px" }}
+                disabled={loading}
                 InputProps={{
-                  endAdornment: contractId && (
-                    <IconButton
-                      size="small"
-                      onClick={handleClearSearch}
-                      sx={{ 
-                        color: 'text.secondary',
-                        '&:hover': {
-                          color: 'text.primary'
-                        }
-                      }}
-                    >
-                      <CloseIcon fontSize="small" />
-                    </IconButton>
+                  endAdornment: (
+                    <>
+                      {loading && <CircularProgress size={20} />}
+                      {contractId && !loading && (
+                        <IconButton
+                          size="small"
+                          onClick={handleClearSearch}
+                          sx={{ 
+                            color: 'text.secondary',
+                            '&:hover': {
+                              color: 'text.primary'
+                            }
+                          }}
+                        >
+                          <CloseIcon fontSize="small" />
+                        </IconButton>
+                      )}
+                    </>
                   )
                 }}
               />
@@ -1048,7 +1100,23 @@ function LuggageTrackingContent() {
                 </Typography>
               </Box>
             </Box>
-            <MapComponent mapRef={mapRef} mapError={mapError} />
+            {mounted ? (
+              <>
+                {!isScriptLoaded && (
+                  <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '500px', flexDirection: 'column', gap: 2 }}>
+                    <CircularProgress />
+                    <Typography variant="body2" color="text.secondary">
+                      Loading map...
+                    </Typography>
+                  </Box>
+                )}
+                {isScriptLoaded && <MapComponent mapRef={mapRef} mapError={mapError} />}
+              </>
+            ) : (
+              <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '500px' }}>
+                <CircularProgress />
+              </Box>
+            )}
           </Paper>
         </>
       )}

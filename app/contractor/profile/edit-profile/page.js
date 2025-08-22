@@ -17,7 +17,7 @@ export default function Page() {
   const [uploading, setUploading] = useState(false);
   const [original, setOriginal] = useState(null);
   const [govIdTypes, setGovIdTypes] = useState([]);
-  const [selectedGovIdType, setSelectedGovIdType] = useState("");
+  const [selectedGovIdType, setSelectedGovIdType] = useState(null);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState("");
   const [snackbarSeverity, setSnackbarSeverity] = useState("success");
@@ -74,7 +74,7 @@ export default function Page() {
         const cleanData = { first_name: data.first_name || "", middle_initial: data.middle_initial || "", last_name: data.last_name || "", suffix: data.suffix || "", contact_number: data.contact_number || "", birth_date: data.birth_date || "", emergency_contact_name: data.emergency_contact_name || "", emergency_contact_number: data.emergency_contact_number || "", gov_id_number: data.gov_id_number || "", gov_id_proof: data.gov_id_proof || "", gov_id_proof_back: data.gov_id_proof_back || "" };
         setForm(cleanData);
         setOriginal(cleanData);
-        if (data.gov_id_type) setSelectedGovIdType(String(data.gov_id_type));
+        if (data.gov_id_type !== null && data.gov_id_type !== undefined) setSelectedGovIdType(Number(data.gov_id_type));
       }
       setLoading(false);
     };
@@ -113,7 +113,7 @@ export default function Page() {
     const userEmail = session.user.email;
     const updates = {};
     Object.keys(form).forEach(key => { if (form[key] !== (original ? original[key] : "")) { updates[key] = form[key]; } });
-    if (selectedGovIdType) updates.gov_id_type = selectedGovIdType;
+    if (selectedGovIdType !== null && selectedGovIdType !== undefined) updates.gov_id_type = Number(selectedGovIdType);
     if (Object.keys(updates).length === 0) { setLoading(false); router.push("/contractor/profile"); return; }
     updates.updated_at = new Date().toISOString();
     const { error } = await supabase.from('profiles').update(updates).eq('email', userEmail);
@@ -225,8 +225,8 @@ export default function Page() {
         <Typography variant="h6" fontWeight="bold" mb={2} color="primary">Identification & Verification</Typography>
         <Grid container spacing={2} mb={4}>
           <Grid item xs={12} sm={6}>
-            <TextField fullWidth sx={formStyles} label="Government ID Type" select SelectProps={{ MenuProps: menuProps }} value={selectedGovIdType ?? ""} onChange={e => setSelectedGovIdType(e.target.value)} required onKeyPress={handleKeyPress}>
-              {govIdTypes.map((type) => <MenuItem key={type.id} value={String(type.id)}>{type.id_type_name}</MenuItem>)}
+            <TextField fullWidth sx={formStyles} label="Government ID Type" select SelectProps={{ MenuProps: menuProps }} value={selectedGovIdType ?? ''} onChange={e => setSelectedGovIdType(Number(e.target.value))} required onKeyPress={handleKeyPress}>
+              {govIdTypes.map((type) => <MenuItem key={type.id} value={Number(type.id)}>{type.id_type_name}</MenuItem>)}
             </TextField>
           </Grid>
           <Grid item xs={12} sm={6}><TextField fullWidth sx={formStyles} label="Government ID Number" name="gov_id_number" value={form.gov_id_number} onChange={handleChange} onKeyPress={handleKeyPress} inputProps={{ minLength: 5, maxLength: 20 }} /></Grid>

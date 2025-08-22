@@ -59,12 +59,12 @@ export default function Page() {
                 setProfile(data);
                 setProfileImage(data.pfp_id || null);
                 await fetchRoleName(data.role_id);
-                await fetchIdTypeName(data.gov_id_type_id);
+                await fetchIdTypeName(data.gov_id_type);
             }
         } catch (error) { console.error('Error fetching profile:', error); }
     };
     const fetchRoleName = async (roleId) => { if (!roleId) return; const { data: roleData } = await supabase.from('profiles_roles').select('role_name').eq('id', roleId).single(); if (roleData?.role_name) setRoleName(roleData.role_name); };
-    const fetchIdTypeName = async (idTypeId) => { if (!idTypeId) return; const { data: idTypeData } = await supabase.from('profiles_id_types').select('type_name').eq('id', idTypeId).single(); if (idTypeData?.type_name) setIdTypeName(idTypeData.type_name); };
+    const fetchIdTypeName = async (idTypeId) => { if (!idTypeId) return; const { data: idTypeData } = await supabase.from('verify_info_type').select('id_type_name').eq('id', idTypeId).single(); if (idTypeData?.id_type_name) setIdTypeName(idTypeData.id_type_name); };
 
     // Image handling
     const handleImageUpload = async (event) => {
