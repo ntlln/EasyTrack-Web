@@ -340,25 +340,6 @@ const TransactionManagement = () => {
     // Add new state for confirmation dialog
     const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
     const [pendingPriceUpdate, setPendingPriceUpdate] = useState(null);
-    const [payments, setPayments] = useState([]);
-    const [loadingPayments, setLoadingPayments] = useState(false);
-    const [paymentsError, setPaymentsError] = useState(null);
-    const [selectedPayments, setSelectedPayments] = useState([]);
-    const [paymentsMenuAnchorEl, setPaymentsMenuAnchorEl] = useState(null);
-    const [paymentsMenuRow, setPaymentsMenuRow] = useState(null);
-    const [confirmMarkPaidOpen, setConfirmMarkPaidOpen] = useState(false);
-    const [markPaidRow, setMarkPaidRow] = useState(null);
-    const [markPaidLoading, setMarkPaidLoading] = useState(false);
-    const [paymentsPage, setPaymentsPage] = useState(0);
-    const [paymentsRowsPerPage, setPaymentsRowsPerPage] = useState(10);
-    // Define paginatedPayments at the top level
-    const paginatedPayments = payments.slice(paymentsPage * paymentsRowsPerPage, paymentsPage * paymentsRowsPerPage + paymentsRowsPerPage);
-    // Pagination handlers
-    const handlePaymentsPageChange = (event, newPage) => setPaymentsPage(newPage);
-    const handlePaymentsRowsPerPageChange = (event) => {
-        setPaymentsRowsPerPage(parseInt(event.target.value, 10));
-        setPaymentsPage(0);
-    };
     const [podOpen, setPodOpen] = useState(false);
     const [podContract, setPodContract] = useState(null);
     const [podImage, setPodImage] = useState(null);
@@ -369,6 +350,7 @@ const TransactionManagement = () => {
     const [summaries, setSummaries] = useState([]);
     const [loadingSummaries, setLoadingSummaries] = useState(false);
     const [summariesError, setSummariesError] = useState(null);
+    const [selectedSummaries, setSelectedSummaries] = useState([]);
 
     // Data fetching
     useEffect(() => {
@@ -494,9 +476,28 @@ const TransactionManagement = () => {
         fetchPrice();
     }, [selectedCity]);
 
-    // Fetch all pricing data for the table
+    // Fetch summaries when Summarized tab is selected
     useEffect(() => {
         if (tabValue !== 1) return;
+        setLoadingSummaries(true);
+        setSummariesError(null);
+        fetch('/api/admin', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'getSummaries', params: {} })
+        })
+            .then(res => res.json())
+            .then(json => {
+                if (json.error) throw new Error(json.error);
+                setSummaries(json.summaries || []);
+            })
+            .catch(err => setSummariesError(err.message || 'Failed to fetch summaries'))
+            .finally(() => setLoadingSummaries(false));
+    }, [tabValue]);
+
+    // Fetch all pricing data for the table
+    useEffect(() => {
+        if (tabValue !== 2) return;
         setLoadingPricingTable(true);
         const fetchPricingTable = async () => {
             try {
@@ -911,124 +912,6 @@ const TransactionManagement = () => {
         }
     };
 
-    // Fetch payments when Payments History tab is selected
-    useEffect(() => {
-        if (tabValue !== 1) return;
-        setLoadingPayments(true);
-        setPaymentsError(null);
-        fetch('/api/admin', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'getPayments', params: {} })
-        })
-            .then(res => res.json())
-            .then(json => {
-                if (json.error) throw new Error(json.error);
-                setPayments(json.data || []);
-            })
-            .catch(err => setPaymentsError(err.message || 'Failed to fetch payments'))
-            .finally(() => setLoadingPayments(false));
-    }, [tabValue]);
-
-    // Fetch summaries when Summaries tab is selected
-    useEffect(() => {
-        if (tabValue !== 3) return;
-        setLoadingSummaries(true);
-        setSummariesError(null);
-        fetch('/api/admin', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'getSummaries', params: {} })
-        })
-            .then(res => res.json())
-            .then(json => {
-                if (json.error) throw new Error(json.error);
-                setSummaries(json.summaries || []);
-            })
-            .catch(err => setSummariesError(err.message || 'Failed to fetch summaries'))
-            .finally(() => setLoadingSummaries(false));
-    }, [tabValue]);
-
-    // Payments History: Checkbox logic
-    const isPaymentSelected = (id) => selectedPayments.includes(id);
-    const handleSelectPayment = (id) => {
-        setSelectedPayments((prev) =>
-            prev.includes(id) ? prev.filter((rowId) => rowId !== id) : [...prev, id]
-        );
-    };
-    const handleSelectAllPayments = (event) => {
-        if (event.target.checked) {
-            const allIds = payments.map((row) => row.id);
-            setSelectedPayments(allIds);
-        } else {
-            setSelectedPayments([]);
-        }
-    };
-    const allPaymentsSelected = payments.length > 0 && payments.every((row) => selectedPayments.includes(row.id));
-    const somePaymentsSelected = payments.some((row) => selectedPayments.includes(row.id));
-    // Payments History: Actions menu logic
-    const handleMarkAsPaid = (row) => {
-        setMarkPaidRow(row);
-        setConfirmMarkPaidOpen(true);
-    };
-    const handleConfirmMarkPaid = async () => {
-        if (!markPaidRow) return;
-        setMarkPaidLoading(true);
-        try {
-            const res = await fetch('/api/admin', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    action: 'updatePaymentStatus',
-                    params: {
-                        payment_id: markPaidRow.id,
-                        summary_stat: 2
-                    }
-                })
-            });
-            const json = await res.json();
-            if (!res.ok) throw new Error(json.error || 'Failed to update payment status');
-            // Update UI
-            setPayments((prev) => prev.map(p => p.id === markPaidRow.id ? { ...p, summary_stat: 2 } : p));
-            setSnackbar({
-                open: true,
-                message: 'Payment marked as paid!',
-                severity: 'success'
-            });
-        } catch (err) {
-            setSnackbar({
-                open: true,
-                message: err.message || 'Failed to update payment status',
-                severity: 'error'
-            });
-        } finally {
-            setMarkPaidLoading(false);
-            setConfirmMarkPaidOpen(false);
-            setMarkPaidRow(null);
-        }
-    };
-    const handleCancelMarkPaid = () => {
-        setConfirmMarkPaidOpen(false);
-        setMarkPaidRow(null);
-    };
-
-    // Transaction Management pagination state
-    const [tmPage, setTmPage] = useState(0);
-    const [tmRowsPerPage, setTmRowsPerPage] = useState(10);
-    const paginatedFilteredData = filteredData.slice(tmPage * tmRowsPerPage, tmPage * tmRowsPerPage + tmRowsPerPage);
-    const handleTmPageChange = (event, newPage) => setTmPage(newPage);
-    const handleTmRowsPerPageChange = (event) => {
-        setTmRowsPerPage(parseInt(event.target.value, 10));
-        setTmPage(0);
-    };
-
-    // Pricing Update pagination handlers
-    const handlePricingPageChange = (event, newPage) => setPricingPage(newPage);
-    const handlePricingRowsPerPageChange = (event) => {
-        setPricingRowsPerPage(parseInt(event.target.value, 10));
-        setPricingPage(0);
-    };
-
     const handlePodClose = () => {
         setPodOpen(false);
         setPodContract(null);
@@ -1160,6 +1043,41 @@ const TransactionManagement = () => {
         }
     };
 
+    // Transaction Management pagination state
+    const [tmPage, setTmPage] = useState(0);
+    const [tmRowsPerPage, setTmRowsPerPage] = useState(10);
+    const paginatedFilteredData = filteredData.slice(tmPage * tmRowsPerPage, tmPage * tmRowsPerPage + tmRowsPerPage);
+    const handleTmPageChange = (event, newPage) => setTmPage(newPage);
+    const handleTmRowsPerPageChange = (event) => {
+        setTmRowsPerPage(parseInt(event.target.value, 10));
+        setTmPage(0);
+    };
+
+    // Pricing Update pagination handlers
+    const handlePricingPageChange = (event, newPage) => setPricingPage(newPage);
+    const handlePricingRowsPerPageChange = (event) => {
+        setPricingRowsPerPage(parseInt(event.target.value, 10));
+        setPricingPage(0);
+    };
+
+    // Summarized tab checkbox logic
+    const isSummarySelected = (id) => selectedSummaries.includes(id);
+    const handleSelectSummary = (id) => {
+        setSelectedSummaries((prev) =>
+            prev.includes(id) ? prev.filter((rowId) => rowId !== id) : [...prev, id]
+        );
+    };
+    const handleSelectAllSummaries = (event) => {
+        if (event.target.checked) {
+            const allIds = summaries.map((row) => row.id);
+            setSelectedSummaries(allIds);
+        } else {
+            setSelectedSummaries([]);
+        }
+    };
+    const allSummariesSelected = summaries.length > 0 && summaries.every((row) => selectedSummaries.includes(row.id));
+    const someSummariesSelected = summaries.some((row) => selectedSummaries.includes(row.id));
+
     // Render
     if (loading) return (<Box sx={{ p: 3, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '300px' }}><CircularProgress /><Typography sx={{ mt: 2 }}>Loading...</Typography></Box>);
     if (error) return (<Box sx={{ p: 3 }}><Typography color="error">{error}</Typography></Box>);
@@ -1172,10 +1090,9 @@ const TransactionManagement = () => {
                     aria-label="transaction management tabs"
                     centered
                 >
-                    <Tab label="Transaction Management" />
-                    <Tab label="Payments History" />
+                    <Tab label="Pending" />
+                    <Tab label="Summarized" />
                     <Tab label="Pricing Update" />
-                    <Tab label="Summaries" />
                 </Tabs>
             </Box>
 
@@ -1347,12 +1264,12 @@ const TransactionManagement = () => {
 
             {tabValue === 1 && (
                 <Box sx={{ p: 3 }}>
-                    {loadingPayments ? (
+                    {loadingSummaries ? (
                         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 200 }}>
                             <CircularProgress />
                         </Box>
-                    ) : paymentsError ? (
-                        <Alert severity="error">{paymentsError}</Alert>
+                    ) : summariesError ? (
+                        <Alert severity="error">{summariesError}</Alert>
                     ) : (
                         <TableContainer component={Paper}>
                             <Table>
@@ -1360,69 +1277,59 @@ const TransactionManagement = () => {
                                     <TableRow sx={{ backgroundColor: 'primary.main' }}>
                                         <TableCell padding="checkbox" sx={{ color: 'white' }}>
                                             <Checkbox
-                                                indeterminate={somePaymentsSelected && !allPaymentsSelected}
-                                                checked={allPaymentsSelected}
-                                                onChange={handleSelectAllPayments}
-                                                inputProps={{ 'aria-label': 'select all payments' }}
+                                                indeterminate={someSummariesSelected && !allSummariesSelected}
+                                                checked={allSummariesSelected}
+                                                onChange={handleSelectAllSummaries}
+                                                inputProps={{ 'aria-label': 'select all summaries' }}
                                                 sx={{ color: 'white', '&.Mui-checked': { color: 'white' } }}
                                             />
                                         </TableCell>
-                                        <TableCell sx={{ color: 'white' }}>Invoice #</TableCell>
+                                        <TableCell sx={{ color: 'white' }}>Summary ID</TableCell>
                                         <TableCell sx={{ color: 'white' }}>Status</TableCell>
                                         <TableCell sx={{ color: 'white' }}>Created At</TableCell>
                                         <TableCell sx={{ color: 'white' }}>Due Date</TableCell>
-                                        <TableCell sx={{ color: 'white' }}>Updated At</TableCell>
                                         <TableCell sx={{ color: 'white' }}>Invoice ID</TableCell>
-                                        <TableCell sx={{ color: 'white' }}>Total Charge</TableCell>
-                                        <TableCell sx={{ color: 'white' }}>Actions</TableCell>
                                     </TableRow>
                                 </TableHead>
                                 <TableBody>
-                                    {paginatedPayments.length === 0 ? (
+                                    {summaries.length === 0 ? (
                                         <TableRow>
-                                            <TableCell colSpan={9} align="center">No payments found</TableCell>
+                                            <TableCell colSpan={6} align="center">No summaries found</TableCell>
                                         </TableRow>
-                                    ) : paginatedPayments.map((row) => (
-                                        <TableRow key={row.id}>
+                                    ) : summaries.map((summary) => (
+                                        <TableRow key={summary.id} selected={isSummarySelected(summary.id)}>
                                             <TableCell padding="checkbox">
                                                 <Checkbox
-                                                    checked={isPaymentSelected(row.id)}
-                                                    onChange={() => handleSelectPayment(row.id)}
-                                                    inputProps={{ 'aria-label': `select payment ${row.id}` }}
+                                                    checked={isSummarySelected(summary.id)}
+                                                    onChange={() => handleSelectSummary(summary.id)}
+                                                    inputProps={{ 'aria-label': `select summary ${summary.id}` }}
                                                 />
                                             </TableCell>
-                                            <TableCell>{row.id}</TableCell>
-                                            <TableCell>{row.summary_stat === 1 ? 'Non-receipted' : row.summary_stat === 2 ? 'Receipted' : row.summary_stat}</TableCell>
-                                            <TableCell>{row.created_at ? new Date(row.created_at).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }) : ''}</TableCell>
-                                            <TableCell>{row.due_date ? new Date(row.due_date).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }) : ''}</TableCell>
-                                            <TableCell>{row.updated_at ? new Date(row.updated_at).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }) : ''}</TableCell>
-                                            <TableCell>{row.invoice_id || 'N/A'}</TableCell>
-                                            <TableCell>₱{Number(row.total_charge).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
+                                            <TableCell>{summary.id}</TableCell>
                                             <TableCell>
-                                                <Button
-                                                    size="small"
-                                                    variant="contained"
-                                                    color="primary"
-                                                    onClick={() => handleMarkAsPaid(row)}
-                                                    disabled={row.summary_stat === 2}
-                                                >
-                                                    Mark as Paid
-                                                </Button>
+                                                {summary.status_name}
                                             </TableCell>
+                                            <TableCell>
+                                                {summary.created_at ? new Date(summary.created_at).toLocaleDateString(undefined, { 
+                                                    year: 'numeric', 
+                                                    month: 'long', 
+                                                    day: 'numeric',
+                                                    hour: '2-digit',
+                                                    minute: '2-digit'
+                                                }) : ''}
+                                            </TableCell>
+                                            <TableCell>
+                                                {summary.due_date ? new Date(summary.due_date).toLocaleDateString(undefined, { 
+                                                    year: 'numeric', 
+                                                    month: 'long', 
+                                                    day: 'numeric'
+                                                }) : ''}
+                                            </TableCell>
+                                            <TableCell>{summary.invoice_id || 'N/A'}</TableCell>
                                         </TableRow>
                                     ))}
                                 </TableBody>
                             </Table>
-                            <TablePagination
-                                rowsPerPageOptions={[10, 25, 50, 100]}
-                                component="div"
-                                count={payments.length}
-                                rowsPerPage={paymentsRowsPerPage}
-                                page={paymentsPage}
-                                onPageChange={handlePaymentsPageChange}
-                                onRowsPerPageChange={handlePaymentsRowsPerPageChange}
-                                labelRowsPerPage="Rows per page:"
-                            />
                         </TableContainer>
                     )}
                 </Box>
@@ -1537,57 +1444,6 @@ const TransactionManagement = () => {
                             />
                         </TableContainer>
                     </Box>
-                </Box>
-            )}
-
-            {tabValue === 3 && (
-                <Box sx={{ p: 3 }}>
-                    {loadingSummaries ? (
-                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 200 }}>
-                            <CircularProgress />
-                        </Box>
-                    ) : summariesError ? (
-                        <Alert severity="error">{summariesError}</Alert>
-                    ) : (
-                        <TableContainer component={Paper}>
-                            <Table>
-                                <TableHead>
-                                    <TableRow sx={{ backgroundColor: 'primary.main' }}>
-                                        <TableCell sx={{ color: 'white' }}>Summary ID</TableCell>
-                                        <TableCell sx={{ color: 'white' }}>Created At</TableCell>
-                                        <TableCell sx={{ color: 'white' }}>Due Date</TableCell>
-                                    </TableRow>
-                                </TableHead>
-                                <TableBody>
-                                    {summaries.length === 0 ? (
-                                        <TableRow>
-                                            <TableCell colSpan={3} align="center">No summaries found</TableCell>
-                                        </TableRow>
-                                    ) : summaries.map((summary) => (
-                                        <TableRow key={summary.id}>
-                                            <TableCell>{summary.id}</TableCell>
-                                            <TableCell>
-                                                {summary.created_at ? new Date(summary.created_at).toLocaleDateString(undefined, { 
-                                                    year: 'numeric', 
-                                                    month: 'long', 
-                                                    day: 'numeric',
-                                                    hour: '2-digit',
-                                                    minute: '2-digit'
-                                                }) : ''}
-                                            </TableCell>
-                                            <TableCell>
-                                                {summary.due_date ? new Date(summary.due_date).toLocaleDateString(undefined, { 
-                                                    year: 'numeric', 
-                                                    month: 'long', 
-                                                    day: 'numeric'
-                                                }) : ''}
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        </TableContainer>
-                    )}
                 </Box>
             )}
 
@@ -1770,24 +1626,6 @@ const TransactionManagement = () => {
                         variant="contained"
                     >
                         {editPriceLoading ? 'Updating...' : 'Confirm Update'}
-                    </Button>
-                </DialogActions>
-            </Dialog>
-            {/* Mark as Paid Confirmation Dialog */}
-            <Dialog
-                open={confirmMarkPaidOpen}
-                onClose={handleCancelMarkPaid}
-                maxWidth="xs"
-                fullWidth
-            >
-                <DialogTitle>Mark as Paid</DialogTitle>
-                <DialogContent dividers>
-                    <Typography>Are you sure you want to mark invoice <b>{markPaidRow?.id}</b> as paid?</Typography>
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={handleCancelMarkPaid} disabled={markPaidLoading}>Cancel</Button>
-                    <Button onClick={handleConfirmMarkPaid} color="primary" variant="contained" disabled={markPaidLoading}>
-                        {markPaidLoading ? 'Updating...' : 'Confirm'}
                     </Button>
                 </DialogActions>
             </Dialog>

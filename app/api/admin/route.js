@@ -778,16 +778,39 @@ export async function POST(req) {
 
     // Handle fetching summaries
     if (action === 'getSummaries') {
-      const { data, error } = await supabase
-        .from('summary')
-        .select('*')
-        .order('created_at', { ascending: false });
+      try {
+        // Fetch summaries
+        const { data: summaries, error: summariesError } = await supabase
+          .from('summary')
+          .select('*')
+          .order('created_at', { ascending: false });
 
-      if (error) {
+        if (summariesError) {
+          return NextResponse.json({ error: summariesError.message }, { status: 500 });
+        }
+
+        // Fetch summary statuses
+        const { data: statuses, error: statusesError } = await supabase
+          .from('summary_status')
+          .select('id, status_name');
+
+        if (statusesError) {
+          return NextResponse.json({ error: statusesError.message }, { status: 500 });
+        }
+
+        // Create a map of status IDs to status names
+        const statusMap = new Map((statuses || []).map(s => [s.id, s.status_name]));
+
+        // Combine the data
+        const summariesWithStatus = (summaries || []).map(summary => ({
+          ...summary,
+          status_name: statusMap.get(summary.summary_status) || 'N/A'
+        }));
+
+        return NextResponse.json({ summaries: summariesWithStatus });
+      } catch (error) {
         return NextResponse.json({ error: error.message }, { status: 500 });
       }
-
-      return NextResponse.json({ summaries: data || [] });
     }
 
     // Handle price update
