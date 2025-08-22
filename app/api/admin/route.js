@@ -97,16 +97,15 @@ export async function GET(request) {
     // Handle contract location request
     if (contractId) {
       const { data: contract, error: contractError } = await supabase
-        .from('contract')
+        .from('contracts')
         .select(`
           id, created_at, accepted_at, pickup_at, delivered_at, cancelled_at,
           pickup_location, pickup_location_geo, drop_off_location, drop_off_location_geo,
-          current_location_geo, contract_status_id, contract_status(status_name),
+          current_location_geo, contract_status_id,
           airline_id, delivery_id, delivery_charge,
-          surcharge, discount,
+          delivery_surcharge, delivery_discount,
           airline:airline_id (*),
-          delivery:delivery_id (*),
-          route_history
+          delivery:delivery_id (*)
         `)
         .eq('id', contractId)
         .single();
@@ -126,24 +125,22 @@ export async function GET(request) {
         );
       }
 
-      // Fetch luggage information
-      const { data: luggage, error: luggageError } = await supabase
-        .from('contract_luggage_information')
-        .select('*, address')
-        .eq('contract_id', contractId);
-
-      if (luggageError) {
-        console.error('Error fetching luggage:', luggageError);
-        return NextResponse.json(
-          { error: luggageError.message },
-          { status: 500 }
-        );
+      // Fetch status for this contract and attach
+      let statusObj = null;
+      if (contract.contract_status_id != null) {
+        const { data: statusRow } = await supabase
+          .from('contract_status')
+          .select('id, status_name')
+          .eq('id', contract.contract_status_id)
+          .single();
+        statusObj = statusRow || null;
       }
 
-      // Combine contract and luggage data
+      // Combine contract data (no luggage table)
       const contractWithLuggage = {
         ...contract,
-        luggage: luggage || []
+        contract_status: statusObj,
+        luggage: []
       };
 
       return NextResponse.json({ data: contractWithLuggage });
@@ -176,13 +173,13 @@ export async function GET(request) {
 
     // Handle contracts request (default)
     const { data: contracts, error: contractError } = await supabase
-      .from('contract')
+      .from('contracts')
       .select(`
         id, created_at, accepted_at, pickup_at, delivered_at, cancelled_at,
         pickup_location, pickup_location_geo, drop_off_location, drop_off_location_geo,
-        current_location_geo, contract_status_id, contract_status(status_name),
+        current_location_geo, contract_status_id,
         airline_id, delivery_id, delivery_charge,
-        surcharge, discount,
+        delivery_surcharge, delivery_discount,
         airline:airline_id (*),
         delivery:delivery_id (*)
       `)
@@ -196,25 +193,17 @@ export async function GET(request) {
       return NextResponse.json({ data: [] });
     }
 
-    const contractIds = contracts.map(c => c.id);
-    const { data: luggage, error: luggageError } = await supabase
-      .from('contract_luggage_information')
-      .select('*')
-      .in('contract_id', contractIds);
+    // Fetch all contract status rows once and build a map
+    const { data: allStatuses } = await supabase
+      .from('contract_status')
+      .select('id, status_name');
+    const statusById = new Map((allStatuses || []).map(s => [s.id, s]));
 
-    if (luggageError) {
-      return NextResponse.json({ error: luggageError.message }, { status: 500 });
-    }
-
-    const luggageByContract = {};
-    luggage.forEach(l => {
-      if (!luggageByContract[l.contract_id]) luggageByContract[l.contract_id] = [];
-      luggageByContract[l.contract_id].push(l);
-    });
-
+    // Build final contracts (no luggage table)
     const contractsWithLuggage = contracts.map(c => ({
       ...c,
-      luggage: luggageByContract[c.id] || []
+      contract_status: statusById.get(c.contract_status_id) || null,
+      luggage: []
     }));
 
     return NextResponse.json({ data: contractsWithLuggage });
@@ -340,21 +329,22 @@ export async function POST(req) {
 
     // Handle payment creation
     if (action === 'createPayment') {
-      const { invoice_number, payment_status_id, created_at, due_date, total_charge, invoice_image } = params;
+      const { invoice_number, summary_stat, created_at, due_date, total_charge, invoice_image, invoice_id } = params;
 
       console.log('Payment creation params:', {
         invoice_number,
-        payment_status_id,
+        summary_stat,
         created_at,
         due_date,
         total_charge,
-        invoice_image
+        invoice_image,
+        invoice_id
       });
 
-      if (!invoice_number || !payment_status_id || !created_at || !due_date || !total_charge || typeof invoice_image === 'undefined') {
+      if (!invoice_number || !summary_stat || !created_at || !due_date || !total_charge || typeof invoice_image === 'undefined') {
         console.log('Missing fields:', {
           invoice_number: !invoice_number,
-          payment_status_id: !payment_status_id,
+          summary_stat: !summary_stat,
           created_at: !created_at,
           due_date: !due_date,
           total_charge: !total_charge,
@@ -381,10 +371,11 @@ export async function POST(req) {
           const { data, error } = await supabase
             .from('payment')
             .update({
-              payment_status_id,
+              summary_stat,
               due_date,
               total_charge,
-              invoice_image
+              invoice_image,
+              invoice_id
             })
             .eq('id', invoice_number)
             .select()
@@ -402,11 +393,12 @@ export async function POST(req) {
             .from('payment')
             .insert({
               id: invoice_number,
-              payment_status_id,
+              summary_stat,
               created_at,
               due_date,
               total_charge,
-              invoice_image
+              invoice_image,
+              invoice_id
             })
             .select()
             .single();
@@ -424,16 +416,16 @@ export async function POST(req) {
       }
     }
 
-    // Handle surcharge update
-    if (action === 'updateSurcharge') {
-      const { contractId, surcharge } = params;
-      if (typeof contractId === 'undefined' || typeof surcharge === 'undefined') {
-        return NextResponse.json({ error: 'Missing contractId or surcharge' }, { status: 400 });
+    // Handle delivery_surcharge update
+    if (action === 'updatedelivery_Surcharge') {
+      const { contractId, delivery_surcharge } = params;
+      if (typeof contractId === 'undefined' || typeof delivery_surcharge === 'undefined') {
+        return NextResponse.json({ error: 'Missing contractId or delivery_surcharge' }, { status: 400 });
       }
 
       const { error } = await supabase
-        .from('contract')
-        .update({ surcharge })
+        .from('contracts')
+        .update({ delivery_surcharge })
         .eq('id', contractId);
 
       if (error) {
@@ -443,16 +435,16 @@ export async function POST(req) {
       return NextResponse.json({ success: true });
     }
 
-    // Handle discount update
-    if (action === 'updateDiscount') {
-      const { contractId, discount } = params;
-      if (typeof contractId === 'undefined' || typeof discount === 'undefined') {
-        return NextResponse.json({ error: 'Missing contractId or discount' }, { status: 400 });
+    // Handle delivery_discount update
+    if (action === 'updatedelivery_discount') {
+      const { contractId, delivery_discount } = params;
+      if (typeof contractId === 'undefined' || typeof delivery_discount === 'undefined') {
+        return NextResponse.json({ error: 'Missing contractId or delivery_discount' }, { status: 400 });
       }
 
       const { error } = await supabase
-        .from('contract')
-        .update({ discount })
+        .from('contracts')
+        .update({ delivery_discount })
         .eq('id', contractId);
 
       if (error) {
@@ -514,7 +506,7 @@ export async function POST(req) {
       }
 
       const { data, error } = await supabase
-        .from('contract')
+        .from('contracts')
         .update({
           delivery_id: deliveryId,
           contract_status_id: 3, // 'Accepted - Awaiting Pickup'
@@ -641,7 +633,7 @@ export async function POST(req) {
         return NextResponse.json({ error: 'Missing contractId' }, { status: 400 });
       }
       const { data, error } = await supabase
-        .from('contract')
+        .from('contracts')
         .update({ contract_status_id: 2 }) // 2 = Cancelled
         .eq('id', contractId)
         .select()
@@ -676,7 +668,7 @@ export async function POST(req) {
 
       // Update route history in database
       const { error } = await supabase
-        .from('contract')
+        .from('contracts')
         .update({
           route_history
         })
@@ -704,14 +696,14 @@ export async function POST(req) {
 
     // Handle payment status update
     if (action === 'updatePaymentStatus') {
-      const { payment_id, payment_status_id } = params;
-      if (!payment_id || !payment_status_id) {
-        return NextResponse.json({ error: 'Missing payment_id or payment_status_id' }, { status: 400 });
+      const { payment_id, summary_stat } = params;
+      if (!payment_id || !summary_stat) {
+        return NextResponse.json({ error: 'Missing payment_id or summary_stat' }, { status: 400 });
       }
       const updated_at = new Date().toISOString();
       const { data, error } = await supabase
         .from('payment')
-        .update({ payment_status_id, updated_at })
+        .update({ summary_stat, updated_at })
         .eq('id', payment_id)
         .select()
         .single();
@@ -729,7 +721,7 @@ export async function POST(req) {
       }
 
       const { data, error } = await supabase
-        .from('contract')
+        .from('contracts')
         .select('proof_of_delivery')
         .eq('id', contract_id)
         .single();

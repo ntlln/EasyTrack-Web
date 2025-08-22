@@ -235,21 +235,76 @@ function LuggageTrackingContent() {
   // Real-time subscription for contract changes
   useEffect(() => {
     if (!contractId) return;
-    const subscription = supabase
+
+    const handleRealtimeUpdate = async (payload) => {
+      try {
+        const updatedRow = payload?.new;
+        if (!updatedRow) return;
+
+        setContract((prev) => {
+          const merged = prev ? { ...prev, ...updatedRow } : updatedRow;
+          return merged;
+        });
+
+        // Update path and map when current location changes
+        if (updatedRow?.current_location_geo?.coordinates) {
+          const newPosition = {
+            lat: updatedRow.current_location_geo.coordinates[1],
+            lng: updatedRow.current_location_geo.coordinates[0]
+          };
+
+          if (Array.isArray(pathRef.current)) {
+            const lastPoint = pathRef.current[pathRef.current.length - 1];
+            pathRef.current.push(newPosition);
+            if (lastPoint && map && window?.google) {
+              await updatePolylineWithDirections(lastPoint, newPosition);
+            }
+          }
+
+          // If marker exists, update immediately
+          if (map) {
+            await updateMapLocation();
+          }
+        }
+      } catch (err) {
+        console.error('Realtime update handling error:', err);
+      }
+    };
+
+    // Subscribe to both possible table names
+    const channelContract = supabase
       .channel(`contract-${contractId}`)
       .on(
         'postgres_changes',
         {
-          event: '*',
+          event: 'UPDATE',
           schema: 'public',
           table: 'contract',
           filter: `id=eq.${contractId}`,
         },
-        () => fetchData(contractId)
+        handleRealtimeUpdate
       )
       .subscribe();
-    return () => { subscription.unsubscribe(); };
-  }, [contractId]);
+
+    const channelContracts = supabase
+      .channel(`contracts-${contractId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'contracts',
+          filter: `id=eq.${contractId}`,
+        },
+        handleRealtimeUpdate
+      )
+      .subscribe();
+
+    return () => {
+      channelContract.unsubscribe();
+      channelContracts.unsubscribe();
+    };
+  }, [contractId, supabase, map]);
 
   // Update polyline with directions
   const updatePolylineWithDirections = async (start, end) => {

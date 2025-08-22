@@ -533,18 +533,40 @@ export default function Page() {
                 console.warn('Could not determine city for price lookup');
             }
 
-            // Step 3: Create contracts and luggage entries for each form
+            // Helper to split a full name into first/middle/last
+            const splitName = (fullName) => {
+                if (!fullName) return { first: null, middle: null, last: null };
+                const parts = fullName.trim().split(/\s+/);
+                if (parts.length === 1) return { first: parts[0], middle: null, last: null };
+                if (parts.length === 2) return { first: parts[0], middle: null, last: parts[1] };
+                return { first: parts[0], middle: parts.slice(1, -1).join(' '), last: parts[parts.length - 1] };
+            };
+
+            // Step 3: Create contracts for each form (no more separate luggage table)
             for (let i = 0; i < luggageForms.length; i++) {
                 const form = luggageForms[i];
+                const names = splitName(form.name);
                 
                 // Prepare contract data for this luggage
                 const contractData = { 
                     id: contractTrackingIDs[i],
-                    luggage_quantity: Number(form.quantity || 0), 
-                    airline_id: user.id, 
+                    airline_id: user.id,
+                    // Pickup and drop-off
                     pickup_location: pickupAddress.location, 
                     drop_off_location: dropoffAddress.location, 
                     drop_off_location_geo: { type: 'Point', coordinates: [dropoffAddress.lng, dropoffAddress.lat] },
+                    // Owner and luggage details
+                    owner_first_name: names.first,
+                    owner_middle_initial: names.middle,
+                    owner_last_name: names.last,
+                    owner_contact: contract.contact,
+                    luggage_description: form.itemDescription,
+                    luggage_weight: form.weight,
+                    luggage_quantity: form.quantity,
+                    case_number: form.caseNumber,
+                    flight_number: form.flightNo,
+                    // Delivery address and pricing
+                    delivery_address: contract.address,
                     delivery_charge: deliveryCharge
                 }; 
 
@@ -552,36 +574,13 @@ export default function Page() {
 
                 // Insert contract data
                 const { data: insertedContract, error: contractError } = await supabase
-                    .from('contract')
+                    .from('contracts')
                     .insert(contractData)
                     .select()
                     .single(); 
 
                 if (contractError) {
                     console.error('Error inserting contract:', contractError);
-                    return;
-                }
-
-                // Insert luggage information for this contract
-                const luggageData = { 
-                    id: luggageTrackingIDs[i],
-                    case_number: form.caseNumber, 
-                    flight_number: form.flightNo,
-                    luggage_owner: form.name,
-                    contact_number: contract.contact, 
-                    item_description: form.itemDescription,
-                    address: contract.address,
-                    weight: form.weight, 
-                    quantity: form.quantity, 
-                    contract_id: contractData.id
-                }; 
-
-                const { error: luggageError } = await supabase
-                    .from('contract_luggage_information')
-                    .insert(luggageData); 
-
-                if (luggageError) {
-                    console.error('Error inserting luggage information:', luggageError);
                     return;
                 }
             }
@@ -609,9 +608,44 @@ export default function Page() {
             setContractListLoading(true);
             setContractListError(null);
             try {
+                const { data: { user }, error: userError } = await supabase.auth.getUser();
+                if (userError) throw userError;
+                if (!user) {
+                    setContractList([]);
+                    return;
+                }
                 const { data: contracts, error: contractError } = await supabase
-                    .from('contract')
-                    .select(`id, created_at, accepted_at, pickup_at, delivered_at, cancelled_at, pickup_location, pickup_location_geo, drop_off_location, drop_off_location_geo, contract_status_id, contract_status(status_name), airline_id, delivery_id, delivery_charge, airline:airline_id (*), delivery:delivery_id (*)`)
+                    .from('contracts')
+                    .select(`
+                        id,
+                        created_at,
+                        accepted_at,
+                        pickup_at,
+                        delivered_at,
+                        cancelled_at,
+                        pickup_location,
+                        pickup_location_geo,
+                        drop_off_location,
+                        drop_off_location_geo,
+                        contract_status_id,
+                        contract_status(status_name),
+                        airline_id,
+                        delivery_id,
+                        delivery_charge,
+                        owner_first_name,
+                        owner_middle_initial,
+                        owner_last_name,
+                        owner_contact,
+                        luggage_description,
+                        luggage_weight,
+                        luggage_quantity,
+                        case_number,
+                        flight_number,
+                        delivery_address,
+                        airline:airline_id (*),
+                        delivery:delivery_id (*)
+                    `)
+                    .eq('airline_id', user.id)
                     .order('created_at', { ascending: false });
 
                 if (contractError) throw contractError;
@@ -621,27 +655,7 @@ export default function Page() {
                     return;
                 }
 
-                // Process contracts to include luggage information
-                const contractIds = contracts.map(c => c.id);
-                const { data: luggage, error: luggageError } = await supabase
-                    .from('contract_luggage_information')
-                    .select('*')
-                    .in('contract_id', contractIds);
-
-                if (luggageError) throw luggageError;
-
-                const luggageByContract = {};
-                luggage.forEach(l => {
-                    if (!luggageByContract[l.contract_id]) luggageByContract[l.contract_id] = [];
-                    luggageByContract[l.contract_id].push(l);
-                });
-
-                const contractsWithLuggage = contracts.map(c => ({
-                    ...c,
-                    luggage: luggageByContract[c.id] || []
-                }));
-
-                setContractList(contractsWithLuggage);
+                setContractList(contracts);
             } catch (err) {
                 setContractListError(err.message || 'Failed to fetch contracts');
             } finally {
@@ -767,7 +781,7 @@ export default function Page() {
         setCancelling(true);
         try {
             const { error } = await supabase
-                .from('contract')
+                .from('contracts')
                 .update({ contract_status_id: 2 })
                 .eq('id', selectedContractId);
 
@@ -1005,36 +1019,42 @@ export default function Page() {
                                                 Luggage Information
                                             </Typography>
                                             <Box sx={{ ml: 1, mb: 1 }}>
-                                                {contract.luggage.length === 0 && (
+                                                {!contract.luggage_description && !contract.case_number && !contract.flight_number && (
                                                     <Typography variant="body2">
                                                         No luggage info.
                                                     </Typography>
                                                 )}
-                                                {contract.luggage.map((l, lidx) => (
-                                                    <Box key={`luggage-${contract.id}-${lidx}`} sx={{ mb: 2, pl: 1 }}>
+                                                {!!(contract.luggage_description || contract.case_number || contract.flight_number) && (
+                                                    <Box sx={{ mb: 2, pl: 1 }}>
                                                         <Typography variant="subtitle2" sx={{ color: 'primary.main', fontWeight: 700 }}>
-                                                            Luggage {lidx + 1}
+                                                            Luggage
                                                         </Typography>
                                                         <Typography variant="body2">
-                                                            Name: <span>{l.luggage_owner || 'N/A'}</span>
+                                                            Name: <span>{`${contract.owner_first_name || ''}${contract.owner_middle_initial ? ' ' + contract.owner_middle_initial : ''}${contract.owner_last_name ? ' ' + contract.owner_last_name : ''}`.trim() || 'N/A'}</span>
                                                         </Typography>
                                                         <Typography variant="body2">
-                                                            Case Number: <span>{l.case_number || 'N/A'}</span>
+                                                            Case Number: <span>{contract.case_number || 'N/A'}</span>
                                                         </Typography>
                                                         <Typography variant="body2">
-                                                            Contact Number: <span>{l.contact_number || 'N/A'}</span>
+                                                            Contact Number: <span>{contract.owner_contact || 'N/A'}</span>
                                                         </Typography>
                                                         <Typography variant="body2">
-                                                            Address: <span>{l.address || 'N/A'}</span>
+                                                            Address: <span>{contract.delivery_address || 'N/A'}</span>
                                                         </Typography>
                                                         <Typography variant="body2">
-                                                            Weight: <span>{l.weight ? `${l.weight} kg` : 'N/A'}</span>
+                                                            Weight: <span>{contract.luggage_weight ? `${contract.luggage_weight} kg` : 'N/A'}</span>
                                                         </Typography>
                                                         <Typography variant="body2">
-                                                            Description: <span>{l.item_description || 'N/A'}</span>
+                                                            Quantity: <span>{contract.luggage_quantity || 'N/A'}</span>
+                                                        </Typography>
+                                                        <Typography variant="body2">
+                                                            Description: <span>{contract.luggage_description || 'N/A'}</span>
+                                                        </Typography>
+                                                        <Typography variant="body2">
+                                                            Flight Number: <span>{contract.flight_number || 'N/A'}</span>
                                                         </Typography>
                                                     </Box>
-                                                ))}
+                                                )}
                                             </Box>
                                             <Divider sx={{ my: 2 }} />
                                             <Typography variant="subtitle2" sx={{ color: 'primary.main', fontWeight: 700, mb: 1 }}>

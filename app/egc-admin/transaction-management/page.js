@@ -79,17 +79,15 @@ const ReceiptPDF = ({ contracts = [], dateRange }) => {
 
     // Calculate totals safely
     const subtotal = safeContracts.reduce((sum, c) => sum + (Number(c.delivery_charge) || 0), 0);
-    const surchargeTotal = safeContracts.reduce((sum, c) => sum + (Number(c.surcharge) || 0), 0);
-    const discountAvg = safeContracts.length > 0 
-        ? safeContracts.reduce((sum, c) => sum + (Number(c.discount) || 0), 0) / safeContracts.length 
-        : 0;
-    const getRowAmount = (c) => (Number(c.delivery_charge) || 0) + (Number(c.surcharge) || 0);
-    const totalAmount = safeContracts.reduce((sum, c) => {
+    const surchargeTotal = safeContracts.reduce((sum, c) => sum + (Number(c.delivery_surcharge || c.surcharge) || 0), 0);
+    const discountTotal = safeContracts.reduce((sum, c) => sum + (Number(c.delivery_discount || c.discount) || 0), 0);
+    const getRowAmount = (c) => {
         const delivery_charge = Number(c.delivery_charge) || 0;
-        const surcharge = Number(c.surcharge) || 0;
-        const discount = Number(c.discount) || 0;
-        return sum + (delivery_charge + surcharge) * (1 - discount / 100);
-    }, 0);
+        const delivery_surcharge = Number(c.delivery_surcharge || c.surcharge) || 0;
+        const delivery_discount = Number(c.delivery_discount || c.discount) || 0;
+        return Math.max(0, (delivery_charge + delivery_surcharge) - delivery_discount);
+    };
+    const totalAmount = safeContracts.reduce((sum, c) => sum + getRowAmount(c), 0);
 
     return (
         <Document>
@@ -134,8 +132,8 @@ const ReceiptPDF = ({ contracts = [], dateRange }) => {
                         <Text style={{ flex: 2 }}></Text>
                     </View>
                     <View style={{ flexDirection: 'row', borderTopWidth: 1, borderColor: '#000', backgroundColor: '#f7f7f7' }}>
-                        <Text style={{ flex: 7.5, fontWeight: 'bold', padding: 2, textAlign: 'right', fontSize: 8 }}>Discount (Average):</Text>
-                        <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 2, fontFamily: 'Roboto', fontSize: 8 }}>{discountAvg.toFixed(2)}%</Text>
+                        <Text style={{ flex: 7.5, fontWeight: 'bold', padding: 2, textAlign: 'right', fontSize: 8 }}>Discount Total:</Text>
+                        <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 2, fontFamily: 'Roboto', fontSize: 8 }}>{'\u20B1\u00A0'}{discountTotal.toFixed(2)}</Text>
                         <Text style={{ flex: 2 }}></Text>
                     </View>
                     <View style={{ flexDirection: 'row', borderTopWidth: 2, borderColor: '#000', backgroundColor: '#eee' }}>
@@ -171,9 +169,9 @@ const InvoicePDF = ({ contracts = [] }) => {
     // Compute total amount
     const subtotal = contracts.reduce((sum, c) => {
         const delivery_charge = Number(c.delivery_charge) || 0;
-        const surcharge = Number(c.surcharge) || 0;
-        const discount = Number(c.discount) || 0;
-        return sum + (delivery_charge + surcharge) * (1 - discount / 100);
+        const delivery_surcharge = Number(c.delivery_surcharge || c.surcharge) || 0;
+        const delivery_discount = Number(c.delivery_discount || c.discount) || 0;
+        return sum + Math.max(0, (delivery_charge + delivery_surcharge) - delivery_discount);
     }, 0);
     const vat = subtotal * 0.12;
     const totalAmount = subtotal + vat;
@@ -537,8 +535,8 @@ const TransactionManagement = () => {
     const handleMenuClose = () => { setAnchorEl(null); setSelectedRow(null); };
     const handleAction = (action) => {
         if (action === 'view' && selectedRow) { setDetailsContract(selectedRow); setDetailsOpen(true); }
-        else if (action === 'surcharge' && selectedRow) { setSurchargeContract(selectedRow); setSurchargeValue(selectedRow.surcharge || ''); setSurchargeError(''); setSurchargeOpen(true); }
-        else if (action === 'discount' && selectedRow) { setDiscountContract(selectedRow); setDiscountValue(selectedRow.discount || ''); setDiscountError(''); setDiscountOpen(true); }
+        else if (action === 'surcharge' && selectedRow) { setSurchargeContract(selectedRow); setSurchargeValue(selectedRow.delivery_surcharge || ''); setSurchargeError(''); setSurchargeOpen(true); }
+        else if (action === 'discount' && selectedRow) { setDiscountContract(selectedRow); setDiscountValue(selectedRow.delivery_discount || ''); setDiscountError(''); setDiscountOpen(true); }
         else if (action === 'pod' && selectedRow) { 
             setPodContract(selectedRow); 
             setPodOpen(true);
@@ -558,40 +556,54 @@ const TransactionManagement = () => {
                 method: 'POST', 
                 headers: { 'Content-Type': 'application/json' }, 
                 body: JSON.stringify({ 
-                    action: 'updateSurcharge',
+                    action: 'updatedelivery_Surcharge',
                     params: { 
                         contractId: surchargeContract.id, 
-                        surcharge: Number(surchargeValue) 
+                        delivery_surcharge: Number(surchargeValue) 
                     }
                 }) 
             });
             const json = await res.json();
             if (!res.ok) throw new Error(json.error || 'Failed to update surcharge');
-            setData((prev) => prev.map(row => row.id === surchargeContract.id ? { ...row, surcharge: Number(surchargeValue) || 0, total: (Number(row.delivery_charge) + Number(surchargeValue)) * (1 - (Number(row.discount) || 0) / 100) } : row));
+            setData((prev) => prev.map(row => {
+                if (row.id !== surchargeContract.id) return row;
+                const delivery_charge = Number(row.delivery_charge) || 0;
+                const delivery_surcharge = Number(surchargeValue) || 0;
+                const delivery_discount = Number(row.delivery_discount) || 0;
+                const total = Math.max(0, (delivery_charge + delivery_surcharge) - delivery_discount);
+                return { ...row, delivery_surcharge, total };
+            }));
             handleSurchargeClose();
         } catch (err) { setSurchargeError(err.message || 'Failed to update surcharge'); } finally { setSurchargeLoading(false); }
     };
     const handleDiscountClose = () => { setDiscountOpen(false); setDiscountValue(''); setDiscountError(''); setDiscountContract(null); };
-    const isDiscountValid = (val) => { const num = Number(val); return !isNaN(num) && num >= 0 && num <= 100; };
+    const isDiscountValid = (val) => { const num = Number(val); return !isNaN(num) && num >= 0; };
     const handleDiscountSubmit = async () => {
         if (!discountContract) return;
-        if (!isDiscountValid(discountValue)) { setDiscountError('Discount must be between 0 and 100.'); return; }
+        if (!isDiscountValid(discountValue)) { setDiscountError('Discount must be 0 or a positive number.'); return; }
         setDiscountLoading(true); setDiscountError('');
         try {
             const res = await fetch('/api/admin', { 
                 method: 'POST', 
                 headers: { 'Content-Type': 'application/json' }, 
                 body: JSON.stringify({ 
-                    action: 'updateDiscount',
+                    action: 'updatedelivery_discount',
                     params: { 
                         contractId: discountContract.id, 
-                        discount: Number(discountValue) 
+                        delivery_discount: Number(discountValue) 
                     }
                 }) 
             });
             const json = await res.json();
             if (!res.ok) throw new Error(json.error || 'Failed to update discount');
-            setData((prev) => prev.map(row => row.id === discountContract.id ? { ...row, discount: Number(discountValue) || 0, total: (Number(row.delivery_charge) + Number(row.surcharge)) * (1 - (Number(discountValue) || 0) / 100) } : row));
+            setData((prev) => prev.map(row => {
+                if (row.id !== discountContract.id) return row;
+                const delivery_charge = Number(row.delivery_charge) || 0;
+                const delivery_surcharge = Number(row.delivery_surcharge) || 0;
+                const delivery_discount = Number(discountValue) || 0;
+                const total = Math.max(0, (delivery_charge + delivery_surcharge) - delivery_discount);
+                return { ...row, delivery_discount, total };
+            }));
             handleDiscountClose();
         } catch (err) { setDiscountError(err.message || 'Failed to update discount'); } finally { setDiscountLoading(false); }
     };
@@ -817,9 +829,9 @@ const TransactionManagement = () => {
         // Compute total amount with VAT
         const subtotal = contracts.reduce((sum, c) => {
             const delivery_charge = Number(c.delivery_charge) || 0;
-            const surcharge = Number(c.surcharge) || 0;
-            const discount = Number(c.discount) || 0;
-            return sum + (delivery_charge + surcharge) * (1 - discount / 100);
+            const delivery_surcharge = Number(c.delivery_surcharge || c.surcharge) || 0;
+            const delivery_discount = Number(c.delivery_discount || c.discount) || 0;
+            return sum + Math.max(0, (delivery_charge + delivery_surcharge) - delivery_discount);
         }, 0);
         
         // Calculate VAT (12% of subtotal)
@@ -830,11 +842,12 @@ const TransactionManagement = () => {
                 action: 'createPayment',
                 params: {
                     invoice_number: invoiceNo,
-                    payment_status_id: 1,
+                    summary_stat: 1,
                     created_at: createdAt,
                     due_date: dueDate,
                     total_charge: totalAmount,
-                    invoice_image: ''
+                    invoice_image: '',
+                    invoice_id: invoiceNo
                 }
             };
             console.log('Sending payment payload:', payload);
@@ -914,14 +927,14 @@ const TransactionManagement = () => {
                     action: 'updatePaymentStatus',
                     params: {
                         payment_id: markPaidRow.id,
-                        payment_status_id: 2
+                        summary_stat: 2
                     }
                 })
             });
             const json = await res.json();
             if (!res.ok) throw new Error(json.error || 'Failed to update payment status');
             // Update UI
-            setPayments((prev) => prev.map(p => p.id === markPaidRow.id ? { ...p, payment_status_id: 2 } : p));
+            setPayments((prev) => prev.map(p => p.id === markPaidRow.id ? { ...p, summary_stat: 2 } : p));
             setSnackbar({
                 open: true,
                 message: 'Payment marked as paid!',
@@ -1128,9 +1141,9 @@ const TransactionManagement = () => {
                                 {paginatedFilteredData.map((row) => {
                                     const status = row.contract_status?.status_name || row.contract_status_id || '';
                                     const delivery_charge = Number(row.delivery_charge) || 0;
-                                    const surcharge = Number(row.surcharge) || 0;
-                                    const discount = Number(row.discount) || 0;
-                                    const total = (delivery_charge + surcharge) * (1 - discount / 100);
+                                    const delivery_surcharge = Number(row.delivery_surcharge || row.surcharge) || 0;
+                                    const delivery_discount = Number(row.delivery_discount || row.discount) || 0;
+                                    const total = Math.max(0, (delivery_charge + delivery_surcharge) - delivery_discount);
                                     const remarks = status === 'Delivery Failed' ? 'Delivery Failed' : '';
                                     
                                     return (
@@ -1195,6 +1208,7 @@ const TransactionManagement = () => {
                                         <TableCell sx={{ color: 'white' }}>Created At</TableCell>
                                         <TableCell sx={{ color: 'white' }}>Due Date</TableCell>
                                         <TableCell sx={{ color: 'white' }}>Updated At</TableCell>
+                                        <TableCell sx={{ color: 'white' }}>Invoice ID</TableCell>
                                         <TableCell sx={{ color: 'white' }}>Total Charge</TableCell>
                                         <TableCell sx={{ color: 'white' }}>Actions</TableCell>
                                     </TableRow>
@@ -1202,7 +1216,7 @@ const TransactionManagement = () => {
                                 <TableBody>
                                     {paginatedPayments.length === 0 ? (
                                         <TableRow>
-                                            <TableCell colSpan={8} align="center">No payments found</TableCell>
+                                            <TableCell colSpan={9} align="center">No payments found</TableCell>
                                         </TableRow>
                                     ) : paginatedPayments.map((row) => (
                                         <TableRow key={row.id}>
@@ -1214,10 +1228,11 @@ const TransactionManagement = () => {
                                                 />
                                             </TableCell>
                                             <TableCell>{row.id}</TableCell>
-                                            <TableCell>{row.payment_status_id === 1 ? 'Unpaid' : row.payment_status_id === 2 ? 'Paid' : row.payment_status_id}</TableCell>
+                                            <TableCell>{row.summary_stat === 1 ? 'Non-receipted' : row.summary_stat === 2 ? 'Receipted' : row.summary_stat}</TableCell>
                                             <TableCell>{row.created_at ? new Date(row.created_at).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }) : ''}</TableCell>
                                             <TableCell>{row.due_date ? new Date(row.due_date).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }) : ''}</TableCell>
                                             <TableCell>{row.updated_at ? new Date(row.updated_at).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }) : ''}</TableCell>
+                                            <TableCell>{row.invoice_id || 'N/A'}</TableCell>
                                             <TableCell>₱{Number(row.total_charge).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
                                             <TableCell>
                                                 <Button
@@ -1225,7 +1240,7 @@ const TransactionManagement = () => {
                                                     variant="contained"
                                                     color="primary"
                                                     onClick={() => handleMarkAsPaid(row)}
-                                                    disabled={row.payment_status_id === 2}
+                                                    disabled={row.summary_stat === 2}
                                                 >
                                                     Mark as Paid
                                                 </Button>
@@ -1419,7 +1434,7 @@ const TransactionManagement = () => {
                 <DialogTitle>Set Surcharge</DialogTitle>
                 <DialogContent dividers>
                     <Typography gutterBottom>Enter the surcharge amount for contract <b>{surchargeContract?.id}</b>:</Typography>
-                    <TextField label="Surcharge" type="text" value={surchargeValue} onChange={e => setSurchargeValue(e.target.value)} fullWidth margin="normal" inputProps={{ min: 0 }} disabled={surchargeLoading} />
+                    <TextField label="Surcharge Amount" type="number" value={surchargeValue} onChange={e => setSurchargeValue(e.target.value)} fullWidth margin="normal" inputProps={{ min: 0, step: '0.01' }} disabled={surchargeLoading} />
                     {surchargeError && <Typography color="error">{surchargeError}</Typography>}
                 </DialogContent>
                 <DialogActions>
@@ -1428,10 +1443,10 @@ const TransactionManagement = () => {
                 </DialogActions>
             </Dialog>
             <Dialog open={discountOpen} onClose={handleDiscountClose} maxWidth="xs" fullWidth>
-                <DialogTitle>Set Discount (%)</DialogTitle>
+                <DialogTitle>Set Discount</DialogTitle>
                 <DialogContent dividers>
-                    <Typography gutterBottom>Enter the discount percentage for contract <b>{discountContract?.id}</b>:</Typography>
-                    <TextField label="Discount (%)" type="text" value={discountValue} onChange={e => setDiscountValue(e.target.value)} fullWidth margin="normal" inputProps={{ min: 0, max: 100 }} disabled={discountLoading} />
+                    <Typography gutterBottom>Enter the discount amount for contract <b>{discountContract?.id}</b>:</Typography>
+                    <TextField label="Discount Amount" type="number" value={discountValue} onChange={e => setDiscountValue(e.target.value)} fullWidth margin="normal" inputProps={{ min: 0, step: '0.01' }} disabled={discountLoading} />
                     {discountError && <Typography color="error">{discountError}</Typography>}
                 </DialogContent>
                 <DialogActions>

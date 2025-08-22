@@ -168,20 +168,20 @@ const ContractList = ({ onTrackContract, initialSearch, setRedirectContractId })
   // Filter contracts based on status
   const filteredContracts = contractList.filter(contract => {
     if (statusFilter === 'all') return true;
-    const status = contract.contract_status?.status_name?.toLowerCase();
+    const statusId = contract.contract_status?.id;
     switch (statusFilter) {
       case 'available':
-        return status === 'available for pickup';
+        return statusId === 1;
       case 'accepted':
-        return status === 'accepted - awaiting pickup';
+        return statusId === 3;
       case 'transit':
-        return status === 'in transit';
+        return statusId === 4 || statusId === 7;
       case 'delivered':
-        return status === 'delivered';
+        return statusId === 5;
       case 'failed':
-        return status === 'delivery failed';
+        return statusId === 6;
       case 'cancelled':
-        return status === 'cancelled';
+        return statusId === 2;
       default:
         return false;
     }
@@ -376,7 +376,7 @@ const ContractList = ({ onTrackContract, initialSearch, setRedirectContractId })
                   color="error"
                   onClick={() => handleCancelClick(contract.id)}
                   sx={{ mb: 1, minWidth: '120px' }}
-                  disabled={contract.contract_status?.status_name?.toLowerCase() === 'cancelled'}
+                  disabled={contract.contract_status?.id === 2}
                 >
                   Cancel
                 </Button>
@@ -630,7 +630,7 @@ const LuggageAssignments = ({ onAssignmentComplete }) => {
 
         // Filter for available contracts only
         const availableContracts = (contractsResult.data || []).filter(
-          contract => contract.contract_status?.status_name?.toLowerCase() === 'available for pickup'
+          contract => contract.contract_status?.id === 1
         );
         
         setAssignments(availableContracts);
@@ -801,9 +801,9 @@ const LuggageAssignments = ({ onAssignmentComplete }) => {
                   key={assignment.id} 
                   hover
                   sx={{
-                    opacity: assignment.contract_status?.status_name?.toLowerCase() === 'cancelled' ? 0.5 : 1,
+                    opacity: assignment.contract_status?.id === 2 ? 0.5 : 1,
                     '&:hover': {
-                      opacity: assignment.contract_status?.status_name?.toLowerCase() === 'cancelled' ? 0.5 : 1
+                      opacity: assignment.contract_status?.id === 2 ? 0.5 : 1
                     }
                   }}
                 >
@@ -849,7 +849,7 @@ const LuggageAssignments = ({ onAssignmentComplete }) => {
                         size="small"
                         onClick={() => handleViewDetails(assignment)}
                         fullWidth
-                        disabled={assignment.contract_status?.status_name?.toLowerCase() === 'cancelled'}
+                        disabled={assignment.contract_status?.id === 2}
                       >
                         View Details
                       </Button>
@@ -858,7 +858,7 @@ const LuggageAssignments = ({ onAssignmentComplete }) => {
                         size="small"
                         onClick={() => handleAssign(assignment)}
                         fullWidth
-                        disabled={assignment.contract_status?.status_name?.toLowerCase() === 'cancelled'}
+                        disabled={assignment.contract_status?.id === 2}
                       >
                         Assign
                       </Button>
