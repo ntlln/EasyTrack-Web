@@ -804,10 +804,62 @@ export async function POST(req) {
         // Combine the data
         const summariesWithStatus = (summaries || []).map(summary => ({
           ...summary,
-          status_name: statusMap.get(summary.summary_status) || 'N/A'
+          status_name: statusMap.get(summary.summary_status_id) || 'N/A'
         }));
 
         return NextResponse.json({ summaries: summariesWithStatus });
+      } catch (error) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+    }
+
+    // Handle fetching contracts by summary_id
+    if (action === 'getContractsBySummaryId') {
+      const { summaryIds } = params;
+      if (!summaryIds || !Array.isArray(summaryIds)) {
+        return NextResponse.json({ error: 'Missing or invalid summaryIds array' }, { status: 400 });
+      }
+
+      try {
+        const { data: contracts, error: contractError } = await supabase
+          .from('contracts')
+          .select(`
+            id, created_at, accepted_at, pickup_at, delivered_at, cancelled_at,
+            pickup_location, pickup_location_geo, drop_off_location, drop_off_location_geo,
+            current_location_geo, contract_status_id,
+            airline_id, delivery_id, delivery_charge,
+            delivery_surcharge, delivery_discount,
+            owner_first_name, owner_middle_initial, owner_last_name, owner_contact,
+            flight_number, case_number, luggage_description, luggage_weight, luggage_quantity,
+            summary_id,
+            airline:airline_id (*),
+            delivery:delivery_id (*)
+          `)
+          .in('summary_id', summaryIds)
+          .order('created_at', { ascending: false });
+
+        if (contractError) {
+          return NextResponse.json({ error: contractError.message }, { status: 500 });
+        }
+
+        if (!contracts || contracts.length === 0) {
+          return NextResponse.json({ contracts: [] });
+        }
+
+        // Fetch all contract status rows once and build a map
+        const { data: allStatuses } = await supabase
+          .from('contract_status')
+          .select('id, status_name');
+        const statusById = new Map((allStatuses || []).map(s => [s.id, s]));
+
+        // Build final contracts
+        const contractsWithStatus = contracts.map(c => ({
+          ...c,
+          contract_status: statusById.get(c.contract_status_id) || null,
+          luggage: []
+        }));
+
+        return NextResponse.json({ contracts: contractsWithStatus });
       } catch (error) {
         return NextResponse.json({ error: error.message }, { status: 500 });
       }

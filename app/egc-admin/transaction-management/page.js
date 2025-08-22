@@ -157,7 +157,7 @@ const ReceiptPDF = ({ contracts = [], dateRange }) => {
     );
 };
 
-// --- INVOICE PDF COMPONENT (BASIC FORMAT) ---
+// --- INVOICE PDF COMPONENT (ENHANCED FORMAT) ---
 const InvoicePDF = ({ contracts = [] }) => {
     const today = new Date();
     const todayFormatted = formatDateFns(today, 'MMMM d, yyyy');
@@ -166,6 +166,7 @@ const InvoicePDF = ({ contracts = [] }) => {
     const monthEnd = endOfMonth(today);
     const dueDate = formatDateFns(monthEnd, 'MMMM d, yyyy');
     const desc = `PIR Luggage Delivery – ${formatDateFns(monthStart, 'MMMM d, yyyy')} to ${formatDateFns(monthEnd, 'MMMM d, yyyy')}`;
+    
     // Compute total amount
     const subtotal = contracts.reduce((sum, c) => {
         const delivery_charge = Number(c.delivery_charge) || 0;
@@ -175,107 +176,207 @@ const InvoicePDF = ({ contracts = [] }) => {
     }, 0);
     const vat = subtotal * 0.12;
     const totalAmount = subtotal + vat;
+
+    // Format PHP currency
+    const formatPHP = (value) => {
+        const num = Number(value || 0);
+        return num.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    };
+
     return (
         <Document>
-            <PDFPage size="A4" style={{ padding: 24, fontSize: 10, fontFamily: 'Roboto', position: 'relative' }}>
+            <PDFPage size="A4" style={{ padding: 20, fontSize: 12, fontFamily: 'Roboto', lineHeight: 1.3 }}>
                 {/* Header */}
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 }}>
+                <View style={{ 
+                    flexDirection: 'row', 
+                    justifyContent: 'space-between', 
+                    marginBottom: 20,
+                    borderBottomWidth: 2,
+                    borderBottomColor: '#000',
+                    paddingBottom: 15
+                }}>
                     <View style={{ flex: 1 }}>
-                        <Text style={{ fontWeight: 'bold', color: '#2d3991', fontSize: 12 }}>GREEN HANGAR EMISSION TESTING CENTER</Text>
-                        <Text style={{ fontWeight: 'bold', color: '#2d3991', fontSize: 10 }}>PROPRIETOR: JONALIZ L. CABALUNA</Text>
-                        <Text style={{ fontSize: 9 }}>ATAYDE ST. BRGY.191 PASAY CITY</Text>
-                        <Text style={{ fontSize: 9 }}>VAT REG. TIN: 234-449-892-00000</Text>
+                        <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 5, color: '#2d3991' }}>
+                            GREEN HANGAR EMISSION TESTING CENTER
+                        </Text>
+                        <Text style={{ fontSize: 11, marginBottom: 3, fontWeight: 'bold', color: '#2d3991' }}>
+                            PROPRIETOR: JONALIZ L. CABALUNA
+                        </Text>
+                        <Text style={{ fontSize: 11, marginBottom: 3 }}>ATAYDE ST. BRGY.191 PASAY CITY</Text>
+                        <Text style={{ fontSize: 11, marginBottom: 3 }}>VAT REG. TIN: 234-449-892-00000</Text>
                     </View>
                     <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                        <Text style={{ fontWeight: 'bold', fontSize: 10 }}>BILL TO PHILLIPINES AIR ASIA INC.</Text>
-                        <Text style={{ fontSize: 9 }}>2ND LEVEL MEZZANINE</Text>
-                        <Text style={{ fontSize: 9 }}>AREA NAIA T3, PASAY CITY</Text>
-                        <Text style={{ fontSize: 9 }}>TIN# 005-838-00016</Text>
-                        <Text style={{ fontSize: 9, marginTop: 4 }}>DATE      {todayFormatted}</Text>
-                        <Text style={{ fontSize: 9 }}>SOA #     {invoiceNo}</Text>
+                        <Text style={{ fontSize: 14, fontWeight: 'bold', marginBottom: 5 }}>BILL TO PHILLIPINES AIR ASIA INC.</Text>
+                        <Text style={{ fontSize: 11, marginBottom: 3 }}>2ND LEVEL MEZZANINE</Text>
+                        <Text style={{ fontSize: 11, marginBottom: 3 }}>AREA NAIA T3, PASAY CITY</Text>
+                        <Text style={{ fontSize: 11, marginBottom: 3 }}>TIN# 005-838-00016</Text>
                     </View>
                 </View>
-                <Text style={{ fontWeight: 'bold', fontSize: 11, marginBottom: 8 }}>SALES INVOICE NO. {invoiceNo}</Text>
+
+                {/* Meta Information */}
+                <View style={{ 
+                    flexDirection: 'row', 
+                    justifyContent: 'space-between', 
+                    marginBottom: 15,
+                    fontSize: 11
+                }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                        <Text style={{ fontWeight: 'bold', marginRight: 10, minWidth: 80 }}>DATE:</Text>
+                        <View style={{ 
+                            borderBottomWidth: 1, 
+                            borderBottomColor: '#000', 
+                            paddingVertical: 2, 
+                            paddingHorizontal: 5, 
+                            minWidth: 150 
+                        }}>
+                            <Text>{todayFormatted}</Text>
+                        </View>
+                    </View>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                        <Text style={{ fontWeight: 'bold', marginRight: 10, minWidth: 80 }}>SOA #:</Text>
+                        <View style={{ 
+                            borderBottomWidth: 1, 
+                            borderBottomColor: '#000', 
+                            paddingVertical: 2, 
+                            paddingHorizontal: 5, 
+                            minWidth: 150 
+                        }}>
+                            <Text>{invoiceNo}</Text>
+                        </View>
+                    </View>
+                </View>
+
+                {/* Invoice Header */}
+                <View style={{ 
+                    textAlign: 'center', 
+                    fontSize: 16, 
+                    fontWeight: 'bold', 
+                    marginBottom: 20,
+                    textDecoration: 'underline'
+                }}>
+                    <Text>SALES INVOICE NO. {invoiceNo}</Text>
+                </View>
+
                 {/* Terms Table */}
-                <View style={{ flexDirection: 'row', backgroundColor: '#2d3991', color: 'white', fontWeight: 'bold', fontSize: 9 }}>
-                    <Text style={{ flex: 1, padding: 4 }}>TERMS</Text>
-                    <Text style={{ flex: 1, padding: 4 }}>PAYMENT METHOD</Text>
-                    <Text style={{ flex: 1, padding: 4 }}>DUE DATE</Text>
+                <View style={{ marginBottom: 20 }}>
+                    <View style={{ 
+                        flexDirection: 'row', 
+                        backgroundColor: '#2d3991', 
+                        color: 'white', 
+                        fontWeight: 'bold', 
+                        fontSize: 11
+                    }}>
+                        <Text style={{ flex: 1, padding: 10, textAlign: 'center' }}>TERMS</Text>
+                        <Text style={{ flex: 1, padding: 10, textAlign: 'center' }}>PAYMENT METHOD</Text>
+                        <Text style={{ flex: 1, padding: 10, textAlign: 'center' }}>DUE DATE</Text>
+                    </View>
+                    <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#2d3991', fontSize: 11 }}>
+                        <Text style={{ flex: 1, padding: 10, backgroundColor: '#f7f3d6', textAlign: 'center' }}>30 DAYS</Text>
+                        <Text style={{ flex: 1, padding: 10, backgroundColor: '#f7f3d6', textAlign: 'center' }}>DOMESTIC FUNDS TRANSFER</Text>
+                        <Text style={{ flex: 1, padding: 10, backgroundColor: '#f7f3d6', textAlign: 'center' }}>{dueDate}</Text>
+                    </View>
                 </View>
-                <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderColor: '#2d3991', fontSize: 9 }}>
-                    <Text style={{ flex: 1, padding: 4, backgroundColor: '#f7f3d6' }}>30 DAYS</Text>
-                    <Text style={{ flex: 1, padding: 4, backgroundColor: '#f7f3d6' }}>DOMESTIC FUNDS TRANSFER</Text>
-                    <Text style={{ flex: 1, padding: 4, backgroundColor: '#f7f3d6' }}>{dueDate}</Text>
-                </View>
+
                 {/* Invoice Table */}
-                <View style={{ marginTop: 12 }}>
-                    <View style={{ flexDirection: 'row', backgroundColor: '#2d3991', color: 'white', fontWeight: 'bold', fontSize: 9 }}>
-                        <Text style={{ flex: 0.5, padding: 4 }}>QTY</Text>
-                        <Text style={{ flex: 1, padding: 4 }}>UNIT</Text>
-                        <Text style={{ flex: 4, padding: 4 }}>DESCRIPTION</Text>
-                        <Text style={{ flex: 1, padding: 4 }}>AMOUNT</Text>
+                <View style={{ marginBottom: 20 }}>
+                    <View style={{ 
+                        flexDirection: 'row', 
+                        backgroundColor: '#2d3991', 
+                        color: 'white', 
+                        fontWeight: 'bold', 
+                        fontSize: 11
+                    }}>
+                        <Text style={{ flex: 0.5, padding: 10, textAlign: 'center' }}>QTY</Text>
+                        <Text style={{ flex: 1, padding: 10, textAlign: 'center' }}>UNIT</Text>
+                        <Text style={{ flex: 4, padding: 10, textAlign: 'center' }}>DESCRIPTION</Text>
+                        <Text style={{ flex: 1, padding: 10, textAlign: 'center' }}>AMOUNT</Text>
                     </View>
-                    <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderColor: '#2d3991', fontSize: 9 }}>
-                        <Text style={{ flex: 0.5, padding: 4, backgroundColor: '#f7f3d6' }}>{contracts.length}</Text>
-                        <Text style={{ flex: 1, padding: 4, backgroundColor: '#f7f3d6' }}>PCS</Text>
-                        <Text style={{ flex: 4, padding: 4, backgroundColor: '#f7f3d6' }}>{desc}</Text>
-                        <Text style={{ flex: 1, padding: 4, backgroundColor: '#f7f3d6' }}>₱{subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+                    <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#2d3991', fontSize: 11 }}>
+                        <Text style={{ flex: 0.5, padding: 10, backgroundColor: '#f7f3d6', textAlign: 'center' }}>{contracts.length}</Text>
+                        <Text style={{ flex: 1, padding: 10, backgroundColor: '#f7f3d6', textAlign: 'center' }}>PCS</Text>
+                        <Text style={{ flex: 4, padding: 10, backgroundColor: '#f7f3d6' }}>{desc}</Text>
+                        <Text style={{ flex: 1, padding: 10, backgroundColor: '#f7f3d6', textAlign: 'right' }}>
+                            ₱{formatPHP(subtotal)}
+                        </Text>
                     </View>
+                    
                     {/* Empty rows for formatting */}
                     {[...Array(7)].map((_, i) => (
-                        <View key={i} style={{ flexDirection: 'row', fontSize: 9 }}>
-                            <Text style={{ flex: 0.5, padding: 4, backgroundColor: '#f7f3d6' }}></Text>
-                            <Text style={{ flex: 1, padding: 4, backgroundColor: '#f7f3d6' }}></Text>
-                            <Text style={{ flex: 4, padding: 4, backgroundColor: '#f7f3d6' }}></Text>
-                            <Text style={{ flex: 1, padding: 4, backgroundColor: '#f7f3d6' }}></Text>
+                        <View key={i} style={{ flexDirection: 'row', fontSize: 11 }}>
+                            <Text style={{ flex: 0.5, padding: 10, backgroundColor: '#f7f3d6' }}></Text>
+                            <Text style={{ flex: 1, padding: 10, backgroundColor: '#f7f3d6' }}></Text>
+                            <Text style={{ flex: 4, padding: 10, backgroundColor: '#f7f3d6' }}></Text>
+                            <Text style={{ flex: 1, padding: 10, backgroundColor: '#f7f3d6' }}></Text>
                         </View>
                     ))}
+                    
                     {/* Note row */}
-                    <View style={{ flexDirection: 'row', fontSize: 9 }}>
-                        <Text style={{ flex: 6.5, padding: 4, backgroundColor: '#f7f3d6', fontWeight: 'bold' }}>Note: All Original Documents are Included in this statement</Text>
-                        <Text style={{ flex: 1, padding: 4, backgroundColor: '#f7f3d6' }}></Text>
+                    <View style={{ flexDirection: 'row', fontSize: 11 }}>
+                        <Text style={{ flex: 5.5, padding: 10, backgroundColor: '#f7f3d6', fontWeight: 'bold' }}>
+                            Note: All Original Documents are Included in this statement
+                        </Text>
+                        <Text style={{ flex: 1, padding: 10, backgroundColor: '#f7f3d6' }}></Text>
                     </View>
+                    
                     {/* Total row */}
-                    <View style={{ flexDirection: 'row', fontSize: 9 }}>
-                        <Text style={{ flex: 6.5, padding: 4, backgroundColor: '#f7f3d6', fontWeight: 'bold', textAlign: 'right' }}>Total Amount Due:</Text>
-                        <Text style={{ flex: 1, padding: 4, backgroundColor: '#f7f3d6', fontWeight: 'bold' }}>₱{totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+                    <View style={{ flexDirection: 'row', fontSize: 11 }}>
+                        <Text style={{ flex: 5.5, padding: 10, backgroundColor: '#f7f3d6', fontWeight: 'bold', textAlign: 'right' }}>
+                            Total Amount Due:
+                        </Text>
+                        <Text style={{ flex: 1, padding: 10, backgroundColor: '#f7f3d6', fontWeight: 'bold' }}>
+                            ₱{formatPHP(totalAmount)}
+                        </Text>
                     </View>
                 </View>
+
                 {/* Footer Notes */}
-                <Text style={{ fontSize: 9, marginTop: 8, fontWeight: 'bold' }}>Note: Please make check payable to JONALIZ L. CABALUNA</Text>
+                <Text style={{ fontSize: 11, marginBottom: 8, fontWeight: 'bold' }}>
+                    Note: Please make check payable to JONALIZ L. CABALUNA
+                </Text>
+
                 {/* Summary Box */}
-                <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 8 }}>
-                    <View style={{ width: 180, borderWidth: 1, borderColor: '#2d3991', padding: 8 }}>
-                        <Text style={{ fontSize: 9 }}>RCBC ACCT NUMBER: 7591033191</Text>
-                        <Text style={{ fontSize: 9 }}>VATABLE: {`₱${subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</Text>
-                        <Text style={{ fontSize: 9 }}>VAT EXEMPT:</Text>
-                        <Text style={{ fontSize: 9 }}>ZERO RATED:</Text>
-                        <Text style={{ fontSize: 9 }}>TOTAL SALES:</Text>
-                        <Text style={{ fontSize: 9 }}>TOTAL VAT: {`₱${vat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</Text>
-                        <Text style={{ fontSize: 9 }}>AMOUNT DUE: {`₱${totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</Text>
+                <View style={{ 
+                    flexDirection: 'row', 
+                    justifyContent: 'flex-end', 
+                    marginTop: 8 
+                }}>
+                    <View style={{ 
+                        width: 180, 
+                        borderWidth: 1, 
+                        borderColor: '#2d3991', 
+                        padding: 8 
+                    }}>
+                        <Text style={{ fontSize: 11 }}>RCBC ACCT NUMBER: 7591033191</Text>
+                        <Text style={{ fontSize: 11 }}>VATABLE: ₱{formatPHP(subtotal)}</Text>
+                        <Text style={{ fontSize: 11 }}>VAT EXEMPT: ₱0.00</Text>
+                        <Text style={{ fontSize: 11 }}>ZERO RATED: ₱0.00</Text>
+                        <Text style={{ fontSize: 11 }}>TOTAL SALES: ₱{formatPHP(subtotal)}</Text>
+                        <Text style={{ fontSize: 11 }}>TOTAL VAT: ₱{formatPHP(vat)}</Text>
+                        <Text style={{ fontSize: 11, fontWeight: 'bold' }}>AMOUNT DUE: ₱{formatPHP(totalAmount)}</Text>
                     </View>
                 </View>
-                {/* Footer Signature Block - Always at the bottom */}
+
+                {/* Footer Signature Block */}
                 <View style={{
                     position: 'absolute',
-                    left: 24,
-                    right: 24,
-                    bottom: 24,
+                    left: 20,
+                    right: 20,
+                    bottom: 20,
                     flexDirection: 'row',
                     justifyContent: 'space-between',
                     alignItems: 'flex-end',
                 }}>
                     <View>
-                        <Text style={{ fontSize: 8, fontWeight: 'bold', color: '#2d3991' }}>Prepared by: K. SAMKIAN</Text>
-                        <Text style={{ fontSize: 8 }}>Revenue Supervisor</Text>
+                        <Text style={{ fontSize: 10, fontWeight: 'bold', color: '#2d3991' }}>Prepared by: K. SAMKIAN</Text>
+                        <Text style={{ fontSize: 10 }}>Revenue Supervisor</Text>
                     </View>
                     <View>
-                        <Text style={{ fontSize: 8, fontWeight: 'bold', color: '#2d3991' }}>CHECKED BY: J.LARA</Text>
-                        <Text style={{ fontSize: 8 }}>ACCOUNTING</Text>
+                        <Text style={{ fontSize: 10, fontWeight: 'bold', color: '#2d3991' }}>CHECKED BY: J.LARA</Text>
+                        <Text style={{ fontSize: 10 }}>ACCOUNTING</Text>
                     </View>
                     <View>
-                        <Text style={{ fontSize: 8, fontWeight: 'bold', color: '#2d3991' }}>RECEIVED BY: ___________</Text>
-                        <Text style={{ fontSize: 8, fontWeight: 'bold', color: '#2d3991' }}>DATE: {todayFormatted}</Text>
+                        <Text style={{ fontSize: 10, fontWeight: 'bold', color: '#2d3991' }}>RECEIVED BY: ___________</Text>
+                        <Text style={{ fontSize: 10, fontWeight: 'bold', color: '#2d3991' }}>DATE: {todayFormatted}</Text>
                     </View>
                 </View>
             </PDFPage>
@@ -351,6 +452,10 @@ const TransactionManagement = () => {
     const [loadingSummaries, setLoadingSummaries] = useState(false);
     const [summariesError, setSummariesError] = useState(null);
     const [selectedSummaries, setSelectedSummaries] = useState([]);
+    const [summaryAnchorEl, setSummaryAnchorEl] = useState(null);
+    const [selectedSummaryRow, setSelectedSummaryRow] = useState(null);
+    const [summaryContracts, setSummaryContracts] = useState([]);
+    const [loadingSummaryContracts, setLoadingSummaryContracts] = useState(false);
 
     // Data fetching
     useEffect(() => {
@@ -494,6 +599,34 @@ const TransactionManagement = () => {
             .catch(err => setSummariesError(err.message || 'Failed to fetch summaries'))
             .finally(() => setLoadingSummaries(false));
     }, [tabValue]);
+
+    // Fetch contracts for selected summaries
+    useEffect(() => {
+        if (tabValue !== 1 || selectedSummaries.length === 0) {
+            setSummaryContracts([]);
+            return;
+        }
+        
+        setLoadingSummaryContracts(true);
+        fetch('/api/admin', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                action: 'getContractsBySummaryId', 
+                params: { summaryIds: selectedSummaries } 
+            })
+        })
+            .then(res => res.json())
+            .then(json => {
+                if (json.error) throw new Error(json.error);
+                setSummaryContracts(json.contracts || []);
+            })
+            .catch(err => {
+                console.error('Error fetching summary contracts:', err);
+                setSummaryContracts([]);
+            })
+            .finally(() => setLoadingSummaryContracts(false));
+    }, [tabValue, selectedSummaries]);
 
     // Fetch all pricing data for the table
     useEffect(() => {
@@ -818,20 +951,66 @@ const TransactionManagement = () => {
 
     // Get contracts for invoice: if none selected, use all for the month (not cancelled)
     const getContractsForInvoice = () => {
-        if (selectedRows.length > 0) {
-            return getSelectedContracts().filter(contract => Number(contract.contract_status_id) === 5 || Number(contract.contract_status_id) === 6);
-        } else {
-            return filteredData.filter(contract => Number(contract.contract_status_id) === 5 || Number(contract.contract_status_id) === 6);
+        if (tabValue === 0) {
+            // Pending tab - use selected contracts or all filtered contracts
+            if (selectedRows.length > 0) {
+                return getSelectedContracts().filter(contract => Number(contract.contract_status_id) === 5 || Number(contract.contract_status_id) === 6);
+            } else {
+                return filteredData.filter(contract => Number(contract.contract_status_id) === 5 || Number(contract.contract_status_id) === 6);
+            }
+        } else if (tabValue === 1) {
+            // Summarized tab - get contracts from selected summaries
+            if (selectedSummaries.length > 0) {
+                // Return contracts from selected summaries
+                return summaryContracts.filter(contract => Number(contract.contract_status_id) === 5 || Number(contract.contract_status_id) === 6);
+            } else {
+                // If no summaries selected, return empty array
+                return [];
+            }
         }
+        return [];
     };
 
     // Add handler for invoice generation/payment creation
     const handleGenerateInvoice = async () => {
+        const contracts = getContractsForInvoice();
+        
+        // Validate based on current tab
+        if (tabValue === 0) {
+            // Pending tab validation
+            if (contracts.length === 0) {
+                setSnackbar({
+                    open: true,
+                    message: 'Please select at least one delivered or delivery failed contract',
+                    severity: 'warning'
+                });
+                return;
+            }
+        } else if (tabValue === 1) {
+            // Summarized tab validation
+            if (selectedSummaries.length === 0) {
+                setSnackbar({
+                    open: true,
+                    message: 'Please select at least one summary to generate invoice',
+                    severity: 'warning'
+                });
+                return;
+            }
+            if (contracts.length === 0) {
+                setSnackbar({
+                    open: true,
+                    message: 'No delivered or delivery failed contracts found in selected summaries',
+                    severity: 'warning'
+                });
+                return;
+            }
+        }
+
         const today = new Date();
         const invoiceNo = formatDateFns(today, 'yyyyMMdd');
         const createdAt = today.toISOString();
         const dueDate = endOfMonth(today).toISOString();
-        const contracts = getContractsForInvoice();
+        
         // Compute total amount with VAT
         const subtotal = contracts.reduce((sum, c) => {
             const delivery_charge = Number(c.delivery_charge) || 0;
@@ -1078,6 +1257,25 @@ const TransactionManagement = () => {
     const allSummariesSelected = summaries.length > 0 && summaries.every((row) => selectedSummaries.includes(row.id));
     const someSummariesSelected = summaries.some((row) => selectedSummaries.includes(row.id));
 
+    // Summary action menu handlers
+    const handleSummaryMenuClick = (event, summary) => { setSummaryAnchorEl(event.currentTarget); setSelectedSummaryRow(summary); };
+    const handleSummaryMenuClose = () => { setSummaryAnchorEl(null); setSelectedSummaryRow(null); };
+    const handleSummaryAction = (action) => {
+        if (action === 'view' && selectedSummaryRow) {
+            // Handle view summary details
+            console.log('View summary:', selectedSummaryRow);
+        }
+        else if (action === 'edit' && selectedSummaryRow) {
+            // Handle edit summary
+            console.log('Edit summary:', selectedSummaryRow);
+        }
+        else if (action === 'delete' && selectedSummaryRow) {
+            // Handle delete summary
+            console.log('Delete summary:', selectedSummaryRow);
+        }
+        handleSummaryMenuClose();
+    };
+
     // Render
     if (loading) return (<Box sx={{ p: 3, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '300px' }}><CircularProgress /><Typography sx={{ mt: 2 }}>Loading...</Typography></Box>);
     if (error) return (<Box sx={{ p: 3 }}><Typography color="error">{error}</Typography></Box>);
@@ -1264,6 +1462,25 @@ const TransactionManagement = () => {
 
             {tabValue === 1 && (
                 <Box sx={{ p: 3 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', mb: 3 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                            <PDFDownloadLink
+                                document={<InvoicePDF contracts={getContractsForInvoice()} />}
+                                fileName={`Invoice-${format(new Date(), 'MMMM-yyyy')}.pdf`}
+                            >
+                                {({ loading, error }) => (
+                                    <Button
+                                        variant="contained"
+                                        color="primary"
+                                        disabled={loading || error}
+                                        onClick={handleGenerateInvoice}
+                                    >
+                                        {loading ? 'Generating Invoice...' : error ? 'Error generating Invoice' : 'Generate Invoice'}
+                                    </Button>
+                                )}
+                            </PDFDownloadLink>
+                        </Box>
+                    </Box>
                     {loadingSummaries ? (
                         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 200 }}>
                             <CircularProgress />
@@ -1289,12 +1506,13 @@ const TransactionManagement = () => {
                                         <TableCell sx={{ color: 'white' }}>Created At</TableCell>
                                         <TableCell sx={{ color: 'white' }}>Due Date</TableCell>
                                         <TableCell sx={{ color: 'white' }}>Invoice ID</TableCell>
+                                        <TableCell sx={{ color: 'white' }}>Actions</TableCell>
                                     </TableRow>
                                 </TableHead>
                                 <TableBody>
                                     {summaries.length === 0 ? (
                                         <TableRow>
-                                            <TableCell colSpan={6} align="center">No summaries found</TableCell>
+                                            <TableCell colSpan={7} align="center">No summaries found</TableCell>
                                         </TableRow>
                                     ) : summaries.map((summary) => (
                                         <TableRow key={summary.id} selected={isSummarySelected(summary.id)}>
@@ -1326,6 +1544,11 @@ const TransactionManagement = () => {
                                                 }) : ''}
                                             </TableCell>
                                             <TableCell>{summary.invoice_id || 'N/A'}</TableCell>
+                                            <TableCell>
+                                                <IconButton size="small" onClick={(e) => handleSummaryMenuClick(e, summary)}>
+                                                    <MoreVertIcon />
+                                                </IconButton>
+                                            </TableCell>
                                         </TableRow>
                                     ))}
                                 </TableBody>
@@ -1452,6 +1675,11 @@ const TransactionManagement = () => {
                 <MenuItem onClick={() => handleAction('surcharge')}>Surcharge</MenuItem>
                 <MenuItem onClick={() => handleAction('discount')}>Discount</MenuItem>
                 <MenuItem onClick={() => handleAction('pod')}>View Proof of Delivery</MenuItem>
+            </Menu>
+            <Menu anchorEl={summaryAnchorEl} open={Boolean(summaryAnchorEl)} onClose={handleSummaryMenuClose}>
+                <MenuItem onClick={() => handleSummaryAction('view')}>View Details</MenuItem>
+                <MenuItem onClick={() => handleSummaryAction('edit')}>Edit Summary</MenuItem>
+                <MenuItem onClick={() => handleSummaryAction('delete')}>Delete Summary</MenuItem>
             </Menu>
             <Dialog open={detailsOpen} onClose={handleDetailsClose} maxWidth="md" fullWidth>
                 <DialogTitle>Contract Details</DialogTitle>
