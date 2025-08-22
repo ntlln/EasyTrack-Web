@@ -15,18 +15,15 @@ export default function Page() {
   const fileInputRef = useRef(null);
   const fileInputBackRef = useRef(null);
 
-  // Bank list
-  const banks = ["BDO Unibank, Inc. (BDO)", "Land Bank of the Philippines (LANDBANK)", "Metropolitan Bank and Trust Company (Metrobank)", "Bank of the Philippine Islands (BPI)", "China Banking Corporation (Chinabank)", "Rizal Commercial Banking Corporation (RCBC)", "Philippine National Bank (PNB)", "Security Bank Corporation", "Union Bank of the Philippines (UnionBank)", "Development Bank of the Philippines (DBP)"];
-
   // Suffix options
   const suffixes = ["", "Jr", "Jr.", "Sr", "Sr.", "II", "III", "IV", "V"];
 
   // State setup
-  const [form, setForm] = useState({ first_name: "", middle_initial: "", last_name: "", suffix: "", contact_number: "", birth_date: "", emergency_contact_name: "", emergency_contact_number: "", gov_id_number: "", gov_id_proof: "", gov_id_proof_back: "", bank_name: "", account_number: "", account_name: "" });
+  const [form, setForm] = useState({ first_name: "", middle_initial: "", last_name: "", suffix: "", contact_number: "", birth_date: "", emergency_contact_name: "", emergency_contact_number: "", gov_id_number: "", gov_id_proof: "", gov_id_proof_back: "" });
   const [loading, setLoading] = useState(false);
   const [original, setOriginal] = useState(null);
   const [govIdTypes, setGovIdTypes] = useState([]);
-  const [selectedGovIdType, setSelectedGovIdType] = useState("");
+  const [selectedGovIdType, setSelectedGovIdType] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState("");
@@ -40,12 +37,12 @@ export default function Page() {
       setLoading(true);
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.user) { setLoading(false); return; }
-      const { data } = await supabase.from('profiles').select('first_name, middle_initial, last_name, suffix, contact_number, birth_date, emergency_contact_name, emergency_contact_number, gov_id_type, gov_id_number, gov_id_proof, gov_id_proof_back, bank_name, account_number, account_name').eq('email', session.user.email).single();
+      const { data } = await supabase.from('profiles').select('first_name, middle_initial, last_name, suffix, contact_number, birth_date, emergency_contact_name, emergency_contact_number, gov_id_type, gov_id_number, gov_id_proof, gov_id_proof_back').eq('email', session.user.email).single();
       if (data) {
-        const cleanData = { first_name: data.first_name || "", middle_initial: data.middle_initial || "", last_name: data.last_name || "", suffix: data.suffix || "", contact_number: data.contact_number || "", birth_date: data.birth_date || "", emergency_contact_name: data.emergency_contact_name || "", emergency_contact_number: data.emergency_contact_number || "", gov_id_number: data.gov_id_number || "", gov_id_proof: data.gov_id_proof || "", gov_id_proof_back: data.gov_id_proof_back || "", bank_name: data.bank_name || "", account_number: data.account_number || "", account_name: data.account_name || "" };
+        const cleanData = { first_name: data.first_name || "", middle_initial: data.middle_initial || "", last_name: data.last_name || "", suffix: data.suffix || "", contact_number: data.contact_number || "", birth_date: data.birth_date || "", emergency_contact_name: data.emergency_contact_name || "", emergency_contact_number: data.emergency_contact_number || "", gov_id_number: data.gov_id_number || "", gov_id_proof: data.gov_id_proof || "", gov_id_proof_back: data.gov_id_proof_back || "" };
         setForm(cleanData);
         setOriginal(cleanData);
-        if (data.gov_id_type) setSelectedGovIdType(String(data.gov_id_type));
+        if (data.gov_id_type !== null && data.gov_id_type !== undefined) setSelectedGovIdType(Number(data.gov_id_type));
       }
       setLoading(false);
     };
@@ -117,7 +114,7 @@ export default function Page() {
     if (!session?.user) return;
     const updates = {};
     Object.keys(form).forEach(key => { if (form[key] !== (original?.[key] ?? "")) updates[key] = form[key]; });
-    if (selectedGovIdType) updates.gov_id_type = selectedGovIdType;
+    if (selectedGovIdType !== null && selectedGovIdType !== undefined) updates.gov_id_type = Number(selectedGovIdType);
     if (Object.keys(updates).length === 0) { setLoading(false); router.push("/egc-admin/profile"); return; }
     updates.updated_at = new Date().toISOString();
     const { error } = await supabase.from('profiles').update(updates).eq('email', session.user.email);
@@ -222,8 +219,8 @@ export default function Page() {
         <Typography variant="h6" fontWeight="bold" mb={2} color="primary">Identification & Verification</Typography>
         <Grid container spacing={2} mb={4}>
           <Grid item xs={12} sm={6}>
-            <TextField fullWidth sx={formStyles} label="Government ID Type" select SelectProps={{ MenuProps: menuProps }} value={selectedGovIdType ?? ""} onChange={e => setSelectedGovIdType(e.target.value)} required>
-              {govIdTypes.map((type) => <MenuItem key={type.id} value={String(type.id)}>{type.id_type_name}</MenuItem>)}
+            <TextField fullWidth sx={formStyles} label="Government ID Type" select SelectProps={{ MenuProps: menuProps }} value={selectedGovIdType ?? ''} onChange={e => setSelectedGovIdType(Number(e.target.value))} required>
+              {govIdTypes.map((type) => <MenuItem key={type.id} value={Number(type.id)}>{type.id_type_name}</MenuItem>)}
             </TextField>
           </Grid>
           <Grid item xs={12} sm={6}><TextField fullWidth sx={formStyles} label="Government ID Number" name="gov_id_number" value={form.gov_id_number} onChange={handleChange} inputProps={{ minLength: 5, maxLength: 20 }} /></Grid>
@@ -235,17 +232,6 @@ export default function Page() {
             <input type="file" ref={fileInputBackRef} onChange={(e) => handleFileUpload(e, 'back')} style={fileInputStyles} accept="image/*" />
             <TextField fullWidth sx={formStyles} label="Upload Government ID (Back)" value={form.gov_id_proof_back ? 'Image uploaded' : ''} InputProps={{ endAdornment: <InputAdornment position="end"><IconButton onClick={() => triggerFileInput('back')} disabled={uploading}><UploadIcon /></IconButton></InputAdornment>, readOnly: true }} />
           </Grid>
-        </Grid>
-
-        <Typography variant="h6" fontWeight="bold" mb={2} color="primary">Bank Details (For Salary & Reimbursement)</Typography>
-        <Grid container spacing={2} mb={4}>
-          <Grid item xs={12} sm={6}>
-            <TextField fullWidth sx={formStyles} label="Bank Name" select SelectProps={{ MenuProps: menuProps }} name="bank_name" value={form.bank_name} onChange={handleChange}>
-              {banks.map((bank) => <MenuItem key={bank} value={bank}>{bank}</MenuItem>)}
-            </TextField>
-          </Grid>
-          <Grid item xs={12} sm={6}><TextField fullWidth sx={formStyles} label="Account Number" placeholder="e.g., 012345678901" name="account_number" value={form.account_number} onChange={handleChange} inputProps={{ minLength: 10, maxLength: 20 }} /></Grid>
-          <Grid item xs={12}><TextField fullWidth sx={formStyles} label="Account Name" placeholder="e.g., Juan D. Santos" name="account_name" value={form.account_name} onChange={handleChange} inputProps={{ minLength: 2, maxLength: 100 }} /></Grid>
         </Grid>
 
         <Box sx={buttonContainerStyles}>

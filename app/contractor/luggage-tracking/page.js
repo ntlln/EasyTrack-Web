@@ -56,20 +56,32 @@ function LuggageTrackingContent() {
     }
   }, [searchParams]);
 
-  // Fetch contract and luggage info (moved out for reuse)
+  // Fetch contract and luggage info (mirror admin API behavior)
   const fetchData = async (id = contractId) => {
     if (!id.trim()) return;
     setError(null);
     try {
-      const { data: contracts, error: contractError } = await supabase.from('contract').select(`id, created_at, accepted_at, pickup_at, delivered_at, cancelled_at, pickup_location, pickup_location_geo, drop_off_location, drop_off_location_geo, current_location_geo, contract_status_id, contract_status(status_name), airline_id, delivery_id, airline:airline_id (*), delivery:delivery_id (*), route_history`).eq('id', id).single();
-      if (contractError) throw contractError;
-      if (contracts) {
-        const { data: luggage, error: luggageError } = await supabase.from('contract_luggage_information').select('*').eq('contract_id', contracts.id);
-        if (luggageError) throw luggageError;
+      const response = await fetch(`/api/admin?contractId=${id}`);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to fetch contract data');
+      }
+      const { data } = await response.json();
+
+      if (data) {
+        const newContract = {
+          ...data,
+          luggage: data.luggage || [],
+          pickup_location_geo: data.pickup_location_geo || null,
+          drop_off_location_geo: data.drop_off_location_geo || null,
+          current_location_geo: data.current_location_geo || null,
+          route_history: data.route_history || []
+        };
         setContract(prev => {
-          const newContract = { ...contracts, luggage: luggage || [] };
           return JSON.stringify(prev) !== JSON.stringify(newContract) ? newContract : prev;
         });
+      } else {
+        setError('No contract data found');
       }
     } catch (err) { setError(err.message || 'Failed to fetch contract'); }
   };
@@ -85,24 +97,77 @@ function LuggageTrackingContent() {
     fetchData(contractId);
   }, [contractId]);
 
-  // Real-time subscription for contract changes (no reset)
+  // Real-time subscription for contract changes (mirror admin)
   useEffect(() => {
     if (!contractId) return;
-    const subscription = supabase
+
+    const handleRealtimeUpdate = async (payload) => {
+      try {
+        const updatedRow = payload?.new;
+        if (!updatedRow) return;
+
+        setContract((prev) => {
+          const merged = prev ? { ...prev, ...updatedRow } : updatedRow;
+          return merged;
+        });
+
+        // Update path and map when current location changes
+        if (updatedRow?.current_location_geo?.coordinates) {
+          const newPosition = {
+            lat: updatedRow.current_location_geo.coordinates[1],
+            lng: updatedRow.current_location_geo.coordinates[0]
+          };
+
+          if (Array.isArray(pathRef.current)) {
+            const lastPoint = pathRef.current[pathRef.current.length - 1];
+            pathRef.current.push(newPosition);
+            if (lastPoint && map && window?.google) {
+              await updatePolylineWithDirections(lastPoint, newPosition);
+            }
+          }
+
+          if (map) {
+            await updateMapLocation();
+          }
+        }
+      } catch (err) {
+        console.error('Realtime update handling error:', err);
+      }
+    };
+
+    const channelContract = supabase
       .channel(`contract-${contractId}`)
       .on(
         'postgres_changes',
         {
-          event: '*',
+          event: 'UPDATE',
           schema: 'public',
           table: 'contract',
           filter: `id=eq.${contractId}`,
         },
-        () => fetchData(contractId)
+        handleRealtimeUpdate
       )
       .subscribe();
-    return () => { subscription.unsubscribe(); };
-  }, [contractId]);
+
+    const channelContracts = supabase
+      .channel(`contracts-${contractId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'contracts',
+          filter: `id=eq.${contractId}`,
+        },
+        handleRealtimeUpdate
+      )
+      .subscribe();
+
+    return () => {
+      channelContract.unsubscribe();
+      channelContracts.unsubscribe();
+    };
+  }, [contractId, supabase, map]);
 
   // Update polyline with directions
   const updatePolylineWithDirections = async (start, end) => {
@@ -467,7 +532,7 @@ function LuggageTrackingContent() {
     }
   };
 
-  // Update the polling effect with retry mechanism
+  // Update the polling effect with retry mechanism (mirror admin, use API)
   useEffect(() => {
     let pollInterval;
     let retryCount = 0;
@@ -478,20 +543,13 @@ function LuggageTrackingContent() {
         console.log('Starting location polling for contract:', contract.id);
         pollInterval = setInterval(async () => {
           try {
-            const { data, error: locationError } = await supabase
-              .from('contract')
-              .select('current_location_geo, route_history')
-              .eq('id', contract.id)
-              .single();
+            const response = await fetch(`/api/admin?action=getContract&contractId=${contract.id}`);
+            if (!response.ok) throw new Error('Failed to fetch contract data');
+            const result = await response.json();
+            if (result.error) throw new Error(result.error);
 
-            if (locationError) throw locationError;
-            
-            if (data) {
-              setContract(prev => ({
-                ...prev,
-                current_location_geo: data.current_location_geo,
-                route_history: data.route_history
-              }));
+            if (result.data) {
+              setContract(result.data);
               await updateMapLocation();
               retryCount = 0; // Reset retry count on successful update
             }
