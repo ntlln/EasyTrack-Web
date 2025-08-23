@@ -157,7 +157,7 @@ const ReceiptPDF = ({ contracts = [], dateRange }) => {
     );
 };
 
-// --- INVOICE PDF COMPONENT (ENHANCED FORMAT) ---
+// --- INVOICE PDF COMPONENT (BASIC FORMAT) ---
 const InvoicePDF = ({ contracts = [] }) => {
     const today = new Date();
     const todayFormatted = formatDateFns(today, 'MMMM d, yyyy');
@@ -166,7 +166,6 @@ const InvoicePDF = ({ contracts = [] }) => {
     const monthEnd = endOfMonth(today);
     const dueDate = formatDateFns(monthEnd, 'MMMM d, yyyy');
     const desc = `PIR Luggage Delivery – ${formatDateFns(monthStart, 'MMMM d, yyyy')} to ${formatDateFns(monthEnd, 'MMMM d, yyyy')}`;
-    
     // Compute total amount
     const subtotal = contracts.reduce((sum, c) => {
         const delivery_charge = Number(c.delivery_charge) || 0;
@@ -176,207 +175,107 @@ const InvoicePDF = ({ contracts = [] }) => {
     }, 0);
     const vat = subtotal * 0.12;
     const totalAmount = subtotal + vat;
-
-    // Format PHP currency
-    const formatPHP = (value) => {
-        const num = Number(value || 0);
-        return num.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    };
-
     return (
         <Document>
-            <PDFPage size="A4" style={{ padding: 20, fontSize: 12, fontFamily: 'Roboto', lineHeight: 1.3 }}>
+            <PDFPage size="A4" style={{ padding: 24, fontSize: 10, fontFamily: 'Roboto', position: 'relative' }}>
                 {/* Header */}
-                <View style={{ 
-                    flexDirection: 'row', 
-                    justifyContent: 'space-between', 
-                    marginBottom: 20,
-                    borderBottomWidth: 2,
-                    borderBottomColor: '#000',
-                    paddingBottom: 15
-                }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 }}>
                     <View style={{ flex: 1 }}>
-                        <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 5, color: '#2d3991' }}>
-                            GREEN HANGAR EMISSION TESTING CENTER
-                        </Text>
-                        <Text style={{ fontSize: 11, marginBottom: 3, fontWeight: 'bold', color: '#2d3991' }}>
-                            PROPRIETOR: JONALIZ L. CABALUNA
-                        </Text>
-                        <Text style={{ fontSize: 11, marginBottom: 3 }}>ATAYDE ST. BRGY.191 PASAY CITY</Text>
-                        <Text style={{ fontSize: 11, marginBottom: 3 }}>VAT REG. TIN: 234-449-892-00000</Text>
+                        <Text style={{ fontWeight: 'bold', color: '#2d3991', fontSize: 12 }}>GREEN HANGAR EMISSION TESTING CENTER</Text>
+                        <Text style={{ fontWeight: 'bold', color: '#2d3991', fontSize: 10 }}>PROPRIETOR: JONALIZ L. CABALUNA</Text>
+                        <Text style={{ fontSize: 9 }}>ATAYDE ST. BRGY.191 PASAY CITY</Text>
+                        <Text style={{ fontSize: 9 }}>VAT REG. TIN: 234-449-892-00000</Text>
                     </View>
                     <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                        <Text style={{ fontSize: 14, fontWeight: 'bold', marginBottom: 5 }}>BILL TO PHILLIPINES AIR ASIA INC.</Text>
-                        <Text style={{ fontSize: 11, marginBottom: 3 }}>2ND LEVEL MEZZANINE</Text>
-                        <Text style={{ fontSize: 11, marginBottom: 3 }}>AREA NAIA T3, PASAY CITY</Text>
-                        <Text style={{ fontSize: 11, marginBottom: 3 }}>TIN# 005-838-00016</Text>
+                        <Text style={{ fontWeight: 'bold', fontSize: 10 }}>BILL TO PHILLIPINES AIR ASIA INC.</Text>
+                        <Text style={{ fontSize: 9 }}>2ND LEVEL MEZZANINE</Text>
+                        <Text style={{ fontSize: 9 }}>AREA NAIA T3, PASAY CITY</Text>
+                        <Text style={{ fontSize: 9 }}>TIN# 005-838-00016</Text>
+                        <Text style={{ fontSize: 9, marginTop: 4 }}>DATE      {todayFormatted}</Text>
+                        <Text style={{ fontSize: 9 }}>SOA #     {invoiceNo}</Text>
                     </View>
                 </View>
-
-                {/* Meta Information */}
-                <View style={{ 
-                    flexDirection: 'row', 
-                    justifyContent: 'space-between', 
-                    marginBottom: 15,
-                    fontSize: 11
-                }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-                        <Text style={{ fontWeight: 'bold', marginRight: 10, minWidth: 80 }}>DATE:</Text>
-                        <View style={{ 
-                            borderBottomWidth: 1, 
-                            borderBottomColor: '#000', 
-                            paddingVertical: 2, 
-                            paddingHorizontal: 5, 
-                            minWidth: 150 
-                        }}>
-                            <Text>{todayFormatted}</Text>
-                        </View>
-                    </View>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-                        <Text style={{ fontWeight: 'bold', marginRight: 10, minWidth: 80 }}>SOA #:</Text>
-                        <View style={{ 
-                            borderBottomWidth: 1, 
-                            borderBottomColor: '#000', 
-                            paddingVertical: 2, 
-                            paddingHorizontal: 5, 
-                            minWidth: 150 
-                        }}>
-                            <Text>{invoiceNo}</Text>
-                        </View>
-                    </View>
-                </View>
-
-                {/* Invoice Header */}
-                <View style={{ 
-                    textAlign: 'center', 
-                    fontSize: 16, 
-                    fontWeight: 'bold', 
-                    marginBottom: 20,
-                    textDecoration: 'underline'
-                }}>
-                    <Text>SALES INVOICE NO. {invoiceNo}</Text>
-                </View>
-
+                <Text style={{ fontWeight: 'bold', fontSize: 11, marginBottom: 8 }}>SALES INVOICE NO. {invoiceNo}</Text>
                 {/* Terms Table */}
-                <View style={{ marginBottom: 20 }}>
-                    <View style={{ 
-                        flexDirection: 'row', 
-                        backgroundColor: '#2d3991', 
-                        color: 'white', 
-                        fontWeight: 'bold', 
-                        fontSize: 11
-                    }}>
-                        <Text style={{ flex: 1, padding: 10, textAlign: 'center' }}>TERMS</Text>
-                        <Text style={{ flex: 1, padding: 10, textAlign: 'center' }}>PAYMENT METHOD</Text>
-                        <Text style={{ flex: 1, padding: 10, textAlign: 'center' }}>DUE DATE</Text>
-                    </View>
-                    <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#2d3991', fontSize: 11 }}>
-                        <Text style={{ flex: 1, padding: 10, backgroundColor: '#f7f3d6', textAlign: 'center' }}>30 DAYS</Text>
-                        <Text style={{ flex: 1, padding: 10, backgroundColor: '#f7f3d6', textAlign: 'center' }}>DOMESTIC FUNDS TRANSFER</Text>
-                        <Text style={{ flex: 1, padding: 10, backgroundColor: '#f7f3d6', textAlign: 'center' }}>{dueDate}</Text>
-                    </View>
+                <View style={{ flexDirection: 'row', backgroundColor: '#2d3991', color: 'white', fontWeight: 'bold', fontSize: 9 }}>
+                    <Text style={{ flex: 1, padding: 4 }}>TERMS</Text>
+                    <Text style={{ flex: 1, padding: 4 }}>PAYMENT METHOD</Text>
+                    <Text style={{ flex: 1, padding: 4 }}>DUE DATE</Text>
                 </View>
-
+                <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderColor: '#2d3991', fontSize: 9 }}>
+                    <Text style={{ flex: 1, padding: 4, backgroundColor: '#f7f3d6' }}>30 DAYS</Text>
+                    <Text style={{ flex: 1, padding: 4, backgroundColor: '#f7f3d6' }}>DOMESTIC FUNDS TRANSFER</Text>
+                    <Text style={{ flex: 1, padding: 4, backgroundColor: '#f7f3d6' }}>{dueDate}</Text>
+                </View>
                 {/* Invoice Table */}
-                <View style={{ marginBottom: 20 }}>
-                    <View style={{ 
-                        flexDirection: 'row', 
-                        backgroundColor: '#2d3991', 
-                        color: 'white', 
-                        fontWeight: 'bold', 
-                        fontSize: 11
-                    }}>
-                        <Text style={{ flex: 0.5, padding: 10, textAlign: 'center' }}>QTY</Text>
-                        <Text style={{ flex: 1, padding: 10, textAlign: 'center' }}>UNIT</Text>
-                        <Text style={{ flex: 4, padding: 10, textAlign: 'center' }}>DESCRIPTION</Text>
-                        <Text style={{ flex: 1, padding: 10, textAlign: 'center' }}>AMOUNT</Text>
+                <View style={{ marginTop: 12 }}>
+                    <View style={{ flexDirection: 'row', backgroundColor: '#2d3991', color: 'white', fontWeight: 'bold', fontSize: 9 }}>
+                        <Text style={{ flex: 0.5, padding: 4 }}>QTY</Text>
+                        <Text style={{ flex: 1, padding: 4 }}>UNIT</Text>
+                        <Text style={{ flex: 4, padding: 4 }}>DESCRIPTION</Text>
+                        <Text style={{ flex: 1, padding: 4 }}>AMOUNT</Text>
                     </View>
-                    <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#2d3991', fontSize: 11 }}>
-                        <Text style={{ flex: 0.5, padding: 10, backgroundColor: '#f7f3d6', textAlign: 'center' }}>{contracts.length}</Text>
-                        <Text style={{ flex: 1, padding: 10, backgroundColor: '#f7f3d6', textAlign: 'center' }}>PCS</Text>
-                        <Text style={{ flex: 4, padding: 10, backgroundColor: '#f7f3d6' }}>{desc}</Text>
-                        <Text style={{ flex: 1, padding: 10, backgroundColor: '#f7f3d6', textAlign: 'right' }}>
-                            ₱{formatPHP(subtotal)}
-                        </Text>
+                    <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderColor: '#2d3991', fontSize: 9 }}>
+                        <Text style={{ flex: 0.5, padding: 4, backgroundColor: '#f7f3d6' }}>{contracts.length}</Text>
+                        <Text style={{ flex: 1, padding: 4, backgroundColor: '#f7f3d6' }}>PCS</Text>
+                        <Text style={{ flex: 4, padding: 4, backgroundColor: '#f7f3d6' }}>{desc}</Text>
+                        <Text style={{ flex: 1, padding: 4, backgroundColor: '#f7f3d6' }}>₱{subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
                     </View>
-                    
                     {/* Empty rows for formatting */}
                     {[...Array(7)].map((_, i) => (
-                        <View key={i} style={{ flexDirection: 'row', fontSize: 11 }}>
-                            <Text style={{ flex: 0.5, padding: 10, backgroundColor: '#f7f3d6' }}></Text>
-                            <Text style={{ flex: 1, padding: 10, backgroundColor: '#f7f3d6' }}></Text>
-                            <Text style={{ flex: 4, padding: 10, backgroundColor: '#f7f3d6' }}></Text>
-                            <Text style={{ flex: 1, padding: 10, backgroundColor: '#f7f3d6' }}></Text>
+                        <View key={i} style={{ flexDirection: 'row', fontSize: 9 }}>
+                            <Text style={{ flex: 0.5, padding: 4, backgroundColor: '#f7f3d6' }}></Text>
+                            <Text style={{ flex: 1, padding: 4, backgroundColor: '#f7f3d6' }}></Text>
+                            <Text style={{ flex: 4, padding: 4, backgroundColor: '#f7f3d6' }}></Text>
+                            <Text style={{ flex: 1, padding: 4, backgroundColor: '#f7f3d6' }}></Text>
                         </View>
                     ))}
-                    
                     {/* Note row */}
-                    <View style={{ flexDirection: 'row', fontSize: 11 }}>
-                        <Text style={{ flex: 5.5, padding: 10, backgroundColor: '#f7f3d6', fontWeight: 'bold' }}>
-                            Note: All Original Documents are Included in this statement
-                        </Text>
-                        <Text style={{ flex: 1, padding: 10, backgroundColor: '#f7f3d6' }}></Text>
+                    <View style={{ flexDirection: 'row', fontSize: 9 }}>
+                        <Text style={{ flex: 6.5, padding: 4, backgroundColor: '#f7f3d6', fontWeight: 'bold' }}>Note: All Original Documents are Included in this statement</Text>
+                        <Text style={{ flex: 1, padding: 4, backgroundColor: '#f7f3d6' }}></Text>
                     </View>
-                    
                     {/* Total row */}
-                    <View style={{ flexDirection: 'row', fontSize: 11 }}>
-                        <Text style={{ flex: 5.5, padding: 10, backgroundColor: '#f7f3d6', fontWeight: 'bold', textAlign: 'right' }}>
-                            Total Amount Due:
-                        </Text>
-                        <Text style={{ flex: 1, padding: 10, backgroundColor: '#f7f3d6', fontWeight: 'bold' }}>
-                            ₱{formatPHP(totalAmount)}
-                        </Text>
+                    <View style={{ flexDirection: 'row', fontSize: 9 }}>
+                        <Text style={{ flex: 6.5, padding: 4, backgroundColor: '#f7f3d6', fontWeight: 'bold', textAlign: 'right' }}>Total Amount Due:</Text>
+                        <Text style={{ flex: 1, padding: 4, backgroundColor: '#f7f3d6', fontWeight: 'bold' }}>₱{totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
                     </View>
                 </View>
-
                 {/* Footer Notes */}
-                <Text style={{ fontSize: 11, marginBottom: 8, fontWeight: 'bold' }}>
-                    Note: Please make check payable to JONALIZ L. CABALUNA
-                </Text>
-
+                <Text style={{ fontSize: 9, marginTop: 8, fontWeight: 'bold' }}>Note: Please make check payable to JONALIZ L. CABALUNA</Text>
                 {/* Summary Box */}
-                <View style={{ 
-                    flexDirection: 'row', 
-                    justifyContent: 'flex-end', 
-                    marginTop: 8 
-                }}>
-                    <View style={{ 
-                        width: 180, 
-                        borderWidth: 1, 
-                        borderColor: '#2d3991', 
-                        padding: 8 
-                    }}>
-                        <Text style={{ fontSize: 11 }}>RCBC ACCT NUMBER: 7591033191</Text>
-                        <Text style={{ fontSize: 11 }}>VATABLE: ₱{formatPHP(subtotal)}</Text>
-                        <Text style={{ fontSize: 11 }}>VAT EXEMPT: ₱0.00</Text>
-                        <Text style={{ fontSize: 11 }}>ZERO RATED: ₱0.00</Text>
-                        <Text style={{ fontSize: 11 }}>TOTAL SALES: ₱{formatPHP(subtotal)}</Text>
-                        <Text style={{ fontSize: 11 }}>TOTAL VAT: ₱{formatPHP(vat)}</Text>
-                        <Text style={{ fontSize: 11, fontWeight: 'bold' }}>AMOUNT DUE: ₱{formatPHP(totalAmount)}</Text>
+                <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 8 }}>
+                    <View style={{ width: 180, borderWidth: 1, borderColor: '#2d3991', padding: 8 }}>
+                        <Text style={{ fontSize: 9 }}>RCBC ACCT NUMBER: 7591033191</Text>
+                        <Text style={{ fontSize: 9 }}>VATABLE: {`₱${subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</Text>
+                        <Text style={{ fontSize: 9 }}>VAT EXEMPT:</Text>
+                        <Text style={{ fontSize: 9 }}>ZERO RATED:</Text>
+                        <Text style={{ fontSize: 9 }}>TOTAL SALES:</Text>
+                        <Text style={{ fontSize: 9 }}>TOTAL VAT: {`₱${vat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</Text>
+                        <Text style={{ fontSize: 9 }}>AMOUNT DUE: {`₱${totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</Text>
                     </View>
                 </View>
-
-                {/* Footer Signature Block */}
+                {/* Footer Signature Block - Always at the bottom */}
                 <View style={{
                     position: 'absolute',
-                    left: 20,
-                    right: 20,
-                    bottom: 20,
+                    left: 24,
+                    right: 24,
+                    bottom: 24,
                     flexDirection: 'row',
                     justifyContent: 'space-between',
                     alignItems: 'flex-end',
                 }}>
                     <View>
-                        <Text style={{ fontSize: 10, fontWeight: 'bold', color: '#2d3991' }}>Prepared by: K. SAMKIAN</Text>
-                        <Text style={{ fontSize: 10 }}>Revenue Supervisor</Text>
+                        <Text style={{ fontSize: 8, fontWeight: 'bold', color: '#2d3991' }}>Prepared by: K. SAMKIAN</Text>
+                        <Text style={{ fontSize: 8 }}>Revenue Supervisor</Text>
                     </View>
                     <View>
-                        <Text style={{ fontSize: 10, fontWeight: 'bold', color: '#2d3991' }}>CHECKED BY: J.LARA</Text>
-                        <Text style={{ fontSize: 10 }}>ACCOUNTING</Text>
+                        <Text style={{ fontSize: 8, fontWeight: 'bold', color: '#2d3991' }}>CHECKED BY: J.LARA</Text>
+                        <Text style={{ fontSize: 8 }}>ACCOUNTING</Text>
                     </View>
                     <View>
-                        <Text style={{ fontSize: 10, fontWeight: 'bold', color: '#2d3991' }}>RECEIVED BY: ___________</Text>
-                        <Text style={{ fontSize: 10, fontWeight: 'bold', color: '#2d3991' }}>DATE: {todayFormatted}</Text>
+                        <Text style={{ fontSize: 8, fontWeight: 'bold', color: '#2d3991' }}>RECEIVED BY: ___________</Text>
+                        <Text style={{ fontSize: 8, fontWeight: 'bold', color: '#2d3991' }}>DATE: {todayFormatted}</Text>
                     </View>
                 </View>
             </PDFPage>
@@ -418,11 +317,13 @@ const TransactionManagement = () => {
     const [discountLoading, setDiscountLoading] = useState(false);
     const [discountError, setDiscountError] = useState('');
     const [discountContract, setDiscountContract] = useState(null);
+    const [shouldRenderPDF, setShouldRenderPDF] = useState(false);
     const [snackbar, setSnackbar] = useState({
         open: false,
         message: '',
         severity: 'success'
     });
+    const [pdfDownloadRef, setPdfDownloadRef] = useState(null);
     const [pricingTable, setPricingTable] = useState([]);
     const [loadingPricingTable, setLoadingPricingTable] = useState(true);
     const [pricingPage, setPricingPage] = useState(0);
@@ -439,6 +340,25 @@ const TransactionManagement = () => {
     // Add new state for confirmation dialog
     const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
     const [pendingPriceUpdate, setPendingPriceUpdate] = useState(null);
+    const [payments, setPayments] = useState([]);
+    const [loadingPayments, setLoadingPayments] = useState(false);
+    const [paymentsError, setPaymentsError] = useState(null);
+    const [selectedPayments, setSelectedPayments] = useState([]);
+    const [paymentsMenuAnchorEl, setPaymentsMenuAnchorEl] = useState(null);
+    const [paymentsMenuRow, setPaymentsMenuRow] = useState(null);
+    const [confirmMarkPaidOpen, setConfirmMarkPaidOpen] = useState(false);
+    const [markPaidRow, setMarkPaidRow] = useState(null);
+    const [markPaidLoading, setMarkPaidLoading] = useState(false);
+    const [paymentsPage, setPaymentsPage] = useState(0);
+    const [paymentsRowsPerPage, setPaymentsRowsPerPage] = useState(10);
+    // Define paginatedPayments at the top level
+    const paginatedPayments = payments.slice(paymentsPage * paymentsRowsPerPage, paymentsPage * paymentsRowsPerPage + paymentsRowsPerPage);
+    // Pagination handlers
+    const handlePaymentsPageChange = (event, newPage) => setPaymentsPage(newPage);
+    const handlePaymentsRowsPerPageChange = (event) => {
+        setPaymentsRowsPerPage(parseInt(event.target.value, 10));
+        setPaymentsPage(0);
+    };
     const [podOpen, setPodOpen] = useState(false);
     const [podContract, setPodContract] = useState(null);
     const [podImage, setPodImage] = useState(null);
@@ -449,11 +369,6 @@ const TransactionManagement = () => {
     const [summaries, setSummaries] = useState([]);
     const [loadingSummaries, setLoadingSummaries] = useState(false);
     const [summariesError, setSummariesError] = useState(null);
-    const [selectedSummaries, setSelectedSummaries] = useState([]);
-    const [summaryAnchorEl, setSummaryAnchorEl] = useState(null);
-    const [selectedSummaryRow, setSelectedSummaryRow] = useState(null);
-    const [summaryContracts, setSummaryContracts] = useState([]);
-    const [loadingSummaryContracts, setLoadingSummaryContracts] = useState(false);
 
     // Data fetching
     useEffect(() => {
@@ -579,56 +494,9 @@ const TransactionManagement = () => {
         fetchPrice();
     }, [selectedCity]);
 
-    // Fetch summaries when Summarized tab is selected
-    useEffect(() => {
-        if (tabValue !== 1) return;
-        setLoadingSummaries(true);
-        setSummariesError(null);
-        fetch('/api/admin', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'getSummaries', params: {} })
-        })
-            .then(res => res.json())
-            .then(json => {
-                if (json.error) throw new Error(json.error);
-                setSummaries(json.summaries || []);
-            })
-            .catch(err => setSummariesError(err.message || 'Failed to fetch summaries'))
-            .finally(() => setLoadingSummaries(false));
-    }, [tabValue]);
-
-    // Fetch contracts for selected summaries
-    useEffect(() => {
-        if (tabValue !== 1 || selectedSummaries.length === 0) {
-            setSummaryContracts([]);
-            return;
-        }
-        
-        setLoadingSummaryContracts(true);
-        fetch('/api/admin', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                action: 'getContractsBySummaryId', 
-                params: { summaryIds: selectedSummaries } 
-            })
-        })
-            .then(res => res.json())
-            .then(json => {
-                if (json.error) throw new Error(json.error);
-                setSummaryContracts(json.contracts || []);
-            })
-            .catch(err => {
-                console.error('Error fetching summary contracts:', err);
-                setSummaryContracts([]);
-            })
-            .finally(() => setLoadingSummaryContracts(false));
-    }, [tabValue, selectedSummaries]);
-
     // Fetch all pricing data for the table
     useEffect(() => {
-        if (tabValue !== 2) return;
+        if (tabValue !== 1) return;
         setLoadingPricingTable(true);
         const fetchPricingTable = async () => {
             try {
@@ -750,6 +618,7 @@ const TransactionManagement = () => {
             const newSelection = prev.includes(id) 
                 ? prev.filter((rowId) => rowId !== id)
                 : [...prev, id];
+            setShouldRenderPDF(false);
             return newSelection;
         });
     };
@@ -761,6 +630,7 @@ const TransactionManagement = () => {
             const monthIds = filteredData.map((row) => row.id);
             setSelectedRows((prev) => prev.filter((id) => !monthIds.includes(id)));
         }
+        setShouldRenderPDF(false);
     };
     const allPageRowsSelected = filteredData.length > 0 && filteredData.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).every((row) => selectedRows.includes(row.id));
     const somePageRowsSelected = filteredData.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).some((row) => selectedRows.includes(row.id));
@@ -776,11 +646,35 @@ const TransactionManagement = () => {
             return [];
         }
     };
+    const handleGeneratePDF = () => {
+        const contracts = getSelectedContracts();
+        if (contracts.length > 0) {
+            const minDate = contracts.reduce((min, c) => c.created_at && c.created_at < min ? c.created_at : min, contracts[0].created_at);
+            const maxDate = contracts.reduce((max, c) => c.created_at && c.created_at > max ? c.created_at : max, contracts[0].created_at);
+            return `${formatDate(minDate)} TO ${formatDate(maxDate)}`;
+        } else {
+            return 'No Data';
+        }
+    };
 
     const handleMonthChange = (newDate) => {
         setSelectedMonth(newDate);
         setSelectedRows([]); // Reset selection when month changes
         setPage(0); // Reset to first page when month changes
+    };
+
+    // Modify the existing PDF button click handler
+    const handlePDFButtonClick = () => {
+        const contracts = getSelectedContracts();
+        if (contracts.length === 0) {
+            setSnackbar({
+                open: true,
+                message: 'Please select at least one delivered or delivery failed contract',
+                severity: 'warning'
+            });
+            return;
+        }
+        setShouldRenderPDF(true);
     };
 
     const handleTabChange = (event, newValue) => {
@@ -921,9 +815,219 @@ const TransactionManagement = () => {
         setPendingPriceUpdate(null);
     };
 
+    // Get contracts for invoice: if none selected, use all for the month (not cancelled)
+    const getContractsForInvoice = () => {
+        if (selectedRows.length > 0) {
+            return getSelectedContracts().filter(contract => Number(contract.contract_status_id) === 5 || Number(contract.contract_status_id) === 6);
+        } else {
+            return filteredData.filter(contract => Number(contract.contract_status_id) === 5 || Number(contract.contract_status_id) === 6);
+        }
+    };
 
+    // Add handler for invoice generation/payment creation
+    const handleGenerateInvoice = async () => {
+        const today = new Date();
+        const invoiceNo = formatDateFns(today, 'yyyyMMdd');
+        const createdAt = today.toISOString();
+        const dueDate = endOfMonth(today).toISOString();
+        const contracts = getContractsForInvoice();
+        // Compute total amount with VAT
+        const subtotal = contracts.reduce((sum, c) => {
+            const delivery_charge = Number(c.delivery_charge) || 0;
+            const delivery_surcharge = Number(c.delivery_surcharge || c.surcharge) || 0;
+            const delivery_discount = Number(c.delivery_discount || c.discount) || 0;
+            return sum + Math.max(0, (delivery_charge + delivery_surcharge) - delivery_discount);
+        }, 0);
+        
+        // Calculate VAT (12% of subtotal)
+        const vat = subtotal * 0.12;
+        const totalAmount = subtotal + vat;
+        try {
+            const payload = {
+                action: 'createPayment',
+                params: {
+                    invoice_number: invoiceNo,
+                    summary_stat: 1,
+                    created_at: createdAt,
+                    due_date: dueDate,
+                    total_charge: totalAmount,
+                    invoice_image: '',
+                    invoice_id: invoiceNo
+                }
+            };
+            console.log('Sending payment payload:', payload);
+            const res = await fetch('/api/admin', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const json = await res.json();
+            console.log('Payment API response:', json);
+            if (!res.ok) {
+                let errorMsg = json.error || 'Failed to create payment';
+                if (res.status === 400 && typeof json === 'object') {
+                    errorMsg += json.missing ? `\nMissing fields: ${JSON.stringify(json.missing)}` : '';
+                }
+                throw new Error(errorMsg);
+            }
 
+            // Update the summary_id for the contracts included in this payment
+            if (contracts.length > 0) {
+                const contractIds = contracts.map(c => c.id);
+                const updatePayload = {
+                    action: 'updateContractSummaryId',
+                    params: {
+                        contractIds: contractIds,
+                        summaryId: invoiceNo
+                    }
+                };
+                
+                const updateRes = await fetch('/api/admin', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(updatePayload)
+                });
+                
+                if (!updateRes.ok) {
+                    console.error('Failed to update contract summary IDs:', await updateRes.text());
+                } else {
+                    // Refresh the data to reflect the changes
+                    window.location.reload();
+                }
+            }
 
+            setSnackbar({
+                open: true,
+                message: 'Invoice generated successfully!',
+                severity: 'success'
+            });
+        } catch (err) {
+            console.error('Payment creation error:', err);
+            setSnackbar({
+                open: true,
+                message: err.message || 'Failed to create payment',
+                severity: 'error'
+            });
+        }
+    };
+
+    // Fetch payments when Payments History tab is selected
+    useEffect(() => {
+        if (tabValue !== 1) return;
+        setLoadingPayments(true);
+        setPaymentsError(null);
+        fetch('/api/admin', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'getPayments', params: {} })
+        })
+            .then(res => res.json())
+            .then(json => {
+                if (json.error) throw new Error(json.error);
+                setPayments(json.data || []);
+            })
+            .catch(err => setPaymentsError(err.message || 'Failed to fetch payments'))
+            .finally(() => setLoadingPayments(false));
+    }, [tabValue]);
+
+    // Fetch summaries when Summaries tab is selected
+    useEffect(() => {
+        if (tabValue !== 3) return;
+        setLoadingSummaries(true);
+        setSummariesError(null);
+        fetch('/api/admin', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'getSummaries', params: {} })
+        })
+            .then(res => res.json())
+            .then(json => {
+                if (json.error) throw new Error(json.error);
+                setSummaries(json.summaries || []);
+            })
+            .catch(err => setSummariesError(err.message || 'Failed to fetch summaries'))
+            .finally(() => setLoadingSummaries(false));
+    }, [tabValue]);
+
+    // Payments History: Checkbox logic
+    const isPaymentSelected = (id) => selectedPayments.includes(id);
+    const handleSelectPayment = (id) => {
+        setSelectedPayments((prev) =>
+            prev.includes(id) ? prev.filter((rowId) => rowId !== id) : [...prev, id]
+        );
+    };
+    const handleSelectAllPayments = (event) => {
+        if (event.target.checked) {
+            const allIds = payments.map((row) => row.id);
+            setSelectedPayments(allIds);
+        } else {
+            setSelectedPayments([]);
+        }
+    };
+    const allPaymentsSelected = payments.length > 0 && payments.every((row) => selectedPayments.includes(row.id));
+    const somePaymentsSelected = payments.some((row) => selectedPayments.includes(row.id));
+    // Payments History: Actions menu logic
+    const handleMarkAsPaid = (row) => {
+        setMarkPaidRow(row);
+        setConfirmMarkPaidOpen(true);
+    };
+    const handleConfirmMarkPaid = async () => {
+        if (!markPaidRow) return;
+        setMarkPaidLoading(true);
+        try {
+            const res = await fetch('/api/admin', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'updatePaymentStatus',
+                    params: {
+                        payment_id: markPaidRow.id,
+                        summary_stat: 2
+                    }
+                })
+            });
+            const json = await res.json();
+            if (!res.ok) throw new Error(json.error || 'Failed to update payment status');
+            // Update UI
+            setPayments((prev) => prev.map(p => p.id === markPaidRow.id ? { ...p, summary_stat: 2 } : p));
+            setSnackbar({
+                open: true,
+                message: 'Payment marked as paid!',
+                severity: 'success'
+            });
+        } catch (err) {
+            setSnackbar({
+                open: true,
+                message: err.message || 'Failed to update payment status',
+                severity: 'error'
+            });
+        } finally {
+            setMarkPaidLoading(false);
+            setConfirmMarkPaidOpen(false);
+            setMarkPaidRow(null);
+        }
+    };
+    const handleCancelMarkPaid = () => {
+        setConfirmMarkPaidOpen(false);
+        setMarkPaidRow(null);
+    };
+
+    // Transaction Management pagination state
+    const [tmPage, setTmPage] = useState(0);
+    const [tmRowsPerPage, setTmRowsPerPage] = useState(10);
+    const paginatedFilteredData = filteredData.slice(tmPage * tmRowsPerPage, tmPage * tmRowsPerPage + tmRowsPerPage);
+    const handleTmPageChange = (event, newPage) => setTmPage(newPage);
+    const handleTmRowsPerPageChange = (event) => {
+        setTmRowsPerPage(parseInt(event.target.value, 10));
+        setTmPage(0);
+    };
+
+    // Pricing Update pagination handlers
+    const handlePricingPageChange = (event, newPage) => setPricingPage(newPage);
+    const handlePricingRowsPerPageChange = (event) => {
+        setPricingRowsPerPage(parseInt(event.target.value, 10));
+        setPricingPage(0);
+    };
 
     const handlePodClose = () => {
         setPodOpen(false);
@@ -1056,60 +1160,6 @@ const TransactionManagement = () => {
         }
     };
 
-    // Transaction Management pagination state
-    const [tmPage, setTmPage] = useState(0);
-    const [tmRowsPerPage, setTmRowsPerPage] = useState(10);
-    const paginatedFilteredData = filteredData.slice(tmPage * tmRowsPerPage, tmPage * tmRowsPerPage + tmRowsPerPage);
-    const handleTmPageChange = (event, newPage) => setTmPage(newPage);
-    const handleTmRowsPerPageChange = (event) => {
-        setTmRowsPerPage(parseInt(event.target.value, 10));
-        setTmPage(0);
-    };
-
-    // Pricing Update pagination handlers
-    const handlePricingPageChange = (event, newPage) => setPricingPage(newPage);
-    const handlePricingRowsPerPageChange = (event) => {
-        setPricingRowsPerPage(parseInt(event.target.value, 10));
-        setPricingPage(0);
-    };
-
-    // Summarized tab checkbox logic
-    const isSummarySelected = (id) => selectedSummaries.includes(id);
-    const handleSelectSummary = (id) => {
-        setSelectedSummaries((prev) =>
-            prev.includes(id) ? prev.filter((rowId) => rowId !== id) : [...prev, id]
-        );
-    };
-    const handleSelectAllSummaries = (event) => {
-        if (event.target.checked) {
-            const allIds = summaries.map((row) => row.id);
-            setSelectedSummaries(allIds);
-        } else {
-            setSelectedSummaries([]);
-        }
-    };
-    const allSummariesSelected = summaries.length > 0 && summaries.every((row) => selectedSummaries.includes(row.id));
-    const someSummariesSelected = summaries.some((row) => selectedSummaries.includes(row.id));
-
-    // Summary action menu handlers
-    const handleSummaryMenuClick = (event, summary) => { setSummaryAnchorEl(event.currentTarget); setSelectedSummaryRow(summary); };
-    const handleSummaryMenuClose = () => { setSummaryAnchorEl(null); setSelectedSummaryRow(null); };
-    const handleSummaryAction = (action) => {
-        if (action === 'view' && selectedSummaryRow) {
-            // Handle view summary details
-            console.log('View summary:', selectedSummaryRow);
-        }
-        else if (action === 'edit' && selectedSummaryRow) {
-            // Handle edit summary
-            console.log('Edit summary:', selectedSummaryRow);
-        }
-        else if (action === 'delete' && selectedSummaryRow) {
-            // Handle delete summary
-            console.log('Delete summary:', selectedSummaryRow);
-        }
-        handleSummaryMenuClose();
-    };
-
     // Render
     if (loading) return (<Box sx={{ p: 3, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '300px' }}><CircularProgress /><Typography sx={{ mt: 2 }}>Loading...</Typography></Box>);
     if (error) return (<Box sx={{ p: 3 }}><Typography color="error">{error}</Typography></Box>);
@@ -1122,9 +1172,10 @@ const TransactionManagement = () => {
                     aria-label="transaction management tabs"
                     centered
                 >
-                    <Tab label="Pending" />
-                    <Tab label="Summarized" />
+                    <Tab label="Transaction Management" />
+                    <Tab label="Payments History" />
                     <Tab label="Pricing Update" />
+                    <Tab label="Summaries" />
                 </Tabs>
             </Box>
 
@@ -1146,13 +1197,79 @@ const TransactionManagement = () => {
                                     }}
                                 />
                             </LocalizationProvider>
-                            <Button 
-                                variant="outlined" 
-                                color="primary"
-                                onClick={handleSummarize}
+                            {shouldRenderPDF ? (
+                                <PDFDownloadLink 
+                                    document={<ReceiptPDF 
+                                        contracts={getContractsForInvoice()} 
+                                        dateRange={handleGeneratePDF()} 
+                                    />}
+                                    fileName={`GHE-Transmittal-Report-${format(selectedMonth, 'MMMM-yyyy')}.pdf`}
+                                >
+                                    {({ loading, error }) => (
+                                        <Button 
+                                            variant="contained" 
+                                            color="primary"
+                                            disabled={loading || error}
+                                        >
+                                            {loading ? 'Generating SOA...' : error ? 'Error generating SOA' : 'Download SOA'}
+                                        </Button>
+                                    )}
+                                </PDFDownloadLink>
+                            ) : (
+                                <>
+                                    <Button 
+                                        variant="outlined" 
+                                        color="primary"
+                                        onClick={handleSummarize}
+                                        sx={{ mr: 1 }}
+                                    >
+                                        Summarize
+                                    </Button>
+                                    <Button 
+                                        variant="contained" 
+                                        color={selectedRows.length > 0 ? "primary" : "secondary"}
+                                        onClick={handlePDFButtonClick}
+                                        sx={{ 
+                                            position: 'relative',
+                                            '&::after': {
+                                                content: `"${getSelectedContracts().length}"`,
+                                                position: 'absolute',
+                                                top: -8,
+                                                right: -8,
+                                                backgroundColor: 'primary.main',
+                                                color: 'white',
+                                                borderRadius: '50%',
+                                                width: 20,
+                                                height: 20,
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                fontSize: '0.75rem',
+                                                fontWeight: 'bold'
+                                            }
+                                        }}
+                                    >
+                                        Generate SOA
+                                    </Button>
+                                </>
+                            )}
+                            {/* New Invoice Button */}
+                            <PDFDownloadLink
+                                document={<InvoicePDF contracts={getContractsForInvoice()} />}
+                                fileName={`Invoice-${format(selectedMonth, 'MMMM-yyyy')}.pdf`}
                             >
-                                Summarize
-                            </Button>
+                                {({ loading, error }) => (
+                                    <Button
+                                        variant="contained"
+                                        color="primary"
+                                        disabled={loading || error}
+                                        sx={{ ml: 2 }}
+                                        onClick={handleGenerateInvoice}
+                                    >
+                                        {loading ? 'Generating Invoice...' : error ? 'Error generating Invoice' : 'Generate Invoice'}
+                                    </Button>
+                                )}
+                            </PDFDownloadLink>
                         </Box>
                     </Box>
                     <TableContainer component={Paper}>
@@ -1230,12 +1347,12 @@ const TransactionManagement = () => {
 
             {tabValue === 1 && (
                 <Box sx={{ p: 3 }}>
-                    {loadingSummaries ? (
+                    {loadingPayments ? (
                         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 200 }}>
                             <CircularProgress />
                         </Box>
-                    ) : summariesError ? (
-                        <Alert severity="error">{summariesError}</Alert>
+                    ) : paymentsError ? (
+                        <Alert severity="error">{paymentsError}</Alert>
                     ) : (
                         <TableContainer component={Paper}>
                             <Table>
@@ -1243,65 +1360,69 @@ const TransactionManagement = () => {
                                     <TableRow sx={{ backgroundColor: 'primary.main' }}>
                                         <TableCell padding="checkbox" sx={{ color: 'white' }}>
                                             <Checkbox
-                                                indeterminate={someSummariesSelected && !allSummariesSelected}
-                                                checked={allSummariesSelected}
-                                                onChange={handleSelectAllSummaries}
-                                                inputProps={{ 'aria-label': 'select all summaries' }}
+                                                indeterminate={somePaymentsSelected && !allPaymentsSelected}
+                                                checked={allPaymentsSelected}
+                                                onChange={handleSelectAllPayments}
+                                                inputProps={{ 'aria-label': 'select all payments' }}
                                                 sx={{ color: 'white', '&.Mui-checked': { color: 'white' } }}
                                             />
                                         </TableCell>
-                                        <TableCell sx={{ color: 'white' }}>Summary ID</TableCell>
+                                        <TableCell sx={{ color: 'white' }}>Invoice #</TableCell>
                                         <TableCell sx={{ color: 'white' }}>Status</TableCell>
                                         <TableCell sx={{ color: 'white' }}>Created At</TableCell>
                                         <TableCell sx={{ color: 'white' }}>Due Date</TableCell>
+                                        <TableCell sx={{ color: 'white' }}>Updated At</TableCell>
                                         <TableCell sx={{ color: 'white' }}>Invoice ID</TableCell>
+                                        <TableCell sx={{ color: 'white' }}>Total Charge</TableCell>
                                         <TableCell sx={{ color: 'white' }}>Actions</TableCell>
                                     </TableRow>
                                 </TableHead>
                                 <TableBody>
-                                    {summaries.length === 0 ? (
+                                    {paginatedPayments.length === 0 ? (
                                         <TableRow>
-                                            <TableCell colSpan={7} align="center">No summaries found</TableCell>
+                                            <TableCell colSpan={9} align="center">No payments found</TableCell>
                                         </TableRow>
-                                    ) : summaries.map((summary) => (
-                                        <TableRow key={summary.id} selected={isSummarySelected(summary.id)}>
+                                    ) : paginatedPayments.map((row) => (
+                                        <TableRow key={row.id}>
                                             <TableCell padding="checkbox">
                                                 <Checkbox
-                                                    checked={isSummarySelected(summary.id)}
-                                                    onChange={() => handleSelectSummary(summary.id)}
-                                                    inputProps={{ 'aria-label': `select summary ${summary.id}` }}
+                                                    checked={isPaymentSelected(row.id)}
+                                                    onChange={() => handleSelectPayment(row.id)}
+                                                    inputProps={{ 'aria-label': `select payment ${row.id}` }}
                                                 />
                                             </TableCell>
-                                            <TableCell>{summary.id}</TableCell>
+                                            <TableCell>{row.id}</TableCell>
+                                            <TableCell>{row.summary_stat === 1 ? 'Non-receipted' : row.summary_stat === 2 ? 'Receipted' : row.summary_stat}</TableCell>
+                                            <TableCell>{row.created_at ? new Date(row.created_at).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }) : ''}</TableCell>
+                                            <TableCell>{row.due_date ? new Date(row.due_date).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }) : ''}</TableCell>
+                                            <TableCell>{row.updated_at ? new Date(row.updated_at).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }) : ''}</TableCell>
+                                            <TableCell>{row.invoice_id || 'N/A'}</TableCell>
+                                            <TableCell>₱{Number(row.total_charge).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
                                             <TableCell>
-                                                {summary.status_name}
-                                            </TableCell>
-                                            <TableCell>
-                                                {summary.created_at ? new Date(summary.created_at).toLocaleDateString(undefined, { 
-                                                    year: 'numeric', 
-                                                    month: 'long', 
-                                                    day: 'numeric',
-                                                    hour: '2-digit',
-                                                    minute: '2-digit'
-                                                }) : ''}
-                                            </TableCell>
-                                            <TableCell>
-                                                {summary.due_date ? new Date(summary.due_date).toLocaleDateString(undefined, { 
-                                                    year: 'numeric', 
-                                                    month: 'long', 
-                                                    day: 'numeric'
-                                                }) : ''}
-                                            </TableCell>
-                                            <TableCell>{summary.invoice_id || 'N/A'}</TableCell>
-                                            <TableCell>
-                                                <IconButton size="small" onClick={(e) => handleSummaryMenuClick(e, summary)}>
-                                                    <MoreVertIcon />
-                                                </IconButton>
+                                                <Button
+                                                    size="small"
+                                                    variant="contained"
+                                                    color="primary"
+                                                    onClick={() => handleMarkAsPaid(row)}
+                                                    disabled={row.summary_stat === 2}
+                                                >
+                                                    Mark as Paid
+                                                </Button>
                                             </TableCell>
                                         </TableRow>
                                     ))}
                                 </TableBody>
                             </Table>
+                            <TablePagination
+                                rowsPerPageOptions={[10, 25, 50, 100]}
+                                component="div"
+                                count={payments.length}
+                                rowsPerPage={paymentsRowsPerPage}
+                                page={paymentsPage}
+                                onPageChange={handlePaymentsPageChange}
+                                onRowsPerPageChange={handlePaymentsRowsPerPageChange}
+                                labelRowsPerPage="Rows per page:"
+                            />
                         </TableContainer>
                     )}
                 </Box>
@@ -1419,16 +1540,62 @@ const TransactionManagement = () => {
                 </Box>
             )}
 
+            {tabValue === 3 && (
+                <Box sx={{ p: 3 }}>
+                    {loadingSummaries ? (
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 200 }}>
+                            <CircularProgress />
+                        </Box>
+                    ) : summariesError ? (
+                        <Alert severity="error">{summariesError}</Alert>
+                    ) : (
+                        <TableContainer component={Paper}>
+                            <Table>
+                                <TableHead>
+                                    <TableRow sx={{ backgroundColor: 'primary.main' }}>
+                                        <TableCell sx={{ color: 'white' }}>Summary ID</TableCell>
+                                        <TableCell sx={{ color: 'white' }}>Created At</TableCell>
+                                        <TableCell sx={{ color: 'white' }}>Due Date</TableCell>
+                                    </TableRow>
+                                </TableHead>
+                                <TableBody>
+                                    {summaries.length === 0 ? (
+                                        <TableRow>
+                                            <TableCell colSpan={3} align="center">No summaries found</TableCell>
+                                        </TableRow>
+                                    ) : summaries.map((summary) => (
+                                        <TableRow key={summary.id}>
+                                            <TableCell>{summary.id}</TableCell>
+                                            <TableCell>
+                                                {summary.created_at ? new Date(summary.created_at).toLocaleDateString(undefined, { 
+                                                    year: 'numeric', 
+                                                    month: 'long', 
+                                                    day: 'numeric',
+                                                    hour: '2-digit',
+                                                    minute: '2-digit'
+                                                }) : ''}
+                                            </TableCell>
+                                            <TableCell>
+                                                {summary.due_date ? new Date(summary.due_date).toLocaleDateString(undefined, { 
+                                                    year: 'numeric', 
+                                                    month: 'long', 
+                                                    day: 'numeric'
+                                                }) : ''}
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </TableContainer>
+                    )}
+                </Box>
+            )}
+
             <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleMenuClose}>
                 <MenuItem onClick={() => handleAction('view')}>View Details</MenuItem>
                 <MenuItem onClick={() => handleAction('surcharge')}>Surcharge</MenuItem>
                 <MenuItem onClick={() => handleAction('discount')}>Discount</MenuItem>
                 <MenuItem onClick={() => handleAction('pod')}>View Proof of Delivery</MenuItem>
-            </Menu>
-            <Menu anchorEl={summaryAnchorEl} open={Boolean(summaryAnchorEl)} onClose={handleSummaryMenuClose}>
-                <MenuItem onClick={() => handleSummaryAction('view')}>View Details</MenuItem>
-                <MenuItem onClick={() => handleSummaryAction('edit')}>Edit Summary</MenuItem>
-                <MenuItem onClick={() => handleSummaryAction('delete')}>Delete Summary</MenuItem>
             </Menu>
             <Dialog open={detailsOpen} onClose={handleDetailsClose} maxWidth="md" fullWidth>
                 <DialogTitle>Contract Details</DialogTitle>
@@ -1603,6 +1770,24 @@ const TransactionManagement = () => {
                         variant="contained"
                     >
                         {editPriceLoading ? 'Updating...' : 'Confirm Update'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+            {/* Mark as Paid Confirmation Dialog */}
+            <Dialog
+                open={confirmMarkPaidOpen}
+                onClose={handleCancelMarkPaid}
+                maxWidth="xs"
+                fullWidth
+            >
+                <DialogTitle>Mark as Paid</DialogTitle>
+                <DialogContent dividers>
+                    <Typography>Are you sure you want to mark invoice <b>{markPaidRow?.id}</b> as paid?</Typography>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={handleCancelMarkPaid} disabled={markPaidLoading}>Cancel</Button>
+                    <Button onClick={handleConfirmMarkPaid} color="primary" variant="contained" disabled={markPaidLoading}>
+                        {markPaidLoading ? 'Updating...' : 'Confirm'}
                     </Button>
                 </DialogActions>
             </Dialog>
