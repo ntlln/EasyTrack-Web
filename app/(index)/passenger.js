@@ -43,6 +43,8 @@ export default function Passenger() {
             <Box display="flex" alignItems="center">
               <nav>
                 <Button color="inherit" href="/" sx={{ color: 'white' }}>Home</Button>
+                <Button color="inherit" href="/" sx={{ color: 'white' }}>About Us</Button>
+                <Button color="inherit" href="/" sx={{ color: 'white' }}>Contact Us</Button>
                 <Button variant="outlined" sx={{ ml: 2, color: 'white', borderColor: 'white' }}>Sign in</Button>
               </nav>
               <Avatar src="/images/pfp.avif" alt="Profile" sx={{ ml: 2, width: 40, height: 40 }} />
@@ -69,7 +71,7 @@ export default function Passenger() {
           backgroundRepeat: 'no-repeat',
           backgroundSize: 'cover',
           backgroundPosition: 'top',
-          minHeight: '700px',
+          minHeight: '100vh',
           pb: 6,
           pt: 4,
           mt: -1,
@@ -78,10 +80,20 @@ export default function Passenger() {
         }}
       >
         <Container maxWidth="lg">
-          <Box display="flex" flexDirection="column" alignItems="center" gap={6}>
+          <Box display="flex" flexDirection="column" alignItems="center" gap={4}>
             {/* Welcome Text Section - Centered */}
-            <Box sx={{ textAlign: 'center', maxWidth: 800 }}>
-              <Typography variant="h4" align="center" gutterBottom sx={{ color: 'white', mb: 3, fontWeight: 600 }}>
+            <Box sx={{ textAlign: 'center', maxWidth: 800, mb: 2 }}>
+              <Typography 
+                variant="h3" 
+                align="center" 
+                gutterBottom 
+                sx={{ 
+                  color: 'white', 
+                  mb: 2, 
+                  fontWeight: 700,
+                  fontSize: { xs: '2rem', md: '3rem' }
+                }}
+              >
                 Welcome, passenger {'{Name}'}!
               </Typography>
               <Typography
@@ -90,10 +102,9 @@ export default function Passenger() {
                   fontStyle: 'italic',
                   fontWeight: 300,
                   color: 'white',
-                  fontSize: { xs: 18, md: 24 },
-                  lineHeight: 1.4,
-                  mb: 4,
-                  opacity: 0.9
+                  fontSize: { xs: 16, md: 20 },
+                  lineHeight: 1.6,
+                  opacity: 0.95
                 }}
                 gutterBottom
               >
@@ -231,68 +242,150 @@ export default function Passenger() {
                   />
                 ))}
               </Box>
-                        </Box>
-            
-            {/* Tracking Container - Below the Image Carousel */}
-            <Box sx={{ maxWidth: 550, textAlign: 'center', mt: 4 }}>
-              <Box sx={{ 
-                bgcolor: 'rgba(255, 255, 255, 0.1)', 
-                borderRadius: 3, 
-                p: 3, 
-                backdropFilter: 'blur(10px)',
-                border: '1px solid rgba(255, 255, 255, 0.2)'
-              }}>
-                <Typography 
-                  variant="h6" 
-                  sx={{ 
-                    fontSize: 24, 
-                    fontWeight: 600, 
-                    color: '#a8b3a3', 
-                    mb: 3 
-                  }}
-                >
-                  Track My Shipment
-                </Typography>
-                <Box display="flex" flexDirection="row" gap={2} alignItems="center" flexWrap="wrap">
-                  <TextField
-                    fullWidth
-                    placeholder="Booking no. Containers no B/L"
-                    variant="outlined"
-                    sx={{ 
-                      bgcolor: 'rgba(255, 255, 255, 0.9)', 
-                      borderRadius: 2,
-                      '& .MuiOutlinedInput-root': {
-                        '& fieldset': {
-                          borderColor: 'rgba(255, 255, 255, 0.3)',
-                        },
-                        '&:hover fieldset': {
-                          borderColor: 'rgba(255, 255, 255, 0.5)',
-                        },
-                      }
-                    }}
-                  />
-                  <Button 
-                    variant="contained" 
-                    sx={{ 
-                      minWidth: 200,
-                      bgcolor: '#4CAF50',
-                      color: 'white',
-                      borderRadius: 2,
-                      py: 1.5,
-                      '&:hover': {
-                        bgcolor: '#45a049',
-                      }
-                    }}
-                  >
-                    Track Shipment Now
-                  </Button>
-                </Box>
-              </Box>
             </Box>
             
-            
+            {/* Inspirational Quote */}
+            <Box sx={{ textAlign: 'center', mb: 4, maxWidth: 700 }}>
+              <Typography
+                variant="h6"
+                sx={{
+                  color: 'white',
+                  fontStyle: 'italic',
+                  fontWeight: 300,
+                  fontSize: { xs: '1.1rem', md: '1.3rem' },
+                  lineHeight: 1.6,
+                  opacity: 0.9,
+                  textShadow: '0 2px 4px rgba(0,0,0,0.3)',
+                  mb: 1
+                }}
+              >
+                "The best logistics is invisible logistics. When everything works perfectly, 
+                you don't even notice it's there."
+              </Typography>
+              <Typography
+                variant="body2"
+                sx={{
+                  color: 'rgba(255, 255, 255, 0.8)',
+                  fontSize: '0.9rem',
+                  fontWeight: 500,
+                  textShadow: '0 1px 2px rgba(0,0,0,0.3)'
+                }}
+              >
+              </Typography>
+            </Box>
+
+            {/* Tracking Container - Enhanced Design */}
+            <Paper 
+              elevation={8}
+              sx={{ 
+                maxWidth: 600, 
+                width: '100%',
+                textAlign: 'center', 
+                p: 4,
+                borderRadius: 4,
+                background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.85) 100%)',
+                backdropFilter: 'blur(20px)',
+                border: '1px solid rgba(255, 255, 255, 0.3)',
+                boxShadow: '0 20px 40px rgba(0,0,0,0.1)',
+                position: 'relative',
+                overflow: 'hidden',
+                '&::before': {
+                  content: '""',
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  height: '4px',
+                  background: 'linear-gradient(90deg, #4CAF50, #45a049, #4CAF50)',
+                  borderRadius: '4px 4px 0 0'
+                }
+              }}
+            >
+              <Typography 
+                variant="h5" 
+                sx={{ 
+                  fontSize: { xs: '1.5rem', md: '2rem' },
+                  fontWeight: 700, 
+                  color: '#214d22', 
+                  mb: 3,
+                  textShadow: '0 1px 2px rgba(0,0,0,0.1)'
+                }}
+              >
+                Track My Shipment
+              </Typography>
+              
+              <Box 
+                display="flex" 
+                flexDirection={{ xs: 'column', sm: 'row' }} 
+                gap={2} 
+                alignItems="stretch"
+                sx={{ mb: 2 }}
+              >
+                <TextField
+                  fullWidth
+                  placeholder="Enter Booking No., Container No., or B/L"
+                  variant="outlined"
+                  sx={{ 
+                    bgcolor: 'rgba(255, 255, 255, 0.8)', 
+                    borderRadius: 2,
+                    '& .MuiOutlinedInput-root': {
+                      '& fieldset': {
+                        borderColor: 'rgba(33, 77, 34, 0.2)',
+                        borderWidth: 2,
+                      },
+                      '&:hover fieldset': {
+                        borderColor: 'rgba(33, 77, 34, 0.4)',
+                      },
+                      '&.Mui-focused fieldset': {
+                        borderColor: '#4CAF50',
+                        borderWidth: 2,
+                      },
+                    },
+                    '& .MuiInputBase-input': {
+                      fontSize: '1rem',
+                      fontWeight: 500,
+                    }
+                  }}
+                />
+                <Button 
+                  variant="contained" 
+                  sx={{ 
+                    minWidth: { xs: '100%', sm: 200 },
+                    bgcolor: '#4CAF50',
+                    color: 'white',
+                    borderRadius: 2,
+                    py: 1.8,
+                    px: 3,
+                    fontSize: '1rem',
+                    fontWeight: 600,
+                    textTransform: 'none',
+                    boxShadow: '0 4px 12px rgba(76, 175, 80, 0.3)',
+                    '&:hover': {
+                      bgcolor: '#45a049',
+                      boxShadow: '0 6px 20px rgba(76, 175, 80, 0.4)',
+                      transform: 'translateY(-1px)',
+                    },
+                    transition: 'all 0.3s ease'
+                  }}
+                >
+                  Track Shipment Now
+                </Button>
+              </Box>
+              
+              <Typography 
+                variant="body2" 
+                sx={{ 
+                  color: 'rgba(33, 77, 34, 0.7)', 
+                  fontSize: '0.875rem',
+                  fontStyle: 'italic'
+                }}
+              >
+                Enter your booking reference, container number, or bill of lading to track your shipment
+              </Typography>
+            </Paper>
           </Box>
         </Container>
+        
         <img 
           src="/images/strip.svg" 
           alt="Strip" 
@@ -301,12 +394,11 @@ export default function Passenger() {
             height: 'auto',
             display: 'block',
             position: 'relative',
-            zIndex: 0
+            zIndex: 0,
+            marginTop: '2rem'
           }} 
         />
       </Box>
-      
-     
     </Layout>
   );
 } 
