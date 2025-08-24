@@ -779,35 +779,56 @@ export async function POST(req) {
     // Handle fetching summaries
     if (action === 'getSummaries') {
       try {
-        // Fetch summaries
+        // Fetch summaries with status information
         const { data: summaries, error: summariesError } = await supabase
           .from('summary')
-          .select('*')
+          .select(`
+            *,
+            summary_status:summary_status_id (id, status_name)
+          `)
           .order('created_at', { ascending: false });
 
         if (summariesError) {
           return NextResponse.json({ error: summariesError.message }, { status: 500 });
         }
 
-        // Fetch summary statuses
-        const { data: statuses, error: statusesError } = await supabase
-          .from('summary_status')
-          .select('id, status_name');
-
-        if (statusesError) {
-          return NextResponse.json({ error: statusesError.message }, { status: 500 });
-        }
-
-        // Create a map of status IDs to status names
-        const statusMap = new Map((statuses || []).map(s => [s.id, s.status_name]));
-
-        // Combine the data
+        // Transform the data to flatten the status object
         const summariesWithStatus = (summaries || []).map(summary => ({
           ...summary,
-          status_name: statusMap.get(summary.summary_status_id) || 'N/A'
+          status_name: summary.summary_status?.status_name || 'N/A',
+          status_id: summary.summary_status?.id || null
         }));
 
         return NextResponse.json({ summaries: summariesWithStatus });
+      } catch (error) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+    }
+
+    // Handle updating summary invoice ID
+    if (action === 'updateSummaryInvoiceId') {
+      const { summaryId, invoiceId } = params;
+      
+      if (!summaryId || !invoiceId) {
+        return NextResponse.json(
+          { error: 'Missing required fields: summaryId and invoiceId' },
+          { status: 400 }
+        );
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from('summary')
+          .update({ invoice_id: invoiceId })
+          .eq('id', summaryId)
+          .select()
+          .single();
+
+        if (error) {
+          return NextResponse.json({ error: error.message }, { status: 500 });
+        }
+
+        return NextResponse.json({ data });
       } catch (error) {
         return NextResponse.json({ error: error.message }, { status: 500 });
       }

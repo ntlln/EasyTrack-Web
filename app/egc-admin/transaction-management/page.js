@@ -6,6 +6,8 @@ import { useRouter } from 'next/navigation';
 
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
+import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
+import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import { PDFDownloadLink, Document, Page as PDFPage, Text, View, Font, Image } from '@react-pdf/renderer';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
@@ -100,10 +102,11 @@ const ReceiptPDF = ({ contracts = [], dateRange }) => {
                     <View style={{ flexDirection: 'row', backgroundColor: '#eee', borderBottomWidth: 1, borderColor: '#000' }}>
                         <Text style={{ flex: 0.5, fontWeight: 'bold', padding: 2, fontSize: 8 }}>No.</Text>
                         <Text style={{ flex: 1, fontWeight: 'bold', padding: 2, fontSize: 8 }}>Tracking ID</Text>
+                        <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 2, fontSize: 8 }}>Invoice No.</Text>
                         <Text style={{ flex: 2, fontWeight: 'bold', padding: 2, fontSize: 8 }}>Luggage Owner</Text>
                         <Text style={{ flex: 1, fontWeight: 'bold', padding: 2, fontSize: 8 }}>Flight No.</Text>
-                        <Text style={{ flex: 3, fontWeight: 'bold', padding: 2, fontSize: 8 }}>Address</Text>
-                        <Text style={{ flex: 2, fontWeight: 'bold', padding: 2, fontSize: 8 }}>Date Received</Text>
+                        <Text style={{ flex: 2.5, fontWeight: 'bold', padding: 2, fontSize: 8 }}>Address</Text>
+                        <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 2, fontSize: 8 }}>Date Received</Text>
                         <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 2, fontSize: 8 }}>Status</Text>
                         <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 2, fontSize: 8 }}>Amount</Text>
                         <Text style={{ flex: 1, fontWeight: 'bold', padding: 2, fontSize: 8 }}>Remarks</Text>
@@ -112,32 +115,33 @@ const ReceiptPDF = ({ contracts = [], dateRange }) => {
                         <View key={c.id || idx} style={{ flexDirection: 'row', borderBottomWidth: 1, borderColor: '#000' }}>
                             <Text style={{ flex: 0.5, padding: 2, fontSize: 8 }}>{idx + 1}</Text>
                             <Text style={{ flex: 1, padding: 2, fontSize: 8 }}>{c.id}</Text>
+                            <Text style={{ flex: 1.5, padding: 2, fontSize: 8 }}>{c.summary_id || 'N/A'}</Text>
                             <Text style={{ flex: 2, padding: 2, fontSize: 8 }}>{c.owner_first_name || c.owner_middle_initial || c.owner_last_name ? `${c.owner_first_name || ''} ${c.owner_middle_initial || ''} ${c.owner_last_name || ''}`.replace(/  +/g, ' ').trim() : 'N/A'}</Text>
                             <Text style={{ flex: 1, padding: 2, fontSize: 8 }}>{c.flight_number || 'N/A'}</Text>
-                            <Text style={{ flex: 3, padding: 2, fontSize: 8 }}>{c.drop_off_location || 'N/A'}</Text>
-                            <Text style={{ flex: 2, padding: 2, fontSize: 8 }}>{formatDate(c.delivered_at || c.created_at)}</Text>
+                            <Text style={{ flex: 2.5, padding: 2, fontSize: 8 }}>{c.drop_off_location || 'N/A'}</Text>
+                            <Text style={{ flex: 1.5, padding: 2, fontSize: 8 }}>{formatDate(c.delivered_at || c.created_at)}</Text>
                             <Text style={{ flex: 1.5, padding: 2, fontSize: 8 }}>{c.contract_status?.status_name || 'N/A'}</Text>
                             <Text style={{ flex: 1.5, padding: 2, fontFamily: 'Roboto', fontSize: 8 }}>{'\u20B1\u00A0'}{getRowAmount(c).toFixed(2)}</Text>
                             <Text style={{ flex: 1, padding: 2, fontSize: 8 }}>{c.contract_status?.status_name === 'Delivery Failed' ? 'Delivery Failed' : ''}</Text>
                         </View>
                     ))}
                     <View style={{ flexDirection: 'row', borderTopWidth: 1, borderColor: '#000', backgroundColor: '#f7f7f7' }}>
-                        <Text style={{ flex: 7.5, fontWeight: 'bold', padding: 2, textAlign: 'right', fontSize: 8 }}>Subtotal:</Text>
+                        <Text style={{ flex: 9, fontWeight: 'bold', padding: 2, textAlign: 'right', fontSize: 8 }}>Subtotal:</Text>
                         <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 2, fontFamily: 'Roboto', fontSize: 8 }}>{'\u20B1\u00A0'}{subtotal.toFixed(2)}</Text>
-                        <Text style={{ flex: 2 }}></Text>
+                        <Text style={{ flex: 1 }}></Text>
                     </View>
                     <View style={{ flexDirection: 'row', borderTopWidth: 1, borderColor: '#000', backgroundColor: '#f7f7f7' }}>
-                        <Text style={{ flex: 7.5, fontWeight: 'bold', padding: 2, textAlign: 'right', fontSize: 8 }}>Surcharge Total:</Text>
+                        <Text style={{ flex: 9, fontWeight: 'bold', padding: 2, textAlign: 'right', fontSize: 8 }}>Surcharge Total:</Text>
                         <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 2, fontFamily: 'Roboto', fontSize: 8 }}>{'\u20B1\u00A0'}{surchargeTotal.toFixed(2)}</Text>
-                        <Text style={{ flex: 2 }}></Text>
+                        <Text style={{ flex: 1 }}></Text>
                     </View>
                     <View style={{ flexDirection: 'row', borderTopWidth: 1, borderColor: '#000', backgroundColor: '#f7f7f7' }}>
-                        <Text style={{ flex: 7.5, fontWeight: 'bold', padding: 2, textAlign: 'right', fontSize: 8 }}>Discount Total:</Text>
+                        <Text style={{ flex: 9, fontWeight: 'bold', padding: 2, textAlign: 'right', fontSize: 8 }}>Discount Total:</Text>
                         <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 2, fontFamily: 'Roboto', fontSize: 8 }}>{'\u20B1\u00A0'}{discountTotal.toFixed(2)}</Text>
-                        <Text style={{ flex: 2 }}></Text>
+                        <Text style={{ flex: 1 }}></Text>
                     </View>
                     <View style={{ flexDirection: 'row', borderTopWidth: 2, borderColor: '#000', backgroundColor: '#eee' }}>
-                        <Text style={{ flex: 9.5, fontWeight: 'bold', padding: 2, textAlign: 'right', fontSize: 8 }}>TOTAL</Text>
+                        <Text style={{ flex: 10.5, fontWeight: 'bold', padding: 2, textAlign: 'right', fontSize: 8 }}>TOTAL</Text>
                         <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 2, fontFamily: 'Roboto', fontSize: 8 }}>{'\u20B1\u00A0'}{totalAmount.toFixed(2)}</Text>
                     </View>
                 </View>
@@ -340,25 +344,7 @@ const TransactionManagement = () => {
     // Add new state for confirmation dialog
     const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
     const [pendingPriceUpdate, setPendingPriceUpdate] = useState(null);
-    const [payments, setPayments] = useState([]);
-    const [loadingPayments, setLoadingPayments] = useState(false);
-    const [paymentsError, setPaymentsError] = useState(null);
-    const [selectedPayments, setSelectedPayments] = useState([]);
-    const [paymentsMenuAnchorEl, setPaymentsMenuAnchorEl] = useState(null);
-    const [paymentsMenuRow, setPaymentsMenuRow] = useState(null);
-    const [confirmMarkPaidOpen, setConfirmMarkPaidOpen] = useState(false);
-    const [markPaidRow, setMarkPaidRow] = useState(null);
-    const [markPaidLoading, setMarkPaidLoading] = useState(false);
-    const [paymentsPage, setPaymentsPage] = useState(0);
-    const [paymentsRowsPerPage, setPaymentsRowsPerPage] = useState(10);
-    // Define paginatedPayments at the top level
-    const paginatedPayments = payments.slice(paymentsPage * paymentsRowsPerPage, paymentsPage * paymentsRowsPerPage + paymentsRowsPerPage);
-    // Pagination handlers
-    const handlePaymentsPageChange = (event, newPage) => setPaymentsPage(newPage);
-    const handlePaymentsRowsPerPageChange = (event) => {
-        setPaymentsRowsPerPage(parseInt(event.target.value, 10));
-        setPaymentsPage(0);
-    };
+
     const [podOpen, setPodOpen] = useState(false);
     const [podContract, setPodContract] = useState(null);
     const [podImage, setPodImage] = useState(null);
@@ -369,6 +355,18 @@ const TransactionManagement = () => {
     const [summaries, setSummaries] = useState([]);
     const [loadingSummaries, setLoadingSummaries] = useState(false);
     const [summariesError, setSummariesError] = useState(null);
+    
+    // Sorting state for Summary table
+    const [summarySortField, setSummarySortField] = useState('created_at');
+    const [summarySortDirection, setSummarySortDirection] = useState('desc');
+    
+    // Sorting state for Pending table
+    const [pendingSortField, setPendingSortField] = useState('created_at');
+    const [pendingSortDirection, setPendingSortDirection] = useState('desc');
+    
+    // Sorting state for Pricing Update table
+    const [pricingSortField, setPricingSortField] = useState('region');
+    const [pricingSortDirection, setPricingSortDirection] = useState('asc');
 
     // Data fetching
     useEffect(() => {
@@ -496,7 +494,7 @@ const TransactionManagement = () => {
 
     // Fetch all pricing data for the table
     useEffect(() => {
-        if (tabValue !== 1) return;
+        if (tabValue !== 2) return;
         setLoadingPricingTable(true);
         const fetchPricingTable = async () => {
             try {
@@ -709,15 +707,65 @@ const TransactionManagement = () => {
     // Get unique regions for filter
     const uniqueRegions = Array.from(new Set(pricingTable.map(row => row.region))).filter(Boolean);
 
-    // Filtered table data
-    const filteredPricingTable = pricingTable.filter(row => {
-        const regionMatch = !regionFilter || row.region === regionFilter;
-        const cityMatch = !citySearch || row.city.toLowerCase().includes(citySearch.toLowerCase());
-        return regionMatch && cityMatch;
-    });
+         // Filtered table data
+     const filteredPricingTable = pricingTable.filter(row => {
+         const regionMatch = !regionFilter || row.region === regionFilter;
+         const cityMatch = !citySearch || row.city.toLowerCase().includes(citySearch.toLowerCase());
+         return regionMatch && cityMatch;
+     });
 
-    // Pagination logic
-    const paginatedPricingTable = filteredPricingTable.slice(pricingPage * pricingRowsPerPage, pricingPage * pricingRowsPerPage + pricingRowsPerPage);
+     // Sorting functions for Pricing Update table
+     const handlePricingSort = (field) => {
+         const isAsc = pricingSortField === field && pricingSortDirection === 'asc';
+         setPricingSortDirection(isAsc ? 'desc' : 'asc');
+         setPricingSortField(field);
+     };
+
+     const getSortedPricingData = () => {
+         return [...filteredPricingTable].sort((a, b) => {
+             let aValue, bValue;
+             
+             switch (pricingSortField) {
+                 case 'region':
+                     aValue = a.region || '';
+                     bValue = b.region || '';
+                     break;
+                 case 'city':
+                     aValue = a.city || '';
+                     bValue = b.city || '';
+                     break;
+                 case 'price':
+                     aValue = Number(a.price) || 0;
+                     bValue = Number(b.price) || 0;
+                     break;
+                 case 'updated_at':
+                     aValue = new Date(a.updated_at || 0);
+                     bValue = new Date(b.updated_at || 0);
+                     break;
+                 default:
+                     aValue = a[pricingSortField] || '';
+                     bValue = b[pricingSortField] || '';
+             }
+             
+             if (aValue < bValue) {
+                 return pricingSortDirection === 'asc' ? -1 : 1;
+             }
+             if (aValue > bValue) {
+                 return pricingSortDirection === 'asc' ? 1 : -1;
+             }
+             return 0;
+         });
+     };
+
+     const getPricingSortIcon = (field) => {
+         if (pricingSortField !== field) {
+             return null;
+         }
+         return pricingSortDirection === 'asc' ? <ArrowUpwardIcon /> : <ArrowDownwardIcon />;
+     };
+
+     // Pagination logic
+     const paginatedPricingTable = getSortedPricingData().slice(pricingPage * pricingRowsPerPage, pricingPage * pricingRowsPerPage + pricingRowsPerPage);
 
     // Modify the edit price handlers
     const handleEditPriceClick = (row) => {
@@ -911,28 +959,9 @@ const TransactionManagement = () => {
         }
     };
 
-    // Fetch payments when Payments History tab is selected
+    // Fetch summaries when Summary tab is selected
     useEffect(() => {
         if (tabValue !== 1) return;
-        setLoadingPayments(true);
-        setPaymentsError(null);
-        fetch('/api/admin', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'getPayments', params: {} })
-        })
-            .then(res => res.json())
-            .then(json => {
-                if (json.error) throw new Error(json.error);
-                setPayments(json.data || []);
-            })
-            .catch(err => setPaymentsError(err.message || 'Failed to fetch payments'))
-            .finally(() => setLoadingPayments(false));
-    }, [tabValue]);
-
-    // Fetch summaries when Summaries tab is selected
-    useEffect(() => {
-        if (tabValue !== 3) return;
         setLoadingSummaries(true);
         setSummariesError(null);
         fetch('/api/admin', {
@@ -949,73 +978,83 @@ const TransactionManagement = () => {
             .finally(() => setLoadingSummaries(false));
     }, [tabValue]);
 
-    // Payments History: Checkbox logic
-    const isPaymentSelected = (id) => selectedPayments.includes(id);
-    const handleSelectPayment = (id) => {
-        setSelectedPayments((prev) =>
-            prev.includes(id) ? prev.filter((rowId) => rowId !== id) : [...prev, id]
-        );
+
+
+
+
+    // Sorting functions for Pending table
+    const handlePendingSort = (field) => {
+        const isAsc = pendingSortField === field && pendingSortDirection === 'asc';
+        setPendingSortDirection(isAsc ? 'desc' : 'asc');
+        setPendingSortField(field);
     };
-    const handleSelectAllPayments = (event) => {
-        if (event.target.checked) {
-            const allIds = payments.map((row) => row.id);
-            setSelectedPayments(allIds);
-        } else {
-            setSelectedPayments([]);
+
+    const getSortedPendingData = () => {
+        return [...filteredData].sort((a, b) => {
+            let aValue, bValue;
+            
+            switch (pendingSortField) {
+                case 'id':
+                    aValue = a.id;
+                    bValue = b.id;
+                    break;
+                case 'owner_name':
+                    aValue = `${a.owner_first_name || ''} ${a.owner_middle_initial || ''} ${a.owner_last_name || ''}`.trim();
+                    bValue = `${b.owner_first_name || ''} ${b.owner_middle_initial || ''} ${b.owner_last_name || ''}`.trim();
+                    break;
+                case 'flight_number':
+                    aValue = a.flight_number || '';
+                    bValue = b.flight_number || '';
+                    break;
+                case 'drop_off_location':
+                    aValue = a.drop_off_location || '';
+                    bValue = b.drop_off_location || '';
+                    break;
+                case 'delivered_at':
+                    aValue = new Date(a.delivered_at || a.created_at || 0);
+                    bValue = new Date(b.delivered_at || b.created_at || 0);
+                    break;
+                case 'contract_status':
+                    aValue = a.contract_status?.status_name || '';
+                    bValue = b.contract_status?.status_name || '';
+                    break;
+                case 'amount':
+                    const aDeliveryCharge = Number(a.delivery_charge) || 0;
+                    const aDeliverySurcharge = Number(a.delivery_surcharge || a.surcharge) || 0;
+                    const aDeliveryDiscount = Number(a.delivery_discount || a.discount) || 0;
+                    aValue = Math.max(0, (aDeliveryCharge + aDeliverySurcharge) - aDeliveryDiscount);
+                    
+                    const bDeliveryCharge = Number(b.delivery_charge) || 0;
+                    const bDeliverySurcharge = Number(b.delivery_surcharge || b.surcharge) || 0;
+                    const bDeliveryDiscount = Number(b.delivery_discount || b.discount) || 0;
+                    bValue = Math.max(0, (bDeliveryCharge + bDeliverySurcharge) - bDeliveryDiscount);
+                    break;
+                default:
+                    aValue = a[pendingSortField] || '';
+                    bValue = b[pendingSortField] || '';
+            }
+            
+            if (aValue < bValue) {
+                return pendingSortDirection === 'asc' ? -1 : 1;
+            }
+            if (aValue > bValue) {
+                return pendingSortDirection === 'asc' ? 1 : -1;
+            }
+            return 0;
+        });
+    };
+
+    const getPendingSortIcon = (field) => {
+        if (pendingSortField !== field) {
+            return null;
         }
-    };
-    const allPaymentsSelected = payments.length > 0 && payments.every((row) => selectedPayments.includes(row.id));
-    const somePaymentsSelected = payments.some((row) => selectedPayments.includes(row.id));
-    // Payments History: Actions menu logic
-    const handleMarkAsPaid = (row) => {
-        setMarkPaidRow(row);
-        setConfirmMarkPaidOpen(true);
-    };
-    const handleConfirmMarkPaid = async () => {
-        if (!markPaidRow) return;
-        setMarkPaidLoading(true);
-        try {
-            const res = await fetch('/api/admin', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    action: 'updatePaymentStatus',
-                    params: {
-                        payment_id: markPaidRow.id,
-                        summary_stat: 2
-                    }
-                })
-            });
-            const json = await res.json();
-            if (!res.ok) throw new Error(json.error || 'Failed to update payment status');
-            // Update UI
-            setPayments((prev) => prev.map(p => p.id === markPaidRow.id ? { ...p, summary_stat: 2 } : p));
-            setSnackbar({
-                open: true,
-                message: 'Payment marked as paid!',
-                severity: 'success'
-            });
-        } catch (err) {
-            setSnackbar({
-                open: true,
-                message: err.message || 'Failed to update payment status',
-                severity: 'error'
-            });
-        } finally {
-            setMarkPaidLoading(false);
-            setConfirmMarkPaidOpen(false);
-            setMarkPaidRow(null);
-        }
-    };
-    const handleCancelMarkPaid = () => {
-        setConfirmMarkPaidOpen(false);
-        setMarkPaidRow(null);
+        return pendingSortDirection === 'asc' ? <ArrowUpwardIcon /> : <ArrowDownwardIcon />;
     };
 
     // Transaction Management pagination state
     const [tmPage, setTmPage] = useState(0);
     const [tmRowsPerPage, setTmRowsPerPage] = useState(10);
-    const paginatedFilteredData = filteredData.slice(tmPage * tmRowsPerPage, tmPage * tmRowsPerPage + tmRowsPerPage);
+    const paginatedFilteredData = getSortedPendingData().slice(tmPage * tmRowsPerPage, tmPage * tmRowsPerPage + tmRowsPerPage);
     const handleTmPageChange = (event, newPage) => setTmPage(newPage);
     const handleTmRowsPerPageChange = (event) => {
         setTmRowsPerPage(parseInt(event.target.value, 10));
@@ -1129,6 +1168,139 @@ const TransactionManagement = () => {
         setSummaryData(null);
     };
 
+     const handleViewSummaryDetails = (summary) => {
+         // For now, just show the summary data in the existing summary dialog
+         // You can expand this to fetch more detailed information if needed
+         setSummaryData({
+             summaryId: summary.id,
+             totalContracts: 0, // This would need to be fetched from the database
+             totalAmount: summary.total_charge || 0,
+             deliveredContracts: 0, // This would need to be fetched from the database
+             failedContracts: 0, // This would need to be fetched from the database
+             contracts: [], // This would need to be fetched from the database
+             summaryRecord: summary
+         });
+         setSummaryOpen(true);
+     };
+
+     const generateInvoiceNumber = () => {
+         const today = new Date();
+         const datePart = formatDateFns(today, 'yyyyMMdd');
+         const randomPart = Math.random().toString(36).substring(2, 6).toUpperCase(); // 4 random alphanumeric characters
+         return `INV${datePart}${randomPart}`;
+     };
+
+     const handleGenerateSummaryInvoice = async (summary) => {
+         // Generate invoice number with format INVyyyymmdd + 4 random alphanumeric characters
+         const invoiceNumber = generateInvoiceNumber();
+         
+         try {
+             // Update the summary record with the generated invoice number
+             const response = await fetch('/api/admin', {
+                 method: 'POST',
+                 headers: { 'Content-Type': 'application/json' },
+                 body: JSON.stringify({
+                     action: 'updateSummaryInvoiceId',
+                     params: {
+                         summaryId: summary.id,
+                         invoiceId: invoiceNumber
+                     }
+                 })
+             });
+             
+             if (!response.ok) {
+                 const errorData = await response.json();
+                 throw new Error(errorData.error || 'Failed to update invoice number');
+             }
+             
+             // Update the local state to reflect the change
+             setSummaries(prev => prev.map(s => 
+                 s.id === summary.id 
+                     ? { ...s, invoice_id: invoiceNumber }
+                     : s
+             ));
+             
+             setSnackbar({
+                 open: true,
+                 message: `Invoice ${invoiceNumber} generated and saved for summary ${summary.id}`,
+                 severity: 'success'
+             });
+         } catch (error) {
+             console.error('Error updating invoice number:', error);
+             setSnackbar({
+                 open: true,
+                 message: error.message || 'Failed to save invoice number',
+                 severity: 'error'
+             });
+         }
+     };
+
+     const handleGenerateSummaryReport = (summary) => {
+         // This would generate a summary report for the specific summary
+         // For now, show a success message
+         setSnackbar({
+             open: true,
+             message: `Summary report generated for ${summary.id}`,
+             severity: 'success'
+         });
+     };
+
+     // Sorting functions for Summary table
+     const handleSummarySort = (field) => {
+         const isAsc = summarySortField === field && summarySortDirection === 'asc';
+         setSummarySortDirection(isAsc ? 'desc' : 'asc');
+         setSummarySortField(field);
+     };
+
+     const getSortedSummaries = () => {
+         return [...summaries].sort((a, b) => {
+             let aValue, bValue;
+             
+             switch (summarySortField) {
+                 case 'id':
+                     aValue = a.id;
+                     bValue = b.id;
+                     break;
+                 case 'invoice_id':
+                     aValue = a.invoice_id || '';
+                     bValue = b.invoice_id || '';
+                     break;
+                 case 'status_name':
+                     aValue = a.status_name || '';
+                     bValue = b.status_name || '';
+                     break;
+                 case 'created_at':
+                     aValue = new Date(a.created_at || 0);
+                     bValue = new Date(b.created_at || 0);
+                     break;
+                 case 'due_date':
+                     aValue = new Date(a.due_date || 0);
+                     bValue = new Date(b.due_date || 0);
+                     break;
+                 default:
+                     aValue = a[summarySortField] || '';
+                     bValue = b[summarySortField] || '';
+             }
+             
+             if (aValue < bValue) {
+                 return summarySortDirection === 'asc' ? -1 : 1;
+             }
+             if (aValue > bValue) {
+                 return summarySortDirection === 'asc' ? 1 : -1;
+             }
+             return 0;
+         });
+     };
+
+     const getSortIcon = (field) => {
+         if (summarySortField !== field) {
+             return null;
+         }
+         return summarySortDirection === 'asc' ? <ArrowUpwardIcon /> : <ArrowDownwardIcon />;
+     };
+
+
+
     const fetchProofOfDelivery = async (contractId) => {
         setPodLoading(true);
         setPodError(null);
@@ -1172,10 +1344,9 @@ const TransactionManagement = () => {
                     aria-label="transaction management tabs"
                     centered
                 >
-                    <Tab label="Transaction Management" />
-                    <Tab label="Payments History" />
+                    <Tab label="Pending" />
+                    <Tab label="Summary" />
                     <Tab label="Pricing Update" />
-                    <Tab label="Summaries" />
                 </Tabs>
             </Box>
 
@@ -1274,28 +1445,84 @@ const TransactionManagement = () => {
                     </Box>
                     <TableContainer component={Paper}>
                         <Table>
-                            <TableHead>
-                                <TableRow sx={{ backgroundColor: 'primary.main' }}>
-                                    <TableCell padding="checkbox" sx={{ color: 'white' }}>
-                                        <Checkbox 
-                                            indeterminate={somePageRowsSelected && !allPageRowsSelected} 
-                                            checked={allPageRowsSelected} 
-                                            onChange={handleSelectAll} 
-                                            inputProps={{ 'aria-label': 'select all contracts' }}
-                                            sx={{ color: 'white', '&.Mui-checked': { color: 'white' } }}
-                                        />
-                                    </TableCell>
-                                    <TableCell sx={{ color: 'white' }}>Tracking ID</TableCell>
-                                    <TableCell sx={{ color: 'white' }}>Luggage Owner</TableCell>
-                                    <TableCell sx={{ color: 'white' }}>Flight No.</TableCell>
-                                    <TableCell sx={{ color: 'white' }}>Address</TableCell>
-                                    <TableCell sx={{ color: 'white' }}>Date Received</TableCell>
-                                    <TableCell sx={{ color: 'white' }}>Status</TableCell>
-                                    <TableCell sx={{ color: 'white' }}>Amount</TableCell>
-                                    <TableCell sx={{ color: 'white' }}>Remarks</TableCell>
-                                    <TableCell sx={{ color: 'white' }}>Actions</TableCell>
-                                </TableRow>
-                            </TableHead>
+                                                         <TableHead>
+                                 <TableRow sx={{ backgroundColor: 'primary.main' }}>
+                                     <TableCell padding="checkbox" sx={{ color: 'white' }}>
+                                         <Checkbox 
+                                             indeterminate={somePageRowsSelected && !allPageRowsSelected} 
+                                             checked={allPageRowsSelected} 
+                                             onChange={handleSelectAll} 
+                                             inputProps={{ 'aria-label': 'select all contracts' }}
+                                             sx={{ color: 'white', '&.Mui-checked': { color: 'white' } }}
+                                         />
+                                     </TableCell>
+                                     <TableCell 
+                                         sx={{ color: 'white', cursor: 'pointer', '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' } }}
+                                         onClick={() => handlePendingSort('id')}
+                                     >
+                                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                             Tracking ID
+                                             {getPendingSortIcon('id')}
+                                         </Box>
+                                     </TableCell>
+                                     <TableCell 
+                                         sx={{ color: 'white', cursor: 'pointer', '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' } }}
+                                         onClick={() => handlePendingSort('owner_name')}
+                                     >
+                                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                             Luggage Owner
+                                             {getPendingSortIcon('owner_name')}
+                                         </Box>
+                                     </TableCell>
+                                     <TableCell 
+                                         sx={{ color: 'white', cursor: 'pointer', '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' } }}
+                                         onClick={() => handlePendingSort('flight_number')}
+                                     >
+                                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                             Flight No.
+                                             {getPendingSortIcon('flight_number')}
+                                         </Box>
+                                     </TableCell>
+                                     <TableCell 
+                                         sx={{ color: 'white', cursor: 'pointer', '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' } }}
+                                         onClick={() => handlePendingSort('drop_off_location')}
+                                     >
+                                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                             Address
+                                             {getPendingSortIcon('drop_off_location')}
+                                         </Box>
+                                     </TableCell>
+                                     <TableCell 
+                                         sx={{ color: 'white', cursor: 'pointer', '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' } }}
+                                         onClick={() => handlePendingSort('delivered_at')}
+                                     >
+                                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                             Date Received
+                                             {getPendingSortIcon('delivered_at')}
+                                         </Box>
+                                     </TableCell>
+                                     <TableCell 
+                                         sx={{ color: 'white', cursor: 'pointer', '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' } }}
+                                         onClick={() => handlePendingSort('contract_status')}
+                                     >
+                                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                             Status
+                                             {getPendingSortIcon('contract_status')}
+                                         </Box>
+                                     </TableCell>
+                                     <TableCell 
+                                         sx={{ color: 'white', cursor: 'pointer', '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' } }}
+                                         onClick={() => handlePendingSort('amount')}
+                                     >
+                                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                             Amount
+                                             {getPendingSortIcon('amount')}
+                                         </Box>
+                                     </TableCell>
+                                     <TableCell sx={{ color: 'white' }}>Remarks</TableCell>
+                                     <TableCell sx={{ color: 'white' }}>Actions</TableCell>
+                                 </TableRow>
+                             </TableHead>
                             <TableBody>
                                 {paginatedFilteredData.map((row) => {
                                     const status = row.contract_status?.status_name || row.contract_status_id || '';
@@ -1331,98 +1558,146 @@ const TransactionManagement = () => {
                                 })}
                             </TableBody>
                         </Table>
-                        <TablePagination 
-                            rowsPerPageOptions={[10, 25, 50, 100]}
-                            component="div" 
-                            count={filteredData.length} 
-                            rowsPerPage={tmRowsPerPage}
-                            page={tmPage}
-                            onPageChange={handleTmPageChange}
-                            onRowsPerPageChange={handleTmRowsPerPageChange}
-                            labelRowsPerPage="Rows per page:"
-                        />
+                                                 <TablePagination 
+                             rowsPerPageOptions={[10, 25, 50, 100]}
+                             component="div" 
+                             count={getSortedPendingData().length} 
+                             rowsPerPage={tmRowsPerPage}
+                             page={tmPage}
+                             onPageChange={handleTmPageChange}
+                             onRowsPerPageChange={handleTmRowsPerPageChange}
+                             labelRowsPerPage="Rows per page:"
+                         />
                     </TableContainer>
                 </Box>
             )}
 
             {tabValue === 1 && (
                 <Box sx={{ p: 3 }}>
-                    {loadingPayments ? (
+                    {loadingSummaries ? (
                         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 200 }}>
                             <CircularProgress />
                         </Box>
-                    ) : paymentsError ? (
-                        <Alert severity="error">{paymentsError}</Alert>
+                    ) : summariesError ? (
+                        <Alert severity="error">{summariesError}</Alert>
                     ) : (
                         <TableContainer component={Paper}>
                             <Table>
                                 <TableHead>
                                     <TableRow sx={{ backgroundColor: 'primary.main' }}>
-                                        <TableCell padding="checkbox" sx={{ color: 'white' }}>
-                                            <Checkbox
-                                                indeterminate={somePaymentsSelected && !allPaymentsSelected}
-                                                checked={allPaymentsSelected}
-                                                onChange={handleSelectAllPayments}
-                                                inputProps={{ 'aria-label': 'select all payments' }}
-                                                sx={{ color: 'white', '&.Mui-checked': { color: 'white' } }}
-                                            />
+                                         <TableCell 
+                                             sx={{ color: 'white', cursor: 'pointer', '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' } }}
+                                             onClick={() => handleSummarySort('id')}
+                                         >
+                                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                                 Summary ID
+                                                 {getSortIcon('id')}
+                                             </Box>
                                         </TableCell>
-                                        <TableCell sx={{ color: 'white' }}>Invoice #</TableCell>
-                                        <TableCell sx={{ color: 'white' }}>Status</TableCell>
-                                        <TableCell sx={{ color: 'white' }}>Created At</TableCell>
-                                        <TableCell sx={{ color: 'white' }}>Due Date</TableCell>
-                                        <TableCell sx={{ color: 'white' }}>Updated At</TableCell>
-                                        <TableCell sx={{ color: 'white' }}>Invoice ID</TableCell>
-                                        <TableCell sx={{ color: 'white' }}>Total Charge</TableCell>
+                                         <TableCell 
+                                             sx={{ color: 'white', cursor: 'pointer', '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' } }}
+                                             onClick={() => handleSummarySort('invoice_id')}
+                                         >
+                                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                                 Invoice No.
+                                                 {getSortIcon('invoice_id')}
+                                             </Box>
+                                         </TableCell>
+                                         <TableCell 
+                                             sx={{ color: 'white', cursor: 'pointer', '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' } }}
+                                             onClick={() => handleSummarySort('status_name')}
+                                         >
+                                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                                 Status
+                                                 {getSortIcon('status_name')}
+                                             </Box>
+                                         </TableCell>
+                                         <TableCell 
+                                             sx={{ color: 'white', cursor: 'pointer', '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' } }}
+                                             onClick={() => handleSummarySort('created_at')}
+                                         >
+                                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                                 Created At
+                                                 {getSortIcon('created_at')}
+                                             </Box>
+                                         </TableCell>
+                                         <TableCell 
+                                             sx={{ color: 'white', cursor: 'pointer', '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' } }}
+                                             onClick={() => handleSummarySort('due_date')}
+                                         >
+                                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                                 Due Date
+                                                 {getSortIcon('due_date')}
+                                             </Box>
+                                         </TableCell>
                                         <TableCell sx={{ color: 'white' }}>Actions</TableCell>
                                     </TableRow>
                                 </TableHead>
                                 <TableBody>
-                                    {paginatedPayments.length === 0 ? (
+                                     {summaries.length === 0 ? (
                                         <TableRow>
-                                            <TableCell colSpan={9} align="center">No payments found</TableCell>
+                                             <TableCell colSpan={6} align="center">No summaries found</TableCell>
                                         </TableRow>
-                                    ) : paginatedPayments.map((row) => (
-                                        <TableRow key={row.id}>
-                                            <TableCell padding="checkbox">
-                                                <Checkbox
-                                                    checked={isPaymentSelected(row.id)}
-                                                    onChange={() => handleSelectPayment(row.id)}
-                                                    inputProps={{ 'aria-label': `select payment ${row.id}` }}
-                                                />
+                                     ) : getSortedSummaries().map((summary) => (
+                                         <TableRow key={summary.id}>
+                                             <TableCell>{summary.id}</TableCell>
+                                             <TableCell>{summary.invoice_id || 'N/A'}</TableCell>
+                                             <TableCell>
+                                                 <Box sx={{ 
+                                                     display: 'inline-flex', 
+                                                     alignItems: 'center', 
+                                                     px: 1.5, 
+                                                     py: 0.5, 
+                                                     borderRadius: 1,
+                                                     backgroundColor: summary.status_id === 1 ? '#fff3cd' : '#d1edff',
+                                                     color: summary.status_id === 1 ? '#856404' : '#0c5460',
+                                                     border: `1px solid ${summary.status_id === 1 ? '#ffeaa7' : '#bee5eb'}`,
+                                                     fontSize: '0.75rem',
+                                                     fontWeight: 500
+                                                 }}>
+                                                     {summary.status_name || 'N/A'}
+                                                 </Box>
                                             </TableCell>
-                                            <TableCell>{row.id}</TableCell>
-                                            <TableCell>{row.summary_stat === 1 ? 'Non-receipted' : row.summary_stat === 2 ? 'Receipted' : row.summary_stat}</TableCell>
-                                            <TableCell>{row.created_at ? new Date(row.created_at).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }) : ''}</TableCell>
-                                            <TableCell>{row.due_date ? new Date(row.due_date).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }) : ''}</TableCell>
-                                            <TableCell>{row.updated_at ? new Date(row.updated_at).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }) : ''}</TableCell>
-                                            <TableCell>{row.invoice_id || 'N/A'}</TableCell>
-                                            <TableCell>₱{Number(row.total_charge).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
                                             <TableCell>
+                                                 {summary.created_at ? new Date(summary.created_at).toLocaleDateString(undefined, { 
+                                                     year: 'numeric', 
+                                                     month: 'long', 
+                                                     day: 'numeric',
+                                                     hour: '2-digit',
+                                                     minute: '2-digit'
+                                                 }) : ''}
+                                             </TableCell>
+                                             <TableCell>
+                                                 {summary.due_date ? new Date(summary.due_date).toLocaleDateString(undefined, { 
+                                                     year: 'numeric', 
+                                                     month: 'long', 
+                                                     day: 'numeric'
+                                                 }) : ''}
+                                             </TableCell>
+                                             <TableCell>
+                                                  <Box sx={{ display: 'flex', gap: 1 }}>
                                                 <Button
-                                                    size="small"
                                                     variant="contained"
+                                                          size="small"
                                                     color="primary"
-                                                    onClick={() => handleMarkAsPaid(row)}
-                                                    disabled={row.summary_stat === 2}
+                                                          onClick={() => handleGenerateSummaryInvoice(summary)}
                                                 >
-                                                    Mark as Paid
+                                                          Generate Invoice
                                                 </Button>
+                                                      <Button
+                                                          variant="contained"
+                                                          size="small"
+                                                          color="secondary"
+                                                          onClick={() => handleGenerateSummaryReport(summary)}
+                                                      >
+                                                          Generate Summary
+                                                      </Button>
+                                                  </Box>
                                             </TableCell>
                                         </TableRow>
                                     ))}
                                 </TableBody>
                             </Table>
-                            <TablePagination
-                                rowsPerPageOptions={[10, 25, 50, 100]}
-                                component="div"
-                                count={payments.length}
-                                rowsPerPage={paymentsRowsPerPage}
-                                page={paymentsPage}
-                                onPageChange={handlePaymentsPageChange}
-                                onRowsPerPageChange={handlePaymentsRowsPerPageChange}
-                                labelRowsPerPage="Rows per page:"
-                            />
                         </TableContainer>
                     )}
                 </Box>
@@ -1457,24 +1732,57 @@ const TransactionManagement = () => {
                         </Box>
                         <TableContainer component={Paper}>
                             <Table>
-                                <TableHead>
-                                    <TableRow sx={{ backgroundColor: 'primary.main' }}>
-                                        <TableCell padding="checkbox" sx={{ color: 'white' }}>
-                                            <Checkbox
-                                                indeterminate={somePagePricingRowsSelected && !allPagePricingRowsSelected}
-                                                checked={allPagePricingRowsSelected}
-                                                onChange={handleSelectAllPricingRows}
-                                                inputProps={{ 'aria-label': 'select all pricing rows' }}
-                                                sx={{ color: 'white', '&.Mui-checked': { color: 'white' } }}
-                                            />
-                                        </TableCell>
-                                        <TableCell sx={{ color: 'white' }}><b>Region</b></TableCell>
-                                        <TableCell sx={{ color: 'white' }}><b>City</b></TableCell>
-                                        <TableCell align="right" sx={{ color: 'white' }}><b>Price (₱)</b></TableCell>
-                                        <TableCell sx={{ color: 'white' }}><b>Last Updated</b></TableCell>
-                                        <TableCell sx={{ color: 'white' }} align="center"><b>Action</b></TableCell>
-                                    </TableRow>
-                                </TableHead>
+                                                                 <TableHead>
+                                     <TableRow sx={{ backgroundColor: 'primary.main' }}>
+                                         <TableCell padding="checkbox" sx={{ color: 'white' }}>
+                                             <Checkbox
+                                                 indeterminate={somePagePricingRowsSelected && !allPagePricingRowsSelected}
+                                                 checked={allPagePricingRowsSelected}
+                                                 onChange={handleSelectAllPricingRows}
+                                                 inputProps={{ 'aria-label': 'select all pricing rows' }}
+                                                 sx={{ color: 'white', '&.Mui-checked': { color: 'white' } }}
+                                             />
+                                         </TableCell>
+                                         <TableCell 
+                                             sx={{ color: 'white', cursor: 'pointer', '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' } }}
+                                             onClick={() => handlePricingSort('region')}
+                                         >
+                                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                                 <b>Region</b>
+                                                 {getPricingSortIcon('region')}
+                                             </Box>
+                                         </TableCell>
+                                         <TableCell 
+                                             sx={{ color: 'white', cursor: 'pointer', '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' } }}
+                                             onClick={() => handlePricingSort('city')}
+                                         >
+                                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                                 <b>City</b>
+                                                 {getPricingSortIcon('city')}
+                                             </Box>
+                                         </TableCell>
+                                         <TableCell 
+                                             align="right"
+                                             sx={{ color: 'white', cursor: 'pointer', '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' } }}
+                                             onClick={() => handlePricingSort('price')}
+                                         >
+                                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, justifyContent: 'flex-end' }}>
+                                                 <b>Price (₱)</b>
+                                                 {getPricingSortIcon('price')}
+                                             </Box>
+                                         </TableCell>
+                                         <TableCell 
+                                             sx={{ color: 'white', cursor: 'pointer', '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' } }}
+                                             onClick={() => handlePricingSort('updated_at')}
+                                         >
+                                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                                 <b>Last Updated</b>
+                                                 {getPricingSortIcon('updated_at')}
+                                             </Box>
+                                         </TableCell>
+                                         <TableCell sx={{ color: 'white' }} align="center"><b>Action</b></TableCell>
+                                     </TableRow>
+                                 </TableHead>
                                 <TableBody>
                                     {loadingPricingTable ? (
                                         <TableRow>
@@ -1525,69 +1833,18 @@ const TransactionManagement = () => {
                                     )}
                                 </TableBody>
                             </Table>
-                            <TablePagination
-                                rowsPerPageOptions={[10, 25, 50, 100]}
-                                component="div"
-                                count={filteredPricingTable.length}
-                                rowsPerPage={pricingRowsPerPage}
-                                page={pricingPage}
-                                onPageChange={handlePricingPageChange}
-                                onRowsPerPageChange={handlePricingRowsPerPageChange}
-                                labelRowsPerPage="Rows per page:"
-                            />
+                                                         <TablePagination
+                                 rowsPerPageOptions={[10, 25, 50, 100]}
+                                 component="div"
+                                 count={getSortedPricingData().length}
+                                 rowsPerPage={pricingRowsPerPage}
+                                 page={pricingPage}
+                                 onPageChange={handlePricingPageChange}
+                                 onRowsPerPageChange={handlePricingRowsPerPageChange}
+                                 labelRowsPerPage="Rows per page:"
+                             />
                         </TableContainer>
                     </Box>
-                </Box>
-            )}
-
-            {tabValue === 3 && (
-                <Box sx={{ p: 3 }}>
-                    {loadingSummaries ? (
-                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 200 }}>
-                            <CircularProgress />
-                        </Box>
-                    ) : summariesError ? (
-                        <Alert severity="error">{summariesError}</Alert>
-                    ) : (
-                        <TableContainer component={Paper}>
-                            <Table>
-                                <TableHead>
-                                    <TableRow sx={{ backgroundColor: 'primary.main' }}>
-                                        <TableCell sx={{ color: 'white' }}>Summary ID</TableCell>
-                                        <TableCell sx={{ color: 'white' }}>Created At</TableCell>
-                                        <TableCell sx={{ color: 'white' }}>Due Date</TableCell>
-                                    </TableRow>
-                                </TableHead>
-                                <TableBody>
-                                    {summaries.length === 0 ? (
-                                        <TableRow>
-                                            <TableCell colSpan={3} align="center">No summaries found</TableCell>
-                                        </TableRow>
-                                    ) : summaries.map((summary) => (
-                                        <TableRow key={summary.id}>
-                                            <TableCell>{summary.id}</TableCell>
-                                            <TableCell>
-                                                {summary.created_at ? new Date(summary.created_at).toLocaleDateString(undefined, { 
-                                                    year: 'numeric', 
-                                                    month: 'long', 
-                                                    day: 'numeric',
-                                                    hour: '2-digit',
-                                                    minute: '2-digit'
-                                                }) : ''}
-                                            </TableCell>
-                                            <TableCell>
-                                                {summary.due_date ? new Date(summary.due_date).toLocaleDateString(undefined, { 
-                                                    year: 'numeric', 
-                                                    month: 'long', 
-                                                    day: 'numeric'
-                                                }) : ''}
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        </TableContainer>
-                    )}
                 </Box>
             )}
 
@@ -1773,24 +2030,7 @@ const TransactionManagement = () => {
                     </Button>
                 </DialogActions>
             </Dialog>
-            {/* Mark as Paid Confirmation Dialog */}
-            <Dialog
-                open={confirmMarkPaidOpen}
-                onClose={handleCancelMarkPaid}
-                maxWidth="xs"
-                fullWidth
-            >
-                <DialogTitle>Mark as Paid</DialogTitle>
-                <DialogContent dividers>
-                    <Typography>Are you sure you want to mark invoice <b>{markPaidRow?.id}</b> as paid?</Typography>
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={handleCancelMarkPaid} disabled={markPaidLoading}>Cancel</Button>
-                    <Button onClick={handleConfirmMarkPaid} color="primary" variant="contained" disabled={markPaidLoading}>
-                        {markPaidLoading ? 'Updating...' : 'Confirm'}
-                    </Button>
-                </DialogActions>
-            </Dialog>
+
             {/* Add Proof of Delivery Dialog */}
             <Dialog open={podOpen} onClose={handlePodClose} maxWidth="md" fullWidth>
                 <DialogTitle>Proof of Delivery</DialogTitle>
