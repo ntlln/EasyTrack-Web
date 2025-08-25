@@ -735,13 +735,17 @@ const TransactionManagement = () => {
     }, [tabValue]);
 
     // Filter data based on selected month using created_at
+    // Additionally, only include contracts with Delivered or Delivery Failed statuses (IDs 5 and 6)
     const filteredData = React.useMemo(() => {
         const monthStart = startOfMonth(selectedMonth);
         const monthEnd = endOfMonth(selectedMonth);
         
         return data.filter(contract => {
             const contractDate = new Date(contract.created_at);
-            return contractDate >= monthStart && contractDate <= monthEnd;
+            const isInMonth = contractDate >= monthStart && contractDate <= monthEnd;
+            const statusId = Number(contract.contract_status_id);
+            const isDeliveredOrFailed = statusId === 5 || statusId === 6;
+            return isInMonth && isDeliveredOrFailed;
         });
     }, [data, selectedMonth]);
 
