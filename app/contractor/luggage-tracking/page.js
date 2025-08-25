@@ -73,7 +73,7 @@ function LuggageTrackingContent() {
     }
   }, [searchParams]);
 
-  // Fetch contract and luggage info (mirror admin API behavior)
+  // Fetch contract and luggage info directly from Supabase (contracts table)
   const fetchData = async (id = contractId) => {
     if (!id.trim()) return;
     
@@ -89,30 +89,125 @@ function LuggageTrackingContent() {
     
     setLoading(true);
     try {
-      console.log('Fetching contract data for ID:', id);
-      const response = await fetch(`/api/admin?contractId=${id}`);
-      console.log('Response status:', response.status);
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error('API Error:', errorData);
-        throw new Error(errorData.error || 'Failed to fetch contract data');
+      console.log('Fetching contract data for ID from Supabase (admin-like joined select):', id);
+      let joinedError = null;
+      const { data: joinedData, error: errJoined } = await supabase
+        .from('contracts')
+        .select(`
+          id, contract_status_id, airline_id, delivery_id,
+          owner_first_name, owner_middle_initial, owner_last_name, owner_contact,
+          luggage_description, luggage_weight, luggage_quantity,
+          flight_number, case_number,
+          delivery_address, address_line_1, address_line_2,
+          pickup_location, current_location, drop_off_location,
+          pickup_location_geo, current_location_geo, drop_off_location_geo,
+          remarks, passenger_form, passenger_id, proof_of_delivery,
+          created_at, cancelled_at, accepted_at, pickup_at, delivered_at,
+          delivery_charge, delivery_surcharge, delivery_discount,
+          summary_id,
+          airline:airline_id (*),
+          delivery:delivery_id (*),
+          contract_status:contract_status_id (id, status_name)
+        `)
+        .eq('id', id)
+        .is('summary_id', null)
+        .single();
+
+      if (!errJoined && joinedData) {
+        previousValidContractIdRef.current = id;
+        const newContract = {
+          ...joinedData,
+          pickup_location_geo: joinedData.pickup_location_geo || null,
+          drop_off_location_geo: joinedData.drop_off_location_geo || null,
+          current_location_geo: joinedData.current_location_geo || null
+        };
+        setContract(prev => {
+          const shouldUpdate = JSON.stringify(prev) !== JSON.stringify(newContract);
+          return shouldUpdate ? newContract : prev;
+        });
+        return;
       }
-      
-      const { data } = await response.json();
-      console.log('Received contract data:', data);
+
+      joinedError = errJoined;
+      if (joinedError) {
+        console.warn('Joined select blocked or failed, falling back to base columns:', JSON.stringify(joinedError || {}, null, 2));
+      }
+
+      console.log('Fetching contract data (fallback base columns):', id);
+      const { data, error } = await supabase
+        .from('contracts')
+        .select(`
+          id, contract_status_id, airline_id, delivery_id,
+          owner_first_name, owner_middle_initial, owner_last_name, owner_contact,
+          luggage_description, luggage_weight, luggage_quantity,
+          flight_number, case_number,
+          delivery_address, address_line_1, address_line_2,
+          pickup_location, current_location, drop_off_location,
+          pickup_location_geo, current_location_geo, drop_off_location_geo,
+          remarks, passenger_form, passenger_id, proof_of_delivery,
+          created_at, cancelled_at, accepted_at, pickup_at, delivered_at,
+          delivery_charge, delivery_surcharge, delivery_discount,
+          summary_id
+        `)
+        .eq('id', id)
+        .is('summary_id', null)
+        .single();
+
+      if (error) {
+        // Gracefully handle 'no rows' to avoid noisy errors in UI
+        if (error.code === 'PGRST116' || (error.message && error.message.includes('no) rows returned'))) {
+          if (shouldShowErrors) {
+            setError('No contract data found');
+            setSnackbarMessage('Invalid luggage tracking ID. No contract found.');
+            setSnackbarSeverity('error');
+            setSnackbarOpen(true);
+          }
+          return; // Stop further processing
+        }
+        console.error('Supabase error fetching contract (fallback):', JSON.stringify(error || {}, null, 2));
+        throw new Error('Contract not found');
+      }
 
       if (data) {
+        // Optionally fetch related rows if policies allow
+        let statusObj = null;
+        if (data.contract_status_id != null) {
+          const { data: statusRow } = await supabase
+            .from('contract_status')
+            .select('id, status_name')
+            .eq('id', data.contract_status_id)
+            .maybeSingle();
+          statusObj = statusRow || null;
+        }
+        let airlineObj = null;
+        if (data.airline_id) {
+          const { data: airlineRow } = await supabase
+            .from('profiles')
+            .select('id, first_name, middle_initial, last_name, suffix, email, contact_number')
+            .eq('id', data.airline_id)
+            .maybeSingle();
+          airlineObj = airlineRow || null;
+        }
+        let deliveryObj = null;
+        if (data.delivery_id) {
+          const { data: deliveryRow } = await supabase
+            .from('profiles')
+            .select('id, first_name, middle_initial, last_name, suffix, email, contact_number')
+            .eq('id', data.delivery_id)
+            .maybeSingle();
+          deliveryObj = deliveryRow || null;
+        }
         // Update the previous valid contract ID
         previousValidContractIdRef.current = id;
         
         const newContract = {
           ...data,
-          luggage: data.luggage || [],
           pickup_location_geo: data.pickup_location_geo || null,
           drop_off_location_geo: data.drop_off_location_geo || null,
           current_location_geo: data.current_location_geo || null,
-          route_history: data.route_history || []
+          contract_status: statusObj,
+          airline: airlineObj,
+          delivery: deliveryObj
         };
         console.log('Processed contract data:', newContract);
         setContract(prev => {
@@ -702,23 +797,58 @@ function LuggageTrackingContent() {
         console.log('Starting location polling for contract:', contract.id);
         pollInterval = setInterval(async () => {
           try {
-            const response = await fetch(`/api/admin?action=getContract&contractId=${contract.id}`);
-            if (!response.ok) throw new Error('Failed to fetch contract data');
-            const result = await response.json();
-            if (result.error) throw new Error(result.error);
+            const { data, error } = await supabase
+              .from('contracts')
+              .select(`
+                id, contract_status_id, airline_id, delivery_id,
+                owner_first_name, owner_middle_initial, owner_last_name, owner_contact,
+                luggage_description, luggage_weight, luggage_quantity,
+                flight_number, case_number,
+                delivery_address, address_line_1, address_line_2,
+                pickup_location, current_location, drop_off_location,
+                pickup_location_geo, current_location_geo, drop_off_location_geo,
+                remarks, passenger_form, passenger_id, proof_of_delivery,
+                created_at, cancelled_at, accepted_at, pickup_at, delivered_at,
+                delivery_charge, delivery_surcharge, delivery_discount,
+                summary_id
+              `)
+              .eq('id', contract.id)
+              .is('summary_id', null)
+              .single();
 
-            if (result.data) {
-              setContract(result.data);
-              // Only update map location if we have current location data
-              if (result.data.current_location_geo?.coordinates) {
+            if (error) {
+              // Ignore 'no rows' during polling; just skip this tick
+              if (error.code === 'PGRST116' || (error.message && error.message.includes('no) rows returned'))) {
+                return;
+              }
+              throw error;
+            }
+
+            if (data) {
+              // If contract_status_name is shown in UI, try to fetch status once in polling as well
+              let statusObj = null;
+              if (data.contract_status_id != null) {
+                const { data: statusRow } = await supabase
+                  .from('contract_status')
+                  .select('id, status_name')
+                  .eq('id', data.contract_status_id)
+                  .maybeSingle();
+                statusObj = statusRow || null;
+              }
+
+              setContract(prev => ({
+                ...prev,
+                ...data,
+                contract_status: statusObj ?? prev?.contract_status ?? null
+              }));
+              if (data.current_location_geo?.coordinates) {
                 await updateMapLocation();
               }
-              retryCount = 0; // Reset retry count on successful update
+              retryCount = 0;
             }
           } catch (error) {
             console.error('Error polling location:', error);
             retryCount++;
-            
             if (retryCount >= MAX_RETRIES) {
               console.log('Max retries reached, stopping polling');
               clearInterval(pollInterval);
@@ -1140,39 +1270,31 @@ function LuggageTrackingContent() {
                 Luggage Information
               </Typography>
               <Box sx={{ ml: 1, mb: 1 }}>
-                {contract.luggage.length === 0 && (
-                  <Typography variant="body2">
-                    No luggage info.
-                  </Typography>
-                )}
-                {contract.luggage.map((l, lidx) => (
-                  <Box key={l.id} sx={{ mb: 2, pl: 1 }}>
-                    <Typography variant="subtitle2" sx={{ color: 'primary.main', fontWeight: 700 }}>
-                      Luggage {lidx + 1}
-                    </Typography>
-                    <Typography variant="body2">
-                      Case Number: <span>{l.case_number || 'N/A'}</span>
-                    </Typography>
-                    <Typography variant="body2">
-                      Flight Number: <span>{l.flight_number || 'N/A'}</span>
-                    </Typography>
-                    <Typography variant="body2">
-                      Name: <span>{l.luggage_owner || 'N/A'}</span>
-                    </Typography>
-                    <Typography variant="body2">
-                      Contact Number: <span>{l.contact_number || 'N/A'}</span>
-                    </Typography>
-                    <Typography variant="body2">
-                      Address: <span>{l.address || 'N/A'}</span>
-                    </Typography>
-                    <Typography variant="body2">
-                      Weight: <span>{l.weight ? `${l.weight} kg` : 'N/A'}</span>
-                    </Typography>
-                    <Typography variant="body2">
-                      Description: <span>{l.item_description || 'N/A'}</span>
-                    </Typography>
-                  </Box>
-                ))}
+                <Typography variant="body2">
+                  <b>Owner Name:</b> <span>
+                    {contract.owner_first_name || contract.owner_middle_initial || contract.owner_last_name 
+                      ? `${contract.owner_first_name || ''} ${contract.owner_middle_initial || ''} ${contract.owner_last_name || ''}`.replace(/  +/g, ' ').trim()
+                      : 'N/A'}
+                  </span>
+                </Typography>
+                <Typography variant="body2">
+                  <b>Owner Contact:</b> <span>{contract.owner_contact || 'N/A'}</span>
+                </Typography>
+                <Typography variant="body2">
+                  <b>Flight Number:</b> <span>{contract.flight_number || 'N/A'}</span>
+                </Typography>
+                <Typography variant="body2">
+                  <b>Case Number:</b> <span>{contract.case_number || 'N/A'}</span>
+                </Typography>
+                <Typography variant="body2">
+                  <b>Luggage Description:</b> <span>{contract.luggage_description || 'N/A'}</span>
+                </Typography>
+                <Typography variant="body2">
+                  <b>Luggage Weight:</b> <span>{contract.luggage_weight ? `${contract.luggage_weight} kg` : 'N/A'}</span>
+                </Typography>
+                <Typography variant="body2">
+                  <b>Luggage Quantity:</b> <span>{contract.luggage_quantity || 'N/A'}</span>
+                </Typography>
               </Box>
               <Divider sx={{ my: 2 }} />
               <Typography variant="subtitle2" sx={{ color: 'primary.main', fontWeight: 700, mb: 1 }}>
