@@ -53,7 +53,7 @@ export async function GET(request) {
 
     // Add after filter if provided (for incremental fetching)
     if (after) {
-      query = query.gt('created_at', after);
+      query = query.gte('created_at', after);
     }
 
     // Order by creation time (oldest first, so latest messages appear at bottom)

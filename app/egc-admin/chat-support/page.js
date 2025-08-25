@@ -34,6 +34,17 @@ export default function Page() {
   const autoRefreshIntervalRef = useRef(null);
   const lastMessageTimeRef = useRef(null);
   const messagesEndRef = useRef(null);
+  const currentUserRef = useRef(null);
+  const selectedUserRef = useRef(null);
+
+  // Keep refs in sync with state to avoid stale closures in realtime callbacks
+  useEffect(() => {
+    currentUserRef.current = currentUser;
+  }, [currentUser]);
+
+  useEffect(() => {
+    selectedUserRef.current = selectedUser;
+  }, [selectedUser]);
 
   // Fetch current user and users on component mount
   useEffect(() => {
@@ -357,10 +368,15 @@ export default function Page() {
   const handleNewMessage = (newMessage) => {
     console.log('New message received:', newMessage);
     
+    const curUser = currentUserRef.current;
+    const selUser = selectedUserRef.current;
+
+    if (!curUser || !selUser) return;
+    
     // Check if this message belongs to the current conversation
-    const isCurrentConversation = selectedUser && 
-      ((newMessage.sender_id === currentUser.id && newMessage.receiver_id === selectedUser.id) ||
-       (newMessage.sender_id === selectedUser.id && newMessage.receiver_id === currentUser.id));
+    const isCurrentConversation = 
+      ((newMessage.sender_id === curUser.id && newMessage.receiver_id === selUser.id) ||
+       (newMessage.sender_id === selUser.id && newMessage.receiver_id === curUser.id));
     
     if (isCurrentConversation) {
       // Add message to current conversation immediately
@@ -386,17 +402,20 @@ export default function Page() {
       setShouldAutoScroll(true);
       
       // Mark message as read if it's from the other user
-      if (newMessage.sender_id !== currentUser.id) {
+      if (newMessage.sender_id !== curUser.id) {
         markMessagesAsRead();
       }
       
+      // Ensure UI syncs by fetching latest messages silently
+      silentRefreshMessages();
+      
       // Show notification if message is from other user
-      if (newMessage.sender_id !== currentUser.id) {
-        showSnackbar(`New message from ${selectedUser.name}`, 'info');
+      if (newMessage.sender_id !== curUser.id) {
+        showSnackbar(`New message from ${selUser.name}`, 'info');
       } else {
-        showSnackbar(`Message sent to ${selectedUser.name}`, 'success');
+        showSnackbar(`Message sent to ${selUser.name}`, 'success');
       }
-    } else if (newMessage.sender_id !== currentUser.id) {
+    } else if (newMessage.sender_id !== (currentUserRef.current?.id)) {
       // Show notification for messages from other users in different conversations
       const sender = users.find(user => user.id === newMessage.sender_id);
       if (sender) {
@@ -411,11 +430,15 @@ export default function Page() {
   // Handle message updates (e.g., read status)
   const handleMessageUpdate = (updatedMessage) => {
     console.log('Message update received:', updatedMessage);
+
+    const curUser = currentUserRef.current;
+    const selUser = selectedUserRef.current;
+    if (!curUser || !selUser) return;
     
     // Only update if this message belongs to the current conversation
-    const isCurrentConversation = selectedUser && 
-      ((updatedMessage.sender_id === currentUser.id && updatedMessage.receiver_id === selectedUser.id) ||
-       (updatedMessage.sender_id === selectedUser.id && updatedMessage.receiver_id === currentUser.id));
+    const isCurrentConversation = 
+      ((updatedMessage.sender_id === curUser.id && updatedMessage.receiver_id === selUser.id) ||
+       (updatedMessage.sender_id === selUser.id && updatedMessage.receiver_id === curUser.id));
     
     if (isCurrentConversation) {
       setMessages(prev => 
