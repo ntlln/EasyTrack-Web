@@ -787,8 +787,8 @@ export default function Page() {
   };
 
   // Styles
-  const containerStyles = { position: "absolute", top: 0, left: "280px", right: 0, bottom: 0, display: "flex", bgcolor: theme.palette.background.default };
-  const sidebarStyles = { width: "350px", borderRight: "1px solid", borderColor: "divider", bgcolor: theme.palette.background.paper, display: "flex", flexDirection: "column", p: 2, gap: 2 };
+  const containerStyles = { position: "absolute", top: 0, left: "72px", right: 0, bottom: 0, display: "flex", bgcolor: theme.palette.background.default };
+  const sidebarStyles = { width: "350px", flex: "0 0 350px", flexShrink: 0, borderRight: "1px solid", borderColor: "divider", bgcolor: theme.palette.background.paper, display: "flex", flexDirection: "column", p: 2, gap: 2 };
   const searchFieldStyles = { bgcolor: theme.palette.background.default, borderRadius: 2 };
   const conversationsStyles = { flexGrow: 1, overflow: "auto", display: "flex", flexDirection: "column", gap: 1 };
   const conversationItemStyles = { p: 1.5, display: "flex", alignItems: "center", gap: 1, borderRadius: 2, bgcolor: theme.palette.background.default, cursor: "pointer", "&:hover": { bgcolor: theme.palette.action.hover } };
@@ -796,14 +796,57 @@ export default function Page() {
   const messageStyles = { fontSize: "12px", color: "text.secondary", noWrap: true };
   const timeStyles = { fontSize: "10px", color: "text.secondary" };
   const unreadBadgeStyles = { bgcolor: "primary.main", color: "white", borderRadius: "50%", width: "20px", height: "20px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", mx: "auto" };
-  const chatContainerStyles = { flexGrow: 1, display: "flex", flexDirection: "column", bgcolor: theme.palette.background.default };
+  const chatContainerStyles = { flex: "1 1 auto", minWidth: 0, display: "flex", flexDirection: "column", bgcolor: theme.palette.background.default };
   const headerStyles = { p: 2, display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid", borderColor: "divider" };
   const userInfoStyles = { display: "flex", alignItems: "center", gap: 2 };
   const statusStyles = { fontSize: "12px", color: "green" };
   const messagesContainerStyles = { flexGrow: 1, p: 2, overflow: "auto", display: "flex", flexDirection: "column", gap: 2 };
-  const messageBubbleStyles = { p: 2, borderRadius: 2, maxWidth: "70%" };
-  const receivedMessageStyles = { ...messageBubbleStyles, bgcolor: theme.palette.background.paper };
-  const sentMessageStyles = { ...messageBubbleStyles, alignSelf: "flex-end", bgcolor: isDark ? "#4d664d" : "#D0E8D0" };
+  const messageBubbleStyles = { p: 2, borderRadius: 2, maxWidth: "50%", display: "inline-block", position: "relative", wordBreak: "break-word", overflowWrap: "anywhere", whiteSpace: "pre-wrap" };
+  const receivedMessageStyles = { 
+    ...messageBubbleStyles, 
+    display: "inline-block",
+    alignSelf: "flex-start",
+    bgcolor: isDark ? theme.palette.grey[800] : theme.palette.grey[100],
+    color: isDark ? theme.palette.common.white : theme.palette.text.primary,
+    border: `1px solid ${isDark ? theme.palette.grey[700] : theme.palette.grey[300]}`,
+    borderTopLeftRadius: 4,
+    borderTopRightRadius: 12,
+    borderBottomLeftRadius: 12,
+    borderBottomRightRadius: 12,
+    '&::after': {
+      content: '""',
+      position: 'absolute',
+      left: -8,
+      bottom: 0,
+      width: 0,
+      height: 0,
+      borderTop: '8px solid transparent',
+      borderRight: `8px solid ${isDark ? theme.palette.grey[800] : theme.palette.grey[100]}`,
+      borderBottom: '8px solid transparent'
+    }
+  };
+  const sentMessageStyles = { 
+    ...messageBubbleStyles, 
+    display: "inline-block",
+    alignSelf: "flex-end", 
+    bgcolor: isDark ? "#4d664d" : "#D0E8D0",
+    color: isDark ? theme.palette.common.white : theme.palette.text.primary,
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 4,
+    borderBottomLeftRadius: 12,
+    borderBottomRightRadius: 12,
+    '&::after': {
+      content: '""',
+      position: 'absolute',
+      right: -8,
+      bottom: 0,
+      width: 0,
+      height: 0,
+      borderTop: '8px solid transparent',
+      borderLeft: `8px solid ${isDark ? '#4d664d' : '#D0E8D0'}`,
+      borderBottom: '8px solid transparent'
+    }
+  };
   const tempMessageStyles = { ...sentMessageStyles, opacity: 0.7 };
   const messageTextStyles = { fontSize: "14px" };
   const messageTimeStyles = { fontSize: "10px", color: "text.secondary", mt: 0.5 };
