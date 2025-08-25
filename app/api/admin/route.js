@@ -4,6 +4,8 @@ import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from '@google/generative-ai';
 
+export const runtime = 'nodejs';
+
 // Validate API key
 const apiKey = process.env.GEMINI_API_KEY;
 if (!apiKey) {
@@ -458,6 +460,46 @@ export async function GET(request) {
       }
 
       return NextResponse.json({ data: deliveryPersonnel });
+    }
+
+    // Handle all contracts for statistics (no summary_id filter)
+    if (action === 'allContracts') {
+      const { data: contracts, error: contractError } = await supabase
+        .from('contracts')
+        .select(`
+          id, created_at, accepted_at, pickup_at, delivered_at, cancelled_at,
+          pickup_location, pickup_location_geo, drop_off_location, drop_off_location_geo,
+          current_location_geo, contract_status_id,
+          airline_id, delivery_id, delivery_charge,
+          delivery_surcharge, delivery_discount,
+          owner_first_name, owner_middle_initial, owner_last_name, owner_contact,
+          flight_number, case_number, luggage_description, luggage_weight, luggage_quantity,
+          summary_id,
+          airline:airline_id (*),
+          delivery:delivery_id (*)
+        `)
+        .order('created_at', { ascending: false });
+
+      if (contractError) {
+        return NextResponse.json({ error: contractError.message }, { status: 500 });
+      }
+
+      if (!contracts || contracts.length === 0) {
+        return NextResponse.json({ data: [] });
+      }
+
+      const { data: allStatuses } = await supabase
+        .from('contract_status')
+        .select('id, status_name');
+      const statusById = new Map((allStatuses || []).map(s => [s.id, s]));
+
+      const contractsWithLuggage = contracts.map(c => ({
+        ...c,
+        contract_status: statusById.get(c.contract_status_id) || null,
+        luggage: []
+      }));
+
+      return NextResponse.json({ data: contractsWithLuggage });
     }
 
     // Handle contracts request (default)
@@ -1394,7 +1436,7 @@ export async function POST(req) {
 
           // Configure the model
           const model = genAI.getGenerativeModel({
-            model: "gemini-2.0-flash",
+            model: "gemini-2.0-flash-lite",
             safetySettings: [
               {
                 category: HarmCategory.HARM_CATEGORY_HARASSMENT,

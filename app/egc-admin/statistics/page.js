@@ -99,7 +99,7 @@ export default function Page() {
     async function fetchContracts() {
       setLoading(true);
       try {
-        const res = await fetch('/api/admin');
+        const res = await fetch('/api/admin?action=allContracts');
         const result = await res.json();
         setContracts(result.data || []);
       } catch (err) {
@@ -166,8 +166,15 @@ export default function Page() {
         body: JSON.stringify({ action: 'geminiInsight', params: { stats } }),
       });
       const data = await res.json();
-      if (data.error) {
-        throw new Error(data.error);
+      if (!res.ok || data.error) {
+        const details = [
+          data.error && `Error: ${data.error}`,
+          data.details && `Details: ${data.details}`,
+          typeof data.apiKeyPresent !== 'undefined' && `API key present: ${data.apiKeyPresent}`,
+          data.apiKeyPrefix && `API key prefix: ${data.apiKeyPrefix}`,
+        ].filter(Boolean).join('\n');
+        setInsight(details || 'Failed to generate insight.');
+        return;
       }
       setInsight(data.insight || "No insight generated.");
     } catch (err) {
