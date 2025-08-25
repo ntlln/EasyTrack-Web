@@ -721,9 +721,16 @@ export default function Page() {
   const handleConversationSelect = (conversation) => {
     const user = users.find(u => u.id === conversation.id);
     if (user) {
+      // If the same conversation is selected, just refresh messages and do nothing else
+      if (selectedUser && selectedUser.id === user.id) {
+        console.log('Same conversation selected, refreshing messages');
+        fetchMessages();
+        return;
+      }
+
       console.log('Selecting conversation with:', user.name);
       
-      // Clear current messages immediately when switching conversations
+      // Clear current messages only when switching to a different conversation
       setMessages([]);
       lastMessageTimeRef.current = null;
       
