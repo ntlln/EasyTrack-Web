@@ -807,20 +807,24 @@ export default function Page() {
     return user?.avatarUrl || null;
   };
 
-  // Resolve avatar URL for a message (prefer joined sender/receiver pfp_id)
+  // Resolve avatar URL for a message: always show the SENDER's avatar
   const getMessageAvatarUrl = (msg) => {
-    // If the API expanded sender/receiver, use their pfp_id first
-    if (msg.sender && msg.sender.pfp_id) return msg.sender.pfp_id;
-    if (msg.receiver && msg.receiver.pfp_id) return msg.receiver.pfp_id;
+    const curUser = currentUserRef.current;
+    const selUser = selectedUserRef.current;
 
-    // Fallbacks using users list or selected user/current user
-    if (msg.sender_id === currentUserRef.current?.id) {
-      return getAvatarForUserId(currentUserRef.current.id) || null;
+    // Prefer expanded sender pfp if available
+    if (msg.sender && msg.sender.pfp_id) return msg.sender.pfp_id;
+
+    // Fallbacks using known users based on sender_id
+    if (curUser && msg.sender_id === curUser.id) {
+      return getAvatarForUserId(curUser.id) || null;
     }
-    if (msg.sender_id === selectedUserRef.current?.id) {
-      return selectedUserRef.current?.avatarUrl || getAvatarForUserId(selectedUserRef.current.id) || null;
+    if (selUser && msg.sender_id === selUser.id) {
+      return selUser.avatarUrl || getAvatarForUserId(selUser.id) || null;
     }
-    return null;
+
+    // Last resort: try lookup by sender_id in users list
+    return getAvatarForUserId(msg.sender_id) || null;
   };
 
   // Styles
