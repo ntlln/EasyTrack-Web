@@ -11,7 +11,7 @@ import BarChartIcon from '@mui/icons-material/BarChart';
 import SupportAgentIcon from '@mui/icons-material/SupportAgent';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import { Gauge } from '@mui/x-charts/Gauge';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 export default function Page() {
   // Theme setup
@@ -39,38 +39,63 @@ export default function Page() {
     { id: 6, name: 'Delivery Failed' },
   ];
 
-  // State for contract status counts
-  const [statusCounts, setStatusCounts] = useState({});
-  const [totalContracts, setTotalContracts] = useState(0);
+  // Contracts state
+  const [contracts, setContracts] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function fetchStatusCounts() {
+    async function fetchContracts() {
+      setLoading(true);
       try {
-        const res = await fetch('/api/admin');
+        const res = await fetch('/api/admin?action=allContracts');
         const result = await res.json();
-        if (result.data) {
-          const counts = {};
-          statusList.forEach(s => { counts[s.id] = 0; });
-          result.data.forEach(contract => {
-            if (contract.contract_status_id && counts.hasOwnProperty(contract.contract_status_id)) {
-              counts[contract.contract_status_id]++;
-            }
-          });
-          setStatusCounts(counts);
-          setTotalContracts(result.data.length);
-        }
+        setContracts(result.data || []);
       } catch (err) {
-        // Optionally handle error
+        setContracts([]);
+      } finally {
+        setLoading(false);
       }
     }
-    fetchStatusCounts();
+    fetchContracts();
   }, []);
+
+  // Derived statistics (match statistics page)
+  const totalDeliveries = contracts.length;
+  const statusCounts = useMemo(() => {
+    const counts = {};
+    statusList.forEach(s => { counts[s.id] = 0; });
+    contracts.forEach(contract => {
+      if (contract.contract_status_id && Object.prototype.hasOwnProperty.call(counts, contract.contract_status_id)) {
+        counts[contract.contract_status_id]++;
+      }
+    });
+    return counts;
+  }, [contracts]);
 
   // Styles
   const titleStyles = { mb: 4 };
   const cardStyles = { height: "100%", width: "35vh" };
   const linkStyles = { textDecoration: "none" };
   const iconStyles = { fontSize: 40, color: "primary.main", mb: 2 };
+
+  // Gauge card style aligned with statistics page
+  const gaugeCardStyles = {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    py: 2,
+    width: 180,
+    height: 180,
+    m: 'auto',
+    bgcolor: theme.palette.background.paper,
+    borderRadius: 2,
+    boxShadow: isDark ? 2 : 1,
+    border: isDark ? `1px solid ${theme.palette.divider}` : undefined,
+    transition: 'background 0.3s'
+  };
+
+  
 
   return (
     <Box>
@@ -95,19 +120,21 @@ export default function Page() {
         <Typography variant="h6" color="primary.main" fontWeight="bold" mb={2}>Performance Overview</Typography>
         <Grid container spacing={3} justifyContent="center">
           {statusList.map((status) => {
-            const value = totalContracts ? Math.round((statusCounts[status.id] || 0) / totalContracts * 100) : 0;
+            const value = totalDeliveries ? Math.round((statusCounts[status.id] || 0) / totalDeliveries * 100) : 0;
             return (
               <Grid item xs={12} sm={6} md={4} lg={2} key={status.id}>
-                <Card sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', py: 2, width: 180, height: 180, m: 'auto' }}>
-                  <Typography variant="subtitle2" color="text.secondary" mb={1} textAlign="center">{status.name}</Typography>
+                <Card sx={gaugeCardStyles}>
+                  <Typography variant="subtitle2" color="primary.main" fontWeight="bold" mb={1} textAlign="center">{status.name}</Typography>
                   <Gauge value={value} width={100} height={100} startAngle={0} endAngle={360} innerRadius="80%" outerRadius="100%" text={`${value}%`} />
-                  <Typography variant="body2" color="primary.main" mt={1}>{statusCounts[status.id] || 0} / {totalContracts}</Typography>
+                  <Typography variant="body2" color="primary.main" mt={1}>{statusCounts[status.id] || 0} / {totalDeliveries}</Typography>
                 </Card>
               </Grid>
             );
           })}
         </Grid>
       </Box>
+
+      {loading && <Typography>Loading...</Typography>}
     </Box>
   );
 }
