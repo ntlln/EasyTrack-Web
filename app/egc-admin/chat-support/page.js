@@ -137,7 +137,7 @@ export default function Page() {
           event: 'INSERT',
           schema: 'public',
           table: 'messages',
-          filter: `sender_id.eq.${currentUser.id}`
+          filter: `sender_id=eq.${currentUser.id}`
         },
         (payload) => {
           console.log('Real-time INSERT (as sender) received:', payload);
@@ -151,7 +151,7 @@ export default function Page() {
           event: 'INSERT',
           schema: 'public',
           table: 'messages',
-          filter: `receiver_id.eq.${currentUser.id}`
+          filter: `receiver_id=eq.${currentUser.id}`
         },
         (payload) => {
           console.log('Real-time INSERT (as receiver) received:', payload);
@@ -165,7 +165,7 @@ export default function Page() {
           event: 'UPDATE',
           schema: 'public',
           table: 'messages',
-          filter: `sender_id.eq.${currentUser.id}`
+          filter: `sender_id=eq.${currentUser.id}`
         },
         (payload) => {
           console.log('Real-time UPDATE (as sender) received:', payload);
@@ -179,7 +179,7 @@ export default function Page() {
           event: 'UPDATE',
           schema: 'public',
           table: 'messages',
-          filter: `receiver_id.eq.${currentUser.id}`
+          filter: `receiver_id=eq.${currentUser.id}`
         },
         (payload) => {
           console.log('Real-time UPDATE (as receiver) received:', payload);
