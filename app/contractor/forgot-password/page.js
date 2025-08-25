@@ -41,7 +41,7 @@ export default function Page() {
 
             // Only proceed with password reset if user is verified
             const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, { 
-                redirectTo: `${window.location.origin}/contractor/forgot-password` 
+                redirectTo: `${window.location.origin}/contractor/reset-password` 
             });
             
             if (resetError) { 
