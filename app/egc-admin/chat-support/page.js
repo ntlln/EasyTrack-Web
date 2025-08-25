@@ -533,6 +533,7 @@ export default function Page() {
           middle_initial, 
           last_name, 
           role_id,
+          pfp_id,
           profiles_roles (role_name)
         `)
         .order('first_name', { ascending: true });
@@ -544,7 +545,8 @@ export default function Page() {
         name: `${user.first_name || ''} ${user.middle_initial || ''} ${user.last_name || ''}`.trim() || user.email,
         email: user.email,
         role: user.profiles_roles?.role_name || 'No Role',
-        role_id: user.role_id
+        role_id: user.role_id,
+        avatarUrl: user.pfp_id || null
       }));
 
       setUsers(formattedUsers);
@@ -900,8 +902,8 @@ export default function Page() {
           renderOption={(props, option) => (
             <Box component="li" {...props}>
               <Box sx={{ display: "flex", alignItems: "center", gap: 1, width: "100%" }}>
-                <Avatar sx={{ width: 32, height: 32, fontSize: "12px" }}>
-                  {option.name.charAt(0)}
+                <Avatar sx={{ width: 32, height: 32, fontSize: "12px" }} src={option.avatarUrl || undefined}>
+                  {(!option.avatarUrl && option.name) ? option.name.charAt(0) : ''}
                 </Avatar>
                 <Box sx={{ flexGrow: 1 }}>
                   <Typography sx={{ fontSize: "14px", fontWeight: "bold" }}>
@@ -932,7 +934,9 @@ export default function Page() {
                 sx={conversationItemStyles}
                 onClick={() => handleConversationSelect(conversation)}
               >
-                <Avatar>{conversation.name.charAt(0)}</Avatar>
+                <Avatar src={conversation.avatarUrl || undefined}>
+                  {(!conversation.avatarUrl && conversation.name) ? conversation.name.charAt(0) : ''}
+                </Avatar>
                 <Box sx={{ flexGrow: 1 }}>
                   <Typography sx={nameStyles}>{conversation.name}</Typography>
                   <Typography sx={messageStyles}>
@@ -956,8 +960,8 @@ export default function Page() {
       <Box sx={chatContainerStyles}>
         <Box sx={headerStyles}>
           <Box sx={userInfoStyles}>
-            <Avatar>
-              {selectedUser ? selectedUser.name.charAt(0) : ""}
+            <Avatar src={selectedUser?.avatarUrl || undefined}>
+              {selectedUser ? (!selectedUser.avatarUrl && selectedUser.name.charAt(0)) : ""}
             </Avatar>
             <Box>
               <Typography sx={{ fontWeight: "bold" }}>

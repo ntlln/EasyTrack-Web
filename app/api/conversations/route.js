@@ -37,14 +37,16 @@ export async function GET(request) {
           first_name,
           middle_initial,
           last_name,
-          email
+          email,
+          pfp_id
         ),
         receiver:profiles!messages_receiver_id_fkey (
           id,
           first_name,
           middle_initial,
           last_name,
-          email
+          email,
+          pfp_id
         )
       `)
       .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`)
@@ -87,6 +89,7 @@ export async function GET(request) {
       id: conv.otherUserId,
       name: `${conv.otherUser.first_name || ''} ${conv.otherUser.middle_initial || ''} ${conv.otherUser.last_name || ''}`.trim() || conv.otherUser.email,
       email: conv.otherUser.email,
+      avatarUrl: conv.otherUser.pfp_id || null,
       lastMessage: conv.lastMessage.content,
       lastMessageTime: conv.lastMessage.created_at,
       unreadCount: conv.unreadCount,

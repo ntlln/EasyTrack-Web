@@ -39,14 +39,16 @@ export async function GET(request) {
           first_name,
           middle_initial,
           last_name,
-          email
+          email,
+          pfp_id
         ),
         receiver:profiles!messages_receiver_id_fkey (
           id,
           first_name,
           middle_initial,
           last_name,
-          email
+          email,
+          pfp_id
         )
       `)
       .or(`and(sender_id.eq.${senderId},receiver_id.eq.${receiverId}),and(sender_id.eq.${receiverId},receiver_id.eq.${senderId})`);
