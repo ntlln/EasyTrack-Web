@@ -795,6 +795,28 @@ export default function Page() {
     return message.id && message.id.startsWith('temp-');
   };
 
+  // Resolve avatar for a given user id from loaded users
+  const getAvatarForUserId = (userId) => {
+    const user = users.find(u => u.id === userId);
+    return user?.avatarUrl || null;
+  };
+
+  // Resolve avatar URL for a message (prefer joined sender/receiver pfp_id)
+  const getMessageAvatarUrl = (msg) => {
+    // If the API expanded sender/receiver, use their pfp_id first
+    if (msg.sender && msg.sender.pfp_id) return msg.sender.pfp_id;
+    if (msg.receiver && msg.receiver.pfp_id) return msg.receiver.pfp_id;
+
+    // Fallbacks using users list or selected user/current user
+    if (msg.sender_id === currentUserRef.current?.id) {
+      return getAvatarForUserId(currentUserRef.current.id) || null;
+    }
+    if (msg.sender_id === selectedUserRef.current?.id) {
+      return selectedUserRef.current?.avatarUrl || getAvatarForUserId(selectedUserRef.current.id) || null;
+    }
+    return null;
+  };
+
   // Styles
   const containerStyles = { position: "absolute", top: 0, left: "72px", right: 0, bottom: 0, display: "flex", bgcolor: theme.palette.background.default };
   const sidebarStyles = { width: "350px", flex: "0 0 350px", flexShrink: 0, borderRight: "1px solid", borderColor: "divider", bgcolor: theme.palette.background.paper, display: "flex", flexDirection: "column", p: 2, gap: 2 };
@@ -984,24 +1006,29 @@ export default function Page() {
                 {messages.map((msg, index) => (
                   <Box 
                     key={msg.id || index} 
-                    sx={isOwnMessage(msg) ? (isTempMessage(msg) ? tempMessageStyles : sentMessageStyles) : receivedMessageStyles}
+                    sx={{ display: 'flex', alignItems: 'flex-end', gap: 1, flexDirection: isOwnMessage(msg) ? 'row-reverse' : 'row' }}
                   >
-                    <Typography sx={messageTextStyles}>
-                      {msg.content}
-                    </Typography>
-                    <Typography sx={messageTimeStyles}>
-                      {formatMessageTime(msg.created_at)}
-                    </Typography>
-                    {isOwnMessage(msg) && !isTempMessage(msg) && (
-                      <Typography sx={messageStatusStyles}>
-                        {isMessageRead(msg) ? '✓ Read' : '✓ Sent'}
+                    <Avatar sx={{ width: 28, height: 28 }} src={getMessageAvatarUrl(msg) || undefined}>
+                      {!getMessageAvatarUrl(msg) && (isOwnMessage(msg) ? (currentUser?.name?.charAt(0) || '') : (selectedUser?.name?.charAt(0) || ''))}
+                    </Avatar>
+                    <Box sx={isOwnMessage(msg) ? (isTempMessage(msg) ? tempMessageStyles : sentMessageStyles) : receivedMessageStyles}>
+                      <Typography sx={messageTextStyles}>
+                        {msg.content}
                       </Typography>
-                    )}
-                    {isTempMessage(msg) && (
-                      <Typography sx={messageStatusStyles}>
-                        Sending...
+                      <Typography sx={messageTimeStyles}>
+                        {formatMessageTime(msg.created_at)}
                       </Typography>
-                    )}
+                      {isOwnMessage(msg) && !isTempMessage(msg) && (
+                        <Typography sx={messageStatusStyles}>
+                          {isMessageRead(msg) ? '✓ Read' : '✓ Sent'}
+                        </Typography>
+                      )}
+                      {isTempMessage(msg) && (
+                        <Typography sx={messageStatusStyles}>
+                          Sending...
+                        </Typography>
+                      )}
+                    </Box>
                   </Box>
                 ))}
                 <div ref={messagesEndRef} />
