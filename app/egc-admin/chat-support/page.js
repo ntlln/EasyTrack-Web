@@ -242,7 +242,7 @@ export default function Page() {
     if (!currentUser) return;
 
     try {
-      const response = await fetch(`/api/conversations?userId=${currentUser.id}`);
+      const response = await fetch(`/api/admin?action=conversations&userId=${currentUser.id}`);
       if (response.ok) {
         const data = await response.json();
         const newConversations = data.conversations || [];
@@ -273,7 +273,7 @@ export default function Page() {
       console.log('Auto-refresh: Checking for new messages...');
       
       // Use incremental refresh if we have a last message time
-      let url = `/api/messages?senderId=${currentUser.id}&receiverId=${selectedUser.id}`;
+      let url = `/api/admin?action=messages&senderId=${currentUser.id}&receiverId=${selectedUser.id}`;
       if (lastMessageTimeRef.current) {
         url += `&after=${encodeURIComponent(lastMessageTimeRef.current)}`;
         console.log('Auto-refresh: Using incremental fetch after:', lastMessageTimeRef.current);
@@ -463,14 +463,17 @@ export default function Page() {
     if (!selectedUser || !currentUser) return;
 
     try {
-      const response = await fetch('/api/messages', {
-        method: 'PUT',
+      const response = await fetch('/api/admin', {
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          receiverId: currentUser.id,
-          senderId: selectedUser.id
+          action: 'markRead',
+          params: {
+            receiverId: currentUser.id,
+            senderId: selectedUser.id
+          }
         }),
       });
 
@@ -491,7 +494,7 @@ export default function Page() {
 
     try {
       setConversationsLoading(true);
-      const response = await fetch(`/api/conversations?userId=${currentUser.id}`);
+      const response = await fetch(`/api/admin?action=conversations&userId=${currentUser.id}`);
       if (response.ok) {
         const data = await response.json();
         setConversations(data.conversations || []);
@@ -508,7 +511,7 @@ export default function Page() {
   // Fetch current user session
   const fetchCurrentUser = async () => {
     try {
-      const response = await fetch('/api/user-session');
+      const response = await fetch('/api/admin?action=userSession');
       if (response.ok) {
         const data = await response.json();
         setCurrentUser(data.user);
@@ -569,7 +572,7 @@ export default function Page() {
       // Reset last message time when switching conversations
       lastMessageTimeRef.current = null;
       
-      const response = await fetch(`/api/messages?senderId=${currentUser.id}&receiverId=${selectedUser.id}`);
+      const response = await fetch(`/api/admin?action=messages&senderId=${currentUser.id}&receiverId=${selectedUser.id}`);
       if (response.ok) {
         const data = await response.json();
         const messages = data.messages || [];
@@ -649,15 +652,18 @@ export default function Page() {
     try {
       setSendingMessage(true);
       
-      const response = await fetch('/api/messages', {
+      const response = await fetch('/api/admin', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          senderId: currentUser.id,
-          receiverId: selectedUser.id,
-          content: messageContent
+          action: 'sendMessage',
+          params: {
+            senderId: currentUser.id,
+            receiverId: selectedUser.id,
+            content: messageContent
+          }
         }),
       });
 

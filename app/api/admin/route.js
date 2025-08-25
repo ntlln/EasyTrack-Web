@@ -1,5 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
+import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
+import { cookies } from 'next/headers';
 import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from '@google/generative-ai';
 
 // Validate API key
@@ -29,6 +31,199 @@ export async function GET(request) {
         }
       }
     );
+
+    // Handle user session fetch for chat support
+    if (action === 'userSession') {
+      try {
+        const authSupabase = createServerComponentClient({ cookies });
+        const { data: { session }, error: sessionError } = await authSupabase.auth.getSession();
+
+        if (sessionError) {
+          console.error('Session error:', sessionError);
+          return NextResponse.json({ error: 'Session error' }, { status: 401 });
+        }
+
+        if (!session) {
+          return NextResponse.json({ error: 'No active session' }, { status: 401 });
+        }
+
+        const { data: profile, error: profileError } = await authSupabase
+          .from('profiles')
+          .select(`
+            id,
+            email,
+            first_name,
+            middle_initial,
+            last_name,
+            role_id,
+            profiles_roles (role_name)
+          `)
+          .eq('id', session.user.id)
+          .single();
+
+        if (profileError) {
+          console.error('Profile error:', profileError);
+          return NextResponse.json({ error: 'Profile not found' }, { status: 404 });
+        }
+
+        const userData = {
+          id: profile.id,
+          email: profile.email,
+          name: `${profile.first_name || ''} ${profile.middle_initial || ''} ${profile.last_name || ''}`.trim() || profile.email,
+          role: profile.profiles_roles?.role_name || 'No Role',
+          role_id: profile.role_id
+        };
+
+        return NextResponse.json({ user: userData });
+      } catch (error) {
+        console.error('Error in GET /api/admin?action=userSession:', error);
+        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+      }
+    }
+
+    // Handle messages listing between two users (bidirectional)
+    if (action === 'messages') {
+      try {
+        const senderId = searchParams.get('senderId');
+        const receiverId = searchParams.get('receiverId');
+        const after = searchParams.get('after');
+
+        if (!senderId || !receiverId) {
+          return NextResponse.json({ error: 'Sender ID and Receiver ID are required' }, { status: 400 });
+        }
+
+        let query = supabase
+          .from('messages')
+          .select(`
+            id,
+            sender_id,
+            receiver_id,
+            content,
+            created_at,
+            read_at,
+            sender:profiles!messages_sender_id_fkey (
+              id,
+              first_name,
+              middle_initial,
+              last_name,
+              email,
+              pfp_id
+            ),
+            receiver:profiles!messages_receiver_id_fkey (
+              id,
+              first_name,
+              middle_initial,
+              last_name,
+              email,
+              pfp_id
+            )
+          `)
+          .or(`and(sender_id.eq.${senderId},receiver_id.eq.${receiverId}),and(sender_id.eq.${receiverId},receiver_id.eq.${senderId})`);
+
+        if (after) {
+          query = query.gte('created_at', after);
+        }
+
+        query = query.order('created_at', { ascending: true });
+
+        const { data: messages, error } = await query;
+
+        if (error) {
+          console.error('Error fetching messages:', error);
+          return NextResponse.json({ error: error.message }, { status: 500 });
+        }
+
+        return NextResponse.json({ messages: messages || [] });
+      } catch (error) {
+        console.error('Error in GET /api/admin?action=messages:', error);
+        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+      }
+    }
+
+    // Handle recent conversations for a user
+    if (action === 'conversations') {
+      try {
+        const userId = searchParams.get('userId');
+        if (!userId) {
+          return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
+        }
+
+        const { data: conversations, error } = await supabase
+          .from('messages')
+          .select(`
+            id,
+            sender_id,
+            receiver_id,
+            content,
+            created_at,
+            read_at,
+            sender:profiles!messages_sender_id_fkey (
+              id,
+              first_name,
+              middle_initial,
+              last_name,
+              email,
+              pfp_id
+            ),
+            receiver:profiles!messages_receiver_id_fkey (
+              id,
+              first_name,
+              middle_initial,
+              last_name,
+              email,
+              pfp_id
+            )
+          `)
+          .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`)
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          console.error('Error fetching conversations:', error);
+          return NextResponse.json({ error: error.message }, { status: 500 });
+        }
+
+        const conversationMap = new Map();
+        conversations.forEach(message => {
+          const otherUserId = message.sender_id === userId ? message.receiver_id : message.sender_id;
+          const otherUser = message.sender_id === userId ? message.receiver : message.sender;
+
+          if (!conversationMap.has(otherUserId)) {
+            conversationMap.set(otherUserId, {
+              otherUserId,
+              otherUser,
+              lastMessage: message,
+              unreadCount: 0
+            });
+          } else {
+            const conversation = conversationMap.get(otherUserId);
+            if (new Date(message.created_at) > new Date(conversation.lastMessage.created_at)) {
+              conversation.lastMessage = message;
+            }
+            if (!message.read_at && message.receiver_id === userId) {
+              conversation.unreadCount++;
+            }
+          }
+        });
+
+        const formattedConversations = Array.from(conversationMap.values()).map(conv => ({
+          id: conv.otherUserId,
+          name: `${conv.otherUser.first_name || ''} ${conv.otherUser.middle_initial || ''} ${conv.otherUser.last_name || ''}`.trim() || conv.otherUser.email,
+          email: conv.otherUser.email,
+          avatarUrl: conv.otherUser.pfp_id || null,
+          lastMessage: conv.lastMessage.content,
+          lastMessageTime: conv.lastMessage.created_at,
+          unreadCount: conv.unreadCount,
+          isOwnMessage: conv.lastMessage.sender_id === userId
+        }));
+
+        formattedConversations.sort((a, b) => new Date(b.lastMessageTime) - new Date(a.lastMessageTime));
+
+        return NextResponse.json({ conversations: formattedConversations });
+      } catch (error) {
+        console.error('Error in GET /api/admin?action=conversations:', error);
+        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+      }
+    }
 
     // Handle logs request
     if (action === 'logs') {
@@ -384,6 +579,92 @@ export async function POST(req) {
         }
       }
     );
+
+    // Handle sending a new message
+    if (action === 'sendMessage') {
+      try {
+        const { senderId, receiverId, content } = params || {};
+
+        if (!senderId || !receiverId || !content) {
+          return NextResponse.json({ 
+            error: 'Sender ID, Receiver ID, and content are required' 
+          }, { status: 400 });
+        }
+
+        const { data: message, error } = await supabase
+          .from('messages')
+          .insert({
+            sender_id: senderId,
+            receiver_id: receiverId,
+            content: content.trim(),
+            created_at: new Date().toISOString(),
+            read_at: null
+          })
+          .select(`
+            id,
+            sender_id,
+            receiver_id,
+            content,
+            created_at,
+            read_at,
+            sender:profiles!messages_sender_id_fkey (
+              id,
+              first_name,
+              middle_initial,
+              last_name,
+              email
+            ),
+            receiver:profiles!messages_receiver_id_fkey (
+              id,
+              first_name,
+              middle_initial,
+              last_name,
+              email
+            )
+          `)
+          .single();
+
+        if (error) {
+          console.error('Error inserting message:', error);
+          return NextResponse.json({ error: error.message }, { status: 500 });
+        }
+
+        return NextResponse.json({ message });
+      } catch (error) {
+        console.error('Error in POST /api/admin (sendMessage):', error);
+        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+      }
+    }
+
+    // Handle marking messages as read
+    if (action === 'markRead') {
+      try {
+        const { receiverId, senderId } = params || {};
+
+        if (!receiverId || !senderId) {
+          return NextResponse.json({ 
+            error: 'Receiver ID and Sender ID are required' 
+          }, { status: 400 });
+        }
+
+        const { error } = await supabase
+          .from('messages')
+          .update({ read_at: new Date().toISOString() })
+          .eq('sender_id', senderId)
+          .eq('receiver_id', receiverId)
+          .is('read_at', null);
+
+        if (error) {
+          console.error('Error updating messages:', error);
+          return NextResponse.json({ error: error.message }, { status: 500 });
+        }
+
+        return NextResponse.json({ success: true });
+      } catch (error) {
+        console.error('Error in POST /api/admin (markRead):', error);
+        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+      }
+    }
 
     // Handle logs request
     if (action === 'logs') {
