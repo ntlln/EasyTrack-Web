@@ -116,32 +116,62 @@ export default function Page() {
       supabase.removeChannel(messagesSubscriptionRef.current);
     }
 
-    // Subscribe to messages where current user is either sender or receiver
+    // Subscribe to messages where current user is either sender or receiver (use two filters instead of OR)
     messagesSubscriptionRef.current = supabase
       .channel(`messages-${currentUser.id}-${Date.now()}`)
+      // INSERTs where current user is the sender
       .on(
         'postgres_changes',
         {
           event: 'INSERT',
           schema: 'public',
           table: 'messages',
-          filter: `or(sender_id.eq.${currentUser.id},receiver_id.eq.${currentUser.id})`
+          filter: `sender_id.eq.${currentUser.id}`
         },
         (payload) => {
-          console.log('Real-time INSERT received:', payload);
+          console.log('Real-time INSERT (as sender) received:', payload);
           handleNewMessage(payload.new);
         }
       )
+      // INSERTs where current user is the receiver
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+          filter: `receiver_id.eq.${currentUser.id}`
+        },
+        (payload) => {
+          console.log('Real-time INSERT (as receiver) received:', payload);
+          handleNewMessage(payload.new);
+        }
+      )
+      // UPDATEs where current user is the sender
       .on(
         'postgres_changes',
         {
           event: 'UPDATE',
           schema: 'public',
           table: 'messages',
-          filter: `or(sender_id.eq.${currentUser.id},receiver_id.eq.${currentUser.id})`
+          filter: `sender_id.eq.${currentUser.id}`
         },
         (payload) => {
-          console.log('Real-time UPDATE received:', payload);
+          console.log('Real-time UPDATE (as sender) received:', payload);
+          handleMessageUpdate(payload.new);
+        }
+      )
+      // UPDATEs where current user is the receiver
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'messages',
+          filter: `receiver_id.eq.${currentUser.id}`
+        },
+        (payload) => {
+          console.log('Real-time UPDATE (as receiver) received:', payload);
           handleMessageUpdate(payload.new);
         }
       )
