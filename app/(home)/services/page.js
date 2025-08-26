@@ -1,6 +1,6 @@
 import React from 'react';
 import { Box, Button, Container, Typography, Paper, Grid, Card, CardContent, Avatar, Chip } from '@mui/material';
-import Layout from '../components/Layout';
+import Layout from '../../components/Layout';
 
 export default function Services() {
   const services = [
@@ -116,7 +116,7 @@ export default function Services() {
                 About Us
               </Button>
               
-              <Button color="inherit" href="/con" sx={{ color: 'white', '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.1)' } }}>
+              <Button color="inherit" href="/contact" sx={{ color: 'white', '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.1)' } }}>
                 Contact Us
               </Button>
               <Box

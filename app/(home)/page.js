@@ -1,3 +1,5 @@
+"use client";
+
 import { Box, Button, Container, Typography, Paper, Grid, Card, CardContent, Avatar, Chip, TextField } from '@mui/material';
 import { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
@@ -192,7 +194,7 @@ export default function Test() {
                 About Us
               </Button>
               
-              <Button color="inherit" href="/con" sx={{ color: 'white', '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.1)' } }}>
+              <Button color="inherit" href="/contact" sx={{ color: 'white', '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.1)' } }}>
                 Contact Us
               </Button>
               <Box

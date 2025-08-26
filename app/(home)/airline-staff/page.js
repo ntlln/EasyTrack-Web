@@ -1,6 +1,6 @@
 import { Box, Button, Container, TextField, Typography, Paper, Avatar } from '@mui/material';
 import { useState, useEffect } from 'react';
-import Layout from '../components/Layout';
+import Layout from '../../components/Layout';
 
 export default function AirlineStaff() {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
