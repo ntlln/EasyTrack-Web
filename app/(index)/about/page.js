@@ -375,7 +375,7 @@ export default function About() {
             <Button
               variant="contained"
               size="large"
-              href="/con"
+              href="/contact"
               sx={{
                 bgcolor: '#ffffff',
                 color: '#214d22',

@@ -29,7 +29,7 @@ export default function ContactUs() {
               <Button color="inherit" href="/" sx={{ color: '#214d22', '&:hover': { bgcolor: 'rgba(33, 77, 34, 0.1)' } }}>
                 Home
               </Button>
-              <Button color="inherit" href="/test" sx={{ color: '#214d22', '&:hover': { bgcolor: 'rgba(33, 77, 34, 0.1)' } }}>
+              <Button color="inherit" href="/services" sx={{ color: '#214d22', '&:hover': { bgcolor: 'rgba(33, 77, 34, 0.1)' } }}>
                 Our Services
               </Button>
               <Button color="inherit" href="/about" sx={{ color: '#214d22', '&:hover': { bgcolor: 'rgba(33, 77, 34, 0.1)' } }}>
@@ -38,7 +38,7 @@ export default function ContactUs() {
               
               <Button 
                 variant="contained" 
-                href="/con"
+                href="/contact"
                 sx={{ 
                   bgcolor: '#214d22', 
                   color: 'white',
