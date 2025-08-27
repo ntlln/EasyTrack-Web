@@ -17,7 +17,7 @@ export async function getContractorSession() {
     const { data: profile } = await supabase.from("profiles").select("role_id, profiles_status(status_name)").eq("id", session.user.id).single();
     if (!profile) return null;
 
-    const allowedRoleIds = [1, 3]; // 1 = Administrator, 3 = Airline Personnel
+    const allowedRoleIds = [1, 3]; // 1 = Administrator, 3 = Contractor Personnel
     if (profile.profiles_status?.status_name === "Deactivated") return null;
     if (!allowedRoleIds.includes(Number(profile.role_id))) return null;
 

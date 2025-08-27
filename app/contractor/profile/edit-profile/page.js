@@ -1,6 +1,6 @@
 "use client";
 
-import { Box, Typography, Grid, TextField, MenuItem, InputAdornment, IconButton, Button, useTheme, Snackbar, Alert, Autocomplete } from "@mui/material";
+import { Box, Typography, Grid, TextField, MenuItem, InputAdornment, IconButton, Button, useTheme, Snackbar, Alert, Autocomplete, Dialog, DialogTitle, DialogContent, DialogActions } from "@mui/material";
 import UploadIcon from "@mui/icons-material/Upload";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import { useState, useEffect, useRef } from "react";
@@ -21,6 +21,7 @@ export default function Page() {
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState("");
   const [snackbarSeverity, setSnackbarSeverity] = useState("success");
+  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
   const [form, setForm] = useState({ first_name: "", middle_initial: "", last_name: "", suffix: "", contact_number: "", birth_date: "", emergency_contact_name: "", emergency_contact_number: "", gov_id_number: "", gov_id_proof: "", gov_id_proof_back: "" });
 
   // Suffix options
@@ -73,7 +74,7 @@ export default function Page() {
       if (data) {
         const cleanData = { first_name: data.first_name || "", middle_initial: data.middle_initial || "", last_name: data.last_name || "", suffix: data.suffix || "", contact_number: data.contact_number || "", birth_date: data.birth_date || "", emergency_contact_name: data.emergency_contact_name || "", emergency_contact_number: data.emergency_contact_number || "", gov_id_number: data.gov_id_number || "", gov_id_proof: data.gov_id_proof || "", gov_id_proof_back: data.gov_id_proof_back || "" };
         setForm(cleanData);
-        setOriginal(cleanData);
+        setOriginal({ ...cleanData, gov_id_type: data.gov_id_type });
         if (data.gov_id_type !== null && data.gov_id_type !== undefined) setSelectedGovIdType(Number(data.gov_id_type));
       }
       setLoading(false);
@@ -103,8 +104,56 @@ export default function Page() {
     }
   };
   const handleKeyPress = (event) => { if (event.key === 'Enter') handleSave(); };
-  const handleClear = () => window.location.reload();
+  const handleClear = () => { 
+    setForm({ first_name: "", middle_initial: "", last_name: "", suffix: "", contact_number: "", birth_date: "", emergency_contact_name: "", emergency_contact_number: "", gov_id_number: "", gov_id_proof: "", gov_id_proof_back: "" });
+    setSelectedGovIdType(null);
+  };
   const triggerFileInput = (type) => type === 'front' ? fileInputRef.current?.click() : fileInputBackRef.current?.click();
+
+  // Check if form has unsaved changes
+  const hasUnsavedChanges = () => {
+    if (!original) return false;
+    
+    // Check form field changes
+    const formChanges = Object.keys(form).some(key => form[key] !== (original[key] ?? ""));
+    
+    // Check gov_id_type changes
+    const originalGovIdType = original.gov_id_type !== null && original.gov_id_type !== undefined ? Number(original.gov_id_type) : null;
+    const govIdTypeChanges = selectedGovIdType !== originalGovIdType;
+    
+    const hasChanges = formChanges || govIdTypeChanges;
+    
+    console.log('Checking unsaved changes:', {
+      form,
+      original,
+      selectedGovIdType,
+      originalGovIdType,
+      formChanges,
+      govIdTypeChanges,
+      hasChanges
+    });
+    
+    return hasChanges;
+  };
+
+  // Handle back button click
+  const handleBackClick = () => {
+    if (hasUnsavedChanges()) {
+      setConfirmDialogOpen(true);
+    } else {
+      router.push("/contractor/profile");
+    }
+  };
+
+  // Handle confirmation dialog
+  const handleConfirmLeave = () => {
+    setConfirmDialogOpen(false);
+    router.push("/contractor/profile");
+  };
+
+  const handleCancelLeave = () => {
+    setConfirmDialogOpen(false);
+  };
 
   const handleSave = async () => {
     setLoading(true);
@@ -134,18 +183,18 @@ export default function Page() {
       if (oldUrl) {
         try {
           const url = new URL(oldUrl);
-          const pathMatch = url.pathname.match(/airlines\/([^.]+_[^./]+)\.(\w+)/);
+          const pathMatch = url.pathname.match(/contractor\/([^.]+_[^./]+)\.(\w+)/);
           if (pathMatch) {
             const fileName = pathMatch[1];
             const fileExt = pathMatch[2];
-            const filePath = `airlines/${fileName}.${fileExt}`;
+            const filePath = `contractor/${fileName}.${fileExt}`;
             await supabase.storage.from('gov-id').remove([filePath]);
           }
         } catch (e) {}
       }
       const fileExt = file.name.split('.').pop();
       const fileName = `${profileData.id}_${type}.${fileExt}`;
-      const filePath = `airlines/${fileName}`;
+      const filePath = `contractor/${fileName}`;
       const { error: uploadError } = await supabase.storage.from('gov-id').upload(filePath, file, { upsert: true });
       if (uploadError) throw uploadError;
       const { data: { signedUrl } } = await supabase.storage.from('gov-id').createSignedUrl(filePath, 31536000);
@@ -177,7 +226,7 @@ export default function Page() {
     <Box sx={containerStyles}>
       <Box sx={headerStyles}>
         <Box sx={backButtonStyles}>
-          <IconButton onClick={() => router.push("/contractor/profile")} sx={{ color: "primary.main" }}><ChevronLeftIcon /></IconButton>
+          <IconButton onClick={handleBackClick} sx={{ color: "primary.main" }}><ChevronLeftIcon /></IconButton>
           <Typography variant="h4" fontWeight="bold" color="primary">Edit Profile</Typography>
         </Box>
       </Box>
@@ -249,6 +298,24 @@ export default function Page() {
       <Snackbar open={snackbarOpen} autoHideDuration={4000} onClose={() => setSnackbarOpen(false)} anchorOrigin={{ vertical: 'top', horizontal: 'center' }}>
         <Alert onClose={() => setSnackbarOpen(false)} severity={snackbarSeverity} sx={{ width: '100%' }}>{snackbarMessage}</Alert>
       </Snackbar>
+
+      {/* Confirmation Dialog */}
+      <Dialog open={confirmDialogOpen} onClose={handleCancelLeave}>
+        <DialogTitle>Unsaved Changes</DialogTitle>
+        <DialogContent>
+          <Typography>
+            You have unsaved changes. Are you sure you want to leave? Your changes will not be saved.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCancelLeave} color="primary">
+            Cancel
+          </Button>
+          <Button onClick={handleConfirmLeave} color="error" variant="contained">
+            Leave Without Saving
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

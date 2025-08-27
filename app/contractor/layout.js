@@ -21,7 +21,7 @@ function ContractorLayoutContent({ children }) {
   const supabase = createClientComponentClient();
   const [checkingSession, setCheckingSession] = useState(true);
   const isAuthPage = pathname === "/contractor/login" || pathname === "/contractor/forgot-password" || pathname === "/contractor/reset-password" || pathname === "/contractor/verify";
-  const contractorRoleId = 3; // AirAsia/Contractor
+  const contractorRoleId = 3; // Contractor
 
   // Session and role validation
   useEffect(() => {

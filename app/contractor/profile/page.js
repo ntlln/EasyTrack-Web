@@ -118,11 +118,11 @@ export default function Page() {
         if (!profile?.pfp_id) return;
         try {
             const url = new URL(profile.pfp_id);
-            const pathMatch = url.pathname.match(/airlines\/([^.]+)\.(\w+)/);
+            const pathMatch = url.pathname.match(/contractor\/([^.]+)\.(\w+)/);
             if (!pathMatch) return;
             const fileName = pathMatch[1];
             const fileExt = pathMatch[2];
-            const filePath = `airlines/${fileName}.${fileExt}`;
+            const filePath = `contractor/${fileName}.${fileExt}`;
             await supabase.storage.from('profile-images').remove([filePath]);
             await supabase.from('profiles').update({ pfp_id: null }).eq('id', profile.id);
         } catch (error) { }
@@ -131,7 +131,7 @@ export default function Page() {
         try {
             const fileExt = file.name.split('.').pop();
             const fileName = `${profile.id}.${fileExt}`;
-            const filePath = `airlines/${fileName}`;
+            const filePath = `contractor/${fileName}`;
             await deleteOldProfileImage();
             const { error: uploadError } = await supabase.storage.from('profile-images').upload(filePath, file, { upsert: true, cacheControl: '3600' });
             if (uploadError) throw new Error(`Failed to upload image: ${uploadError.message}`);

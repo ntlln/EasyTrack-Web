@@ -91,11 +91,11 @@ export default function Page() {
             }
 
             console.log('User role_id:', profile.role_id);
-            // Check by role_id directly (3 = Airline Personnel, 1 = Administrator)
+            // Check by role_id directly (3 = Contractor Personnel, 1 = Administrator)
             if (![3, 1].includes(Number(profile.role_id))) {
                 await supabase.auth.signOut();
                 console.log('Role not allowed, signing out.');
-                setSnackbar({ open: true, message: "Access denied: Only airline staff can log in here.", severity: "error" });
+                setSnackbar({ open: true, message: "Access denied: Only contractor staff can log in here.", severity: "error" });
                 setEmail(""); setPassword(""); setIsLoading(false);
                 return;
             }

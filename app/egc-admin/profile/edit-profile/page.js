@@ -1,6 +1,6 @@
 "use client";
 
-import { Box, Typography, Grid, TextField, MenuItem, InputAdornment, IconButton, Button, useTheme, Snackbar, Alert, Autocomplete } from "@mui/material";
+import { Box, Typography, Grid, TextField, MenuItem, InputAdornment, IconButton, Button, useTheme, Snackbar, Alert, Autocomplete, Dialog, DialogTitle, DialogContent, DialogActions } from "@mui/material";
 import UploadIcon from "@mui/icons-material/Upload";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import { useState, useEffect, useRef } from "react";
@@ -28,6 +28,7 @@ export default function Page() {
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState("");
   const [snackbarSeverity, setSnackbarSeverity] = useState("success");
+  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
 
   const menuProps = { PaperProps: { style: { maxHeight: 48 * 5 } } };
 
@@ -41,7 +42,7 @@ export default function Page() {
       if (data) {
         const cleanData = { first_name: data.first_name || "", middle_initial: data.middle_initial || "", last_name: data.last_name || "", suffix: data.suffix || "", contact_number: data.contact_number || "", birth_date: data.birth_date || "", emergency_contact_name: data.emergency_contact_name || "", emergency_contact_number: data.emergency_contact_number || "", gov_id_number: data.gov_id_number || "", gov_id_proof: data.gov_id_proof || "", gov_id_proof_back: data.gov_id_proof_back || "" };
         setForm(cleanData);
-        setOriginal(cleanData);
+        setOriginal({ ...cleanData, gov_id_type: data.gov_id_type });
         if (data.gov_id_type !== null && data.gov_id_type !== undefined) setSelectedGovIdType(Number(data.gov_id_type));
       }
       setLoading(false);
@@ -121,7 +122,10 @@ export default function Page() {
     setLoading(false);
     if (!error) router.push("/egc-admin/profile");
   };
-  const handleClear = () => { window.location.reload(); };
+  const handleClear = () => { 
+    setForm({ first_name: "", middle_initial: "", last_name: "", suffix: "", contact_number: "", birth_date: "", emergency_contact_name: "", emergency_contact_number: "", gov_id_number: "", gov_id_proof: "", gov_id_proof_back: "" });
+    setSelectedGovIdType(null);
+  };
   const handleFileUpload = async (event, type) => {
     try {
       setUploading(true);
@@ -159,6 +163,51 @@ export default function Page() {
   };
   const triggerFileInput = (type) => { (type === 'front' ? fileInputRef : fileInputBackRef).current?.click(); };
 
+  // Check if form has unsaved changes
+  const hasUnsavedChanges = () => {
+    if (!original) return false;
+    
+    // Check form field changes
+    const formChanges = Object.keys(form).some(key => form[key] !== (original[key] ?? ""));
+    
+    // Check gov_id_type changes
+    const originalGovIdType = original.gov_id_type !== null && original.gov_id_type !== undefined ? Number(original.gov_id_type) : null;
+    const govIdTypeChanges = selectedGovIdType !== originalGovIdType;
+    
+    const hasChanges = formChanges || govIdTypeChanges;
+    
+    console.log('Checking unsaved changes:', {
+      form,
+      original,
+      selectedGovIdType,
+      originalGovIdType,
+      formChanges,
+      govIdTypeChanges,
+      hasChanges
+    });
+    
+    return hasChanges;
+  };
+
+  // Handle back button click
+  const handleBackClick = () => {
+    if (hasUnsavedChanges()) {
+      setConfirmDialogOpen(true);
+    } else {
+      router.push("/egc-admin/profile");
+    }
+  };
+
+  // Handle confirmation dialog
+  const handleConfirmLeave = () => {
+    setConfirmDialogOpen(false);
+    router.push("/egc-admin/profile");
+  };
+
+  const handleCancelLeave = () => {
+    setConfirmDialogOpen(false);
+  };
+
   // Styles
   const pageStyles = { p: 4, maxWidth: "1400px", mx: "auto" };
   const headerStyles = { display: "flex", justifyContent: "space-between", alignItems: "center", mb: 4 };
@@ -170,12 +219,12 @@ export default function Page() {
 
   return (
     <Box sx={pageStyles}>
-      <Box sx={headerStyles}>
-        <Box sx={backButtonStyles}>
-          <IconButton onClick={() => router.push("/egc-admin/profile")} sx={{ color: "primary.main" }}><ChevronLeftIcon /></IconButton>
-          <Typography variant="h4" fontWeight="bold" color="primary">Edit Profile</Typography>
+              <Box sx={headerStyles}>
+          <Box sx={backButtonStyles}>
+            <IconButton onClick={handleBackClick} sx={{ color: "primary.main" }}><ChevronLeftIcon /></IconButton>
+            <Typography variant="h4" fontWeight="bold" color="primary">Edit Profile</Typography>
+          </Box>
         </Box>
-      </Box>
 
       <form onSubmit={(e) => { e.preventDefault(); handleSave(); }}>
         <Typography variant="h6" fontWeight="bold" mb={2} color="primary">Personal Information</Typography>
@@ -243,6 +292,24 @@ export default function Page() {
       <Snackbar open={snackbarOpen} autoHideDuration={4000} onClose={() => setSnackbarOpen(false)} anchorOrigin={{ vertical: 'top', horizontal: 'center' }}>
         <Alert onClose={() => setSnackbarOpen(false)} severity={snackbarSeverity} sx={alertStyles}>{snackbarMessage}</Alert>
       </Snackbar>
+
+      {/* Confirmation Dialog */}
+      <Dialog open={confirmDialogOpen} onClose={handleCancelLeave}>
+        <DialogTitle>Unsaved Changes</DialogTitle>
+        <DialogContent>
+          <Typography>
+            You have unsaved changes. Are you sure you want to leave? Your changes will not be saved.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCancelLeave} color="primary">
+            Cancel
+          </Button>
+          <Button onClick={handleConfirmLeave} color="error" variant="contained">
+            Leave Without Saving
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }
