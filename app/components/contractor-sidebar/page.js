@@ -123,11 +123,6 @@ function ContractorSidebarContent() {
                                     <ListItemIcon><MyLocationIcon sx={iconStyles("/contractor/luggage-tracking")} /></ListItemIcon>
                                     <ListItemText primary="Luggage Tracking" />
                                 </ListItemButton>
-
-                                {/* <ListItemButton sx={{ pl: 4, ...(isActive("/contractor/payments") ? activeStyles : {}), ...listItemStyles("/contractor/payments") }} onClick={() => handleNavigation("/contractor/payments")}>
-                                    <ListItemIcon><PaymentIcon sx={iconStyles("/contractor/payments")} /></ListItemIcon>
-                                    <ListItemText primary="Payments" />
-                                </ListItemButton> */}
                             </List>
                         </Collapse>
                     )}
@@ -136,16 +131,6 @@ function ContractorSidebarContent() {
                         <ListItemIcon><SupportAgentIcon sx={iconStyles("/contractor/chat-support")} /></ListItemIcon>
                         {!isMinimized && <ListItemText primary="Chat Support" />}
                     </ListItemButton>
-
-                    {/* <ListItemButton onClick={() => handleNavigation("/contractor/history-and-reports")} sx={listItemStyles("/contractor/history-and-reports")}>
-                        <ListItemIcon><AssignmentIcon sx={iconStyles("/contractor/history-and-reports")} /></ListItemIcon>
-                        {!isMinimized && <ListItemText primary="History and Reports" />}
-                    </ListItemButton>
-
-                    <ListItemButton onClick={() => handleNavigation("/contractor/statistics")} sx={listItemStyles("/contractor/statistics")}>
-                        <ListItemIcon><BarChartIcon sx={iconStyles("/contractor/statistics")} /></ListItemIcon>
-                        {!isMinimized && <ListItemText primary="Statistics" />}
-                    </ListItemButton> */}
                 </List>
             </Box>
 
