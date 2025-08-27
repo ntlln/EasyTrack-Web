@@ -120,6 +120,8 @@ export default function Page() {
     const [cancelling, setCancelling] = useState(false);
     const [page, setPage] = useState(0);
     const [rowsPerPage, setRowsPerPage] = useState(10);
+    const [validationErrors, setValidationErrors] = useState({});
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     // Mount
     useEffect(() => { setMounted(true); setIsFormMounted(true); }, []);
@@ -323,8 +325,23 @@ export default function Page() {
     };
 
     // Contract form handlers
-    const handlePickupAddressChange = (field, value) => { setPickupAddress(prev => ({ ...prev, [field]: value })); };
-    const handleDropoffAddressChange = (field, value) => { setDropoffAddress(prev => ({ ...prev, [field]: value })); };
+    const handlePickupAddressChange = (field, value) => { 
+        setPickupAddress(prev => ({ ...prev, [field]: value })); 
+        // Clear validation error for this field
+        if (validationErrors.pickupLocation) {
+            setValidationErrors(prev => ({ ...prev, pickupLocation: null }));
+        }
+    };
+    const handleDropoffAddressChange = (field, value) => { 
+        setDropoffAddress(prev => ({ ...prev, [field]: value })); 
+        // Clear validation errors for dropoff fields
+        if (validationErrors.dropoffLocation) {
+            setValidationErrors(prev => ({ ...prev, dropoffLocation: null }));
+        }
+        if (validationErrors.dropoffCoordinates) {
+            setValidationErrors(prev => ({ ...prev, dropoffCoordinates: null }));
+        }
+    };
     const handleInputChange = (field, value) => {
         if (field === 'contact') {
             // Handle backspace and empty values
@@ -337,6 +354,10 @@ export default function Page() {
             }
         } else {
             setContract(prev => ({ ...prev, [field]: value }));
+        }
+        // Clear validation error for this field
+        if (validationErrors[field]) {
+            setValidationErrors(prev => ({ ...prev, [field]: null }));
         }
     };
     const handleImageChange = (file) => { setContract(prev => ({ ...prev, image: file })); };
@@ -458,6 +479,15 @@ export default function Page() {
             newForms[index] = { ...newForms[index], [field]: value };
             return newForms;
         });
+        // Clear validation error for this field
+        if (validationErrors.luggage && validationErrors.luggage[index] && validationErrors.luggage[index][field]) {
+            setValidationErrors(prev => ({
+                ...prev,
+                luggage: prev.luggage.map((formErrors, i) => 
+                    i === index ? { ...formErrors, [field]: null } : formErrors
+                )
+            }));
+        }
     };
 
     // Add function to add new luggage form
@@ -470,12 +500,111 @@ export default function Page() {
         setLuggageForms(prev => prev.filter((_, i) => i !== index));
     };
 
+    // Validation function
+    const validateForm = () => {
+        const errors = {};
+
+        // Validate pickup location
+        if (!pickupAddress.location || pickupAddress.location.trim() === '') {
+            errors.pickupLocation = 'Pickup location is required';
+        }
+
+        // Validate dropoff location
+        if (!dropoffAddress.location || dropoffAddress.location.trim() === '') {
+            errors.dropoffLocation = 'Drop-off location is required';
+        }
+
+        // Validate dropoff coordinates
+        if (!dropoffAddress.lat || !dropoffAddress.lng) {
+            errors.dropoffCoordinates = 'Please select a valid drop-off location on the map';
+        }
+
+        // Validate delivery address fields
+        if (!contract.province || contract.province.trim() === '') {
+            errors.province = 'Province is required';
+        }
+        if (!contract.city || contract.city.trim() === '') {
+            errors.city = 'City/Municipality is required';
+        }
+        if (!contract.barangay || contract.barangay.trim() === '') {
+            errors.barangay = 'Barangay is required';
+        }
+        if (!contract.postalCode || contract.postalCode.trim() === '') {
+            errors.postalCode = 'Postal code is required';
+        }
+        if (!contract.addressLine1 || contract.addressLine1.trim() === '') {
+            errors.addressLine1 = 'Address line 1 is required';
+        }
+
+        // Validate contact number
+        if (!contract.contact || contract.contact.trim() === '') {
+            errors.contact = 'Contact number is required';
+        } else if (!/^\+63\s\d{3}\s\d{3}\s\d{4}$/.test(contract.contact.trim())) {
+            errors.contact = 'Contact number must be in format: +63 XXX XXX XXXX';
+        }
+
+        // Validate luggage forms
+        const luggageErrors = [];
+        luggageForms.forEach((form, index) => {
+            const formErrors = {};
+            
+            if (!form.name || form.name.trim() === '') {
+                formErrors.name = 'Name is required';
+            }
+            if (!form.caseNumber || form.caseNumber.trim() === '') {
+                formErrors.caseNumber = 'Case number is required';
+            }
+            if (!form.flightNo || form.flightNo.trim() === '') {
+                formErrors.flightNo = 'Flight number is required';
+            }
+            if (!form.itemDescription || form.itemDescription.trim() === '') {
+                formErrors.itemDescription = 'Item description is required';
+            }
+            if (!form.weight || form.weight.trim() === '') {
+                formErrors.weight = 'Weight is required';
+            } else if (Number(form.weight) <= 0 || Number(form.weight) > 100) {
+                formErrors.weight = 'Weight must be between 0.1 and 100 kg';
+            }
+            if (!form.quantity || form.quantity.trim() === '') {
+                formErrors.quantity = 'Quantity is required';
+            } else if (Number(form.quantity) < 1 || Number(form.quantity) > 10) {
+                formErrors.quantity = 'Quantity must be between 1 and 10';
+            }
+
+            if (Object.keys(formErrors).length > 0) {
+                luggageErrors[index] = formErrors;
+            }
+        });
+
+        if (luggageErrors.length > 0) {
+            errors.luggage = luggageErrors;
+        }
+
+        return errors;
+    };
+
     // Modify handleSubmit to handle multiple luggage forms
     const handleSubmit = async () => { 
+        // Clear previous validation errors
+        setValidationErrors({});
+        
+        // Validate form
+        const errors = validateForm();
+        if (Object.keys(errors).length > 0) {
+            setValidationErrors(errors);
+            setSnackbarMessage('Please fill in all required fields correctly');
+            setSnackbarOpen(true);
+            return;
+        }
+
+        setIsSubmitting(true);
+        
         try { 
             const { data: { user }, error: userError } = await supabase.auth.getUser(); 
             if (userError) {
                 console.error('Error getting user:', userError);
+                setSnackbarMessage('Authentication error. Please try again.');
+                setSnackbarOpen(true);
                 return;
             }
 
@@ -600,6 +729,7 @@ export default function Page() {
                 }
             }
 
+            setSnackbarMessage('Booking created successfully!');
             setSnackbarOpen(true);
             // Reset form
             setContract({ 
@@ -614,12 +744,18 @@ export default function Page() {
             setLuggageForms([{ name: "", caseNumber: "", flightNo: "", itemDescription: "", weight: "", quantity: "" }]);
             setPickupAddress({ location: "", addressLine1: "", addressLine2: "", province: "", city: "", barangay: "", postalCode: "" });
             setDropoffAddress({ location: null, lat: null, lng: null });
+            // Clear validation errors
+            setValidationErrors({});
             // Switch to contract list tab and refresh
             setActiveTab(0);
             router.refresh();
         } catch (error) { 
             console.error('Error submitting contract:', error);
-        } 
+            setSnackbarMessage('Error creating booking. Please try again.');
+            setSnackbarOpen(true);
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     // Tab change
@@ -1143,7 +1279,7 @@ export default function Page() {
                     <Paper elevation={3} sx={{ maxWidth: 700, mx: "auto", mt: 4, p: 4, pt: 2, borderRadius: 3, backgroundColor: theme.palette.background.paper, position: "relative" }}>
                         <Typography variant="h6" fontWeight="bold" align="center" mb={3}>Pickup Location</Typography>
                         <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mb: 2 }}>
-                            <FormControl fullWidth size="small" required>
+                            <FormControl fullWidth size="small" required error={!!validationErrors.pickupLocation}>
                                 <InputLabel>Pickup Location</InputLabel>
                                 <Select 
                                     value={pickupAddress.location || ""} 
@@ -1157,6 +1293,11 @@ export default function Page() {
                                         </MenuItem>
                                     ))}
                                 </Select>
+                                {validationErrors.pickupLocation && (
+                                    <Typography variant="caption" color="error" sx={{ mt: 0.5, ml: 1.5 }}>
+                                        {validationErrors.pickupLocation}
+                                    </Typography>
+                                )}
                             </FormControl>
                         </Box>
                     </Paper>
@@ -1185,6 +1326,8 @@ export default function Page() {
                                                 size="small"
                                                 placeholder="Search for a location"
                                                 required
+                                                error={!!validationErrors.dropoffLocation}
+                                                helperText={validationErrors.dropoffLocation}
                                                 InputProps={{
                                                     ...params.InputProps,
                                                     endAdornment: (
@@ -1201,6 +1344,11 @@ export default function Page() {
                                     />
                                 </Box>
                             )}
+                            {validationErrors.dropoffCoordinates && (
+                                <Typography variant="caption" color="error" sx={{ mt: 0.5, ml: 1.5 }}>
+                                    {validationErrors.dropoffCoordinates}
+                                </Typography>
+                            )}
                             {mounted && <MapComponent mapRef={mapRef} mapError={mapError} />}
                         </Box>
                     </Paper>
@@ -1215,6 +1363,8 @@ export default function Page() {
                                     value={contract.province || ""} 
                                     onChange={(e) => handleInputChange("province", e.target.value.slice(0, 100))} 
                                     required 
+                                    error={!!validationErrors.province}
+                                    helperText={validationErrors.province}
                                     inputProps={{ maxLength: 100 }}
                                     InputProps={{ 
                                         endAdornment: contract.province ? (
@@ -1231,6 +1381,8 @@ export default function Page() {
                                     value={contract.city || ""} 
                                     onChange={(e) => handleInputChange("city", e.target.value.slice(0, 100))} 
                                     required 
+                                    error={!!validationErrors.city}
+                                    helperText={validationErrors.city}
                                     inputProps={{ maxLength: 100 }}
                                     InputProps={{ 
                                         endAdornment: contract.city ? (
@@ -1249,6 +1401,8 @@ export default function Page() {
                                     value={contract.barangay || ""} 
                                     onChange={(e) => handleInputChange("barangay", e.target.value.slice(0, 100))} 
                                     required 
+                                    error={!!validationErrors.barangay}
+                                    helperText={validationErrors.barangay}
                                     inputProps={{ maxLength: 100 }}
                                     InputProps={{ 
                                         endAdornment: contract.barangay ? (
@@ -1265,6 +1419,8 @@ export default function Page() {
                                     value={contract.postalCode || ""} 
                                     onChange={(e) => handleInputChange("postalCode", e.target.value.slice(0, 10))} 
                                     required 
+                                    error={!!validationErrors.postalCode}
+                                    helperText={validationErrors.postalCode}
                                     inputProps={{ maxLength: 10 }}
                                     InputProps={{ 
                                         endAdornment: contract.postalCode ? (
@@ -1282,6 +1438,8 @@ export default function Page() {
                                 value={contract.addressLine1 || ""} 
                                 onChange={(e) => handleInputChange("addressLine1", e.target.value.slice(0, 200))} 
                                 required 
+                                error={!!validationErrors.addressLine1}
+                                helperText={validationErrors.addressLine1}
                                 inputProps={{ maxLength: 200 }}
                                 InputProps={{ 
                                     endAdornment: contract.addressLine1 ? (
@@ -1337,6 +1495,8 @@ export default function Page() {
                                         value={form.name} 
                                         onChange={(e) => handleLuggageFormChange(index, "name", e.target.value.slice(0, 100))} 
                                         required 
+                                        error={!!(validationErrors.luggage && validationErrors.luggage[index] && validationErrors.luggage[index].name)}
+                                        helperText={validationErrors.luggage && validationErrors.luggage[index] && validationErrors.luggage[index].name}
                                         inputProps={{ maxLength: 100 }}
                                         InputProps={{ 
                                             endAdornment: form.name ? (
@@ -1353,6 +1513,8 @@ export default function Page() {
                                         value={form.caseNumber} 
                                         onChange={(e) => handleLuggageFormChange(index, "caseNumber", e.target.value.slice(0, 20))} 
                                         required 
+                                        error={!!(validationErrors.luggage && validationErrors.luggage[index] && validationErrors.luggage[index].caseNumber)}
+                                        helperText={validationErrors.luggage && validationErrors.luggage[index] && validationErrors.luggage[index].caseNumber}
                                         inputProps={{ maxLength: 20 }}
                                     />
                                     <TextField 
@@ -1362,6 +1524,8 @@ export default function Page() {
                                         value={form.itemDescription} 
                                         onChange={(e) => handleLuggageFormChange(index, "itemDescription", e.target.value.slice(0, 200))} 
                                         required 
+                                        error={!!(validationErrors.luggage && validationErrors.luggage[index] && validationErrors.luggage[index].itemDescription)}
+                                        helperText={validationErrors.luggage && validationErrors.luggage[index] && validationErrors.luggage[index].itemDescription}
                                         inputProps={{ maxLength: 200 }}
                                     />
                                     <Box sx={{ display: 'flex', gap: 2, width: '100%' }}>
@@ -1373,6 +1537,8 @@ export default function Page() {
                                             onChange={(e) => handleInputChange("contact", e.target.value)} 
                                             onFocus={handlePhoneFocus}
                                             required 
+                                            error={!!validationErrors.contact}
+                                            helperText={validationErrors.contact}
                                             placeholder="+63 XXX XXX XXXX"
                                             sx={{ width: '30%' }}
                                             inputProps={{
@@ -1394,6 +1560,8 @@ export default function Page() {
                                             value={form.flightNo} 
                                             onChange={(e) => handleLuggageFormChange(index, "flightNo", e.target.value.slice(0, 10))} 
                                             required 
+                                            error={!!(validationErrors.luggage && validationErrors.luggage[index] && validationErrors.luggage[index].flightNo)}
+                                            helperText={validationErrors.luggage && validationErrors.luggage[index] && validationErrors.luggage[index].flightNo}
                                             sx={{ width: '25%' }} 
                                             inputProps={{ maxLength: 10 }}
                                         />
@@ -1410,6 +1578,8 @@ export default function Page() {
                                                 }
                                             }} 
                                             required 
+                                            error={!!(validationErrors.luggage && validationErrors.luggage[index] && validationErrors.luggage[index].weight)}
+                                            helperText={validationErrors.luggage && validationErrors.luggage[index] && validationErrors.luggage[index].weight}
                                             sx={{ width: '20%' }}
                                             inputProps={{ 
                                                 min: 0,
@@ -1430,6 +1600,8 @@ export default function Page() {
                                                 }
                                             }} 
                                             required 
+                                            error={!!(validationErrors.luggage && validationErrors.luggage[index] && validationErrors.luggage[index].quantity)}
+                                            helperText={validationErrors.luggage && validationErrors.luggage[index] && validationErrors.luggage[index].quantity}
                                             sx={{ width: '25%' }}
                                             inputProps={{ 
                                                 min: 1,
@@ -1450,7 +1622,16 @@ export default function Page() {
                             Add Another Luggage
                         </Button>
                     </Paper>
-                    <Box sx={{ display: "flex", justifyContent: "center", mt: 4, gap: 2 }}><Button variant="contained" onClick={handleSubmit}>Create Booking</Button></Box>
+                    <Box sx={{ display: "flex", justifyContent: "center", mt: 4, gap: 2 }}>
+                        <Button 
+                            variant="contained" 
+                            onClick={handleSubmit}
+                            disabled={isSubmitting}
+                            startIcon={isSubmitting ? <CircularProgress size={20} color="inherit" /> : null}
+                        >
+                            {isSubmitting ? 'Creating Booking...' : 'Create Booking'}
+                        </Button>
+                    </Box>
                     <Box sx={{ textAlign: "center", mt: 6 }}><Typography variant="h6" fontWeight="bold">Partnered with:</Typography><Box sx={{ display: "flex", justifyContent: "center", gap: 4, mt: 2 }}><Image src="/brand-3.png" alt="AirAsia" width={60} height={60} /></Box></Box>
                 </Box>)}
                 <Snackbar 
@@ -1461,8 +1642,8 @@ export default function Page() {
                     anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
                     sx={{
                         '& .MuiSnackbarContent-root': {
-                            backgroundColor: theme.palette.error.main,
-                            color: theme.palette.error.contrastText
+                            backgroundColor: snackbarMessage?.includes('successfully') ? theme.palette.success.main : theme.palette.error.main,
+                            color: snackbarMessage?.includes('successfully') ? theme.palette.success.contrastText : theme.palette.error.contrastText
                         }
                     }}
                 />
