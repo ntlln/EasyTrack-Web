@@ -1,6 +1,7 @@
 "use client";
 
-import { Box, Typography, CircularProgress, Paper, TextField, Button, Alert } from "@mui/material";
+import { Box, Typography, CircularProgress, Paper, TextField, Button, Alert, InputAdornment, IconButton } from "@mui/material";
+import { Visibility, VisibilityOff } from "@mui/icons-material";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
@@ -16,6 +17,8 @@ export default function Page() {
     const [password, setPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
     const [isLoading, setIsLoading] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
     // Verification and password setup
     useEffect(() => {
@@ -45,6 +48,10 @@ export default function Page() {
         try {
             const { error: updateError } = await supabase.auth.updateUser({ password });
             if (updateError) { setError(updateError.message); setIsLoading(false); return; }
+            
+            // Sign out the user after password update to force them to login again
+            await supabase.auth.signOut();
+            
             setStatus("success");
             setTimeout(() => router.push("/egc-admin/login"), 3000);
         } catch (err) {
@@ -81,8 +88,50 @@ export default function Page() {
                     <Typography variant="h5" color="primary.main" sx={titleStyles}>Set Your Password</Typography>
                     <Typography variant="body2" color="text.secondary" sx={titleStyles}>Please set a password for your account before logging in.</Typography>
                     <form onSubmit={handleSetPassword} style={formStyles}>
-                        <TextField label="New Password" type="password" fullWidth required value={password} onChange={e => setPassword(e.target.value)} sx={textFieldStyles} />
-                        <TextField label="Confirm Password" type="password" fullWidth required value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} sx={textFieldStyles} />
+                        <TextField 
+                            label="New Password" 
+                            type={showPassword ? "text" : "password"} 
+                            fullWidth 
+                            required 
+                            value={password} 
+                            onChange={e => setPassword(e.target.value)} 
+                            sx={textFieldStyles}
+                            InputProps={{
+                                endAdornment: (
+                                    <InputAdornment position="end">
+                                        <IconButton
+                                            aria-label="toggle password visibility"
+                                            onClick={() => setShowPassword(!showPassword)}
+                                            edge="end"
+                                        >
+                                            {showPassword ? <VisibilityOff /> : <Visibility />}
+                                        </IconButton>
+                                    </InputAdornment>
+                                ),
+                            }}
+                        />
+                        <TextField 
+                            label="Confirm Password" 
+                            type={showConfirmPassword ? "text" : "password"} 
+                            fullWidth 
+                            required 
+                            value={confirmPassword} 
+                            onChange={e => setConfirmPassword(e.target.value)} 
+                            sx={textFieldStyles}
+                            InputProps={{
+                                endAdornment: (
+                                    <InputAdornment position="end">
+                                        <IconButton
+                                            aria-label="toggle confirm password visibility"
+                                            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                            edge="end"
+                                        >
+                                            {showConfirmPassword ? <VisibilityOff /> : <Visibility />}
+                                        </IconButton>
+                                    </InputAdornment>
+                                ),
+                            }}
+                        />
                         {error && <Alert severity="error" sx={alertStyles}>{error}</Alert>}
                         <Button type="submit" variant="contained" color="primary" fullWidth disabled={isLoading}>
                             {isLoading ? <CircularProgress size={24} /> : "Set Password & Continue"}
