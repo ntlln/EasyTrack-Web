@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useContext, useEffect, Suspense } from "react";
+import { useState, useContext, useEffect, useRef, Suspense } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { Box, Divider, List, ListItemButton, ListItemIcon, ListItemText, Collapse, Button, IconButton, useMediaQuery, Typography } from "@mui/material";
+import { Box, Divider, List, ListItemButton, ListItemIcon, ListItemText, Collapse, Button, IconButton, useMediaQuery, Typography, Snackbar, Alert } from "@mui/material";
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 // import PaymentIcon from '@mui/icons-material/Payment';
@@ -32,7 +32,7 @@ export default function Page() {
 
 function ContractorSidebarContent() {
     // State and context setup
-    const [openPages, setOpenPages] = useState(() => typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('contractorSidebarTransactionsOpen') || 'false') : false);
+    const [openPages, setOpenPages] = useState(() => typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('contractorSidebarTransactionsOpen') || 'true') : true);
     const [isMinimized, setIsMinimized] = useState(true);
     const { mode, toggleMode } = useContext(ColorModeContext);
     const theme = useTheme();
@@ -40,6 +40,13 @@ function ContractorSidebarContent() {
     const pathname = usePathname();
     const supabase = createClientComponentClient();
     const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+    const [chatUnreadCount, setChatUnreadCount] = useState(0);
+    const chatUnreadIntervalRef = useRef(null);
+    const prevUnreadRef = useRef(0);
+    const prevUnreadByConvRef = useRef(new Map());
+    const didInitRef = useRef(false);
+    const [toast, setToast] = useState({ open: false, title: '', message: '', severity: 'info', targetUserId: null });
+    const closeToast = () => setToast(prev => ({ ...prev, open: false }));
 
     // Click outside handler
     useEffect(() => {
@@ -55,6 +62,68 @@ function ContractorSidebarContent() {
     useEffect(() => {
         if (typeof window !== 'undefined') localStorage.setItem('contractorSidebarTransactionsOpen', JSON.stringify(openPages));
     }, [openPages]);
+
+    // Start polling unread conversations and show toast on increase
+    useEffect(() => {
+        const setup = async () => {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session?.user) return;
+            const userId = session.user.id;
+
+            const fetchUnread = async () => {
+                try {
+                    const res = await fetch(`/api/admin?action=conversations&userId=${userId}`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        const conversations = data.conversations || [];
+                        const totalUnread = conversations.reduce((sum, c) => sum + (c.unreadCount || 0), 0);
+
+                        // Compute per-conversation increases
+                        const prevMap = prevUnreadByConvRef.current || new Map();
+                        const increases = [];
+                        let totalDelta = 0;
+                        conversations.forEach(c => {
+                            const prev = prevMap.get(c.id) || 0;
+                            const cur = c.unreadCount || 0;
+                            if (cur > prev) {
+                                increases.push({ ...c, delta: cur - prev });
+                                totalDelta += (cur - prev);
+                            }
+                        });
+
+                        if (didInitRef.current && totalDelta > 0) {
+                            const mostRecent = increases.sort((a, b) => new Date(b.lastMessageTime) - new Date(a.lastMessageTime))[0];
+                            if (mostRecent) {
+                                const label = `${mostRecent.name}${mostRecent.role ? ` - ${mostRecent.role}` : ''}`;
+                                const suffix = totalDelta > 1 ? ` (+${totalDelta - 1} more)` : '';
+                                setToast({ open: true, title: label, message: `${mostRecent.lastMessage}${suffix}`.trim(), severity: 'info', targetUserId: mostRecent.id });
+                            }
+                        }
+
+                        // Update refs and state
+                        const nextMap = new Map();
+                        conversations.forEach(c => nextMap.set(c.id, c.unreadCount || 0));
+                        prevUnreadByConvRef.current = nextMap;
+                        prevUnreadRef.current = totalUnread;
+                        setChatUnreadCount(totalUnread);
+                        if (!didInitRef.current) didInitRef.current = true;
+                    }
+                } catch (_) { /* ignore */ }
+            };
+
+            // initial fetch and interval
+            fetchUnread();
+            if (chatUnreadIntervalRef.current) clearInterval(chatUnreadIntervalRef.current);
+            chatUnreadIntervalRef.current = setInterval(fetchUnread, 5000);
+        };
+        setup();
+        return () => {
+            if (chatUnreadIntervalRef.current) {
+                clearInterval(chatUnreadIntervalRef.current);
+                chatUnreadIntervalRef.current = null;
+            }
+        };
+    }, []);
 
     // Navigation and auth handlers
     const handleClickPages = () => isMinimized ? setIsMinimized(false) : setOpenPages(!openPages);
@@ -104,6 +173,7 @@ function ContractorSidebarContent() {
     const transactionsButtonStyles = { ...listItemStyles("/contractor/transactions"), ...(isDropdownActive() ? activeStyles : {}) };
 
     return (
+        <>
         <Box sx={sidebarStyles} data-sidebar="true">
             <Box sx={headerStyles}>
                 <Box component="img" src="../brand-2.png" alt="EasyTrack Logo" sx={logoStyles} onClick={() => handleNavigation("/contractor/")} />
@@ -145,9 +215,25 @@ function ContractorSidebarContent() {
                         </Collapse>
                     )}
 
-                    <ListItemButton onClick={() => handleNavigation("/contractor/chat-support")} sx={listItemStyles("/contractor/chat-support")}>
-                        <ListItemIcon><SupportAgentIcon sx={iconStyles("/contractor/chat-support")} /></ListItemIcon>
-                        {!isMinimized && <ListItemText primary="Chat Support" />}
+                    <ListItemButton onClick={() => handleNavigation("/contractor/chat-support")} sx={{ ...listItemStyles("/contractor/chat-support"), position: 'relative' }}>
+                        <ListItemIcon sx={{ position: 'relative' }}>
+                            <SupportAgentIcon sx={iconStyles("/contractor/chat-support")} />
+                            {isMinimized && chatUnreadCount > 0 && (
+                                <Box sx={{ position: 'absolute', top: -2, right: -2, bgcolor: 'primary.main', color: '#fff', borderRadius: '10px', px: 0.5, minWidth: 16, height: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, lineHeight: 1 }}>
+                                    {chatUnreadCount > 99 ? '99+' : chatUnreadCount}
+                                </Box>
+                            )}
+                        </ListItemIcon>
+                        {!isMinimized && (
+                            <>
+                                <ListItemText primary="Chat Support" />
+                                {chatUnreadCount > 0 && (
+                                    <Box sx={{ ml: 1, bgcolor: 'primary.main', color: '#fff', borderRadius: '12px', px: 1, minWidth: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, lineHeight: 1 }}>
+                                        {chatUnreadCount > 99 ? '99+' : chatUnreadCount}
+                                    </Box>
+                                )}
+                            </>
+                        )}
                     </ListItemButton>
                 </List>
             </Box>
@@ -164,5 +250,19 @@ function ContractorSidebarContent() {
                 </Button>
             </Box>
         </Box>
+        <Snackbar 
+            open={toast.open} 
+            autoHideDuration={4000} 
+            onClose={closeToast}
+            anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+        >
+            <Alert onClose={closeToast} severity={toast.severity} variant="filled" sx={{ width: '100%', bgcolor: 'primary.main', color: 'primary.contrastText', '& .MuiAlert-icon': { color: 'primary.contrastText' }, cursor: toast.targetUserId ? 'pointer' : 'default' }} onClick={() => { if (toast.targetUserId) { closeToast(); router.push(`/contractor/chat-support?openUser=${toast.targetUserId}`); } }}>
+                <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                    <Typography sx={{ fontWeight: 600 }}>{toast.title}</Typography>
+                    <Typography sx={{ mt: 0.5 }}>{toast.message}</Typography>
+                </Box>
+            </Alert>
+        </Snackbar>
+        </>
     );
 }

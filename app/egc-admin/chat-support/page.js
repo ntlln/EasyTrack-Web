@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { Box, Typography, TextField, IconButton, InputAdornment, Paper, Avatar, Button, useTheme, Autocomplete, CircularProgress, Snackbar, Alert } from "@mui/material";
+import { useSearchParams } from 'next/navigation';
 import SearchIcon from '@mui/icons-material/Search';
 import SendIcon from '@mui/icons-material/Send';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
@@ -34,8 +35,10 @@ export default function Page() {
   const autoRefreshIntervalRef = useRef(null);
   const lastMessageTimeRef = useRef(null);
   const messagesEndRef = useRef(null);
+  const messageInputRef = useRef(null);
   const currentUserRef = useRef(null);
   const selectedUserRef = useRef(null);
+  const searchParams = useSearchParams();
 
   // Keep refs in sync with state to avoid stale closures in realtime callbacks
   useEffect(() => {
@@ -58,6 +61,16 @@ export default function Page() {
       fetchConversations();
     }
   }, [currentUser]);
+
+  // Open conversation from URL param if provided
+  useEffect(() => {
+    if (!users.length) return;
+    const id = searchParams?.get('openUser');
+    if (id) {
+      const user = users.find(u => String(u.id) === String(id));
+      if (user) setSelectedUser(user);
+    }
+  }, [users, searchParams]);
 
   // Fetch messages when selected user changes
   useEffect(() => {
@@ -535,6 +548,7 @@ export default function Page() {
           first_name, 
           middle_initial, 
           last_name, 
+          user_status_id,
           role_id,
           pfp_id,
           profiles_roles (role_name)
@@ -549,6 +563,8 @@ export default function Page() {
         email: user.email,
         role: user.profiles_roles?.role_name || 'No Role',
         role_id: user.role_id,
+        user_status_id: user.user_status_id,
+        statusLabel: user.user_status_id === 1 ? 'Online' : 'Offline',
         avatarUrl: user.pfp_id || null
       }));
 
@@ -620,6 +636,8 @@ export default function Page() {
 
     const messageContent = message.trim();
     setMessage(""); // Clear input immediately for better UX
+    // Keep focus on the input
+    messageInputRef.current?.focus();
 
     // Create a temporary message object for immediate display
     const tempMessage = {
@@ -692,6 +710,8 @@ export default function Page() {
       setMessage(messageContent);
     } finally {
       setSendingMessage(false);
+      // Restore focus after sending completes
+      messageInputRef.current?.focus();
     }
   };
 
@@ -840,7 +860,7 @@ export default function Page() {
   const chatContainerStyles = { flex: "1 1 auto", minWidth: 0, display: "flex", flexDirection: "column", bgcolor: theme.palette.background.default };
   const headerStyles = { p: 2, display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid", borderColor: "divider" };
   const userInfoStyles = { display: "flex", alignItems: "center", gap: 2 };
-  const statusStyles = { fontSize: "12px", color: "green" };
+  const statusStyles = { fontSize: "12px" };
   const messagesContainerStyles = { flexGrow: 1, p: 2, overflow: "auto", display: "flex", flexDirection: "column", gap: 2 };
   const messageBubbleStyles = { p: 2, borderRadius: 2, maxWidth: "50%", display: "inline-block", position: "relative", wordBreak: "break-word", overflowWrap: "anywhere", whiteSpace: "pre-wrap" };
   const receivedMessageStyles = { 
@@ -999,8 +1019,15 @@ export default function Page() {
               <Typography sx={{ fontWeight: "bold" }}>
                 {selectedUser ? selectedUser.name : "Select a conversation"}
               </Typography>
-              <Typography sx={statusStyles}>
-                {selectedUser ? "Online" : "No active chat"}
+              <Typography 
+                sx={{ 
+                  ...statusStyles,
+                  color: selectedUser 
+                    ? (selectedUser.user_status_id === 1 ? 'success.main' : 'text.secondary') 
+                    : 'text.secondary' 
+                }}
+              >
+                {selectedUser ? (selectedUser.user_status_id === 1 ? 'Online' : 'Offline') : 'No active chat'}
               </Typography>
             </Box>
           </Box>
@@ -1064,7 +1091,8 @@ export default function Page() {
             onChange={(e) => setMessage(e.target.value)}
             onKeyPress={handleKeyPress}
             sx={inputFieldStyles} 
-            disabled={!selectedUser || sendingMessage}
+            disabled={!selectedUser}
+            inputRef={messageInputRef}
           />
           <IconButton 
             color="primary" 

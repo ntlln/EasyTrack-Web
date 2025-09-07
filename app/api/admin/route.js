@@ -165,7 +165,9 @@ export async function GET(request) {
               middle_initial,
               last_name,
               email,
-              pfp_id
+              pfp_id,
+              role_id,
+              profiles_roles (role_name)
             ),
             receiver:profiles!messages_receiver_id_fkey (
               id,
@@ -173,7 +175,9 @@ export async function GET(request) {
               middle_initial,
               last_name,
               email,
-              pfp_id
+              pfp_id,
+              role_id,
+              profiles_roles (role_name)
             )
           `)
           .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`)
@@ -194,7 +198,7 @@ export async function GET(request) {
               otherUserId,
               otherUser,
               lastMessage: message,
-              unreadCount: 0
+              unreadCount: (!message.read_at && message.receiver_id === userId) ? 1 : 0
             });
           } else {
             const conversation = conversationMap.get(otherUserId);
@@ -212,6 +216,7 @@ export async function GET(request) {
           name: `${conv.otherUser.first_name || ''} ${conv.otherUser.middle_initial || ''} ${conv.otherUser.last_name || ''}`.trim() || conv.otherUser.email,
           email: conv.otherUser.email,
           avatarUrl: conv.otherUser.pfp_id || null,
+          role: conv.otherUser.profiles_roles?.role_name || 'No Role',
           lastMessage: conv.lastMessage.content,
           lastMessageTime: conv.lastMessage.created_at,
           unreadCount: conv.unreadCount,

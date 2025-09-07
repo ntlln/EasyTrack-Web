@@ -6,6 +6,7 @@ import SearchIcon from '@mui/icons-material/Search';
 import SendIcon from '@mui/icons-material/Send';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { useSearchParams } from 'next/navigation';
 
 export default function Page() {
     // Theme and state setup
@@ -24,9 +25,14 @@ export default function Page() {
     const [sendingMessage, setSendingMessage] = useState(false);
     const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
     const messagesEndRef = useRef(null);
+    const messageInputRef = useRef(null);
     const currentUserRef = useRef(null);
     const selectedUserRef = useRef(null);
     const realtimeChannelRef = useRef(null);
+    const searchParams = useSearchParams();
+    const autoRefreshIntervalRef = useRef(null);
+    const lastMessageTimeRef = useRef(null);
+    const [shouldAutoScroll, setShouldAutoScroll] = useState(false);
     useEffect(() => { currentUserRef.current = currentUser; }, [currentUser]);
     useEffect(() => { selectedUserRef.current = selectedUser; }, [selectedUser]);
 
@@ -41,14 +47,26 @@ export default function Page() {
         if (currentUser) {
             fetchConversations();
             setupRealtime();
+            startAutoRefresh();
         }
         return () => {
             if (realtimeChannelRef.current) {
                 supabase.removeChannel(realtimeChannelRef.current);
                 realtimeChannelRef.current = null;
             }
+            stopAutoRefresh();
         };
     }, [currentUser]);
+
+    // Open conversation from URL param if provided
+    useEffect(() => {
+        if (!users.length) return;
+        const id = searchParams?.get('openUser');
+        if (id) {
+            const user = users.find(u => String(u.id) === String(id));
+            if (user) setSelectedUser(user);
+        }
+    }, [users, searchParams]);
 
     // Load messages on conversation change
     useEffect(() => {
@@ -60,10 +78,28 @@ export default function Page() {
         }
     }, [selectedUser, currentUser]);
 
-    // Auto-scroll
+    // Track selected conversation changes for incremental refresh and scrolling
     useEffect(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [messages]);
+        if (selectedUser && currentUser) {
+            // update last message time when switching conversations
+            if (messages.length > 0) {
+                lastMessageTimeRef.current = messages[messages.length - 1].created_at;
+            } else {
+                lastMessageTimeRef.current = null;
+            }
+            setShouldAutoScroll(false);
+        } else {
+            lastMessageTimeRef.current = null;
+        }
+    }, [selectedUser, currentUser, messages]);
+
+    // Auto-scroll when flagged
+    useEffect(() => {
+        if (shouldAutoScroll && messages.length > 0 && selectedUser) {
+            messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+            setShouldAutoScroll(false);
+        }
+    }, [messages, shouldAutoScroll, selectedUser]);
 
     // Data functions
     const fetchCurrentUser = async () => {
@@ -95,7 +131,7 @@ export default function Page() {
             setLoadingUsers(true);
             const { data, error } = await supabase
                 .from('profiles')
-                .select(`id, email, first_name, middle_initial, last_name, role_id, profiles_roles (role_name), pfp_id`)
+                .select(`id, email, first_name, middle_initial, last_name, role_id, user_status_id, profiles_roles (role_name), pfp_id`)
                 .order('first_name', { ascending: true });
             if (error) throw error;
             const formatted = (data || []).map(u => ({
@@ -104,6 +140,7 @@ export default function Page() {
                 email: u.email,
                 role: u.profiles_roles?.role_name || 'No Role',
                 role_id: u.role_id,
+                user_status_id: u.user_status_id,
                 avatarUrl: u.pfp_id || null
             }));
             setUsers(formatted);
@@ -160,13 +197,17 @@ export default function Page() {
     const fetchMessages = async () => {
         if (!currentUser || !selectedUser) return;
         try {
-            const { data, error } = await supabase
-                .from('messages')
-                .select(`id, sender_id, receiver_id, content, created_at, read_at`)
-                .or(`and(sender_id.eq.${currentUser.id},receiver_id.eq.${selectedUser.id}),and(sender_id.eq.${selectedUser.id},receiver_id.eq.${currentUser.id})`)
-                .order('created_at', { ascending: true });
-            if (error) throw error;
-            setMessages(data || []);
+            lastMessageTimeRef.current = null;
+            const res = await fetch(`/api/admin?action=messages&senderId=${currentUser.id}&receiverId=${selectedUser.id}`);
+            if (!res.ok) throw new Error('Failed to fetch messages');
+            const json = await res.json();
+            const list = (json.messages || []).filter(m =>
+                (m.sender_id === currentUser.id && m.receiver_id === selectedUser.id) ||
+                (m.sender_id === selectedUser.id && m.receiver_id === currentUser.id)
+            );
+            setMessages(list);
+            if (list.length > 0) lastMessageTimeRef.current = list[list.length - 1].created_at;
+            setShouldAutoScroll(true);
         } catch (e) {
             console.error(e);
         }
@@ -189,8 +230,15 @@ export default function Page() {
         const sel = selectedUserRef.current;
         if (!cur) return;
         fetchConversations();
-        if (sel && ((newMessage.sender_id === cur.id && newMessage.receiver_id === sel.id) || (newMessage.sender_id === sel.id && newMessage.receiver_id === cur.id))) {
-            setMessages(prev => prev.some(m => m.id === newMessage.id) ? prev : [...prev, newMessage]);
+        const inCurrent = sel && ((newMessage.sender_id === cur.id && newMessage.receiver_id === sel.id) || (newMessage.sender_id === sel.id && newMessage.receiver_id === cur.id));
+        if (inCurrent) {
+            setMessages(prev => prev.some(m => m.id === newMessage.id) ? prev : [...prev.filter(m => !(m.id && String(m.id).startsWith('temp-') && m.content === newMessage.content)), newMessage]);
+            lastMessageTimeRef.current = newMessage.created_at;
+            setShouldAutoScroll(true);
+            if (newMessage.sender_id !== cur.id) {
+                markMessagesAsRead();
+            }
+            silentRefreshMessages();
         }
     };
 
@@ -208,36 +256,117 @@ export default function Page() {
         setMessage("");
         const temp = { id: `temp-${Date.now()}`, sender_id: currentUser.id, receiver_id: selectedUser.id, content, created_at: new Date().toISOString(), read_at: null };
         setMessages(prev => [...prev, temp]);
+        setShouldAutoScroll(true);
+        // Keep focus on the input
+        messageInputRef.current?.focus();
         try {
             setSendingMessage(true);
-            const { data, error } = await supabase
-                .from('messages')
-                .insert({ sender_id: currentUser.id, receiver_id: selectedUser.id, content, created_at: new Date().toISOString(), read_at: null })
-                .select('id, sender_id, receiver_id, content, created_at, read_at')
-                .single();
-            if (error) throw error;
-            setMessages(prev => prev.map(m => m.id === temp.id ? data : m));
+            const res = await fetch('/api/admin', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'sendMessage', params: { senderId: currentUser.id, receiverId: selectedUser.id, content } })
+            });
+            if (!res.ok) throw new Error('Failed to send');
+            const json = await res.json();
+            setMessages(prev => prev.map(m => m.id === temp.id ? json.message : m));
         } catch (e) {
             console.error(e);
             setMessages(prev => prev.filter(m => m.id !== temp.id));
             setMessage(content);
         } finally {
             setSendingMessage(false);
+            // Restore focus
+            messageInputRef.current?.focus();
         }
     };
 
     const markMessagesAsRead = async () => {
         if (!currentUser || !selectedUser) return;
         try {
-            await supabase
-                .from('messages')
-                .update({ read_at: new Date().toISOString() })
-                .eq('sender_id', selectedUser.id)
-                .eq('receiver_id', currentUser.id)
-                .is('read_at', null);
+            await fetch('/api/admin', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'markRead', params: { receiverId: currentUser.id, senderId: selectedUser.id } })
+            });
             fetchConversations();
         } catch (e) {
             console.error(e);
+        }
+    };
+
+    // Auto-refresh helpers
+    const startAutoRefresh = () => {
+        stopAutoRefresh();
+        autoRefreshIntervalRef.current = setInterval(() => {
+            silentRefreshConversations();
+            if (selectedUser) {
+                silentRefreshMessages();
+            }
+        }, 5000);
+    };
+
+    const stopAutoRefresh = () => {
+        if (autoRefreshIntervalRef.current) {
+            clearInterval(autoRefreshIntervalRef.current);
+            autoRefreshIntervalRef.current = null;
+        }
+    };
+
+    const silentRefreshConversations = async () => {
+        if (!currentUser) return;
+        try {
+            const res = await fetch(`/api/admin?action=conversations&userId=${currentUser.id}`);
+            if (res.ok) {
+                const data = await res.json();
+                const newConvs = data.conversations || [];
+                setConversations(prev => {
+                    if (JSON.stringify(prev) !== JSON.stringify(newConvs)) return newConvs;
+                    return prev;
+                });
+            }
+        } catch (_) {}
+    };
+
+    const silentRefreshMessages = async () => {
+        if (!currentUser || !selectedUser) {
+            lastMessageTimeRef.current = null;
+            return;
+        }
+        try {
+            let url = `/api/admin?action=messages&senderId=${currentUser.id}&receiverId=${selectedUser.id}`;
+            if (lastMessageTimeRef.current) {
+                url += `&after=${encodeURIComponent(lastMessageTimeRef.current)}`;
+            }
+            const res = await fetch(url);
+            if (!res.ok) return;
+            const data = await res.json();
+            const newMessages = data.messages || [];
+            if (newMessages.length > 0) {
+                const filtered = newMessages.filter(msg =>
+                    (msg.sender_id === currentUser.id && msg.receiver_id === selectedUser.id) ||
+                    (msg.sender_id === selectedUser.id && msg.receiver_id === currentUser.id)
+                );
+                if (filtered.length > 0) {
+                    lastMessageTimeRef.current = filtered[filtered.length - 1].created_at;
+                    setMessages(prev => {
+                        const existingIds = new Set(prev.map(m => m.id));
+                        const trulyNew = filtered.filter(m => !existingIds.has(m.id));
+                        if (trulyNew.length > 0) {
+                            const filteredPrev = prev.filter(m => !(m.id && String(m.id).startsWith('temp-')));
+                            const updated = [...filteredPrev, ...trulyNew];
+                            setShouldAutoScroll(true);
+                            return updated;
+                        }
+                        return prev;
+                    });
+                    const fromOther = filtered.filter(m => m.sender_id !== currentUser.id);
+                    if (fromOther.length > 0) {
+                        markMessagesAsRead();
+                    }
+                }
+            }
+        } catch (e) {
+            console.log('silent refresh error', e);
         }
     };
 
@@ -429,7 +558,9 @@ export default function Page() {
                         </Avatar>
                         <Box>
                             <Typography sx={{ fontWeight: "bold" }}>{selectedUser ? selectedUser.name : "Select a conversation"}</Typography>
-                            <Typography sx={{ fontSize: "12px", color: "green" }}>{selectedUser ? "Online" : "No active chat"}</Typography>
+                            <Typography sx={{ fontSize: "12px", color: selectedUser ? (selectedUser.user_status_id === 1 ? 'success.main' : 'text.secondary') : 'text.secondary' }}>
+                                {selectedUser ? (selectedUser.user_status_id === 1 ? 'Online' : 'Offline') : 'No active chat'}
+                            </Typography>
                         </Box>
                     </Box>
                     <IconButton disabled={!selectedUser}><MoreVertIcon /></IconButton>
@@ -479,7 +610,8 @@ export default function Page() {
                         onChange={(e) => setMessage(e.target.value)}
                         onKeyPress={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
                         sx={inputFieldStyles}
-                        disabled={!selectedUser || sendingMessage}
+                        disabled={!selectedUser}
+                        inputRef={messageInputRef}
                     />
                     <IconButton color="primary" onClick={handleSend} disabled={!selectedUser || !message.trim() || sendingMessage}>
                         {sendingMessage ? <CircularProgress size={20} /> : <SendIcon />}
