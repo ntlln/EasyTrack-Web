@@ -7,6 +7,9 @@ import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { getLoginStatus, incrementLoginAttempt, resetLoginAttempts, MAX_ATTEMPTS, COOLDOWN_MINUTES } from '../../../utils/auth';
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
+import CloseIcon from '@mui/icons-material/Close';
+import TermsAndConditions from '../../components/TermsAndConditions';
+import PrivacyPolicy from '../../components/PrivacyPolicy';
 
 export default function Page() {
     // Client and state setup
@@ -25,6 +28,8 @@ export default function Page() {
     const [isPwUpdating, setIsPwUpdating] = useState(false);
     const [showNewPassword, setShowNewPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+    const [openTerms, setOpenTerms] = useState(false);
+    const [openPrivacy, setOpenPrivacy] = useState(false);
 
     useEffect(() => { setLoginStatus(getLoginStatus(email)); }, [email]);
 
@@ -235,8 +240,8 @@ export default function Page() {
                 </Box>
 
                 <Box sx={linksContainerStyles}>
-                    <Typography color="secondary.main" sx={linkStyles}>Terms and Conditions</Typography>
-                    <Typography color="secondary.main" sx={linkStyles}>Privacy Policy</Typography>
+                    <Typography color="secondary.main" sx={linkStyles} onClick={() => setOpenTerms(true)}>Terms and Conditions</Typography>
+                    <Typography color="secondary.main" sx={linkStyles} onClick={() => setOpenPrivacy(true)}>Privacy Policy</Typography>
                 </Box>
             </Box>
 
@@ -344,6 +349,40 @@ export default function Page() {
                         {isPwUpdating ? <CircularProgress size={20} sx={{ color: 'primary.main' }} /> : 'Save and Continue'}
                     </Button>
                 </DialogActions>
+            </Dialog>
+
+            {/* Terms and Conditions Modal */}
+            <Dialog open={openTerms} onClose={() => setOpenTerms(false)} fullWidth maxWidth="md">
+                <DialogTitle sx={{ position: 'relative', pr: 6 }}>
+                    Terms and Conditions
+                    <IconButton
+                        aria-label="close"
+                        onClick={() => setOpenTerms(false)}
+                        sx={{ position: 'absolute', right: 8, top: 8 }}
+                    >
+                        <CloseIcon />
+                    </IconButton>
+                </DialogTitle>
+                <DialogContent dividers>
+                    <TermsAndConditions />
+                </DialogContent>
+            </Dialog>
+
+            {/* Privacy Policy Modal */}
+            <Dialog open={openPrivacy} onClose={() => setOpenPrivacy(false)} fullWidth maxWidth="md">
+                <DialogTitle sx={{ position: 'relative', pr: 6 }}>
+                    Privacy Policy
+                    <IconButton
+                        aria-label="close"
+                        onClick={() => setOpenPrivacy(false)}
+                        sx={{ position: 'absolute', right: 8, top: 8 }}
+                    >
+                        <CloseIcon />
+                    </IconButton>
+                </DialogTitle>
+                <DialogContent dividers>
+                    <PrivacyPolicy />
+                </DialogContent>
             </Dialog>
         </Box>
     );
