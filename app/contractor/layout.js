@@ -20,7 +20,7 @@ function ContractorLayoutContent({ children }) {
   const router = useRouter();
   const supabase = createClientComponentClient();
   const [checkingSession, setCheckingSession] = useState(true);
-  const isAuthPage = pathname === "/contractor/login" || pathname === "/contractor/forgot-password" || pathname === "/contractor/reset-password" || pathname === "/contractor/verify";
+  const isAuthPage = pathname === "/contractor/login" || pathname === "/contractor/forgot-password" || pathname === "/contractor/reset-password" || pathname === "/contractor/verify" || pathname === "/contractor/otp";
   const contractorRoleId = 3; // Contractor
 
   // Session and role validation

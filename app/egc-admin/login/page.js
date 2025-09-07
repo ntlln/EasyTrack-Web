@@ -129,6 +129,10 @@ export default function Page() {
   const handleClickShowPassword = () => setShowPassword((show) => !show);
   const handleMouseDownPassword = (event) => event.preventDefault();
 
+  const handleOtpLogin = async () => {
+    router.push('/egc-admin/otp');
+  };
+
   // Styles
   const containerStyles = {
     display: "flex",
@@ -230,9 +234,21 @@ export default function Page() {
             <Typography color="secondary.main" onClick={() => router.push("./forgot-password")} sx={forgotPasswordStyles}>Forgot Password?</Typography>
           </Box>
 
-          <Button type="submit" variant="contained" color="primary" disabled={isLoading || !loginStatus.canAttempt} sx={buttonStyles}>
-            {!isLoading ? "Login" : <CircularProgress size={24} sx={progressStyles} />}
-          </Button>
+          <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0 }}>
+            <Button type="submit" variant="contained" color="primary" disabled={isLoading || !loginStatus.canAttempt} sx={buttonStyles}>
+              {!isLoading ? "Login" : <CircularProgress size={24} sx={progressStyles} />}
+            </Button>
+            <Box sx={{ width: '40%', display: 'flex', justifyContent: 'center', my: 0.3 }}>
+              <Typography color="secondary.main" variant="body2">or</Typography>
+            </Box>
+            <Typography
+              color="primary.main"
+              onClick={() => { if (!isLoading && loginStatus?.canAttempt) handleOtpLogin(); }}
+              sx={{ width: '40%', mt: 0.1, fontSize: '0.85rem', textAlign: 'center', cursor: (isLoading || !loginStatus?.canAttempt) ? 'not-allowed' : 'pointer', opacity: (isLoading || !loginStatus?.canAttempt) ? 0.6 : 1, '&:hover': { textDecoration: (isLoading || !loginStatus?.canAttempt) ? 'none' : 'underline', color: (isLoading || !loginStatus?.canAttempt) ? 'primary.main' : 'primary.main' } }}
+            >
+              Login with OTP
+            </Typography>
+          </Box>
         </Box>
 
         <Box sx={linkContainerStyles}>

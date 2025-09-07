@@ -8,7 +8,13 @@ export async function middleware(req) {
 
   // Contractor section access control
   if (req.nextUrl.pathname.startsWith('/contractor')) {
-    if (req.nextUrl.pathname === '/contractor/login' || req.nextUrl.pathname === '/contractor/forgot-password' || req.nextUrl.pathname === '/contractor/reset-password' || req.nextUrl.pathname === '/contractor/verify') return res;
+    if (
+      req.nextUrl.pathname === '/contractor/login' ||
+      req.nextUrl.pathname === '/contractor/forgot-password' ||
+      req.nextUrl.pathname === '/contractor/reset-password' ||
+      req.nextUrl.pathname === '/contractor/verify' ||
+      req.nextUrl.pathname === '/contractor/otp'
+    ) return res;
     const session = await getContractorSessionMiddleware(req, res);
     console.log('Session in middleware:', session);
     if (!session) {

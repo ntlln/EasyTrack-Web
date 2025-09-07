@@ -27,7 +27,7 @@ function AdminLayoutContent({ children }) {
     const lastUserIdRef = useRef(null);
 
     // Auth page check
-    const isAuthPage = pathname === "/egc-admin/login" || pathname === "/egc-admin/forgot-password" || pathname === "/egc-admin/reset-password" || pathname === "/egc-admin/verify";
+    const isAuthPage = pathname === "/egc-admin/login" || pathname === "/egc-admin/forgot-password" || pathname === "/egc-admin/reset-password" || pathname === "/egc-admin/verify" || pathname === "/egc-admin/otp";
 
     // Auth and session management
     useEffect(() => {

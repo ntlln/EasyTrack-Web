@@ -158,6 +158,23 @@ export default function Page() {
         event.preventDefault();
     };
 
+    const handleOtpLogin = async () => {
+        try {
+            console.log('[ContractorLogin] OTP button clicked', {
+                isLoading,
+                canAttempt: loginStatus?.canAttempt,
+                emailPresent: Boolean(email)
+            });
+            const target = '/contractor/otp';
+            console.log('[ContractorLogin] Navigating to', target);
+            router.push(target);
+            console.log('[ContractorLogin] router.push issued');
+        } catch (err) {
+            console.error('[ContractorLogin] OTP navigation error:', err);
+            setSnackbar({ open: true, message: err.message || 'Failed to open OTP page', severity: 'error' });
+        }
+    };
+
     // Styles
     const containerStyles = { 
         display: "flex", 
@@ -234,9 +251,21 @@ export default function Page() {
                         <Typography color="secondary.main" onClick={() => router.push("./forgot-password")} sx={forgotPasswordStyles}>Forgot Password?</Typography>
                     </Box>
 
-                    <Button type="submit" variant="contained" color="primary" sx={buttonStyles} disabled={isLoading || !loginStatus.canAttempt}>
-                        {!isLoading ? "Login" : <CircularProgress size={24} sx={{ color: "primary.main" }} />}
-                    </Button>
+                    <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0 }}>
+                        <Button type="submit" variant="contained" color="primary" sx={buttonStyles} disabled={isLoading || !loginStatus.canAttempt}>
+                            {!isLoading ? "Login" : <CircularProgress size={24} sx={{ color: "primary.main" }} />}
+                        </Button>
+                        <Box sx={{ width: '40%', display: 'flex', justifyContent: 'center', my: 0.3 }}>
+                            <Typography color="secondary.main" variant="body2">or</Typography>
+                        </Box>
+                        <Typography
+                            color="primary.main"
+                            onClick={() => { if (!isLoading && loginStatus?.canAttempt) handleOtpLogin(); }}
+                            sx={{ width: '40%', mt: 0.1, fontSize: '0.85rem', textAlign: 'center', cursor: (isLoading || !loginStatus?.canAttempt) ? 'not-allowed' : 'pointer', opacity: (isLoading || !loginStatus?.canAttempt) ? 0.6 : 1, '&:hover': { textDecoration: (isLoading || !loginStatus?.canAttempt) ? 'none' : 'underline', color: (isLoading || !loginStatus?.canAttempt) ? 'primary.main' : 'primary.main' } }}
+                        >
+                            Login with OTP
+                        </Typography>
+                    </Box>
                 </Box>
 
                 <Box sx={linksContainerStyles}>
