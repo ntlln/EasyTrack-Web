@@ -41,6 +41,7 @@ export default function Page() {
         console.log('[ContractorLogin] Submit login');
         setIsLoading(true);
         setSnackbar({ open: false, message: "", severity: "error" });
+        let flowComplete = false; // will be set true when we redirect or intentionally stop at a modal
 
         const status = getLoginStatus(email);
         if (!status.canAttempt) {
@@ -65,6 +66,7 @@ export default function Page() {
                     
                     setSnackbar({ open: true, message: "Please check your email for a verification link.", severity: "info" });
                     setEmail(""); setPassword(""); setIsLoading(false);
+                    flowComplete = true; // handled with info prompt; no session created
                     return;
                 }
 
@@ -120,6 +122,7 @@ export default function Page() {
                 resetLoginAttempts(email);
                 setForcePwOpen(true);
                 setIsLoading(false);
+                flowComplete = true; // we intentionally stop at modal; keep session
                 return;
             }
 
@@ -143,11 +146,22 @@ export default function Page() {
             await supabase.auth.refreshSession();
             console.log('Redirecting to /contractor/dashboard...');
             router.replace("/contractor/");
+            flowComplete = true;
         } catch (error) {
             console.log('Login error:', error);
             setSnackbar({ open: true, message: error.message || "Login failed", severity: "error" });
             setEmail(""); setPassword("");
-        } finally { setIsLoading(false); }
+            try { await supabase.auth.signOut(); } catch (_) {}
+        } finally { 
+            setIsLoading(false);
+            // Safety: if we didn't navigate or intentionally stop, ensure no session remains
+            if (!flowComplete) {
+                try {
+                    const { data: { session } } = await supabase.auth.getSession();
+                    if (session) { await supabase.auth.signOut(); console.log('[ContractorLogin] Cleaned up lingering session after failed login.'); }
+                } catch (_) {}
+            }
+        }
     };
 
     const handleClickShowPassword = () => {

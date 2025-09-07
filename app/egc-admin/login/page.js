@@ -53,6 +53,7 @@ export default function Page() {
     console.log('[AdminLogin] Submit login');
     setIsLoading(true);
     setSnackbar({ open: false, message: "", severity: "error" });
+    let flowComplete = false; // set true when we navigate or intentionally pause at a modal
 
     const status = getLoginStatus(email);
     if (!status.canAttempt) {
@@ -69,6 +70,7 @@ export default function Page() {
         if (error.message?.toLowerCase().includes('email not confirmed')) {
           setSnackbar({ open: true, message: "Email not confirmed. Please verify your email to continue.", severity: "error" });
           setEmail(""); setPassword(""); setIsLoading(false);
+          flowComplete = true; // no session created, but we've handled UX
           return;
         }
         const attempts = incrementLoginAttempt(email);
@@ -100,6 +102,7 @@ export default function Page() {
         resetLoginAttempts(email);
         setForcePwOpen(true);
         setIsLoading(false);
+        flowComplete = true; // intentionally stay with session for password update
         return;
       }
 
@@ -119,11 +122,21 @@ export default function Page() {
       const { error: updErr } = await supabase.from("profiles").update(updateOnLogin).eq("id", userId);
       if (updErr) console.warn('[AdminLogin] Failed to update last_sign_in/status:', updErr);
       router.push("/egc-admin/");
+      flowComplete = true;
     } catch (error) {
       console.error('[AdminLogin] Login flow error:', error);
       setSnackbar({ open: true, message: error.message || "Login failed", severity: "error" });
       setEmail(""); setPassword("");
-    } finally { setIsLoading(false); }
+      try { await supabase.auth.signOut(); } catch (_) {}
+    } finally { 
+      setIsLoading(false);
+      if (!flowComplete) {
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session) { await supabase.auth.signOut(); console.log('[AdminLogin] Cleaned up lingering session after failed login.'); }
+        } catch (_) {}
+      }
+    }
   };
 
   const handleClickShowPassword = () => setShowPassword((show) => !show);
