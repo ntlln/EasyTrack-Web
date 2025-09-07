@@ -877,20 +877,35 @@ export async function POST(req) {
 
     // Handle user status update
     if (action === 'updateUserStatus') {
-      const { userId, statusName } = params;
-      const { data: statusData, error: statusError } = await supabase
-        .from('profiles_status')
-        .select('id')
-        .eq('status_name', statusName)
-        .single();
+      const { userId, statusName, verifyStatusId } = params;
+      
+      // Prepare update data
+      const updateData = {};
+      
+      // Handle user status update
+      if (statusName) {
+        const { data: statusData, error: statusError } = await supabase
+          .from('profiles_status')
+          .select('id')
+          .eq('status_name', statusName)
+          .single();
 
-      if (statusError || !statusData) {
-        return NextResponse.json({ error: 'Invalid status name' }, { status: 400 });
+        if (statusError || !statusData) {
+          return NextResponse.json({ error: 'Invalid status name' }, { status: 400 });
+        }
+        updateData.user_status_id = statusData.id;
+      }
+      
+      // Handle verify status update
+      if (verifyStatusId !== undefined && verifyStatusId !== '') {
+        updateData.verify_status_id = verifyStatusId;
+      } else if (verifyStatusId === '') {
+        updateData.verify_status_id = null;
       }
 
       const { error, data } = await supabase
         .from('profiles')
-        .update({ user_status_id: statusData.id })
+        .update(updateData)
         .eq('id', userId);
 
       if (error) {

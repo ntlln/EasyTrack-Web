@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Box, MenuItem, TextField, Typography, Button, TableContainer, Table, TableHead, TableRow, TableCell, TableBody, Paper, IconButton, Menu, TablePagination, TableSortLabel, Snackbar, Alert, Dialog, DialogTitle, DialogContent, DialogActions } from "@mui/material";
+import { Box, MenuItem, TextField, Typography, Button, TableContainer, Table, TableHead, TableRow, TableCell, TableBody, Paper, IconButton, Menu, TablePagination, TableSortLabel, Snackbar, Alert, Dialog, DialogTitle, DialogContent, DialogActions, Grid } from "@mui/material";
 import { MoreVert as MoreVertIcon, Edit as EditIcon, Delete as DeleteIcon, LockReset as LockResetIcon, ChevronLeft as ChevronLeftIcon, Person as PersonIcon } from "@mui/icons-material";
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { createUser } from './create-account/actions';
 
 export default function Page() {
   // Client setup
@@ -22,6 +23,8 @@ export default function Page() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDepartment, setSelectedDepartment] = useState('All Departments');
   const [statusOptions, setStatusOptions] = useState([]);
+  const [verifyStatusOptions, setVerifyStatusOptions] = useState([]);
+  const [verifyStatusLoading, setVerifyStatusLoading] = useState(false);
   const [orderBy, setOrderBy] = useState(null);
   const [order, setOrder] = useState('asc');
   const [users, setUsers] = useState([]);
@@ -29,15 +32,18 @@ export default function Page() {
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
   const [editDialog, setEditDialog] = useState({ open: false, user: null });
   const [deleteDialog, setDeleteDialog] = useState({ open: false, userId: null });
-  const [editForm, setEditForm] = useState({ user_status_name: '' });
+  const [editForm, setEditForm] = useState({ user_status_name: '', verify_status_id: '' });
+  const [createDialog, setCreateDialog] = useState({ open: false });
+  const [createForm, setCreateForm] = useState({ email: "", role_id: "" });
+  const [createLoading, setCreateLoading] = useState(false);
 
   // Data fetching
-  useEffect(() => { fetchAccounts(); fetchStatusOptions(); fetchUsers(); fetchRoles(); }, []);
+  useEffect(() => { fetchAccounts(); fetchStatusOptions(); fetchVerifyStatusOptions(); fetchUsers(); fetchRoles(); }, []);
 
   const fetchAccounts = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase.from('profiles').select(`id, email, first_name, middle_initial, last_name, role_id, user_status_id, profiles_status (status_name), profiles_roles (role_name), created_at, last_sign_in_at, updated_at`).order('created_at', { ascending: false });
+      const { data, error } = await supabase.from('profiles').select(`id, email, first_name, middle_initial, last_name, role_id, user_status_id, verify_status_id, profiles_status (status_name), profiles_roles (role_name), created_at, last_sign_in_at, updated_at`).order('created_at', { ascending: false });
       if (error) throw error;
       const formattedAccounts = data.map(account => ({
         id: account.id,
@@ -47,6 +53,7 @@ export default function Page() {
         email: account.email,
         status: account.profiles_status?.status_name || 'Inactive',
         user_status_id: account.user_status_id,
+        verify_status_id: account.verify_status_id,
         created_at: account.created_at,
         last_sign_in_at: account.last_sign_in_at,
         updated_at: account.updated_at
@@ -63,6 +70,25 @@ export default function Page() {
   const fetchStatusOptions = async () => {
     const { data, error } = await supabase.from('profiles_status').select('id, status_name');
     if (!error && data) setStatusOptions(data.filter(opt => !['Online', 'Offline', 'Pending'].includes(opt.status_name)));
+  };
+
+  const fetchVerifyStatusOptions = async () => {
+    try {
+      setVerifyStatusLoading(true);
+      const { data, error } = await supabase.from('verify_status').select('id, status_name');
+      if (error) {
+        console.error('Error fetching verify status options:', error);
+        setSnackbar({ open: true, message: 'Error fetching verification status options', severity: 'error' });
+        return;
+      }
+      console.log('Verify status options fetched:', data);
+      setVerifyStatusOptions(data || []);
+    } catch (error) {
+      console.error('Error in fetchVerifyStatusOptions:', error);
+      setSnackbar({ open: true, message: 'Error fetching verification status options', severity: 'error' });
+    } finally {
+      setVerifyStatusLoading(false);
+    }
   };
 
   const fetchUsers = async () => {
@@ -134,7 +160,7 @@ export default function Page() {
     }
     handleCloseMenu();
   };
-  const handleCreateAccount = () => router.push("/egc-admin/user-management/create-account");
+  const handleCreateAccount = () => setCreateDialog({ open: true });
   const handleRefresh = () => fetchAccounts();
   const handleSearchChange = (event) => { setSearchQuery(event.target.value); setPage(0); };
   const handleDepartmentChange = (event) => { setSelectedDepartment(event.target.value); setPage(0); };
@@ -142,7 +168,18 @@ export default function Page() {
   const handleEditClick = () => {
     setEditDialog({ open: true, user: selectedAccount });
     const selectedStatus = statusOptions.find(opt => opt.id === selectedAccount.user_status_id);
-    setEditForm({ user_status_name: selectedStatus ? selectedStatus.status_name : '' });
+    const selectedVerifyStatus = verifyStatusOptions.find(opt => opt.id === selectedAccount.verify_status_id);
+    console.log('verifyStatusOptions when opening edit dialog:', verifyStatusOptions);
+    
+    // Ensure verify status options are loaded
+    if (verifyStatusOptions.length === 0 && !verifyStatusLoading) {
+      fetchVerifyStatusOptions();
+    }
+    
+    setEditForm({ 
+      user_status_name: selectedStatus ? selectedStatus.status_name : '',
+      verify_status_id: selectedAccount.verify_status_id || ''
+    });
     handleCloseMenu();
   };
   const handleDeleteClick = () => { setDeleteDialog({ open: true, userId: selectedAccount.id }); handleCloseMenu(); };
@@ -156,6 +193,7 @@ export default function Page() {
           params: {
             userId: editDialog.user.id,
             statusName: editForm.user_status_name,
+            verifyStatusId: editForm.verify_status_id,
           },
         }),
       });
@@ -185,6 +223,32 @@ export default function Page() {
     }
   };
   const handleSnackbarClose = () => setSnackbar(prev => ({ ...prev, open: false }));
+  
+  // Create account handlers
+  const handleCreateFormChange = (e) => setCreateForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
+  const handleCreateSubmit = async () => {
+    if (!createForm.email || !createForm.role_id) {
+      setSnackbar({ open: true, message: "Please fill in all required fields", severity: 'error' });
+      return;
+    }
+    
+    setCreateLoading(true);
+    try {
+      await createUser(createForm);
+      setSnackbar({ open: true, message: "Account created successfully! Login credentials have been sent to the user's email.", severity: 'success' });
+      setCreateForm({ email: "", role_id: "" });
+      setCreateDialog({ open: false });
+      fetchAccounts(); // Refresh the accounts list
+    } catch (error) {
+      setSnackbar({ open: true, message: error.message || "An error occurred during signup", severity: 'error' });
+    } finally {
+      setCreateLoading(false);
+    }
+  };
+  const handleCreateClose = () => {
+    setCreateDialog({ open: false });
+    setCreateForm({ email: "", role_id: "" });
+  };
 
   // Styles
   const containerStyles = {display: "flex", flexDirection: "column", gap: 4 };
@@ -300,6 +364,20 @@ export default function Page() {
           <TextField select fullWidth label="Status" value={editForm.user_status_name} onChange={e => setEditForm(prev => ({ ...prev, user_status_name: e.target.value }))} sx={dialogFieldStyles}>
             {statusOptions.map((status) => <MenuItem key={status.id} value={status.status_name}>{status.status_name}</MenuItem>)}
           </TextField>
+          <TextField select fullWidth label="Verification Status" value={editForm.verify_status_id} onChange={e => setEditForm(prev => ({ ...prev, verify_status_id: e.target.value }))} sx={dialogFieldStyles} disabled={verifyStatusLoading}>
+            <MenuItem value="">Select verification status</MenuItem>
+            {verifyStatusLoading ? (
+              <MenuItem disabled>Loading verification status options...</MenuItem>
+            ) : verifyStatusOptions.length > 0 ? (
+              verifyStatusOptions.map((status) => (
+                <MenuItem key={status.id} value={status.id}>
+                  {status.status_name}
+                </MenuItem>
+              ))
+            ) : (
+              <MenuItem disabled>No verification status options available</MenuItem>
+            )}
+          </TextField>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setEditDialog({ open: false, user: null })}>Cancel</Button>
@@ -313,6 +391,48 @@ export default function Page() {
         <DialogActions>
           <Button onClick={() => setDeleteDialog({ open: false, userId: null })}>Cancel</Button>
           <Button onClick={handleDeleteConfirm} variant="contained" color="error">Delete</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={createDialog.open} onClose={handleCreateClose} maxWidth="xs" fullWidth>
+        <DialogTitle>Create New Account</DialogTitle>
+        <DialogContent>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, mt: 1 }}>
+            <TextField 
+              fullWidth 
+              label="Email Address" 
+              name="email" 
+              type="email" 
+              value={createForm.email} 
+              onChange={handleCreateFormChange} 
+              required 
+            />
+            <TextField 
+              fullWidth 
+              select 
+              label="Role" 
+              name="role_id" 
+              value={createForm.role_id} 
+              onChange={handleCreateFormChange} 
+              required
+            >
+              <MenuItem value="" disabled>Select a role</MenuItem>
+              {roles.map((role) => (
+                <MenuItem key={role.id} value={role.id}>{role.role_name}</MenuItem>
+              ))}
+            </TextField>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCreateClose} disabled={createLoading}>Cancel</Button>
+          <Button 
+            onClick={handleCreateSubmit} 
+            variant="contained" 
+            color="primary" 
+            disabled={createLoading}
+          >
+            {createLoading ? "Creating Account..." : "Create Account"}
+          </Button>
         </DialogActions>
       </Dialog>
 
