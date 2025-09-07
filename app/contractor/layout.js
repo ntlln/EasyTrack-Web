@@ -35,6 +35,21 @@ function ContractorLayoutContent({ children }) {
         // const { data: contractorRole } = await supabase.from('profiles_roles').select('id').eq('role_name', 'AirAsia').single();
 
         if (!profile || !profile.role_id || Number(profile.role_id) !== Number(contractorRoleId)) {
+          try {
+            const userId = session.user.id;
+            const { data: statusRow } = await supabase
+              .from('profiles_status')
+              .select('id')
+              .eq('status_name', 'Signed Out')
+              .single();
+            const signedOutId = statusRow?.id || null;
+            if (signedOutId) {
+              await supabase
+                .from('profiles')
+                .update({ user_status_id: signedOutId })
+                .eq('id', userId);
+            }
+          } catch (_) { }
           await supabase.auth.signOut();
           router.replace("/contractor/login");
           return;

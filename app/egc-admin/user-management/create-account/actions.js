@@ -26,7 +26,7 @@ export async function createUser(formData) {
         const sanitizedEmail = sanitizeEmail(formData.email);
         const encryptedValue = generateSecurePassword();
 
-        // Create user account
+        // Create user account and send invitation email
         const { data, error: inviteError } = await supabase.auth.admin.inviteUserByEmail(sanitizedEmail, {
             email: sanitizedEmail,
             data: { password: encryptedValue, role: formData.role_id },
@@ -35,10 +35,11 @@ export async function createUser(formData) {
 
         if (inviteError) throw new Error(inviteError.message);
 
-        // Update user metadata
+        // Immediately mark email as verified and set initial password
         const { error: updateError } = await supabase.auth.admin.updateUserById(data.user.id, {
             email: sanitizedEmail,
             password: encryptedValue,
+            email_confirm: true,
             user_metadata: { password: null, role: null }
         });
 
@@ -56,7 +57,7 @@ export async function createUser(formData) {
             throw new Error('Profile creation failed: ' + profileError.message);
         }
 
-        return { success: true, message: 'Account created! Check your email to verify.' };
+        return { success: true, message: 'Account created and verified. Invitation email sent.' };
     } catch (error) {
         console.error('Error creating user:', error);
         throw new Error(error.message);

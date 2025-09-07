@@ -1,6 +1,6 @@
 "use client";
 
-import { Box, Typography, Button, TextField, Snackbar, Alert, CircularProgress, IconButton, InputAdornment } from "@mui/material";
+import { Box, Typography, Button, TextField, Snackbar, Alert, CircularProgress, IconButton, InputAdornment, Dialog, DialogTitle, DialogContent, DialogActions } from "@mui/material";
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
@@ -18,6 +18,12 @@ export default function Page() {
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "error" });
   const [isLoading, setIsLoading] = useState(false);
   const [loginStatus, setLoginStatus] = useState({ canAttempt: true, remainingTime: 0, attempts: 0 });
+  const [forcePwOpen, setForcePwOpen] = useState(false);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [isPwUpdating, setIsPwUpdating] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   // Session and role validation
   useEffect(() => {
@@ -39,6 +45,7 @@ export default function Page() {
   const handleCloseSnackbar = () => setSnackbar(prev => ({ ...prev, open: false }));
   const handleLogin = async (e) => {
     e.preventDefault();
+    console.log('[AdminLogin] Submit login');
     setIsLoading(true);
     setSnackbar({ open: false, message: "", severity: "error" });
 
@@ -50,11 +57,12 @@ export default function Page() {
     }
 
     try {
+      console.log('[AdminLogin] Calling signInWithPassword');
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) {
+        console.warn('[AdminLogin] signInWithPassword error:', error);
         if (error.message?.toLowerCase().includes('email not confirmed')) {
-          const { error: otpError } = await supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: `${window.location.origin}/egc-admin/verify` } });
-          setSnackbar({ open: true, message: otpError ? otpError.message : "Please check your email for a verification link.", severity: otpError ? "error" : "info" });
+          setSnackbar({ open: true, message: "Email not confirmed. Please verify your email to continue.", severity: "error" });
           setEmail(""); setPassword(""); setIsLoading(false);
           return;
         }
@@ -66,8 +74,10 @@ export default function Page() {
       }
 
       const userId = data.user.id;
+      console.log('[AdminLogin] Auth OK. userId=', userId);
       const adminRoleId = 1; // Administrator role ID
-      const { data: profile } = await supabase.from("profiles").select("role_id, profiles_status(status_name)").eq("id", userId).single();
+      const { data: profile, error: profileErr } = await supabase.from("profiles").select("role_id, last_sign_in_at, profiles_status(status_name)").eq("id", userId).single();
+      console.log('[AdminLogin] Profile fetch:', { profile, profileErr });
 
       if (!profile) { await supabase.auth.signOut(); throw new Error("User profile not found."); }
       if (profile.profiles_status?.status_name === "Deactivated") { await supabase.auth.signOut(); throw new Error("This account has been deactivated."); }
@@ -79,10 +89,33 @@ export default function Page() {
         return;
       }
 
+      // If first login (no previous sign-in), force password change before proceeding
+      if (!profile.last_sign_in_at) {
+        console.log('[AdminLogin] First-time login. Forcing password change modal.');
+        resetLoginAttempts(email);
+        setForcePwOpen(true);
+        setIsLoading(false);
+        return;
+      }
+
       resetLoginAttempts(email);
-      await supabase.from("profiles").update({ last_sign_in_at: new Date().toISOString() }).eq("id", userId);
+      // On every successful login, update last_sign_in_at and set status to 'Signed In' if available
+      let activeStatusIdOnLogin = null;
+      const { data: activeRowOnLogin } = await supabase
+        .from('profiles_status')
+        .select('id')
+        .eq('status_name', 'Signed In')
+        .single();
+      console.log('[AdminLogin] Signed In status id:', activeRowOnLogin);
+      activeStatusIdOnLogin = activeRowOnLogin?.id || null;
+
+      const updateOnLogin = { last_sign_in_at: new Date().toISOString() };
+      if (activeStatusIdOnLogin) updateOnLogin.user_status_id = activeStatusIdOnLogin;
+      const { error: updErr } = await supabase.from("profiles").update(updateOnLogin).eq("id", userId);
+      if (updErr) console.warn('[AdminLogin] Failed to update last_sign_in/status:', updErr);
       router.push("/egc-admin/");
     } catch (error) {
+      console.error('[AdminLogin] Login flow error:', error);
       setSnackbar({ open: true, message: error.message || "Login failed", severity: "error" });
       setEmail(""); setPassword("");
     } finally { setIsLoading(false); }
@@ -150,6 +183,8 @@ export default function Page() {
   const linkContainerStyles = { display: "flex", gap: 5 };
   const linkStyles = { fontSize: ".75rem", cursor: "pointer", "&:hover": { textDecoration: "underline", color: "primary.main" } };
   const alertStyles = { width: '100%' };
+  const dialogContentStyles = { display: 'flex', flexDirection: 'column', gap: 2, minWidth: '360px' };
+  const changePwButtonStyles = { minWidth: '120px', position: 'relative' };
 
   return (
     <Box sx={containerStyles}>
@@ -204,6 +239,115 @@ export default function Page() {
       <Snackbar open={snackbar.open} autoHideDuration={4000} onClose={handleCloseSnackbar} anchorOrigin={{ vertical: "top", horizontal: "center" }}>
         <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={alertStyles}>{snackbar.message}</Alert>
       </Snackbar>
+
+      {/* Force password change dialog for first-time login */}
+      <Dialog
+        open={forcePwOpen}
+        onClose={(event, reason) => {
+          // Prevent closing via backdrop click
+          if (reason !== 'backdropClick') setForcePwOpen(false);
+        }}
+        disableEscapeKeyDown
+      >
+        <DialogTitle>Set a new password</DialogTitle>
+        <DialogContent sx={dialogContentStyles}>
+          <Typography color="secondary.main">For security, please change your password before continuing.</Typography>
+          <TextField
+            label="New Password"
+            type={showNewPassword ? 'text' : 'password'}
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            disabled={isPwUpdating}
+            InputProps={{
+              endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton
+                    aria-label="toggle new password visibility"
+                    onClick={() => setShowNewPassword((v) => !v)}
+                    edge="end"
+                    disabled={isPwUpdating}
+                  >
+                    {showNewPassword ? <VisibilityOff /> : <Visibility />}
+                  </IconButton>
+                </InputAdornment>
+              ),
+            }}
+          />
+          <TextField
+            label="Confirm New Password"
+            type={showConfirmPassword ? 'text' : 'password'}
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            disabled={isPwUpdating}
+            error={Boolean(confirmPassword) && newPassword !== confirmPassword}
+            helperText={Boolean(confirmPassword) && newPassword !== confirmPassword ? 'Passwords do not match' : ' '}
+            InputProps={{
+              endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton
+                    aria-label="toggle confirm password visibility"
+                    onClick={() => setShowConfirmPassword((v) => !v)}
+                    edge="end"
+                    disabled={isPwUpdating}
+                  >
+                    {showConfirmPassword ? <VisibilityOff /> : <Visibility />}
+                  </IconButton>
+                </InputAdornment>
+              ),
+            }}
+          />
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button
+            variant="contained"
+            color="primary"
+            sx={changePwButtonStyles}
+            disabled={isPwUpdating || !newPassword || newPassword.length < 8 || newPassword !== confirmPassword}
+            onClick={async () => {
+              try {
+                setIsPwUpdating(true);
+                const { data: sessionData } = await supabase.auth.getSession();
+                const userId = sessionData?.session?.user?.id;
+                if (!userId) throw new Error('No active session');
+
+                const { error: upErr } = await supabase.auth.updateUser({ password: newPassword });
+                if (upErr) throw upErr;
+
+                // Activate account by setting user_status_id to the id of 'Activated'
+                let activeStatusId = null;
+                const { data: statusRow, error: statusErr } = await supabase
+                  .from('profiles_status')
+                  .select('id')
+                  .eq('status_name', 'Activated')
+                  .single();
+                if (!statusErr) {
+                  activeStatusId = statusRow?.id || null;
+                }
+
+                const updatePayload = { last_sign_in_at: new Date().toISOString() };
+                if (activeStatusId) {
+                  updatePayload.user_status_id = activeStatusId;
+                }
+                const { error: profileUpdateErr } = await supabase
+                  .from('profiles')
+                  .update(updatePayload)
+                  .eq('id', userId);
+                if (profileUpdateErr) throw profileUpdateErr;
+                setSnackbar({ open: true, message: 'Password updated successfully.', severity: 'success' });
+                setForcePwOpen(false);
+                router.push('/egc-admin/');
+              } catch (err) {
+                console.error('[AdminLogin] Password update error:', err);
+                setSnackbar({ open: true, message: err.message || 'Failed to update password', severity: 'error' });
+              } finally {
+                setIsPwUpdating(false);
+              }
+            }}
+          >
+            {isPwUpdating ? <CircularProgress size={20} sx={progressStyles} /> : 'Save and Continue'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

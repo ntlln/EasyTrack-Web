@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useContext, Suspense } from "react";
+import { useState, useEffect, useContext, Suspense, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { Box, CircularProgress } from "@mui/material";
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
@@ -24,6 +24,7 @@ function AdminLayoutContent({ children }) {
     const router = useRouter();
     const pathname = usePathname();
     const supabase = createClientComponentClient();
+    const lastUserIdRef = useRef(null);
 
     // Auth page check
     const isAuthPage = pathname === "/egc-admin/login" || pathname === "/egc-admin/forgot-password" || pathname === "/egc-admin/reset-password" || pathname === "/egc-admin/verify";
@@ -31,35 +32,71 @@ function AdminLayoutContent({ children }) {
     // Auth and session management
     useEffect(() => {
         let mounted = true;
+        let unsubscribe = null;
 
         const checkSession = async () => {
             try {
-                if (isAuthPage) { if (mounted) setIsLoading(false); return; }
+                console.log('[AdminLayout] checkSession start. isAuthPage=', isAuthPage);
+                if (isAuthPage) { if (mounted) { console.log('[AdminLayout] Auth page detected, stop loading'); setIsLoading(false); } return; }
 
                 const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-                if (sessionError || !session) { if (mounted) { setIsLoading(false); router.replace("/egc-admin/login"); } return; }
+                console.log('[AdminLayout] getSession result:', { hasSession: !!session, sessionError });
+                if (sessionError || !session) { if (mounted) { console.log('[AdminLayout] No session, redirect to login'); setIsLoading(false); router.replace("/egc-admin/login"); } return; }
+                lastUserIdRef.current = session.user.id;
 
-                const { data: profile } = await supabase.from('profiles').select('role_id').eq('id', session.user.id).single();
+                const { data: profile, error: profileError } = await supabase.from('profiles').select('role_id').eq('id', session.user.id).single();
+                console.log('[AdminLayout] profile fetch:', { profile, profileError });
                 const adminRoleId = 1; // Administrator
 
                 if (!profile || !adminRoleId || Number(profile.role_id) !== Number(adminRoleId)) {
+                    console.warn('[AdminLayout] Role check failed. Signing out.');
                     await supabase.auth.signOut();
-                    if (mounted) { setIsLoading(false); router.replace("/egc-admin/login"); }
+                    if (mounted) { console.log('[AdminLayout] Signed out due to role, redirecting'); setIsLoading(false); router.replace("/egc-admin/login"); }
                     return;
                 }
 
                 const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event) => {
-                    if (event === 'SIGNED_OUT' && mounted) { setIsLoading(false); router.replace("/egc-admin/login"); }
+                    console.log('[AdminLayout] onAuthStateChange event:', event);
+                    if (event === 'SIGNED_OUT' && mounted) { console.log('[AdminLayout] SIGNED_OUT -> stop loading and redirect'); setIsLoading(false); router.replace("/egc-admin/login"); }
+                    if (event === 'SIGNED_OUT') {
+                        try {
+                            let userId = lastUserIdRef.current;
+                            if (!userId) {
+                                const { data: s } = await supabase.auth.getSession();
+                                userId = s?.session?.user?.id || null;
+                            }
+                            const { data: statusRow } = await supabase
+                                .from('profiles_status')
+                                .select('id')
+                                .eq('status_name', 'Signed Out')
+                                .single();
+                            const signedOutId = statusRow?.id || null;
+                            if (userId && signedOutId) {
+                                console.log('[AdminLayout] Updating Signed Out status for user', userId);
+                                await supabase
+                                    .from('profiles')
+                                    .update({ user_status_id: signedOutId })
+                                    .eq('id', userId);
+                            }
+                        } catch (_) { }
+                    }
                 });
+                unsubscribe = subscription?.unsubscribe;
 
-                if (mounted) setIsLoading(false);
-                return () => subscription?.unsubscribe();
+                if (mounted) { console.log('[AdminLayout] Session valid. Rendering app.'); setIsLoading(false); }
             } catch (error) {
-                if (mounted) { setIsLoading(false); router.replace("/egc-admin/login"); }
+                console.error('[AdminLayout] checkSession error:', error);
+                if (mounted) { console.log('[AdminLayout] Error path -> redirect to login'); setIsLoading(false); router.replace("/egc-admin/login"); }
             }
         };
         checkSession();
-    }, [isAuthPage, router, supabase, supabase.auth, isLoading]);
+
+        return () => {
+            mounted = false;
+            if (typeof unsubscribe === 'function') unsubscribe();
+            console.log('[AdminLayout] cleanup complete');
+        };
+    }, [isAuthPage, router]);
 
     // Styles
     const containerStyles = { display: "flex", minHeight: "100vh", bgcolor: "background.default", position: "relative" };

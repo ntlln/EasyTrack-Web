@@ -64,6 +64,24 @@ function ContractorSidebarContent() {
 
     // Auth handlers
     const handleLogout = async () => {
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            const userId = session?.user?.id || null;
+            if (userId) {
+                const { data: statusRow } = await supabase
+                    .from('profiles_status')
+                    .select('id')
+                    .eq('status_name', 'Signed Out')
+                    .single();
+                const signedOutId = statusRow?.id || null;
+                if (signedOutId) {
+                    await supabase
+                        .from('profiles')
+                        .update({ user_status_id: signedOutId })
+                        .eq('id', userId);
+                }
+            }
+        } catch (_) { /* ignore status update errors on logout */ }
         await supabase.auth.signOut();
         if (typeof window !== 'undefined') {
             Object.keys(localStorage).filter(key => key.startsWith('sb-') && key.endsWith('-auth-token')).forEach(key => localStorage.removeItem(key));
