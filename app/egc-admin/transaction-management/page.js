@@ -557,6 +557,10 @@ const TransactionManagement = () => {
     const [invoiceConfirmDialogOpen, setInvoiceConfirmDialogOpen] = useState(false);
     const [pendingInvoiceSummary, setPendingInvoiceSummary] = useState(null);
     const [pendingInvoiceNumber, setPendingInvoiceNumber] = useState(null);
+    
+    // Add new state for complete confirmation dialog
+    const [completeConfirmDialogOpen, setCompleteConfirmDialogOpen] = useState(false);
+    const [pendingCompleteSummary, setPendingCompleteSummary] = useState(null);
 
     const [podOpen, setPodOpen] = useState(false);
     const [podContract, setPodContract] = useState(null);
@@ -1381,6 +1385,69 @@ const TransactionManagement = () => {
         setPendingInvoiceNumber(null);
     };
 
+    // Complete summary handlers
+    const handleCompleteSummary = (summary) => {
+        setPendingCompleteSummary(summary);
+        setCompleteConfirmDialogOpen(true);
+    };
+
+    const handleConfirmComplete = async () => {
+        if (!pendingCompleteSummary) return;
+
+        try {
+            // Update the summary status to Completed (status_id = 3)
+            const response = await fetch('/api/admin', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'updateSummaryStatus',
+                    params: {
+                        summaryId: pendingCompleteSummary.id,
+                        statusId: 3
+                    }
+                })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Failed to update summary status');
+            }
+            
+            // Update the local state to reflect the change
+            setSummaries(prev => prev.map(s => 
+                s.id === pendingCompleteSummary.id 
+                    ? { ...s, status_id: 3, status_name: 'Completed' }
+                    : s
+            ));
+            
+            setSnackbar({
+                open: true,
+                message: `Summary ${pendingCompleteSummary.id} has been marked as completed`,
+                severity: 'success'
+            });
+            
+            // Close the dialog
+            setCompleteConfirmDialogOpen(false);
+            setPendingCompleteSummary(null);
+        } catch (error) {
+            console.error('Error completing summary:', error);
+            setSnackbar({
+                open: true,
+                message: error.message || 'Failed to complete summary',
+                severity: 'error'
+            });
+            
+            // Close the dialog even on error
+            setCompleteConfirmDialogOpen(false);
+            setPendingCompleteSummary(null);
+        }
+    };
+
+    const handleCancelComplete = () => {
+        setCompleteConfirmDialogOpen(false);
+        setPendingCompleteSummary(null);
+    };
+
          const handleGenerateSummaryReport = async (summary) => {
         try {
             // Fetch contracts associated with this summary
@@ -1785,9 +1852,9 @@ const TransactionManagement = () => {
                                                      px: 1.5, 
                                                      py: 0.5, 
                                                      borderRadius: 1,
-                                                     backgroundColor: summary.status_id === 1 ? '#fff3cd' : '#d1edff',
-                                                     color: summary.status_id === 1 ? '#856404' : '#0c5460',
-                                                     border: `1px solid ${summary.status_id === 1 ? '#ffeaa7' : '#bee5eb'}`,
+                                                     backgroundColor: summary.status_id === 1 ? '#fff3cd' : summary.status_id === 3 ? '#d4edda' : '#d1edff',
+                                                     color: summary.status_id === 1 ? '#856404' : summary.status_id === 3 ? '#155724' : '#0c5460',
+                                                     border: `1px solid ${summary.status_id === 1 ? '#ffeaa7' : summary.status_id === 3 ? '#c3e6cb' : '#bee5eb'}`,
                                                      fontSize: '0.75rem',
                                                      fontWeight: 500
                                                  }}>
@@ -1817,12 +1884,12 @@ const TransactionManagement = () => {
                                                           size="small"
                                                     color="primary"
                                                           onClick={() => handleGenerateSummaryInvoice(summary)}
-                                                    disabled={summary.invoice_id !== null}
+                                                    disabled={summary.invoice_id !== null || summary.status_id === 3}
                                                     sx={{
-                                                        backgroundColor: summary.invoice_id !== null ? '#ccc' : undefined,
-                                                        color: summary.invoice_id !== null ? '#666' : undefined,
+                                                        backgroundColor: (summary.invoice_id !== null || summary.status_id === 3) ? '#ccc' : undefined,
+                                                        color: (summary.invoice_id !== null || summary.status_id === 3) ? '#666' : undefined,
                                                         '&:hover': {
-                                                            backgroundColor: summary.invoice_id !== null ? '#ccc' : undefined
+                                                            backgroundColor: (summary.invoice_id !== null || summary.status_id === 3) ? '#ccc' : undefined
                                                         }
                                                     }}
                                                 >
@@ -1833,8 +1900,32 @@ const TransactionManagement = () => {
                                                           size="small"
                                                           color="primary"
                                                           onClick={() => handleGenerateSummaryReport(summary)}
+                                                          disabled={summary.status_id === 3}
+                                                          sx={{
+                                                              backgroundColor: summary.status_id === 3 ? '#ccc' : undefined,
+                                                              color: summary.status_id === 3 ? '#666' : undefined,
+                                                              '&:hover': {
+                                                                  backgroundColor: summary.status_id === 3 ? '#ccc' : undefined
+                                                              }
+                                                          }}
                                                       >
                                                           Generate Summary
+                                                      </Button>
+                                                      <Button
+                                                          variant="contained"
+                                                          size="small"
+                                                          color="success"
+                                                          onClick={() => handleCompleteSummary(summary)}
+                                                          disabled={summary.status_id === 3}
+                                                          sx={{
+                                                              backgroundColor: summary.status_id === 3 ? '#ccc' : undefined,
+                                                              color: summary.status_id === 3 ? '#666' : undefined,
+                                                              '&:hover': {
+                                                                  backgroundColor: summary.status_id === 3 ? '#ccc' : undefined
+                                                              }
+                                                          }}
+                                                      >
+                                                          Complete
                                                       </Button>
                                                   </Box>
                                             </TableCell>
@@ -2344,6 +2435,27 @@ const TransactionManagement = () => {
                     </Button>
                     <Button onClick={handleConfirmGenerateInvoice} color="primary" variant="contained">
                         Generate Invoice
+                    </Button>
+                </DialogActions>
+            </Dialog>
+            
+            {/* Complete Confirmation Dialog */}
+            <Dialog open={completeConfirmDialogOpen} onClose={handleCancelComplete} maxWidth="sm" fullWidth>
+                <DialogTitle>Confirm Summary Completion</DialogTitle>
+                <DialogContent dividers>
+                    <Typography variant="body1" sx={{ mb: 2 }}>
+                        Are you sure you want to mark Summary ID: <strong>{pendingCompleteSummary?.id}</strong> as completed?
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                        This action will mark the summary as completed and disable the Generate Summary button. This action cannot be undone.
+                    </Typography>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={handleCancelComplete} color="inherit">
+                        Cancel
+                    </Button>
+                    <Button onClick={handleConfirmComplete} color="success" variant="contained">
+                        Complete Summary
                     </Button>
                 </DialogActions>
             </Dialog>
