@@ -1200,68 +1200,82 @@ export default function Page() {
     const handleTabChange = (event, newValue) => { setActiveTab(newValue); };
 
     // Fetch contract list
-    useEffect(() => {
-        const fetchContracts = async () => {
+    const fetchContracts = async (isInitialLoad = false) => {
+        // Only show loading indicator on initial load, not on auto-refresh
+        if (isInitialLoad) {
             setContractListLoading(true);
-            setContractListError(null);
-            try {
-                const { data: { user }, error: userError } = await supabase.auth.getUser();
-                if (userError) throw userError;
-                if (!user) {
-                    setContractList([]);
-                    return;
-                }
-                const { data: contracts, error: contractError } = await supabase
-                    .from('contracts')
-                    .select(`
-                        id,
-                        created_at,
-                        accepted_at,
-                        pickup_at,
-                        delivered_at,
-                        cancelled_at,
-                        pickup_location,
-                        pickup_location_geo,
-                        drop_off_location,
-                        drop_off_location_geo,
-                        contract_status_id,
-                        contract_status(status_name),
-                        airline_id,
-                        delivery_id,
-                        delivery_charge,
-                        owner_first_name,
-                        owner_middle_initial,
-                        owner_last_name,
-                        owner_contact,
-                        luggage_description,
-                        luggage_quantity,
-                        flight_number,
-                        delivery_address,
-                        address_line_1,
-                        address_line_2,
-                        airline:airline_id (*),
-                        delivery:delivery_id (*)
-                    `)
-                    .eq('airline_id', user.id)
-                    .order('created_at', { ascending: false });
+        }
+        setContractListError(null);
+        try {
+            const { data: { user }, error: userError } = await supabase.auth.getUser();
+            if (userError) throw userError;
+            if (!user) {
+                setContractList([]);
+                return;
+            }
+            const { data: contracts, error: contractError } = await supabase
+                .from('contracts')
+                .select(`
+                    id,
+                    created_at,
+                    accepted_at,
+                    pickup_at,
+                    delivered_at,
+                    cancelled_at,
+                    pickup_location,
+                    pickup_location_geo,
+                    drop_off_location,
+                    drop_off_location_geo,
+                    contract_status_id,
+                    contract_status(status_name),
+                    airline_id,
+                    delivery_id,
+                    delivery_charge,
+                    owner_first_name,
+                    owner_middle_initial,
+                    owner_last_name,
+                    owner_contact,
+                    luggage_description,
+                    luggage_quantity,
+                    flight_number,
+                    delivery_address,
+                    address_line_1,
+                    address_line_2,
+                    airline:airline_id (*),
+                    delivery:delivery_id (*)
+                `)
+                .eq('airline_id', user.id)
+                .order('created_at', { ascending: false });
 
-                if (contractError) throw contractError;
+            if (contractError) throw contractError;
 
-                if (!contracts || contracts.length === 0) {
-                    setContractList([]);
-                    return;
-                }
+            if (!contracts || contracts.length === 0) {
+                setContractList([]);
+                return;
+            }
 
-                setContractList(contracts);
-            } catch (err) {
-                setContractListError(err.message || 'Failed to fetch contracts');
-            } finally {
+            setContractList(contracts);
+        } catch (err) {
+            setContractListError(err.message || 'Failed to fetch contracts');
+        } finally {
+            if (isInitialLoad) {
                 setContractListLoading(false);
             }
-        };
+        }
+    };
 
+    useEffect(() => {
         if (activeTab === 0) {
-            fetchContracts();
+            // Initial fetch with loading indicator
+            fetchContracts(true);
+
+            // Set up auto-refresh every 5 seconds (quiet refresh)
+            const interval = setInterval(() => {
+                fetchContracts(false);
+            }, 5000);
+
+            // Cleanup interval on unmount or tab change
+            return () => clearInterval(interval);
         }
     }, [activeTab]);
 
@@ -1479,7 +1493,7 @@ export default function Page() {
                                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', position: 'relative' }}>
                                             <Box sx={{ flex: 1 }}>
                                                 <Typography variant="subtitle1" sx={{ color: 'primary.main', fontWeight: 700, mb: 1 }}>
-                                                    Contract ID: <span style={{ color: theme.palette.text.secondary, fontWeight: 400 }}>{contract.id}</span>
+                                                    Contract ID: <span style={{ color: 'primary.main', fontWeight: 400 }}>{contract.id}</span>
                                                 </Typography>
                                                 <Divider sx={{ my: 1 }} />
                                                 <Typography variant="subtitle2" sx={{ color: 'primary.main', fontWeight: 700, mb: 1 }}>

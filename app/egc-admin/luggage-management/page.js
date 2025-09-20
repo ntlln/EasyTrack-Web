@@ -131,30 +131,44 @@ const ContractList = ({ onTrackContract, initialSearch, setRedirectContractId })
   }, []);
 
   // Fetch contract list
+  const fetchContracts = async (isInitialLoad = false) => {
+    // Only show loading indicator on initial load, not on auto-refresh
+    if (isInitialLoad) {
+      setContractListLoading(true);
+    }
+    setContractListError(null);
+    try {
+      const response = await fetch('/api/admin');
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to fetch contracts');
+      }
+
+      setContractList(result.data || []);
+    } catch (err) {
+      console.error('Error in fetchContracts:', err);
+      setContractListError(err.message || 'Failed to fetch contracts');
+    } finally {
+      if (isInitialLoad) {
+        setContractListLoading(false);
+      }
+    }
+  };
+
   useEffect(() => {
     if (!mounted) return;
 
-    const fetchContracts = async () => {
-      setContractListLoading(true);
-      setContractListError(null);
-      try {
-        const response = await fetch('/api/admin');
-        const result = await response.json();
+    // Initial fetch with loading indicator
+    fetchContracts(true);
 
-        if (!response.ok) {
-          throw new Error(result.error || 'Failed to fetch contracts');
-        }
+    // Set up auto-refresh every 5 seconds (quiet refresh)
+    const interval = setInterval(() => {
+      fetchContracts(false);
+    }, 5000);
 
-        setContractList(result.data || []);
-      } catch (err) {
-        console.error('Error in fetchContracts:', err);
-        setContractListError(err.message || 'Failed to fetch contracts');
-      } finally {
-        setContractListLoading(false);
-      }
-    };
-
-    fetchContracts();
+    // Cleanup interval on unmount
+    return () => clearInterval(interval);
   }, [mounted]);
 
   const handleExpandClick = (contractId) => {
@@ -613,46 +627,61 @@ const LuggageAssignments = ({ onAssignmentComplete }) => {
     setMounted(true);
   }, []);
 
+  // Fetch data function
+  const fetchData = async (isInitialLoad = false) => {
+    // Only show loading indicator on initial load, not on auto-refresh
+    if (isInitialLoad) {
+      setLoading(true);
+    }
+    setError(null);
+    try {
+      // Fetch contracts
+      const contractsResponse = await fetch('/api/admin');
+      const contractsResult = await contractsResponse.json();
+
+      if (!contractsResponse.ok) {
+        throw new Error(contractsResult.error || 'Failed to fetch contracts');
+      }
+
+      // Filter for available contracts only
+      const availableContracts = (contractsResult.data || []).filter(
+        contract => contract.contract_status?.id === 1
+      );
+      
+      setAssignments(availableContracts);
+
+      // Fetch delivery personnel
+      const personnelResponse = await fetch('/api/admin?action=delivery-personnel');
+      const personnelResult = await personnelResponse.json();
+
+      if (!personnelResponse.ok) {
+        throw new Error(personnelResult.error || 'Failed to fetch delivery personnel');
+      }
+
+      setDeliveryPersonnel(personnelResult.data || []);
+    } catch (err) {
+      console.error('Error in fetchData:', err);
+      setError(err.message || 'Failed to fetch data');
+    } finally {
+      if (isInitialLoad) {
+        setLoading(false);
+      }
+    }
+  };
+
   useEffect(() => {
     if (!mounted) return;
 
-    const fetchData = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        // Fetch contracts
-        const contractsResponse = await fetch('/api/admin');
-        const contractsResult = await contractsResponse.json();
+    // Initial fetch with loading indicator
+    fetchData(true);
 
-        if (!contractsResponse.ok) {
-          throw new Error(contractsResult.error || 'Failed to fetch contracts');
-        }
+    // Set up auto-refresh every 5 seconds (quiet refresh)
+    const interval = setInterval(() => {
+      fetchData(false);
+    }, 5000);
 
-        // Filter for available contracts only
-        const availableContracts = (contractsResult.data || []).filter(
-          contract => contract.contract_status?.id === 1
-        );
-        
-        setAssignments(availableContracts);
-
-        // Fetch delivery personnel
-        const personnelResponse = await fetch('/api/admin?action=delivery-personnel');
-        const personnelResult = await personnelResponse.json();
-
-        if (!personnelResponse.ok) {
-          throw new Error(personnelResult.error || 'Failed to fetch delivery personnel');
-        }
-
-        setDeliveryPersonnel(personnelResult.data || []);
-      } catch (err) {
-        console.error('Error in fetchData:', err);
-        setError(err.message || 'Failed to fetch data');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchData();
+    // Cleanup interval on unmount
+    return () => clearInterval(interval);
   }, [mounted]);
 
   const handleAssign = (contract) => {
@@ -952,42 +981,42 @@ const LuggageAssignments = ({ onAssignmentComplete }) => {
           {detailsContract && (
             <Box sx={{ minWidth: 400 }}>
               <Typography variant="subtitle1" sx={{ color: 'primary.main', fontWeight: 700, mb: 1 }}>
-                Contract ID: <span style={{ color: theme.palette.text.secondary, fontWeight: 400 }}>{detailsContract.id}</span>
+                Contract ID: <span style={{ color: 'primary.main', fontWeight: 400 }}>{detailsContract.id}</span>
               </Typography>
               <Divider sx={{ my: 1 }} />
               <Typography variant="subtitle2" sx={{ color: 'primary.main', fontWeight: 700, mb: 1 }}>
                 Location Information
               </Typography>
               <Box sx={{ ml: 1, mb: 1 }}>
-                <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                  <b>Pickup:</b> <span style={{ color: 'text.primary' }}>{detailsContract.pickup_location || 'N/A'}</span>
+                <Typography variant="body2" sx={{ color: isDark ? '#fff' : 'text.secondary' }}>
+                  <b>Pickup:</b> <span style={{ color: isDark ? '#fff' : 'text.primary' }}>{detailsContract.pickup_location || 'N/A'}</span>
                 </Typography>
                 {detailsContract.pickup_location_geo && (
-                  <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                  <Typography variant="body2" sx={{ color: isDark ? '#fff' : 'text.secondary' }}>
                     <b>Pickup Coordinates:</b>{' '}
-                    <span style={{ color: 'text.primary' }}>
+                    <span style={{ color: isDark ? '#fff' : 'text.primary' }}>
                       {detailsContract.pickup_location_geo.coordinates[1].toFixed(6)}, {detailsContract.pickup_location_geo.coordinates[0].toFixed(6)}
                     </span>
                   </Typography>
                 )}
-                <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                  <b>Drop-off:</b> <span style={{ color: 'text.primary' }}>{detailsContract.drop_off_location || 'N/A'}</span>
+                <Typography variant="body2" sx={{ color: isDark ? '#fff' : 'text.secondary' }}>
+                  <b>Drop-off:</b> <span style={{ color: isDark ? '#fff' : 'text.primary' }}>{detailsContract.drop_off_location || 'N/A'}</span>
                 </Typography>
                 {detailsContract.drop_off_location_geo && (
-                  <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                  <Typography variant="body2" sx={{ color: isDark ? '#fff' : 'text.secondary' }}>
                     <b>Drop-off Coordinates:</b>{' '}
-                    <span style={{ color: 'text.primary' }}>
+                    <span style={{ color: isDark ? '#fff' : 'text.primary' }}>
                       {detailsContract.drop_off_location_geo.coordinates[1].toFixed(6)}, {detailsContract.drop_off_location_geo.coordinates[0].toFixed(6)}
                     </span>
                   </Typography>
                 )}
                 {detailsContract.delivery_charge !== null && !isNaN(Number(detailsContract.delivery_charge)) ? (
-                  <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                    <b>Price:</b> <span style={{ color: 'text.primary' }}>₱{Number(detailsContract.delivery_charge).toLocaleString()}</span>
+                  <Typography variant="body2" sx={{ color: isDark ? '#fff' : 'text.secondary' }}>
+                    <b>Price:</b> <span style={{ color: isDark ? '#fff' : 'text.primary' }}>₱{Number(detailsContract.delivery_charge).toLocaleString()}</span>
                   </Typography>
                 ) : (
-                  <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                    <b>Price:</b> <span style={{ color: 'text.primary' }}>N/A</span>
+                  <Typography variant="body2" sx={{ color: isDark ? '#fff' : 'text.secondary' }}>
+                    <b>Price:</b> <span style={{ color: isDark ? '#fff' : 'text.primary' }}>N/A</span>
                   </Typography>
                 )}
               </Box>
@@ -997,29 +1026,29 @@ const LuggageAssignments = ({ onAssignmentComplete }) => {
               </Typography>
               <Box sx={{ ml: 1, mb: 1 }}>
                 {detailsContract.luggage.length === 0 && (
-                  <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                  <Typography variant="body2" sx={{ color: isDark ? '#fff' : 'text.secondary' }}>
                     No passenger info.
                   </Typography>
                 )}
                 {detailsContract.luggage.map((l, lidx) => (
                   <Box key={`luggage-${detailsContract.id}-${lidx}`} sx={{ mb: 2, pl: 1 }}>
-                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                      <b>Name:</b> <span style={{ color: 'text.primary' }}>{l.luggage_owner || 'N/A'}</span>
+                    <Typography variant="body2" sx={{ color: isDark ? '#fff' : 'text.secondary' }}>
+                      <b>Name:</b> <span style={{ color: isDark ? '#fff' : 'text.primary' }}>{l.luggage_owner || 'N/A'}</span>
                     </Typography>
-                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                      <b>Contact Number:</b> <span style={{ color: 'text.primary' }}>{l.contact_number || 'N/A'}</span>
+                    <Typography variant="body2" sx={{ color: isDark ? '#fff' : 'text.secondary' }}>
+                      <b>Contact Number:</b> <span style={{ color: isDark ? '#fff' : 'text.primary' }}>{l.contact_number || 'N/A'}</span>
                     </Typography>
-                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                      <b>Address:</b> <span style={{ color: 'text.primary' }}>{l.address || 'N/A'}</span>
+                    <Typography variant="body2" sx={{ color: isDark ? '#fff' : 'text.secondary' }}>
+                      <b>Address:</b> <span style={{ color: isDark ? '#fff' : 'text.primary' }}>{l.address || 'N/A'}</span>
                     </Typography>
-                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                      <b>Quantity:</b> <span style={{ color: 'text.primary' }}>{l.quantity || 'N/A'}</span>
+                    <Typography variant="body2" sx={{ color: isDark ? '#fff' : 'text.secondary' }}>
+                      <b>Quantity:</b> <span style={{ color: isDark ? '#fff' : 'text.primary' }}>{l.quantity || 'N/A'}</span>
                     </Typography>
-                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                      <b>Description:</b> <span style={{ color: 'text.primary' }}>{l.item_description || 'N/A'}</span>
+                    <Typography variant="body2" sx={{ color: isDark ? '#fff' : 'text.secondary' }}>
+                      <b>Description:</b> <span style={{ color: isDark ? '#fff' : 'text.primary' }}>{l.item_description || 'N/A'}</span>
                     </Typography>
-                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                      <b>Flight Number:</b> <span style={{ color: 'text.primary' }}>{l.flight_number || 'N/A'}</span>
+                    <Typography variant="body2" sx={{ color: isDark ? '#fff' : 'text.secondary' }}>
+                      <b>Flight Number:</b> <span style={{ color: isDark ? '#fff' : 'text.primary' }}>{l.flight_number || 'N/A'}</span>
                     </Typography>
                   </Box>
                 ))}
@@ -1029,9 +1058,9 @@ const LuggageAssignments = ({ onAssignmentComplete }) => {
                 Airline Personnel Information
               </Typography>
               <Box sx={{ ml: 1, mb: 1 }}>
-                <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                <Typography variant="body2" sx={{ color: isDark ? '#fff' : 'text.secondary' }}>
                   <b>Airline Personnel:</b>{' '}
-                  <span style={{ color: 'text.primary' }}>
+                  <span style={{ color: isDark ? '#fff' : 'text.primary' }}>
                     {detailsContract.airline
                       ? `${detailsContract.airline.first_name || ''} ${detailsContract.airline.middle_initial || ''} ${
                           detailsContract.airline.last_name || ''
@@ -1041,13 +1070,13 @@ const LuggageAssignments = ({ onAssignmentComplete }) => {
                       : 'N/A'}
                   </span>
                 </Typography>
-                <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                <Typography variant="body2" sx={{ color: isDark ? '#fff' : 'text.secondary' }}>
                   <b>Email:</b>{' '}
-                  <span style={{ color: 'text.primary' }}>{detailsContract.airline?.email || 'N/A'}</span>
+                  <span style={{ color: isDark ? '#fff' : 'text.primary' }}>{detailsContract.airline?.email || 'N/A'}</span>
                 </Typography>
-                <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                <Typography variant="body2" sx={{ color: isDark ? '#fff' : 'text.secondary' }}>
                   <b>Contact:</b>{' '}
-                  <span style={{ color: 'text.primary' }}>{detailsContract.airline?.contact_number || 'N/A'}</span>
+                  <span style={{ color: isDark ? '#fff' : 'text.primary' }}>{detailsContract.airline?.contact_number || 'N/A'}</span>
                 </Typography>
               </Box>
               <Divider sx={{ my: 2 }} />
@@ -1055,9 +1084,9 @@ const LuggageAssignments = ({ onAssignmentComplete }) => {
                 Delivery Personnel Information
               </Typography>
               <Box sx={{ ml: 1, mb: 1 }}>
-                <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                <Typography variant="body2" sx={{ color: isDark ? '#fff' : 'text.secondary' }}>
                   <b>Delivery Personnel:</b>{' '}
-                  <span style={{ color: 'text.primary' }}>
+                  <span style={{ color: isDark ? '#fff' : 'text.primary' }}>
                     {detailsContract.delivery
                       ? `${detailsContract.delivery.first_name || ''} ${detailsContract.delivery.middle_initial || ''} ${
                           detailsContract.delivery.last_name || ''
@@ -1067,15 +1096,15 @@ const LuggageAssignments = ({ onAssignmentComplete }) => {
                       : 'N/A'}
                   </span>
                 </Typography>
-                <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                <Typography variant="body2" sx={{ color: isDark ? '#fff' : 'text.secondary' }}>
                   <b>Email:</b>{' '}
-                  <span style={{ color: 'text.primary' }}>{detailsContract.delivery?.email || 'N/A'}</span>
+                  <span style={{ color: isDark ? '#fff' : 'text.primary' }}>{detailsContract.delivery?.email || 'N/A'}</span>
                 </Typography>
-                <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                <Typography variant="body2" sx={{ color: isDark ? '#fff' : 'text.secondary' }}>
                   <b>Contact:</b>{' '}
-                  <span style={{ color: 'text.primary' }}>{detailsContract.delivery?.contact_number || 'N/A'}</span>
+                  <span style={{ color: isDark ? '#fff' : 'text.primary' }}>{detailsContract.delivery?.contact_number || 'N/A'}</span>
                 </Typography>
-                <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                <Typography variant="body2" sx={{ color: isDark ? '#fff' : 'text.secondary' }}>
                   <b>Status:</b>{' '}
                   <span style={{ color: 'primary.main', fontWeight: 700 }}>
                     {detailsContract.contract_status?.status_name || 'N/A'}
@@ -1087,31 +1116,31 @@ const LuggageAssignments = ({ onAssignmentComplete }) => {
                 Timeline
               </Typography>
               <Box sx={{ ml: 1, mb: 1 }}>
-                <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                <Typography variant="body2" sx={{ color: isDark ? '#fff' : 'text.secondary' }}>
                   <b>Created:</b>{' '}
-                  <span style={{ color: 'text.primary' }}>{formatDate(detailsContract.created_at)}</span>
+                  <span style={{ color: isDark ? '#fff' : 'text.primary' }}>{formatDate(detailsContract.created_at)}</span>
                 </Typography>
-                <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                <Typography variant="body2" sx={{ color: isDark ? '#fff' : 'text.secondary' }}>
                   <b>Accepted:</b>{' '}
-                  <span style={{ color: 'text.primary' }}>
+                  <span style={{ color: isDark ? '#fff' : 'text.primary' }}>
                     {detailsContract.accepted_at ? formatDate(detailsContract.accepted_at) : 'N/A'}
                   </span>
                 </Typography>
-                <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                <Typography variant="body2" sx={{ color: isDark ? '#fff' : 'text.secondary' }}>
                   <b>Pickup:</b>{' '}
-                  <span style={{ color: 'text.primary' }}>
+                  <span style={{ color: isDark ? '#fff' : 'text.primary' }}>
                     {detailsContract.pickup_at ? formatDate(detailsContract.pickup_at) : 'N/A'}
                   </span>
                 </Typography>
-                <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                <Typography variant="body2" sx={{ color: isDark ? '#fff' : 'text.secondary' }}>
                   <b>Delivered:</b>{' '}
-                  <span style={{ color: 'text.primary' }}>
+                  <span style={{ color: isDark ? '#fff' : 'text.primary' }}>
                     {detailsContract.delivered_at ? formatDate(detailsContract.delivered_at) : 'N/A'}
                   </span>
                 </Typography>
-                <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                <Typography variant="body2" sx={{ color: isDark ? '#fff' : 'text.secondary' }}>
                   <b>Cancelled:</b>{' '}
-                  <span style={{ color: 'text.primary' }}>
+                  <span style={{ color: isDark ? '#fff' : 'text.primary' }}>
                     {detailsContract.cancelled_at ? formatDate(detailsContract.cancelled_at) : 'N/A'}
                   </span>
                 </Typography>
