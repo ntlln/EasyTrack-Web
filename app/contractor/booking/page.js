@@ -24,6 +24,8 @@ const dateOptions = [
   { label: 'Last Year', value: 'lastYear' },
 ];
 
+
+
 // Add filterByDate helper function
 function filterByDate(contracts, filter) {
   if (filter === 'all') return contracts;
@@ -105,7 +107,7 @@ export default function Page() {
         postalCode: "", 
         contact: "" 
     });
-    const [luggageForms, setLuggageForms] = useState([{ name: "", caseNumber: "", flightNo: "", itemDescription: "", weight: "", quantity: "" }]);
+    const [luggageForms, setLuggageForms] = useState([{ name: "", flightNo: "", itemDescription: "", quantity: "" }]);
     const [pickupAddress, setPickupAddress] = useState({ location: "", addressLine1: "", addressLine2: "", province: "", city: "", barangay: "", postalCode: "" });
     const [dropoffAddress, setDropoffAddress] = useState({ location: null, lat: null, lng: null });
     const [placeOptions, setPlaceOptions] = useState([]); const [placeLoading, setPlaceLoading] = useState(false); const autocompleteServiceRef = useRef(null); const placesServiceRef = useRef(null);
@@ -122,9 +124,435 @@ export default function Page() {
     const [rowsPerPage, setRowsPerPage] = useState(10);
     const [validationErrors, setValidationErrors] = useState({});
     const [isSubmitting, setIsSubmitting] = useState(false);
+    
+    // Location dropdown states for Google Places
+    const [provinces, setProvinces] = useState([]);
+    const [cities, setCities] = useState([]);
+    const [barangays, setBarangays] = useState([]);
+    const [selectedProvince, setSelectedProvince] = useState('');
+    const [selectedCity, setSelectedCity] = useState('');
+    const [selectedBarangay, setSelectedBarangay] = useState('');
+    const [isLoadingProvinces, setIsLoadingProvinces] = useState(false);
+    const [isLoadingCities, setIsLoadingCities] = useState(false);
+    const [isLoadingBarangays, setIsLoadingBarangays] = useState(false);
+    const [locationError, setLocationError] = useState(null);
 
     // Mount
     useEffect(() => { setMounted(true); setIsFormMounted(true); }, []);
+
+    // Initialize provinces immediately on mount (based on image regions)
+    useEffect(() => {
+        const regionProvinces = [
+            // Regional classifications
+            'NCR',
+            'North Luzon', 
+            'South Luzon',
+            
+            // Specific provinces
+            'Batangas',
+            'Bulacan', 
+            'Cavite',
+            'Laguna',
+            'Pampanga',
+            'Rizal'
+        ];
+
+        const provinceList = regionProvinces.map(province => ({
+            value: province,
+            label: province
+        }));
+        
+        setProvinces(provinceList);
+    }, []);
+
+    // Fetch cities for selected province using Google Places API
+    const fetchCities = async (province) => {
+        console.log('Fetching cities for province:', province);
+        setIsLoadingCities(true);
+        setLocationError(null);
+        
+        try {
+            // For now, always use fallback data to ensure it works
+            // TODO: Re-enable Google Places API once it's properly configured
+            const fallbackCities = getFallbackCities(province);
+            console.log('Fallback cities for', province, ':', fallbackCities);
+            setCities(fallbackCities);
+            
+            // Check if Google Places API is available (disabled for now)
+            if (false && window.google && autocompleteServiceRef.current) {
+                // Use Google Places Autocomplete for cities
+                const request = {
+                    input: `${province} cities Philippines`,
+                    types: ['(cities)'],
+                    componentRestrictions: { country: 'ph' },
+                    fields: ['name', 'formatted_address', 'address_components']
+                };
+
+                autocompleteServiceRef.current.getPlacePredictions(request, (predictions, status) => {
+                    console.log('Google Places API response:', { status, predictions });
+                    if (status === window.google.maps.places.PlacesServiceStatus.OK && predictions) {
+                        // Filter and process cities
+                        const cityList = predictions
+                            .filter(prediction => {
+                                const address = prediction.description.toLowerCase();
+                                return address.includes(province.toLowerCase()) || 
+                                       address.includes('philippines');
+                            })
+                            .map(prediction => ({
+                                value: prediction.description,
+                                label: prediction.description
+                            }))
+                            .slice(0, 30); // Limit to 30 cities
+                        
+                        console.log('Filtered cities:', cityList);
+                        setCities(cityList);
+                    } else {
+                        // Fallback to predefined cities
+                        const fallbackCities = getFallbackCities(province);
+                        console.log('Using fallback cities:', fallbackCities);
+                        setCities(fallbackCities);
+                    }
+                });
+            }
+        } catch (error) {
+            console.error('Error fetching cities:', error);
+            setLocationError('Failed to load cities');
+            // Fallback to predefined cities
+            const fallbackCities = getFallbackCities(province);
+            setCities(fallbackCities);
+        } finally {
+            setIsLoadingCities(false);
+        }
+    };
+
+
+    // Fallback cities for regions and provinces (based on image)
+    const getFallbackCities = (province) => {
+        const fallbackData = {
+            // Regional classifications
+            'NCR': ['Manila', 'Quezon City', 'Caloocan', 'Las Piñas', 'Makati', 'Malabon', 'Mandaluyong', 'Marikina', 'Muntinlupa', 'Navotas', 'Parañaque', 'Pasay', 'Pasig', 'Pateros', 'San Juan', 'Taguig', 'Valenzuela'],
+            'North Luzon': [
+                // Ilocos Region
+                'Laoag', 'Batac', 'Pagudpud', 'Bangui', 'Burgos', 'Currimao', 'Dingras', 'Dumalneg', 'Marcos', 'Nueva Era', 'Piddig', 'Pinili', 'San Nicolas', 'Sarrat', 'Solsona', 'Vintar',
+                'Vigan', 'Candon', 'Bantay', 'Cabugao', 'Caoayan', 'Cervantes', 'Galimuyod', 'Gregorio del Pilar', 'Lidlidda', 'Magsingal', 'Nagbukel', 'Narvacan', 'Quirino', 'Salcedo', 'San Emilio', 'San Esteban', 'San Ildefonso', 'San Juan', 'San Vicente', 'Santa', 'Santa Catalina', 'Santa Cruz', 'Santa Lucia', 'Santa Maria', 'Santiago', 'Santo Domingo', 'Sigay', 'Sinait', 'Sugpon', 'Suyo', 'Tagudin',
+                'San Fernando (La Union)', 'Agoo', 'Aringay', 'Bacnotan', 'Bagulin', 'Balaoan', 'Bangar', 'Bauang', 'Burgos', 'Caba', 'Luna', 'Naguilian', 'Pugo', 'Rosario', 'San Gabriel', 'Santo Tomas', 'Santol', 'Sudipen', 'Tubao',
+                'Dagupan', 'San Carlos', 'Urdaneta', 'Alaminos', 'Alcala', 'Anda', 'Asingan', 'Balungao', 'Bani', 'Basista', 'Bautista', 'Bayambang', 'Binalonan', 'Binmaley', 'Bolinao', 'Bugallon', 'Burgos', 'Calasiao', 'Dasol', 'Infanta', 'Labrador', 'Laoac', 'Lingayen', 'Mabini', 'Malasiqui', 'Manaoag', 'Mangaldan', 'Mangatarem', 'Mapandan', 'Natividad', 'Pozorrubio', 'Rosales', 'San Fabian', 'San Jacinto', 'San Manuel', 'San Nicolas', 'San Quintin', 'Santa Barbara', 'Santa Maria', 'Santo Tomas', 'Sison', 'Sual', 'Tayug', 'Umingan', 'Urbiztondo', 'Villasis',
+                // Cagayan Valley
+                'Tuguegarao', 'Abulug', 'Alcala', 'Allacapan', 'Amulung', 'Aparri', 'Baggao', 'Ballesteros', 'Buguey', 'Calayan', 'Camalaniugan', 'Claveria', 'Enrile', 'Gattaran', 'Gonzaga', 'Iguig', 'Lal-lo', 'Lasam', 'Pamplona', 'Peñablanca', 'Piat', 'Rizal', 'Sanchez-Mira', 'Santa Ana', 'Santa Praxedes', 'Santa Teresita', 'Santo Niño', 'Solana', 'Tuao',
+                'Ilagan', 'Alicia', 'Angadanan', 'Aurora', 'Benito Soliven', 'Burgos', 'Cabagan', 'Cabatuan', 'Cauayan', 'Cordon', 'Dinapigue', 'Divilacan', 'Echague', 'Gamu', 'Jones', 'Luna', 'Maconacon', 'Mallig', 'Naguilian', 'Palanan', 'Quezon', 'Quirino', 'Ramon', 'Reina Mercedes', 'Roxas', 'San Agustin', 'San Guillermo', 'San Isidro', 'San Manuel', 'San Mariano', 'San Mateo', 'San Pablo', 'Santa Maria', 'Santiago', 'Santo Tomas', 'Tumauini',
+                'Bayombong', 'Alfonso Castañeda', 'Ambaguio', 'Aritao', 'Bagabag', 'Bambang', 'Diadi', 'Dupax del Norte', 'Dupax del Sur', 'Kasibu', 'Kayapa', 'Quezon', 'Santa Fe', 'Solano', 'Villaverde',
+                'Cabarroguis', 'Aglipay', 'Diffun', 'Maddela', 'Nagtipunan', 'Saguday',
+                // Central Luzon
+                'Baler', 'Casiguran', 'Dilasag', 'Dinalungan', 'Dingalan', 'Dipaculao', 'Maria Aurora', 'San Luis',
+                'Balanga', 'Abucay', 'Bagac', 'Dinalupihan', 'Hermosa', 'Limay', 'Mariveles', 'Morong', 'Orani', 'Pilar', 'Samal',
+                'Malolos', 'Angat', 'Balagtas', 'Baliuag', 'Bocaue', 'Bulakan', 'Bustos', 'Calumpit', 'Doña Remedios Trinidad', 'Guiguinto', 'Hagonoy', 'Marilao', 'Meycauayan', 'Norzagaray', 'Obando', 'Pandi', 'Paombong', 'Plaridel', 'Pulilan', 'San Ildefonso', 'San Jose del Monte', 'San Miguel', 'San Rafael', 'Santa Maria',
+                'Cabanatuan', 'Aliaga', 'Bongabon', 'Cabiao', 'Carranglan', 'Cuyapo', 'Gabaldon', 'General Mamerto Natividad', 'General Tinio', 'Gapan', 'Guimba', 'Jaen', 'Laur', 'Licab', 'Llanera', 'Lupao', 'Muñoz', 'Nampicuan', 'Palayan', 'Pantabangan', 'Peñaranda', 'Quezon', 'Rizal', 'San Antonio', 'San Isidro', 'San Jose', 'San Leonardo', 'Santa Rosa', 'Santo Domingo', 'Talavera', 'Talugtug', 'Zaragoza',
+                'San Fernando (Pampanga)', 'Angeles', 'Apalit', 'Arayat', 'Bacolor', 'Candaba', 'Floridablanca', 'Guagua', 'Lubao', 'Mabalacat', 'Macabebe', 'Magalang', 'Masantol', 'Mexico', 'Minalin', 'Porac', 'San Luis', 'San Simon', 'Santa Ana', 'Santa Rita', 'Santo Tomas', 'Sasmuan',
+                'Tarlac City', 'Anao', 'Bamban', 'Camiling', 'Capas', 'Concepcion', 'Gerona', 'La Paz', 'Mayantoc', 'Moncada', 'Paniqui', 'Pura', 'Ramos', 'San Clemente', 'San Jose', 'San Manuel', 'Santa Ignacia', 'Victoria',
+                'Olongapo', 'Botolan', 'Cabangan', 'Candelaria', 'Castillejos', 'Iba', 'Masinloc', 'Palauig', 'San Antonio', 'San Felipe', 'San Marcelino', 'San Narciso', 'Santa Cruz', 'Subic',
+                // Cordillera Administrative Region
+                'Baguio', 'La Trinidad', 'Atok', 'Bakun', 'Bokod', 'Buguias', 'Itogon', 'Kabayan', 'Kapangan', 'Kibungan', 'Mankayan', 'Sablan', 'Tuba', 'Tublay',
+                'Bangued', 'Boliney', 'Bucay', 'Bucloc', 'Daguioman', 'Danglas', 'Dolores', 'La Paz', 'Lacub', 'Lagangilang', 'Lagayan', 'Langiden', 'Licuan-Baay', 'Luba', 'Malibcong', 'Manabo', 'Peñarrubia', 'Pidigan', 'Pilar', 'Sallapadan', 'San Isidro', 'San Juan', 'San Quintin', 'Tayum', 'Tineg', 'Tubo', 'Villaviciosa',
+                'Kabugao', 'Calanasan', 'Conner', 'Flora', 'Luna', 'Pudtol', 'Santa Marcela',
+                'Lagawe', 'Aguinaldo', 'Alfonso Lista', 'Asipulo', 'Banaue', 'Hingyon', 'Hungduan', 'Kiangan', 'Lamut', 'Mayoyao', 'Tinoc',
+                'Tabuk', 'Balbalan', 'Lubuagan', 'Pasil', 'Pinukpuk', 'Rizal', 'Tanudan', 'Tinglayan',
+                'Bontoc', 'Barlig', 'Bauko', 'Besao', 'Natonin', 'Paracelis', 'Sabangan', 'Sadanga', 'Sagada', 'Tadian'
+            ],
+            'South Luzon': [
+                // CALABARZON
+                'Batangas City', 'Lipa', 'Tanauan', 'Santo Tomas', 'Malvar', 'Balayan', 'Calaca', 'Lemery', 'Nasugbu', 'Taal', 'Talisay', 'Tuy', 'Agoncillo', 'Alitagtag', 'Balete', 'Bauan', 'Calatagan', 'Cuenca', 'Ibaan', 'Laurel', 'Lian', 'Lobo', 'Mabini', 'Mataasnakahoy', 'Padre Garcia', 'Rosario', 'San Jose', 'San Juan', 'San Luis', 'San Nicolas', 'San Pascual', 'Santa Teresita', 'Taysan', 'Tingloy',
+                'Trece Martires', 'Alfonso', 'Amadeo', 'Bacoor', 'Carmona', 'Cavite City', 'Dasmariñas', 'General Emilio Aguinaldo', 'General Mariano Alvarez', 'General Trias', 'Imus', 'Indang', 'Kawit', 'Magallanes', 'Maragondon', 'Mendez', 'Naic', 'Noveleta', 'Rosario', 'Silang', 'Tagaytay', 'Tanza', 'Ternate',
+                'Calamba', 'San Pedro', 'Santa Rosa', 'Biñan', 'Cabuyao', 'San Pablo', 'Los Baños', 'Sta. Cruz', 'Pila', 'Liliw', 'Alaminos', 'Bay', 'Calauan', 'Cavinti', 'Famy', 'Kalayaan', 'Luisiana', 'Lumban', 'Mabitac', 'Magdalena', 'Majayjay', 'Nagcarlan', 'Paete', 'Pagsanjan', 'Pakil', 'Pangil', 'Rizal', 'Siniloan', 'Victoria',
+                'Lucena', 'Agdangan', 'Alabat', 'Atimonan', 'Buenavista', 'Burdeos', 'Calauag', 'Candelaria', 'Catanauan', 'Dolores', 'General Luna', 'General Nakar', 'Guinayangan', 'Gumaca', 'Infanta', 'Jomalig', 'Lopez', 'Lucban', 'Macalelon', 'Mauban', 'Mulanay', 'Padre Burgos', 'Pagbilao', 'Panukulan', 'Patnanungan', 'Perez', 'Pitogo', 'Plaridel', 'Polillo', 'Quezon', 'Real', 'Sampaloc', 'San Andres', 'San Antonio', 'San Francisco', 'San Narciso', 'Sariaya', 'Tagkawayan', 'Tayabas', 'Tiaong', 'Unisan',
+                'Antipolo', 'Angono', 'Baras', 'Binangonan', 'Cainta', 'Cardona', 'Jala-Jala', 'Morong', 'Pililla', 'Rodriguez', 'San Mateo', 'Tanay', 'Taytay', 'Teresa',
+                // MIMAROPA
+                'Boac', 'Buenavista', 'Gasan', 'Mogpog', 'Santa Cruz', 'Torrijos',
+                'Mamburao', 'Abra de Ilog', 'Calintaan', 'Looc', 'Lubang', 'Magsaysay', 'Paluan', 'Rizal', 'Sablayan', 'San Jose', 'Santa Cruz',
+                'Calapan', 'Baco', 'Bansud', 'Bongabon', 'Bulalacao', 'Gloria', 'Mansalay', 'Naujan', 'Pinamalayan', 'Pola', 'Puerto Galera', 'Roxas', 'San Teodoro', 'Socorro', 'Victoria',
+                'Puerto Princesa', 'Aborlan', 'Agutaya', 'Araceli', 'Balabac', 'Bataraza', 'Brooke\'s Point', 'Busuanga', 'Cagayancillo', 'Coron', 'Culion', 'Cuyo', 'Dumaran', 'El Nido', 'Kalayaan', 'Linapacan', 'Magsaysay', 'Narra', 'Quezon', 'Rizal', 'Roxas', 'San Vicente', 'Sofronio Española', 'Taytay',
+                'Romblon', 'Alcantara', 'Banton', 'Cajidiocan', 'Calatrava', 'Concepcion', 'Corcuera', 'Ferrol', 'Looc', 'Magdiwang', 'Odiongan', 'San Agustin', 'San Andres', 'San Fernando', 'San Jose', 'Santa Fe', 'Santa Maria',
+                // Bicol Region
+                'Legazpi', 'Bacacay', 'Camalig', 'Daraga', 'Guinobatan', 'Jovellar', 'Libon', 'Ligao', 'Malilipot', 'Malinao', 'Manito', 'Oas', 'Pio Duran', 'Polangui', 'Rapu-Rapu', 'Santo Domingo', 'Tabaco', 'Tiwi',
+                'Daet', 'Basud', 'Capalonga', 'Jose Panganiban', 'Labo', 'Mercedes', 'Paracale', 'San Lorenzo Ruiz', 'San Vicente', 'Santa Elena', 'Talisay', 'Vinzons',
+                'Naga', 'Iriga', 'Baao', 'Balatan', 'Bato', 'Bombon', 'Buhi', 'Bula', 'Cabusao', 'Calabanga', 'Camaligan', 'Canaman', 'Caramoan', 'Del Gallego', 'Gainza', 'Garchitorena', 'Goa', 'Lagonoy', 'Libmanan', 'Lupi', 'Magarao', 'Milaor', 'Minalabac', 'Nabua', 'Ocampo', 'Pamplona', 'Pasacao', 'Pili', 'Presentacion', 'Ragay', 'Sagñay', 'San Fernando', 'San Jose', 'Sipocot', 'Siruma', 'Tigaon', 'Tinambac',
+                'Virac', 'Bagamanoc', 'Baras', 'Bato', 'Caramoran', 'Gigmoto', 'Pandan', 'Panganiban', 'San Andres', 'San Miguel', 'Viga',
+                'Masbate City', 'Aroroy', 'Baleno', 'Balud', 'Batuan', 'Cataingan', 'Cawayan', 'Claveria', 'Dimasalang', 'Esperanza', 'Mandaon', 'Milagros', 'Mobo', 'Monreal', 'Palanas', 'Pio V. Corpuz', 'Placer', 'San Fernando', 'San Jacinto', 'San Pascual', 'Uson',
+                'Sorsogon City', 'Barcelona', 'Bulan', 'Bulusan', 'Casiguran', 'Castilla', 'Donsol', 'Gubat', 'Irosin', 'Juban', 'Magallanes', 'Matnog', 'Pilar', 'Prieto Diaz', 'Santa Magdalena'
+            ],
+            
+            // Specific provinces from image
+            'Batangas': ['Batangas City', 'Lipa', 'Tanauan', 'Santo Tomas', 'Malvar', 'Balayan', 'Calaca', 'Lemery', 'Nasugbu', 'Taal', 'Talisay', 'Tuy', 'Agoncillo', 'Alitagtag', 'Balete', 'Bauan', 'Calatagan', 'Cuenca', 'Ibaan', 'Laurel', 'Lian', 'Lobo', 'Mabini', 'Mataasnakahoy', 'Padre Garcia', 'Rosario', 'San Jose', 'San Juan', 'San Luis', 'San Nicolas', 'San Pascual', 'Santa Teresita', 'Taysan', 'Tingloy'],
+            'Bulacan': ['Malolos', 'Meycauayan', 'San Jose del Monte', 'Marilao', 'Bocaue', 'Guiguinto', 'Pulilan', 'Plaridel', 'Santa Maria', 'Balagtas', 'Angat', 'Baliuag', 'Bulakan', 'Bustos', 'Calumpit', 'Doña Remedios Trinidad', 'Hagonoy', 'Norzagaray', 'Obando', 'Pandi', 'Paombong', 'San Ildefonso', 'San Miguel', 'San Rafael'],
+            'Cavite': ['Bacoor', 'Imus', 'Dasmarinas', 'Tagaytay', 'Trece Martires', 'General Trias', 'Kawit', 'Noveleta', 'Rosario', 'Silang', 'Alfonso', 'Amadeo', 'Carmona', 'Cavite City', 'General Emilio Aguinaldo', 'General Mariano Alvarez', 'Indang', 'Magallanes', 'Maragondon', 'Mendez', 'Naic', 'Tanza', 'Ternate'],
+            'Laguna': ['Calamba', 'San Pedro', 'Santa Rosa', 'Biñan', 'Cabuyao', 'San Pablo', 'Los Baños', 'Sta. Cruz', 'Pila', 'Liliw', 'Alaminos', 'Bay', 'Calauan', 'Cavinti', 'Famy', 'Kalayaan', 'Luisiana', 'Lumban', 'Mabitac', 'Magdalena', 'Majayjay', 'Nagcarlan', 'Paete', 'Pagsanjan', 'Pakil', 'Pangil', 'Rizal', 'Siniloan', 'Victoria'],
+            'Pampanga': ['San Fernando', 'Angeles', 'Mabalacat', 'Mexico', 'Apalit', 'Arayat', 'Bacolor', 'Candaba', 'Floridablanca', 'Guagua', 'Lubao', 'Macabebe', 'Magalang', 'Masantol', 'Minalin', 'Porac', 'San Luis', 'San Simon', 'Santa Ana', 'Santa Rita', 'Santo Tomas', 'Sasmuan'],
+            'Rizal': ['Antipolo', 'Taytay', 'Cainta', 'Angono', 'Binangonan', 'Montalban', 'San Mateo', 'Marikina', 'Pasig', 'Taguig', 'Baras', 'Cardona', 'Jala-Jala', 'Morong', 'Pililla', 'Rodriguez', 'Tanay', 'Teresa']
+        };
+        
+        const cities = fallbackData[province] || [];
+        return cities.map(city => ({
+            value: city,
+            label: city
+        }));
+    };
+
+    // Fetch barangays for selected city using Google Places API
+    const fetchBarangays = async (city, province) => {
+        console.log('Fetching barangays for city:', city, 'province:', province);
+        setIsLoadingBarangays(true);
+        setLocationError(null);
+        
+        try {
+            // For now, always use fallback data to ensure it works
+            // TODO: Re-enable Google Places API once it's properly configured
+            const fallbackBarangays = getFallbackBarangays(city);
+            console.log('Fallback barangays for', city, ':', fallbackBarangays);
+            setBarangays(fallbackBarangays);
+            
+            // Check if Google Places API is available (disabled for now)
+            if (false && window.google && autocompleteServiceRef.current) {
+                // Use Google Places Autocomplete for barangays
+                const request = {
+                    input: `${city} barangays ${province} Philippines`,
+                    types: ['establishment', 'point_of_interest'],
+                    componentRestrictions: { country: 'ph' },
+                    fields: ['name', 'formatted_address', 'address_components']
+                };
+
+                autocompleteServiceRef.current.getPlacePredictions(request, (predictions, status) => {
+                    console.log('Google Places API response for barangays:', { status, predictions });
+                    if (status === window.google.maps.places.PlacesServiceStatus.OK && predictions) {
+                        // Filter and process barangays
+                        const barangayList = predictions
+                            .filter(prediction => {
+                                const address = prediction.description.toLowerCase();
+                                return address.includes(city.toLowerCase()) && 
+                                       address.includes(province.toLowerCase());
+                            })
+                            .map(prediction => ({
+                                value: prediction.description,
+                                label: prediction.description
+                            }))
+                            .slice(0, 20); // Limit to 20 barangays
+                        
+                        console.log('Filtered barangays:', barangayList);
+                        setBarangays(barangayList);
+                    } else {
+                        // Fallback to predefined barangays
+                        const fallbackBarangays = getFallbackBarangays(city);
+                        console.log('Using fallback barangays:', fallbackBarangays);
+                        setBarangays(fallbackBarangays);
+                    }
+                });
+            }
+        } catch (error) {
+            console.error('Error fetching barangays:', error);
+            setLocationError('Failed to load barangays');
+            // Fallback to predefined barangays
+            const fallbackBarangays = getFallbackBarangays(city);
+            setBarangays(fallbackBarangays);
+        } finally {
+            setIsLoadingBarangays(false);
+        }
+    };
+
+    // Fallback barangays for major cities
+    const getFallbackBarangays = (city) => {
+        const fallbackData = {
+            // NCR Barangays
+            'Manila': ['Barangay 1', 'Barangay 2', 'Barangay 3', 'Barangay 4', 'Barangay 5', 'Alicia', 'Amihan', 'Apolonio Samson', 'Baesa', 'Bagbag', 'Bagong Silangan', 'Bagong Pag-asa', 'Bahay Toro', 'Balingasa', 'Balong Bato', 'Bungad', 'Camp Aguinaldo', 'Central', 'Claro', 'Damaso', 'Diliman', 'E. Rodriguez', 'East Kamias', 'Escopa', 'Fairview', 'Holy Spirit', 'Katipunan', 'Loyola Heights', 'Malaya', 'Marilag', 'Masagana', 'Matandang Balara', 'Milagrosa', 'Pansol', 'Philam', 'Pinagkaisahan', 'Pinyahan', 'Project 4', 'Quirino 3-A', 'Quirino 3-B', 'Roxas', 'Sacred Heart', 'Salvacion', 'San Antonio', 'San Isidro', 'San Martin de Porres', 'San Roque', 'Santa Cruz', 'Santa Lucia', 'Santa Monica', 'Santo Cristo', 'Santo Domingo', 'Santo Niño', 'Sikatuna Village', 'Silangan', 'Socorro', 'St. Ignatius', 'St. Peter', 'Tagumpay', 'Tatalon', 'Teachers Village East', 'Teachers Village West', 'Ugong Norte', 'Unang Sigaw', 'Valencia', 'Vasra', 'Veterans Village', 'Villa Maria Clara', 'West Kamias', 'White Plains'],
+            'Quezon City': ['Alicia', 'Amihan', 'Apolonio Samson', 'Baesa', 'Bagbag', 'Bagong Silangan', 'Bagong Pag-asa', 'Bahay Toro', 'Balingasa', 'Balong Bato'],
+            'Makati': ['Ayala', 'Bel-Air', 'Cembo', 'Comembo', 'Dasmariñas', 'Forbes Park', 'Guadalupe Nuevo', 'Guadalupe Viejo', 'Kasilawan', 'La Paz'],
+            'Taguig': ['Bagumbayan', 'Bambang', 'Calzada', 'Hagonoy', 'Ibayo-Tipas', 'Ligid-Tipas', 'Lower Bicutan', 'Maharlika Village', 'Napindan', 'New Lower Bicutan'],
+            'Caloocan': ['Barangay 1', 'Barangay 2', 'Barangay 3', 'Barangay 4', 'Barangay 5', 'Bagong Silang', 'Camarin', 'Libis', 'Maypajo', 'Sangandaan'],
+            'Las Piñas': ['Almanza Uno', 'Almanza Dos', 'CAA-BF International', 'Daniel Fajardo', 'Elias Aldana', 'Ilaya', 'Manuyo Uno', 'Manuyo Dos', 'Pamplona Uno', 'Pamplona Dos'],
+            'Malabon': ['Acacia', 'Baritan', 'Bayan-Bayanan', 'Catmon', 'Concepcion', 'Dampalit', 'Flores', 'Hulong Duhat', 'Ibaba', 'Longos'],
+            'Mandaluyong': ['Addition Hills', 'Bagong Silang', 'Barangka Drive', 'Barangka Ibaba', 'Barangka Ilaya', 'Barangka Itaas', 'Buayang Bato', 'Burol', 'Daang Bakal', 'Hagdang Bato Itaas'],
+            'Marikina': ['Barangay I (Jesus)', 'Barangay II (Concepcion)', 'Barangay III (San Roque)', 'Barangay IV (Santo Niño)', 'Barangay V (Santa Elena)', 'Barangay VI (San Jose)', 'Barangay VII (San Miguel)', 'Barangay VIII (San Antonio)', 'Barangay IX (San Isidro)', 'Barangay X (San Gabriel)'],
+            'Muntinlupa': ['Alabang', 'Ayala Alabang', 'Bayanan', 'Buli', 'Cupang', 'Poblacion', 'Putatan', 'Sucat', 'Tunasan', 'New Alabang'],
+            'Navotas': ['Bagumbayan North', 'Bagumbayan South', 'Bangkulasi', 'Daanghari', 'Navotas East', 'Navotas West', 'North Bay Boulevard North', 'North Bay Boulevard South', 'San Jose', 'San Rafael Village'],
+            'Parañaque': ['Baclaran', 'BF Homes', 'Don Bosco', 'La Huerta', 'Marcelo Green', 'Merville', 'Moonwalk', 'San Antonio', 'San Dionisio', 'San Isidro'],
+            'Pasay': ['Barangay 1', 'Barangay 2', 'Barangay 3', 'Barangay 4', 'Barangay 5', 'Barangay 6', 'Barangay 7', 'Barangay 8', 'Barangay 9', 'Barangay 10'],
+            'Pasig': ['Bagong Ilog', 'Bagong Katipunan', 'Bambang', 'Buting', 'Caniogan', 'Dela Paz', 'Kalawaan', 'Kapasigan', 'Kapitolyo', 'Malinao'],
+            'Pateros': ['Aguho', 'Magtanggol', 'San Pedro', 'San Roque', 'Santo Rosario', 'Sta. Ana', 'Sta. Cruz', 'Sta. Elena', 'Sto. Rosario Kanluran', 'Tabacalera'],
+            'San Juan': ['Balong-Bato', 'Batino', 'Corazon de Jesus', 'Ermitaño', 'Greenhills', 'Isabelita', 'Kabayanan', 'Little Baguio', 'Maytunas', 'Onse'],
+            'Valenzuela': ['Arkong Bato', 'Balangkas', 'Bignay', 'Bisig', 'Canumay East', 'Canumay West', 'Coloong', 'Dalandanan', 'Gen. T. de Leon', 'Isla'],
+            'Bacoor': ['Alima', 'Aniban I', 'Aniban II', 'Aniban III', 'Aniban IV', 'Aniban V', 'Banalo', 'Bayanan', 'Camposanto', 'Daang Bukid'],
+            'Imus': ['Alapan I-A', 'Alapan I-B', 'Alapan I-C', 'Alapan II-A', 'Alapan II-B', 'Anabu I-A', 'Anabu I-B', 'Anabu I-C', 'Anabu I-D', 'Anabu I-E'],
+            'Dasmarinas': ['Burol I', 'Burol II', 'Burol III', 'Emmanuel Bergado I', 'Emmanuel Bergado II', 'Emmanuel Bergado III', 'Fatima I', 'Fatima II', 'Fatima III', 'Fatima IV'],
+            'Tagaytay': ['Bagong Silang', 'Calvary Hill', 'Francisco', 'Guinhawa', 'Iruhin East', 'Iruhin West', 'Kaybagal North', 'Kaybagal South', 'Maharlika East', 'Maharlika West'],
+            'Calamba': ['Bagong Kalsada', 'Banadero', 'Banlic', 'Barandal', 'Barangay I', 'Barangay II', 'Barangay III', 'Barangay IV', 'Barangay V', 'Barangay VI'],
+            'San Pedro': ['Bagong Silang', 'Calendola', 'Cuyab', 'Estrella', 'Guyong', 'Landayan', 'Langgam', 'Laram', 'Magsaysay', 'Narra'],
+            'Santa Rosa': ['Aplaya', 'Balibago', 'Caingin', 'Dila', 'Dita', 'Don Jose', 'Ibaba', 'Kanluran', 'Labas', 'Macabling'],
+            'Antipolo': ['Bagong Nayon', 'Beverly Hills', 'Cupang', 'Dalig', 'Dela Paz', 'Inarawan', 'Mambugan', 'Mayamot', 'Muntindilaw', 'San Isidro'],
+            'Taytay': ['Dolores', 'San Juan', 'San Isidro', 'San Antonio', 'Muzon', 'Santa Ana', 'San Jose', 'Santo Niño', 'San Miguel', 'San Roque'],
+            
+            // Batangas Province Cities
+            'Batangas City': ['Barangay 1', 'Barangay 2', 'Barangay 3', 'Barangay 4', 'Barangay 5', 'Barangay 6', 'Barangay 7', 'Barangay 8', 'Barangay 9', 'Barangay 10', 'Barangay 11', 'Barangay 12', 'Barangay 13', 'Barangay 14', 'Barangay 15', 'Barangay 16', 'Barangay 17', 'Barangay 18', 'Barangay 19', 'Barangay 20', 'Barangay 21', 'Barangay 22', 'Barangay 23', 'Barangay 24'],
+            'Lipa': ['Adya', 'Anilao', 'Anilao-Labac', 'Antipolo del Norte', 'Antipolo del Sur', 'Bagong Pook', 'Balintawak', 'Banaybanay', 'Bolbok', 'Bugtong na Pulo', 'Bulacnin', 'Bulaklakan', 'Calamias', 'Cumba', 'Dagatan', 'Duhatan', 'Halang', 'Inosloban', 'Kayumanggi', 'Latag', 'Lodlod', 'Lumbang', 'Mabini', 'Malagonlong', 'Marawoy', 'Marauoy', 'Mataas na Lupa', 'Munting Pulo', 'Pagolingin Bata', 'Pagolingin East', 'Pagolingin West', 'Pangao', 'Pinagkawitan', 'Pinagtongulan', 'Plaridel', 'Poblacion Barangay 1', 'Poblacion Barangay 2', 'Poblacion Barangay 3', 'Poblacion Barangay 4', 'Poblacion Barangay 5', 'Poblacion Barangay 6', 'Poblacion Barangay 7', 'Poblacion Barangay 8', 'Poblacion Barangay 9', 'Poblacion Barangay 10', 'Poblacion Barangay 11', 'Poblacion Barangay 12', 'Pusil', 'Quezon', 'Sabang', 'Sampaguita', 'San Benito', 'San Carlos', 'San Celestino', 'San Francisco', 'San Guillermo', 'San Jose', 'San Lucas', 'San Salvador', 'San Sebastian', 'Santo Niño', 'Santo Toribio', 'Sapac', 'Sico', 'Talisay', 'Tambo', 'Tangob', 'Tanguay', 'Tibig', 'Tipacan'],
+            'Tanauan': ['Altura Bata', 'Altura Matanda', 'Ambulong', 'Balele', 'Banjo East', 'Banjo Laurel', 'Banjo West', 'Bilog-bilog', 'Boot', 'Bugaan East', 'Bugaan West', 'Bulihan', 'Cale', 'Darasa', 'Gonzales', 'Hidalgo', 'Janopol Eastern', 'Janopol Oriental', 'Laurel', 'Luyos', 'Malaking Pulo', 'Maria Paz', 'Montana', 'Natatas', 'Pagaspas', 'Pantay Bata', 'Pantay Matanda', 'Poblacion Barangay 1', 'Poblacion Barangay 2', 'Poblacion Barangay 3', 'Poblacion Barangay 4', 'Poblacion Barangay 5', 'Poblacion Barangay 6', 'Poblacion Barangay 7', 'Sala', 'Sambat', 'San Jose', 'Santol', 'Sulpoc', 'Suplang', 'Talahib Pandayan', 'Talahib Payapa', 'Trapiche', 'Ulango', 'Wawa'],
+            
+            // Bulacan Province Cities
+            'Malolos': ['Anilao', 'Atlag', 'Babatnin', 'Bagna', 'Bagong Nayon', 'Balayong', 'Balite', 'Bangkal', 'Barihan', 'Bulihan', 'Bungahan', 'Caingin', 'Calero', 'Caliligawan', 'Canalate', 'Caniogan', 'Catmon', 'Cofradia', 'Dakila', 'Guinhawa', 'Liang', 'Ligas', 'Longos', 'Look 1st', 'Look 2nd', 'Lugam', 'Mabolo', 'Mahabang Parang', 'Masile', 'Matimbo', 'Mojon', 'Namayan', 'Niugan', 'Pamarawan', 'Panasahan', 'Pinagbakahan', 'San Agustin', 'San Gabriel', 'San Juan', 'San Pablo', 'San Vicente', 'Santa Ana', 'Santa Rosa', 'Santiago', 'Santissima Trinidad', 'Santo Cristo', 'Santo Rosario', 'Sumapang Bata', 'Sumapang Matanda', 'Taal', 'Tikay'],
+            'Meycauayan': ['Bagbaguin', 'Bahay Pare', 'Bancal', 'Banga', 'Bayugo', 'Calvario', 'Camalig', 'Hulo', 'Iba', 'Langka', 'Lawa', 'Libtong', 'Liputan', 'Longos', 'Malhacan', 'Pajo', 'Pandayan', 'Pantoc', 'Perez', 'Poblacion', 'Saluysoy', 'Tugatog', 'Ubihan', 'Zamora'],
+            
+            // Cavite Province Cities  
+            'Bacoor': ['Alima', 'Aniban I', 'Aniban II', 'Aniban III', 'Aniban IV', 'Aniban V', 'Banalo', 'Bayanan', 'Camposanto', 'Daang Bukid', 'Daang Hari', 'Digman', 'Dulong Bayan', 'Ginintuang Silangan', 'Habay I', 'Habay II', 'Kaingin', 'Ligas I', 'Ligas II', 'Ligas III', 'Mabolo I', 'Mabolo II', 'Mabolo III', 'Maliksi I', 'Maliksi II', 'Maliksi III', 'Molino I', 'Molino II', 'Molino III', 'Molino IV', 'Molino V', 'Molino VI', 'Molino VII', 'Niog I', 'Niog II', 'Niog III', 'Panapaan I', 'Panapaan II', 'Panapaan III', 'Panapaan IV', 'Panapaan V', 'Panapaan VI', 'Panapaan VII', 'Panapaan VIII', 'Queen\'s Row Central', 'Queen\'s Row East', 'Queen\'s Row West', 'Real I', 'Real II', 'Salinas I', 'Salinas II', 'Salinas III', 'San Nicolas I', 'San Nicolas II', 'San Nicolas III', 'Springville', 'Tabing Dagat', 'Talaba I', 'Talaba II', 'Talaba III', 'Talaba IV', 'Talaba V', 'Talaba VI', 'Talaba VII', 'Villa Rosario', 'Zapote I', 'Zapote II', 'Zapote III', 'Zapote IV', 'Zapote V'],
+            'Imus': ['Alapan I-A', 'Alapan I-B', 'Alapan I-C', 'Alapan II-A', 'Alapan II-B', 'Anabu I-A', 'Anabu I-B', 'Anabu I-C', 'Anabu I-D', 'Anabu I-E', 'Anabu I-F', 'Anabu I-G', 'Anabu I-H', 'Anabu I-I', 'Anabu I-J', 'Anabu II-A', 'Anabu II-B', 'Anabu II-C', 'Anabu II-D', 'Anabu II-E', 'Anabu II-F', 'Bayan Luma I', 'Bayan Luma II', 'Bayan Luma III', 'Bayan Luma IV', 'Bayan Luma V', 'Bayan Luma VI', 'Bayan Luma VII', 'Bayan Luma VIII', 'Bayan Luma IX', 'Bucandala I', 'Bucandala II', 'Bucandala III', 'Bucandala IV', 'Bucandala V', 'Malagasang I-A', 'Malagasang I-B', 'Malagasang I-C', 'Malagasang I-D', 'Malagasang I-E', 'Malagasang I-F', 'Malagasang I-G', 'Malagasang II-A', 'Malagasang II-B', 'Malagasang II-C', 'Malagasang II-D', 'Malagasang II-E', 'Malagasang II-F', 'Medicion I-A', 'Medicion I-B', 'Medicion I-C', 'Medicion I-D', 'Medicion II-A', 'Medicion II-B', 'Medicion II-C', 'Medicion II-D', 'Medicion II-E', 'Medicion II-F', 'Pag-asa I', 'Pag-asa II', 'Pag-asa III', 'Palico I', 'Palico II', 'Palico III', 'Palico IV', 'Poblacion I-A', 'Poblacion I-B', 'Poblacion I-C', 'Poblacion II-A', 'Poblacion II-B', 'Poblacion III-A', 'Poblacion III-B', 'Poblacion IV-A', 'Poblacion IV-B', 'Poblacion IV-C', 'Poblacion IV-D', 'Tangduhan', 'Tanzang Luma I', 'Tanzang Luma II', 'Tanzang Luma III', 'Tanzang Luma IV', 'Tanzang Luma V', 'Tanzang Luma VI', 'Toclong I-A', 'Toclong I-B', 'Toclong I-C', 'Toclong II-A', 'Toclong II-B'],
+            
+            // Laguna Province Cities
+            'Calamba': ['Bagong Kalsada', 'Banadero', 'Banlic', 'Barandal', 'Barangay I', 'Barangay II', 'Barangay III', 'Barangay IV', 'Barangay V', 'Barangay VI', 'Barangay VII', 'Batino', 'Bunggo', 'Burol', 'Camaligan', 'Canlubang', 'Halang', 'Hornalan', 'Kay-Anlog', 'Laguna', 'Lawa', 'Lecheria', 'Lingga', 'Looc', 'Mabato', 'Majada Labas', 'Majada Out', 'Makiling', 'Mapagong', 'Masili', 'Maunong', 'Mayapa', 'Milagrosa', 'Paciano Rizal', 'Palingon', 'Palo-Alto', 'Pansol', 'Parian', 'Poblacion', 'Punta', 'Puting Lupa', 'Real', 'Saimsim', 'Sampiruhan', 'San Cristobal', 'San Jose', 'San Juan', 'Sirang Lupa', 'Sucol', 'Turbina', 'Ulango', 'Uwisan'],
+            'San Pedro': ['Bagong Silang', 'Calendola', 'Cuyab', 'Estrella', 'Guyong', 'Landayan', 'Langgam', 'Laram', 'Magsaysay', 'Narra', 'Nueva', 'Pacita I', 'Pacita II', 'Poblacion', 'Riverside', 'Rosario', 'Sacred Heart', 'Sampaguita Village', 'San Antonio', 'San Jose', 'San Roque', 'San Vicente', 'Santo Niño', 'United Bayanihan', 'United Better Living'],
+            'Santa Rosa': ['Aplaya', 'Balibago', 'Caingin', 'Dila', 'Dita', 'Don Jose', 'Ibaba', 'Kanluran', 'Labas', 'Macabling', 'Malusak', 'Market Area', 'Pooc', 'Pulong Santa Cruz', 'Santo Domingo', 'Sinalhan', 'Tagapo'],
+            
+            // Pampanga Province Cities
+            'San Fernando': ['Alasas', 'Baliti', 'Bulaon', 'Calulut', 'Dela Paz Norte', 'Dela Paz Sur', 'Dolores', 'Juliana', 'Lara', 'Lourdes', 'Magliman', 'Malino', 'Maimpis', 'Malpitic', 'Panipuan', 'Poblacion', 'Pulung Bulu', 'Quebiawan', 'San Agustin', 'San Felipe', 'San Isidro', 'San Jose', 'San Juan', 'San Nicolas', 'San Pedro', 'Santa Lucia', 'Santa Teresita', 'Santo Niño', 'Santo Rosario', 'Sindalan', 'Telabastagan'],
+            'Angeles': ['Agapito del Rosario', 'Amsic', 'Balibago', 'Capaya', 'Claro M. Recto', 'Cuayan', 'Cutcut', 'Cutud', 'Lourdes Northwest', 'Lourdes Sur', 'Lourdes Sur East', 'Malabanias', 'Margot', 'Mining', 'Ninoy Aquino', 'Pampang', 'Pulung Cacutud', 'Pulung Maragul', 'Salapungan', 'San Jose', 'San Nicolas', 'Santa Teresita', 'Santa Trinidad', 'Santo Cristo', 'Santo Domingo', 'Sapalibutad', 'Sapangbato', 'Tabun', 'Timog', 'Uli', 'Virgen delos Remedios'],
+            
+            // Rizal Province Cities
+            'Antipolo': ['Bagong Nayon', 'Beverly Hills', 'Cupang', 'Dalig', 'Dela Paz', 'Inarawan', 'Mambugan', 'Mayamot', 'Muntindilaw', 'San Isidro', 'San Jose', 'San Juan', 'San Luis', 'San Roque', 'Santa Cruz', 'Santo Niño', 'Taktak'],
+            'Taytay': ['Dolores', 'San Juan', 'San Isidro', 'San Antonio', 'Muzon', 'Santa Ana', 'San Jose', 'Santo Niño', 'San Miguel', 'San Roque'],
+            'Cainta': ['Dayap', 'Karangalan', 'San Andres', 'San Isidro', 'San Juan', 'Santa Rosa']
+        };
+        
+        const barangays = fallbackData[city] || [];
+        return barangays.map(barangay => ({
+            value: barangay,
+            label: barangay
+        }));
+    };
+
+    // Location dropdown handlers
+    const handleProvinceChange = (event) => {
+        const province = event.target.value;
+        setSelectedProvince(province);
+        setSelectedCity('');
+        setSelectedBarangay('');
+        setCities([]);
+        setBarangays([]);
+        
+        // Update contract state
+        setContract(prev => ({
+            ...prev,
+            province: province,
+            city: '',
+            barangay: '',
+            postalCode: ''
+        }));
+
+        if (province) {
+            fetchCities(province);
+        }
+    };
+
+    const handleCityChange = (event) => {
+        const city = event.target.value;
+        setSelectedCity(city);
+        setSelectedBarangay('');
+        setBarangays([]);
+        
+        // Update contract state
+        setContract(prev => ({
+            ...prev,
+            city: city,
+            barangay: '',
+            postalCode: ''
+        }));
+
+        if (city && selectedProvince) {
+            fetchBarangays(city, selectedProvince);
+        }
+    };
+
+    const handleBarangayChange = (event) => {
+        const barangay = event.target.value;
+        setSelectedBarangay(barangay);
+        
+        // Generate a mock postal code based on the barangay selection
+        // In a real implementation, you would use Google Places API to get the actual postal code
+        const mockPostalCode = generateMockPostalCode(selectedProvince, selectedCity, barangay);
+        
+        setContract(prev => ({
+            ...prev,
+            barangay: barangay,
+            postalCode: mockPostalCode
+        }));
+    };
+
+    // Generate mock postal code based on location
+    const generateMockPostalCode = (province, city, barangay) => {
+        const postalCodeMap = {
+            'NCR': {
+                'Manila': '1000',
+                'Quezon City': '1100',
+                'Caloocan': '1400',
+                'Las Piñas': '1740',
+                'Makati': '1200',
+                'Malabon': '1470',
+                'Mandaluyong': '1550',
+                'Marikina': '1800',
+                'Muntinlupa': '1770',
+                'Navotas': '1485',
+                'Parañaque': '1700',
+                'Pasay': '1300',
+                'Pasig': '1600',
+                'Pateros': '1620',
+                'San Juan': '1500',
+                'Taguig': '1630',
+                'Valenzuela': '1440'
+            },
+            'North Luzon': {
+                'Baguio': '2600',
+                'Laoag': '2900',
+                'Vigan': '2700',
+                'Dagupan': '2400',
+                'Tuguegarao': '3500',
+                'Ilagan': '3300',
+                'Bayombong': '3700',
+                'Cabanatuan': '3100',
+                'San Fernando (Pampanga)': '2000',
+                'Tarlac City': '2300',
+                'Olongapo': '2200',
+                'Balanga': '2100',
+                'Malolos': '3000',
+                'Baler': '3200'
+            },
+            'South Luzon': {
+                'Legazpi': '4500',
+                'Naga': '4400',
+                'Sorsogon City': '4700',
+                'Puerto Princesa': '5300',
+                'Calapan': '5200',
+                'Mamburao': '5100',
+                'Boac': '4900',
+                'Romblon': '5500',
+                'Lucena': '4300',
+                'Tayabas': '4327',
+                'Calauag': '4318',
+                'Gumaca': '4303',
+                'Sariaya': '4322',
+                'Candelaria': '4323',
+                'Dolores': '4326'
+            },
+            'Cavite': {
+                'Bacoor': '4102',
+                'Imus': '4103',
+                'Dasmarinas': '4114',
+                'Tagaytay': '4120'
+            },
+            'Laguna': {
+                'Calamba': '4027',
+                'San Pedro': '4023',
+                'Santa Rosa': '4026'
+            },
+            'Rizal': {
+                'Antipolo': '1870',
+                'Taytay': '1920'
+            }
+        };
+        
+        return postalCodeMap[province]?.[city] || '0000';
+    };
 
     // Google Maps script
     useEffect(() => { if (mounted && !isScriptLoaded && activeTab === 1) { const script = document.createElement('script'); script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places,marker`; script.async = true; script.defer = true; script.onload = () => { setIsScriptLoaded(true); setIsGoogleMapsReady(true); }; script.onerror = (e) => { setMapError('Failed to load Google Maps'); }; document.head.appendChild(script); return () => { if (document.head.contains(script)) { document.head.removeChild(script); } }; } }, [mounted, activeTab]);
@@ -490,15 +918,18 @@ export default function Page() {
         }
     };
 
-    // Add function to add new luggage form
+    // Add function to add new passenger form
     const handleAddLuggageForm = () => {
-        setLuggageForms(prev => [...prev, { name: "", caseNumber: "", flightNo: "", itemDescription: "", weight: "", quantity: "" }]);
+        if (luggageForms.length < 15) {
+            setLuggageForms(prev => [...prev, { name: "", flightNo: "", itemDescription: "", quantity: "" }]);
+        }
     };
 
     // Add function to remove luggage form
     const handleRemoveLuggageForm = (index) => {
         setLuggageForms(prev => prev.filter((_, i) => i !== index));
     };
+
 
     // Validation function
     const validateForm = () => {
@@ -519,7 +950,7 @@ export default function Page() {
             errors.dropoffCoordinates = 'Please select a valid drop-off location on the map';
         }
 
-        // Validate delivery address fields
+        // Validate delivery address fields (from dropdowns)
         if (!contract.province || contract.province.trim() === '') {
             errors.province = 'Province is required';
         }
@@ -741,9 +1172,16 @@ export default function Page() {
                 postalCode: "", 
                 contact: "" 
             }); // Only keep address and contact in the main contract
-            setLuggageForms([{ name: "", caseNumber: "", flightNo: "", itemDescription: "", weight: "", quantity: "" }]);
+            setLuggageForms([{ name: "", flightNo: "", itemDescription: "", quantity: "" }]);
             setPickupAddress({ location: "", addressLine1: "", addressLine2: "", province: "", city: "", barangay: "", postalCode: "" });
             setDropoffAddress({ location: null, lat: null, lng: null });
+            // Reset location dropdowns
+            setSelectedProvince('');
+            setSelectedCity('');
+            setSelectedBarangay('');
+            setCities([]);
+            setBarangays([]);
+            setLocationError(null);
             // Clear validation errors
             setValidationErrors({});
             // Switch to contract list tab and refresh
@@ -796,9 +1234,7 @@ export default function Page() {
                         owner_last_name,
                         owner_contact,
                         luggage_description,
-                        luggage_weight,
                         luggage_quantity,
-                        case_number,
                         flight_number,
                         delivery_address,
                         address_line_1,
@@ -1194,16 +1630,10 @@ export default function Page() {
                                                             Name: <span>{`${contract.owner_first_name || ''}${contract.owner_middle_initial ? ' ' + contract.owner_middle_initial : ''}${contract.owner_last_name ? ' ' + contract.owner_last_name : ''}`.trim() || 'N/A'}</span>
                                                         </Typography>
                                                         <Typography variant="body2">
-                                                            Case Number: <span>{contract.case_number || 'N/A'}</span>
-                                                        </Typography>
-                                                        <Typography variant="body2">
                                                             Contact Number: <span>{contract.owner_contact || 'N/A'}</span>
                                                         </Typography>
                                                         <Typography variant="body2">
                                                             Address: <span>{contract.delivery_address || 'N/A'}</span>
-                                                        </Typography>
-                                                        <Typography variant="body2">
-                                                            Weight: <span>{contract.luggage_weight ? `${contract.luggage_weight} kg` : 'N/A'}</span>
                                                         </Typography>
                                                         <Typography variant="body2">
                                                             Quantity: <span>{contract.luggage_quantity || 'N/A'}</span>
@@ -1355,80 +1785,225 @@ export default function Page() {
                     <Paper elevation={3} sx={{ maxWidth: 700, mx: "auto", mt: 4, p: 4, pt: 2, borderRadius: 3, backgroundColor: theme.palette.background.paper, position: "relative" }}>
                         <Typography variant="h6" fontWeight="bold" align="center" mb={3}>Delivery Information</Typography>
                         <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mb: 2 }}>
+                            {locationError && (
+                                <Typography variant="body2" color="error" sx={{ mb: 1 }}>
+                                    {locationError}
+                                </Typography>
+                            )}
                             <Box sx={{ display: 'flex', gap: 2, width: '100%' }}>
-                                <TextField 
-                                    label="Province" 
-                                    fullWidth 
-                                    size="small" 
-                                    value={contract.province || ""} 
-                                    onChange={(e) => handleInputChange("province", e.target.value.slice(0, 100))} 
-                                    required 
-                                    error={!!validationErrors.province}
-                                    helperText={validationErrors.province}
-                                    inputProps={{ maxLength: 100 }}
-                                    InputProps={{ 
-                                        endAdornment: contract.province ? (
-                                            <IconButton size="small" onClick={() => handleInputChange("province", "")} edge="end">
-                                                <CloseIcon fontSize="small" />
-                                            </IconButton>
-                                        ) : null, 
-                                    }} 
+                                <Autocomplete
+                                    fullWidth
+                                    size="small"
+                                    options={provinces}
+                                    value={provinces.find(province => province.value === selectedProvince) || null}
+                                    onChange={(event, newValue) => {
+                                        if (newValue) {
+                                            handleProvinceChange({ target: { value: newValue.value } });
+                                        } else {
+                                            handleProvinceChange({ target: { value: '' } });
+                                        }
+                                    }}
+                                    onInputChange={(event, newInputValue) => {
+                                        // Allow typing and searching
+                                        if (newInputValue) {
+                                            setSelectedProvince(newInputValue);
+                                            setSelectedCity('');
+                                            setSelectedBarangay('');
+                                            setCities([]);
+                                            setBarangays([]);
+                                            
+                                            // Update contract state
+                                            setContract(prev => ({
+                                                ...prev,
+                                                province: newInputValue,
+                                                city: '',
+                                                barangay: '',
+                                                postalCode: ''
+                                            }));
+                                            
+                                            // Fetch cities for the typed province
+                                            fetchCities(newInputValue);
+                                        }
+                                    }}
+                                    getOptionLabel={(option) => option.label || option}
+                                    isOptionEqualToValue={(option, value) => option.value === value?.value}
+                                    disabled={provinces.length === 0}
+                                    renderInput={(params) => (
+                                        <TextField
+                                            {...params}
+                                            label="Province"
+                                            required
+                                            error={!!validationErrors.province}
+                                            helperText={validationErrors.province}
+                                        />
+                                    )}
+                                    renderOption={(props, option) => (
+                                        <li {...props} key={option.value}>
+                                            {option.label}
+                                        </li>
+                                    )}
+                                    ListboxProps={{
+                                        style: {
+                                            maxHeight: 300,
+                                            overflow: 'auto'
+                                        }
+                                    }}
+                                    freeSolo
+                                    selectOnFocus
+                                    clearOnBlur
+                                    handleHomeEndKeys
                                 />
-                                <TextField 
-                                    label="City/Municipality" 
-                                    fullWidth 
-                                    size="small" 
-                                    value={contract.city || ""} 
-                                    onChange={(e) => handleInputChange("city", e.target.value.slice(0, 100))} 
-                                    required 
-                                    error={!!validationErrors.city}
-                                    helperText={validationErrors.city}
-                                    inputProps={{ maxLength: 100 }}
-                                    InputProps={{ 
-                                        endAdornment: contract.city ? (
-                                            <IconButton size="small" onClick={() => handleInputChange("city", "")} edge="end">
-                                                <CloseIcon fontSize="small" />
-                                            </IconButton>
-                                        ) : null, 
-                                    }} 
+                                <Autocomplete
+                                    fullWidth
+                                    size="small"
+                                    options={cities}
+                                    value={cities.find(city => city.value === selectedCity) || null}
+                                    onChange={(event, newValue) => {
+                                        if (newValue) {
+                                            handleCityChange({ target: { value: newValue.value } });
+                                        } else {
+                                            handleCityChange({ target: { value: '' } });
+                                        }
+                                    }}
+                                    onInputChange={(event, newInputValue) => {
+                                        // Allow typing and searching
+                                        if (newInputValue) {
+                                            setSelectedCity(newInputValue);
+                                            setSelectedBarangay('');
+                                            setBarangays([]);
+                                            
+                                            // Update contract state
+                                            setContract(prev => ({
+                                                ...prev,
+                                                city: newInputValue,
+                                                barangay: '',
+                                                postalCode: ''
+                                            }));
+                                            
+                                            // Fetch barangays for the typed city
+                                            if (selectedProvince) {
+                                                fetchBarangays(newInputValue, selectedProvince);
+                                            }
+                                        }
+                                    }}
+                                    getOptionLabel={(option) => option.label || option}
+                                    isOptionEqualToValue={(option, value) => option.value === value?.value}
+                                    disabled={cities.length === 0 || isLoadingCities}
+                                    loading={isLoadingCities}
+                                    renderInput={(params) => (
+                                        <TextField
+                                            {...params}
+                                            label="City/Municipality"
+                                            required
+                                            error={!!validationErrors.city}
+                                            helperText={validationErrors.city}
+                                            InputProps={{
+                                                ...params.InputProps,
+                                                endAdornment: (
+                                                    <>
+                                                        {isLoadingCities ? <CircularProgress color="inherit" size={20} /> : null}
+                                                        {params.InputProps.endAdornment}
+                                                    </>
+                                                ),
+                                            }}
+                                        />
+                                    )}
+                                    renderOption={(props, option) => (
+                                        <li {...props} key={option.value}>
+                                            {option.label}
+                                        </li>
+                                    )}
+                                    ListboxProps={{
+                                        style: {
+                                            maxHeight: 300,
+                                            overflow: 'auto'
+                                        }
+                                    }}
+                                    freeSolo
+                                    selectOnFocus
+                                    clearOnBlur
+                                    handleHomeEndKeys
                                 />
                             </Box>
                             <Box sx={{ display: 'flex', gap: 2, width: '100%' }}>
-                                <TextField 
-                                    label="Barangay" 
-                                    fullWidth 
-                                    size="small" 
-                                    value={contract.barangay || ""} 
-                                    onChange={(e) => handleInputChange("barangay", e.target.value.slice(0, 100))} 
-                                    required 
-                                    error={!!validationErrors.barangay}
-                                    helperText={validationErrors.barangay}
-                                    inputProps={{ maxLength: 100 }}
-                                    InputProps={{ 
-                                        endAdornment: contract.barangay ? (
-                                            <IconButton size="small" onClick={() => handleInputChange("barangay", "")} edge="end">
-                                                <CloseIcon fontSize="small" />
-                                            </IconButton>
-                                        ) : null, 
-                                    }} 
+                                <Autocomplete
+                                    fullWidth
+                                    size="small"
+                                    options={barangays}
+                                    value={barangays.find(barangay => barangay.value === selectedBarangay) || null}
+                                    onChange={(event, newValue) => {
+                                        if (newValue) {
+                                            handleBarangayChange({ target: { value: newValue.value } });
+                                        } else {
+                                            handleBarangayChange({ target: { value: '' } });
+                                        }
+                                    }}
+                                    onInputChange={(event, newInputValue) => {
+                                        // Allow typing and searching
+                                        if (newInputValue) {
+                                            setSelectedBarangay(newInputValue);
+                                            
+                                            // Update contract state
+                                            setContract(prev => ({
+                                                ...prev,
+                                                barangay: newInputValue,
+                                                postalCode: generateMockPostalCode(selectedProvince, selectedCity, newInputValue)
+                                            }));
+                                        }
+                                    }}
+                                    getOptionLabel={(option) => option.label || option}
+                                    isOptionEqualToValue={(option, value) => option.value === value?.value}
+                                    disabled={barangays.length === 0 || isLoadingBarangays}
+                                    loading={isLoadingBarangays}
+                                    renderInput={(params) => (
+                                        <TextField
+                                            {...params}
+                                            label="Barangay"
+                                            required
+                                            error={!!validationErrors.barangay}
+                                            helperText={validationErrors.barangay}
+                                            InputProps={{
+                                                ...params.InputProps,
+                                                endAdornment: (
+                                                    <>
+                                                        {isLoadingBarangays ? <CircularProgress color="inherit" size={20} /> : null}
+                                                        {params.InputProps.endAdornment}
+                                                    </>
+                                                ),
+                                            }}
+                                        />
+                                    )}
+                                    renderOption={(props, option) => (
+                                        <li {...props} key={option.value}>
+                                            {option.label}
+                                        </li>
+                                    )}
+                                    ListboxProps={{
+                                        style: {
+                                            maxHeight: 300,
+                                            overflow: 'auto'
+                                        }
+                                    }}
+                                    freeSolo
+                                    selectOnFocus
+                                    clearOnBlur
+                                    handleHomeEndKeys
                                 />
                                 <TextField 
                                     label="Postal Code" 
                                     fullWidth 
                                     size="small" 
                                     value={contract.postalCode || ""} 
-                                    onChange={(e) => handleInputChange("postalCode", e.target.value.slice(0, 10))} 
+                                    onChange={(e) => {
+                                        setContract(prev => ({
+                                            ...prev,
+                                            postalCode: e.target.value
+                                        }));
+                                    }}
                                     required 
                                     error={!!validationErrors.postalCode}
                                     helperText={validationErrors.postalCode}
                                     inputProps={{ maxLength: 10 }}
-                                    InputProps={{ 
-                                        endAdornment: contract.postalCode ? (
-                                            <IconButton size="small" onClick={() => handleInputChange("postalCode", "")} edge="end">
-                                                <CloseIcon fontSize="small" />
-                                            </IconButton>
-                                        ) : null, 
-                                    }} 
                                 />
                             </Box>
                             <TextField 
@@ -1467,7 +2042,7 @@ export default function Page() {
                         </Box>
                     </Paper>
                     <Paper elevation={3} sx={{ maxWidth: 700, mx: "auto", mt: 3, p: 4, pt: 2, borderRadius: 3, backgroundColor: theme.palette.background.paper, position: "relative" }}>
-                        <Typography variant="h6" fontWeight="bold" align="center" mb={3}>Luggage Information</Typography>
+                        <Typography variant="h6" fontWeight="bold" align="center" mb={3}>Passenger Information</Typography>
                         {luggageForms.map((form, index) => (
                             <Box key={index} sx={{ mb: 4, position: 'relative' }}>
                                 {index > 0 && (
@@ -1485,7 +2060,7 @@ export default function Page() {
                                     </IconButton>
                                 )}
                                 <Typography variant="subtitle1" sx={{ mb: 2, color: 'primary.main' }}>
-                                    Luggage {index + 1}
+                                    Passenger {index + 1}
                                 </Typography>
                                 <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
                                     <TextField 
@@ -1505,17 +2080,6 @@ export default function Page() {
                                                 </IconButton>
                                             ) : null, 
                                         }} 
-                                    />
-                                    <TextField 
-                                        label="Case Number" 
-                                        fullWidth 
-                                        size="small" 
-                                        value={form.caseNumber} 
-                                        onChange={(e) => handleLuggageFormChange(index, "caseNumber", e.target.value.slice(0, 20))} 
-                                        required 
-                                        error={!!(validationErrors.luggage && validationErrors.luggage[index] && validationErrors.luggage[index].caseNumber)}
-                                        helperText={validationErrors.luggage && validationErrors.luggage[index] && validationErrors.luggage[index].caseNumber}
-                                        inputProps={{ maxLength: 20 }}
                                     />
                                     <TextField 
                                         label="Item Description" 
@@ -1540,7 +2104,7 @@ export default function Page() {
                                             error={!!validationErrors.contact}
                                             helperText={validationErrors.contact}
                                             placeholder="+63 XXX XXX XXXX"
-                                            sx={{ width: '30%' }}
+                                            sx={{ width: '40%' }}
                                             inputProps={{
                                                 pattern: '^\\+63\\s\\d{3}\\s\\d{3}\\s\\d{4}$',
                                                 maxLength: 17 // +63 XXX XXX XXXX format
@@ -1558,33 +2122,19 @@ export default function Page() {
                                             fullWidth 
                                             size="small" 
                                             value={form.flightNo} 
-                                            onChange={(e) => handleLuggageFormChange(index, "flightNo", e.target.value.slice(0, 10))} 
+                                            onChange={(e) => {
+                                                const value = e.target.value;
+                                                // Only allow alphanumeric characters and limit to 8 characters
+                                                const alphanumericValue = value.replace(/[^a-zA-Z0-9]/g, '').slice(0, 8);
+                                                handleLuggageFormChange(index, "flightNo", alphanumericValue);
+                                            }} 
                                             required 
                                             error={!!(validationErrors.luggage && validationErrors.luggage[index] && validationErrors.luggage[index].flightNo)}
                                             helperText={validationErrors.luggage && validationErrors.luggage[index] && validationErrors.luggage[index].flightNo}
-                                            sx={{ width: '25%' }} 
-                                            inputProps={{ maxLength: 10 }}
-                                        />
-                                        <TextField 
-                                            label="Weight (kg)" 
-                                            fullWidth 
-                                            size="small" 
-                                            type="number" 
-                                            value={form.weight} 
-                                            onChange={(e) => {
-                                                const value = e.target.value;
-                                                if (value === '' || (Number(value) >= 0 && Number(value) <= 100)) {
-                                                    handleLuggageFormChange(index, "weight", value);
-                                                }
-                                            }} 
-                                            required 
-                                            error={!!(validationErrors.luggage && validationErrors.luggage[index] && validationErrors.luggage[index].weight)}
-                                            helperText={validationErrors.luggage && validationErrors.luggage[index] && validationErrors.luggage[index].weight}
-                                            sx={{ width: '20%' }}
+                                            sx={{ width: '30%' }} 
                                             inputProps={{ 
-                                                min: 0,
-                                                max: 100,
-                                                step: 0.1
+                                                maxLength: 8,
+                                                pattern: '^[a-zA-Z0-9]{1,8}$'
                                             }}
                                         />
                                         <TextField 
@@ -1595,17 +2145,17 @@ export default function Page() {
                                             value={form.quantity} 
                                             onChange={(e) => {
                                                 const value = e.target.value;
-                                                if (value === '' || (Number(value) >= 1 && Number(value) <= 10)) {
+                                                if (value === '' || (Number(value) >= 1 && Number(value) <= 3)) {
                                                     handleLuggageFormChange(index, "quantity", value);
                                                 }
                                             }} 
                                             required 
                                             error={!!(validationErrors.luggage && validationErrors.luggage[index] && validationErrors.luggage[index].quantity)}
                                             helperText={validationErrors.luggage && validationErrors.luggage[index] && validationErrors.luggage[index].quantity}
-                                            sx={{ width: '25%' }}
+                                            sx={{ width: '30%' }}
                                             inputProps={{ 
                                                 min: 1,
-                                                max: 10,
+                                                max: 3,
                                                 step: 1
                                             }}
                                         />
@@ -1617,9 +2167,10 @@ export default function Page() {
                             variant="outlined"
                             onClick={handleAddLuggageForm}
                             startIcon={<AddIcon />}
+                            disabled={luggageForms.length >= 15}
                             sx={{ mt: 2 }}
                         >
-                            Add Another Luggage
+                            Add Another Passenger
                         </Button>
                     </Paper>
                     <Box sx={{ display: "flex", justifyContent: "center", mt: 4, gap: 2 }}>
