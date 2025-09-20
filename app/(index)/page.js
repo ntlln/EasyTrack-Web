@@ -85,8 +85,8 @@ export default function Test() {
         .select(`
           id, contract_status_id, airline_id, delivery_id,
           owner_first_name, owner_middle_initial, owner_last_name, owner_contact,
-          luggage_description, luggage_weight, luggage_quantity,
-          flight_number, case_number,
+          luggage_description, luggage_quantity,
+          flight_number,
           delivery_address, address_line_1, address_line_2,
           pickup_location, current_location, drop_off_location,
           pickup_location_geo, current_location_geo, drop_off_location_geo,

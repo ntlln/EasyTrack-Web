@@ -1013,9 +1013,6 @@ function LuggageTrackingContent() {
                       Luggage {lidx + 1}
                     </Typography>
                     <Typography variant="body2">
-                      Case Number: <span>{l.case_number || 'N/A'}</span>
-                    </Typography>
-                    <Typography variant="body2">
                       Flight Number: <span>{l.flight_number || 'N/A'}</span>
                     </Typography>
                     <Typography variant="body2">
@@ -1026,9 +1023,6 @@ function LuggageTrackingContent() {
                     </Typography>
                     <Typography variant="body2">
                       Address: <span>{l.address || 'N/A'}</span>
-                    </Typography>
-                    <Typography variant="body2">
-                      Weight: <span>{l.weight ? `${l.weight} kg` : 'N/A'}</span>
                     </Typography>
                     <Typography variant="body2">
                       Description: <span>{l.item_description || 'N/A'}</span>

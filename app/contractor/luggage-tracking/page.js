@@ -96,8 +96,8 @@ function LuggageTrackingContent() {
         .select(`
           id, contract_status_id, airline_id, delivery_id,
           owner_first_name, owner_middle_initial, owner_last_name, owner_contact,
-          luggage_description, luggage_weight, luggage_quantity,
-          flight_number, case_number,
+          luggage_description, luggage_quantity,
+          flight_number,
           delivery_address, address_line_1, address_line_2,
           pickup_location, current_location, drop_off_location,
           pickup_location_geo, current_location_geo, drop_off_location_geo,
@@ -1118,7 +1118,7 @@ function LuggageTrackingContent() {
         <>
           <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <IconButton onClick={() => router.push('/contractor/booking')} sx={{ mr: 1, color: 'primary.main' }}><ChevronLeftIcon /></IconButton>
+              <IconButton onClick={() => router.push('/airline/booking')} sx={{ mr: 1, color: 'primary.main' }}><ChevronLeftIcon /></IconButton>
               <Typography variant="h4" color="primary.main" fontWeight="bold">Luggage Tracking</Typography>
             </Box>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -1215,11 +1215,11 @@ function LuggageTrackingContent() {
             <Collapse in={expanded} timeout="auto" unmountOnExit>
               <Divider sx={{ my: 2 }} />
               <Typography variant="subtitle2" sx={{ color: 'primary.main', fontWeight: 700, mb: 1 }}>
-                Contractor Information
+                Airline Information
               </Typography>
               <Box sx={{ ml: 1, mb: 1 }}>
                 <Typography variant="body2">
-                  <b>Contractor Name:</b>{' '}
+                  <b>Airline Personnel:</b>{' '}
                   <span>
                     {contract.airline
                       ? `${contract.airline.first_name || ''} ${contract.airline.middle_initial || ''} ${
@@ -1231,15 +1231,15 @@ function LuggageTrackingContent() {
                   </span>
                 </Typography>
                 <Typography variant="body2">
-                  <b>Contractor Email:</b>{' '}
+                  <b>Email:</b>{' '}
                   <span>{contract.airline?.email || 'N/A'}</span>
                 </Typography>
                 <Typography variant="body2">
-                  <b>Contractor Contact:</b>{' '}
+                  <b>Contact:</b>{' '}
                   <span>{contract.airline?.contact_number || 'N/A'}</span>
                 </Typography>
                 <Typography variant="body2">
-                  <b>Subcontractor Name:</b>{' '}
+                  <b>Delivery Personnel:</b>{' '}
                   <span>
                     {contract.delivery
                       ? `${contract.delivery.first_name || ''} ${contract.delivery.middle_initial || ''} ${
@@ -1251,11 +1251,11 @@ function LuggageTrackingContent() {
                   </span>
                 </Typography>
                 <Typography variant="body2">
-                  <b>Subcontractor Email:</b>{' '}
+                  <b>Email:</b>{' '}
                   <span>{contract.delivery?.email || 'N/A'}</span>
                 </Typography>
                 <Typography variant="body2">
-                  <b>Subcontractor Contact:</b>{' '}
+                  <b>Contact:</b>{' '}
                   <span>{contract.delivery?.contact_number || 'N/A'}</span>
                 </Typography>
                 <Typography variant="body2">
@@ -1271,29 +1271,30 @@ function LuggageTrackingContent() {
               </Typography>
               <Box sx={{ ml: 1, mb: 1 }}>
                 <Typography variant="body2">
-                  <b>Owner Name:</b> <span>
+                  <b>Name:</b> <span>
                     {contract.owner_first_name || contract.owner_middle_initial || contract.owner_last_name 
                       ? `${contract.owner_first_name || ''} ${contract.owner_middle_initial || ''} ${contract.owner_last_name || ''}`.replace(/  +/g, ' ').trim()
                       : 'N/A'}
                   </span>
                 </Typography>
                 <Typography variant="body2">
-                  <b>Owner Contact:</b> <span>{contract.owner_contact || 'N/A'}</span>
+                  <b>Contact Number:</b> <span>{contract.owner_contact || 'N/A'}</span>
+                </Typography>
+                <Typography variant="body2">
+                  <b>Address:</b> <span>
+                    {contract.delivery_address || contract.address_line_1 || contract.address_line_2
+                      ? `${contract.delivery_address || ''} ${contract.address_line_1 || ''} ${contract.address_line_2 || ''}`.replace(/  +/g, ' ').trim()
+                      : 'N/A'}
+                  </span>
+                </Typography>
+                <Typography variant="body2">
+                  <b>Quantity:</b> <span>{contract.luggage_quantity || 'N/A'}</span>
+                </Typography>
+                <Typography variant="body2">
+                  <b>Description:</b> <span>{contract.luggage_description || 'N/A'}</span>
                 </Typography>
                 <Typography variant="body2">
                   <b>Flight Number:</b> <span>{contract.flight_number || 'N/A'}</span>
-                </Typography>
-                <Typography variant="body2">
-                  <b>Case Number:</b> <span>{contract.case_number || 'N/A'}</span>
-                </Typography>
-                <Typography variant="body2">
-                  <b>Luggage Description:</b> <span>{contract.luggage_description || 'N/A'}</span>
-                </Typography>
-                <Typography variant="body2">
-                  <b>Luggage Weight:</b> <span>{contract.luggage_weight ? `${contract.luggage_weight} kg` : 'N/A'}</span>
-                </Typography>
-                <Typography variant="body2">
-                  <b>Luggage Quantity:</b> <span>{contract.luggage_quantity || 'N/A'}</span>
                 </Typography>
               </Box>
               <Divider sx={{ my: 2 }} />

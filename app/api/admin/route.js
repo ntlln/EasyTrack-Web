@@ -363,11 +363,17 @@ export async function GET(request) {
         }
       }
 
-      // Combine contract data (no luggage table)
+      // Combine contract data with luggage from contract fields
       const contractWithLuggage = {
         ...contract,
         contract_status: statusObj,
-        luggage: []
+        luggage: contract.luggage_description ? [{
+          luggage_owner: `${contract.owner_first_name || ''} ${contract.owner_middle_initial || ''} ${contract.owner_last_name || ''}`.replace(/  +/g, ' ').trim() || 'N/A',
+          flight_number: contract.flight_number || 'N/A',
+          item_description: contract.luggage_description || 'N/A',
+          contact_number: contract.owner_contact || 'N/A',
+          address: `${contract.delivery_address || ''} ${contract.address_line_1 || ''} ${contract.address_line_2 || ''}`.replace(/  +/g, ' ').trim() || 'N/A'
+        }] : []
       };
 
       return NextResponse.json({ data: contractWithLuggage });
@@ -432,11 +438,17 @@ export async function GET(request) {
         }
       }
 
-      // Combine contract data (no luggage table)
+      // Combine contract data with luggage from contract fields
       const contractWithLuggage = {
         ...contract,
         contract_status: statusObj,
-        luggage: []
+        luggage: contract.luggage_description ? [{
+          luggage_owner: `${contract.owner_first_name || ''} ${contract.owner_middle_initial || ''} ${contract.owner_last_name || ''}`.replace(/  +/g, ' ').trim() || 'N/A',
+          flight_number: contract.flight_number || 'N/A',
+          item_description: contract.luggage_description || 'N/A',
+          contact_number: contract.owner_contact || 'N/A',
+          address: `${contract.delivery_address || ''} ${contract.address_line_1 || ''} ${contract.address_line_2 || ''}`.replace(/  +/g, ' ').trim() || 'N/A'
+        }] : []
       };
 
       return NextResponse.json({ data: contractWithLuggage });
@@ -478,7 +490,8 @@ export async function GET(request) {
           airline_id, delivery_id, delivery_charge,
           delivery_surcharge, delivery_discount,
           owner_first_name, owner_middle_initial, owner_last_name, owner_contact,
-          flight_number, case_number, luggage_description, luggage_weight, luggage_quantity,
+          flight_number, luggage_description, luggage_quantity,
+          delivery_address, address_line_1, address_line_2,
           summary_id,
           airline:airline_id (*),
           delivery:delivery_id (*)
@@ -501,7 +514,14 @@ export async function GET(request) {
       const contractsWithLuggage = contracts.map(c => ({
         ...c,
         contract_status: statusById.get(c.contract_status_id) || null,
-        luggage: []
+        luggage: c.luggage_description ? [{
+          luggage_owner: `${c.owner_first_name || ''} ${c.owner_middle_initial || ''} ${c.owner_last_name || ''}`.replace(/  +/g, ' ').trim() || 'N/A',
+          flight_number: c.flight_number || 'N/A',
+          item_description: c.luggage_description || 'N/A',
+          contact_number: c.owner_contact || 'N/A',
+          address: `${c.delivery_address || ''} ${c.address_line_1 || ''} ${c.address_line_2 || ''}`.replace(/  +/g, ' ').trim() || 'N/A',
+          quantity: c.luggage_quantity || 'N/A'
+        }] : []
       }));
 
       return NextResponse.json({ data: contractsWithLuggage });
@@ -517,7 +537,8 @@ export async function GET(request) {
         airline_id, delivery_id, delivery_charge,
         delivery_surcharge, delivery_discount,
         owner_first_name, owner_middle_initial, owner_last_name, owner_contact,
-        flight_number, case_number, luggage_description, luggage_weight, luggage_quantity,
+        flight_number, luggage_description, luggage_quantity,
+        delivery_address, address_line_1, address_line_2,
         summary_id,
         airline:airline_id (*),
         delivery:delivery_id (*)
@@ -539,11 +560,18 @@ export async function GET(request) {
       .select('id, status_name');
     const statusById = new Map((allStatuses || []).map(s => [s.id, s]));
 
-    // Build final contracts (no luggage table)
+    // Build final contracts with luggage data from contract fields
     const contractsWithLuggage = contracts.map(c => ({
       ...c,
       contract_status: statusById.get(c.contract_status_id) || null,
-      luggage: []
+      luggage: c.luggage_description ? [{
+        luggage_owner: `${c.owner_first_name || ''} ${c.owner_middle_initial || ''} ${c.owner_last_name || ''}`.replace(/  +/g, ' ').trim() || 'N/A',
+        flight_number: c.flight_number || 'N/A',
+        item_description: c.luggage_description || 'N/A',
+        contact_number: c.owner_contact || 'N/A',
+        address: `${c.delivery_address || ''} ${c.address_line_1 || ''} ${c.address_line_2 || ''}`.replace(/  +/g, ' ').trim() || 'N/A',
+        quantity: c.luggage_quantity || 'N/A'
+      }] : []
     }));
 
     return NextResponse.json({ data: contractsWithLuggage });
@@ -1223,7 +1251,8 @@ export async function POST(req) {
             airline_id, delivery_id, delivery_charge,
             delivery_surcharge, delivery_discount,
             owner_first_name, owner_middle_initial, owner_last_name, owner_contact,
-            flight_number, case_number, luggage_description, luggage_weight, luggage_quantity,
+            flight_number, luggage_description, luggage_quantity,
+            delivery_address, address_line_1, address_line_2,
             summary_id,
             airline:airline_id (*),
             delivery:delivery_id (*)
@@ -1245,11 +1274,18 @@ export async function POST(req) {
           .select('id, status_name');
         const statusById = new Map((allStatuses || []).map(s => [s.id, s]));
 
-        // Build final contracts
+        // Build final contracts with luggage data
         const contractsWithStatus = contracts.map(c => ({
           ...c,
           contract_status: statusById.get(c.contract_status_id) || null,
-          luggage: []
+          luggage: c.luggage_description ? [{
+            luggage_owner: `${c.owner_first_name || ''} ${c.owner_middle_initial || ''} ${c.owner_last_name || ''}`.replace(/  +/g, ' ').trim() || 'N/A',
+            flight_number: c.flight_number || 'N/A',
+            item_description: c.luggage_description || 'N/A',
+            contact_number: c.owner_contact || 'N/A',
+        address: `${c.delivery_address || ''} ${c.address_line_1 || ''} ${c.address_line_2 || ''}`.replace(/  +/g, ' ').trim() || 'N/A',
+        quantity: c.luggage_quantity || 'N/A'
+      }] : []
         }));
 
         return NextResponse.json({ contracts: contractsWithStatus });
@@ -1275,7 +1311,8 @@ export async function POST(req) {
             airline_id, delivery_id, delivery_charge,
             delivery_surcharge, delivery_discount,
             owner_first_name, owner_middle_initial, owner_last_name, owner_contact,
-            flight_number, case_number, luggage_description, luggage_weight, luggage_quantity,
+            flight_number, luggage_description, luggage_quantity,
+            delivery_address, address_line_1, address_line_2,
             summary_id,
             airline:airline_id (*),
             delivery:delivery_id (*)
@@ -1297,11 +1334,18 @@ export async function POST(req) {
           .select('id, status_name');
         const statusById = new Map((allStatuses || []).map(s => [s.id, s]));
 
-        // Build final contracts
+        // Build final contracts with luggage data
         const contractsWithStatus = contracts.map(c => ({
           ...c,
           contract_status: statusById.get(c.contract_status_id) || null,
-          luggage: []
+          luggage: c.luggage_description ? [{
+            luggage_owner: `${c.owner_first_name || ''} ${c.owner_middle_initial || ''} ${c.owner_last_name || ''}`.replace(/  +/g, ' ').trim() || 'N/A',
+            flight_number: c.flight_number || 'N/A',
+            item_description: c.luggage_description || 'N/A',
+            contact_number: c.owner_contact || 'N/A',
+        address: `${c.delivery_address || ''} ${c.address_line_1 || ''} ${c.address_line_2 || ''}`.replace(/  +/g, ' ').trim() || 'N/A',
+        quantity: c.luggage_quantity || 'N/A'
+      }] : []
         }));
 
         return NextResponse.json({ contracts: contractsWithStatus });
