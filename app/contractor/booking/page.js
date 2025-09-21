@@ -105,9 +105,9 @@ export default function Page() {
         addressLine2: "", 
         barangay: "", 
         postalCode: "", 
-        contact: "" 
+        contact: ""
     });
-    const [luggageForms, setLuggageForms] = useState([{ name: "", flightNo: "", itemDescription: "", quantity: "" }]);
+    const [luggageForms, setLuggageForms] = useState([{ name: "", flightNo: "", luggageDescriptions: [""], quantity: "", contact: "" }]);
     const [pickupAddress, setPickupAddress] = useState({ location: "", addressLine1: "", addressLine2: "", province: "", city: "", barangay: "", postalCode: "" });
     const [dropoffAddress, setDropoffAddress] = useState({ location: null, lat: null, lng: null });
     const [placeOptions, setPlaceOptions] = useState([]); const [placeLoading, setPlaceLoading] = useState(false); const autocompleteServiceRef = useRef(null); const placesServiceRef = useRef(null);
@@ -124,6 +124,7 @@ export default function Page() {
     const [rowsPerPage, setRowsPerPage] = useState(10);
     const [validationErrors, setValidationErrors] = useState({});
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
     
     // Location dropdown states for Google Places
     const [provinces, setProvinces] = useState([]);
@@ -904,7 +905,37 @@ export default function Page() {
     const handleLuggageFormChange = (index, field, value) => {
         setLuggageForms(prev => {
             const newForms = [...prev];
-            newForms[index] = { ...newForms[index], [field]: value };
+            
+            // Handle phone number formatting for contact field
+            if (field === 'contact') {
+                if (!value) {
+                    newForms[index] = { ...newForms[index], [field]: '' };
+                } else {
+                    const formatted = formatPhoneNumber(value);
+                    newForms[index] = { ...newForms[index], [field]: formatted };
+                }
+            } else {
+                newForms[index] = { ...newForms[index], [field]: value };
+            }
+            
+            // If quantity is being changed, update luggage descriptions array
+            if (field === 'quantity') {
+                const quantity = parseInt(value) || 0;
+                const currentDescriptions = newForms[index].luggageDescriptions || [""];
+                
+                if (quantity > currentDescriptions.length) {
+                    // Add empty descriptions for new items
+                    const newDescriptions = [...currentDescriptions];
+                    for (let i = currentDescriptions.length; i < quantity; i++) {
+                        newDescriptions.push("");
+                    }
+                    newForms[index].luggageDescriptions = newDescriptions;
+                } else if (quantity < currentDescriptions.length) {
+                    // Remove excess descriptions
+                    newForms[index].luggageDescriptions = currentDescriptions.slice(0, quantity);
+                }
+            }
+            
             return newForms;
         });
         // Clear validation error for this field
@@ -918,10 +949,55 @@ export default function Page() {
         }
     };
 
+    // Add function to handle luggage description changes
+    const handleLuggageDescriptionChange = (formIndex, descIndex, value) => {
+        setLuggageForms(prev => {
+            const newForms = [...prev];
+            const newDescriptions = [...newForms[formIndex].luggageDescriptions];
+            newDescriptions[descIndex] = value;
+            newForms[formIndex].luggageDescriptions = newDescriptions;
+            return newForms;
+        });
+        
+        // Clear validation error for this field
+        if (validationErrors.luggage && validationErrors.luggage[formIndex] && validationErrors.luggage[formIndex].luggageDescriptions && validationErrors.luggage[formIndex].luggageDescriptions[descIndex]) {
+            setValidationErrors(prev => ({
+                ...prev,
+                luggage: prev.luggage.map((formErrors, i) => 
+                    i === formIndex ? { 
+                        ...formErrors, 
+                        luggageDescriptions: formErrors.luggageDescriptions ? 
+                            formErrors.luggageDescriptions.map((descError, j) => 
+                                j === descIndex ? null : descError
+                            ) : formErrors.luggageDescriptions
+                    } : formErrors
+                )
+            }));
+        }
+    };
+
     // Add function to add new passenger form
     const handleAddLuggageForm = () => {
         if (luggageForms.length < 15) {
-            setLuggageForms(prev => [...prev, { name: "", flightNo: "", itemDescription: "", quantity: "" }]);
+            setLuggageForms(prev => [...prev, { name: "", flightNo: "", luggageDescriptions: [""], quantity: "", contact: "" }]);
+        }
+    };
+
+    // Add function to duplicate passenger form
+    const handleDuplicateLuggageForm = () => {
+        if (luggageForms.length < 15 && luggageForms.length > 0) {
+            // Duplicate the last passenger form (name and flight number only, NOT contact)
+            const lastForm = luggageForms[luggageForms.length - 1];
+            const duplicatedForm = {
+                name: lastForm.name,
+                flightNo: lastForm.flightNo,
+                luggageDescriptions: [""], // Reset descriptions for new form
+                quantity: "", // Reset quantity for new form
+                contact: "" // Reset contact for new form
+            };
+            
+            // Add the duplicated form at the end
+            setLuggageForms(prev => [...prev, duplicatedForm]);
         }
     };
 
@@ -967,12 +1043,7 @@ export default function Page() {
             errors.addressLine1 = 'Address line 1 is required';
         }
 
-        // Validate contact number
-        if (!contract.contact || contract.contact.trim() === '') {
-            errors.contact = 'Contact number is required';
-        } else if (!/^\+63\s\d{3}\s\d{3}\s\d{4}$/.test(contract.contact.trim())) {
-            errors.contact = 'Contact number must be in format: +63 XXX XXX XXXX';
-        }
+        // Contact number validation is now handled per passenger form
 
         // Validate luggage forms
         const luggageErrors = [];
@@ -982,19 +1053,27 @@ export default function Page() {
             if (!form.name || form.name.trim() === '') {
                 formErrors.name = 'Name is required';
             }
-            if (!form.caseNumber || form.caseNumber.trim() === '') {
-                formErrors.caseNumber = 'Case number is required';
-            }
             if (!form.flightNo || form.flightNo.trim() === '') {
                 formErrors.flightNo = 'Flight number is required';
             }
-            if (!form.itemDescription || form.itemDescription.trim() === '') {
-                formErrors.itemDescription = 'Item description is required';
+            if (!form.contact || form.contact.trim() === '') {
+                formErrors.contact = 'Contact number is required';
+            } else if (!/^\+63\s\d{3}\s\d{3}\s\d{4}$/.test(form.contact.trim())) {
+                formErrors.contact = 'Contact number must be in format: +63 XXX XXX XXXX';
             }
-            if (!form.weight || form.weight.trim() === '') {
-                formErrors.weight = 'Weight is required';
-            } else if (Number(form.weight) <= 0 || Number(form.weight) > 100) {
-                formErrors.weight = 'Weight must be between 0.1 and 100 kg';
+            // Validate luggage descriptions
+            if (!form.luggageDescriptions || form.luggageDescriptions.length === 0) {
+                formErrors.luggageDescriptions = ['Luggage descriptions are required'];
+            } else {
+                const descriptionErrors = [];
+                form.luggageDescriptions.forEach((desc, descIndex) => {
+                    if (!desc || desc.trim() === '') {
+                        descriptionErrors[descIndex] = 'Luggage description is required';
+                    }
+                });
+                if (descriptionErrors.some(error => error)) {
+                    formErrors.luggageDescriptions = descriptionErrors;
+                }
             }
             if (!form.quantity || form.quantity.trim() === '') {
                 formErrors.quantity = 'Quantity is required';
@@ -1127,11 +1206,9 @@ export default function Page() {
                     owner_first_name: names.first,
                     owner_middle_initial: names.middle,
                     owner_last_name: names.last,
-                    owner_contact: contract.contact,
-                    luggage_description: form.itemDescription,
-                    luggage_weight: form.weight,
+                    owner_contact: form.contact,
+                    luggage_description: form.luggageDescriptions.join(', '),
                     luggage_quantity: form.quantity,
-                    case_number: form.caseNumber,
                     flight_number: form.flightNo,
                     // Delivery address fields
                     delivery_address: [
@@ -1170,9 +1247,9 @@ export default function Page() {
                 addressLine2: "", 
                 barangay: "", 
                 postalCode: "", 
-                contact: "" 
+                contact: ""
             }); // Only keep address and contact in the main contract
-            setLuggageForms([{ name: "", flightNo: "", itemDescription: "", quantity: "" }]);
+            setLuggageForms([{ name: "", flightNo: "", luggageDescriptions: [""], quantity: "", contact: "" }]);
             setPickupAddress({ location: "", addressLine1: "", addressLine2: "", province: "", city: "", barangay: "", postalCode: "" });
             setDropoffAddress({ location: null, lat: null, lng: null });
             // Reset location dropdowns
@@ -1286,9 +1363,18 @@ export default function Page() {
         router.push(`/airline/luggage-tracking?contractId=${contractId}`);
     };
 
-    // Filter contracts based on status and date
+    // Filter contracts based on status, date, and search term
     const filteredContracts = contractList.filter(contract => {
-        // First apply status filter
+        // First apply search filter
+        if (searchTerm.trim() !== '') {
+            const contractId = contract.id?.toLowerCase() || '';
+            const searchLower = searchTerm.toLowerCase();
+            if (!contractId.includes(searchLower)) {
+                return false;
+            }
+        }
+        
+        // Then apply status filter
         if (statusFilter !== 'all') {
             const status = contract.contract_status?.status_name?.toLowerCase();
             switch (statusFilter) {
@@ -1335,6 +1421,11 @@ export default function Page() {
         setRowsPerPage(parseInt(event.target.value, 10));
         setPage(0);
     };
+
+    // Reset page when search term changes
+    useEffect(() => {
+        setPage(0);
+    }, [searchTerm]);
 
     const filterOptions = [
         { value: 'all', label: 'All' },
@@ -1438,54 +1529,103 @@ export default function Page() {
                         {contractListLoading && (<Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}><CircularProgress /></Box>)}
                         {contractListError && (<Typography color="error" align="center">{contractListError}</Typography>)}
                         <Box sx={{ maxWidth: '800px', mx: 'auto', width: '100%', mb: 3 }}>
-                            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 2, p: 1 }}>
-                                <Box sx={{ display: 'flex', gap: 1, whiteSpace: 'nowrap' }}>
-                                    {filterOptions.map((option) => (
-                                        <Button
-                                            key={option.value}
-                                            variant={statusFilter === option.value ? "contained" : "outlined"}
-                                            onClick={() => setStatusFilter(option.value)}
+                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, p: 1 }}>
+                                {/* Search Bar */}
+                                <Box sx={{ display: 'flex', justifyContent: 'center' }}>
+                                    <TextField
+                                        placeholder="Search by Contract ID..."
+                                        value={searchTerm}
+                                        onChange={(e) => setSearchTerm(e.target.value)}
+                                        size="small"
+                                        sx={{
+                                            minWidth: '300px',
+                                            '& .MuiOutlinedInput-root': {
+                                                borderRadius: '20px',
+                                                '& fieldset': {
+                                                    borderColor: 'divider',
+                                                },
+                                                '&:hover fieldset': {
+                                                    borderColor: 'primary.main',
+                                                },
+                                                '&.Mui-focused fieldset': {
+                                                    borderColor: 'primary.main',
+                                                },
+                                            }
+                                        }}
+                                        InputProps={{
+                                            startAdornment: (
+                                                <Box sx={{ display: 'flex', alignItems: 'center', mr: 1, color: 'text.secondary' }}>
+                                                    🔍
+                                                </Box>
+                                            ),
+                                            endAdornment: searchTerm && (
+                                                <IconButton
+                                                    size="small"
+                                                    onClick={() => setSearchTerm('')}
+                                                    edge="end"
+                                                >
+                                                    <CloseIcon fontSize="small" />
+                                                </IconButton>
+                                            )
+                                        }}
+                                    />
+                                </Box>
+                                
+                                {/* Filters */}
+                                <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 2 }}>
+                                    <Box sx={{ display: 'flex', gap: 1, whiteSpace: 'nowrap' }}>
+                                        {filterOptions.map((option) => (
+                                            <Button
+                                                key={option.value}
+                                                variant={statusFilter === option.value ? "contained" : "outlined"}
+                                                onClick={() => setStatusFilter(option.value)}
+                                                sx={{
+                                                    borderRadius: '20px',
+                                                    textTransform: 'none',
+                                                    px: 2,
+                                                    whiteSpace: 'nowrap',
+                                                    minWidth: '100px',
+                                                    borderColor: statusFilter === option.value ? 'primary.main' : 'divider',
+                                                    '&:hover': {
+                                                        borderColor: 'primary.main',
+                                                        bgcolor: statusFilter === option.value ? 'primary.main' : 'transparent'
+                                                    }
+                                                }}
+                                            >
+                                                {option.label}
+                                            </Button>
+                                        ))}
+                                    </Box>
+                                    <Divider orientation="vertical" flexItem />
+                                    <FormControl size="small" sx={{ minWidth: 180, flexShrink: 0 }}>
+                                        <InputLabel>Filter by Date</InputLabel>
+                                        <Select
+                                            value={dateFilter}
+                                            onChange={(e) => setDateFilter(e.target.value)}
+                                            label="Filter by Date"
                                             sx={{
                                                 borderRadius: '20px',
-                                                textTransform: 'none',
-                                                px: 2,
-                                                whiteSpace: 'nowrap',
-                                                minWidth: '100px',
-                                                borderColor: statusFilter === option.value ? 'primary.main' : 'divider',
-                                                '&:hover': {
-                                                    borderColor: 'primary.main',
-                                                    bgcolor: statusFilter === option.value ? 'primary.main' : 'transparent'
+                                                '& .MuiSelect-select': {
+                                                    textTransform: 'none'
                                                 }
                                             }}
                                         >
-                                            {option.label}
-                                        </Button>
-                                    ))}
+                                            {dateOptions.map((option) => (
+                                                <MenuItem key={option.value} value={option.value}>
+                                                    {option.label}
+                                                </MenuItem>
+                                            ))}
+                                        </Select>
+                                    </FormControl>
                                 </Box>
-                                <Divider orientation="vertical" flexItem />
-                                <FormControl size="small" sx={{ minWidth: 180, flexShrink: 0 }}>
-                                    <InputLabel>Filter by Date</InputLabel>
-                                    <Select
-                                        value={dateFilter}
-                                        onChange={(e) => setDateFilter(e.target.value)}
-                                        label="Filter by Date"
-                                        sx={{
-                                            borderRadius: '20px',
-                                            '& .MuiSelect-select': {
-                                                textTransform: 'none'
-                                            }
-                                        }}
-                                    >
-                                        {dateOptions.map((option) => (
-                                            <MenuItem key={option.value} value={option.value}>
-                                                {option.label}
-                                            </MenuItem>
-                                        ))}
-                                    </Select>
-                                </FormControl>
                             </Box>
                         </Box>
                         {!contractListLoading && !contractListError && contractList.length === 0 && (<Typography align="center" sx={{ mb: 4 }}>No contracts found</Typography>)}
+                        {!contractListLoading && !contractListError && contractList.length > 0 && dateFilteredContracts.length === 0 && searchTerm && (
+                            <Typography align="center" sx={{ mb: 4, color: 'text.secondary' }}>
+                                No contracts found matching "{searchTerm}"
+                            </Typography>
+                        )}
                         {mounted && (
                             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4, maxWidth: '800px', mx: 'auto', width: '100%' }}>
                                 {getPaginatedContracts().map((contract, idx) => (
@@ -1592,12 +1732,30 @@ export default function Page() {
                                                 <Typography variant="body2" sx={{ color: 'text.secondary' }}>
                                                     <b>Address:</b> <span style={{ color: theme.palette.text.primary }}>{contract.delivery_address || 'N/A'}</span>
                                                 </Typography>
+                                                {contract.address_line_1 && (
+                                                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                                                        <b>Address Line 1:</b> <span style={{ color: theme.palette.text.primary }}>{contract.address_line_1}</span>
+                                                    </Typography>
+                                                )}
+                                                {contract.address_line_2 && (
+                                                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                                                        <b>Address Line 2 / Landmark Details:</b> <span style={{ color: theme.palette.text.primary }}>{contract.address_line_2}</span>
+                                                    </Typography>
+                                                )}
                                                 <Typography variant="body2" sx={{ color: 'text.secondary' }}>
                                                     <b>Quantity:</b> <span style={{ color: theme.palette.text.primary }}>{contract.luggage_quantity || 'N/A'}</span>
                                                 </Typography>
-                                                <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                                                    <b>Description:</b> <span style={{ color: theme.palette.text.primary }}>{contract.luggage_description || 'N/A'}</span>
-                                                </Typography>
+                                                {contract.luggage_description ? (
+                                                    contract.luggage_description.split(', ').map((desc, index) => (
+                                                        <Typography key={index} variant="body2" sx={{ color: 'text.secondary' }}>
+                                                            <b>Luggage Description {index + 1}:</b> <span style={{ color: theme.palette.text.primary }}>{desc.trim()}</span>
+                                                        </Typography>
+                                                    ))
+                                                ) : (
+                                                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                                                        <span style={{ color: theme.palette.text.primary }}>N/A</span>
+                                                    </Typography>
+                                                )}
                                                 <Typography variant="body2" sx={{ color: 'text.secondary' }}>
                                                     <b>Flight Number:</b> <span style={{ color: theme.palette.text.primary }}>{contract.flight_number || 'N/A'}</span>
                                                 </Typography>
@@ -2028,6 +2186,7 @@ export default function Page() {
                                 required 
                                 error={!!validationErrors.addressLine1}
                                 helperText={validationErrors.addressLine1}
+                                placeholder="e.g., 123 Main Street, Building Name, Unit Number"
                                 inputProps={{ maxLength: 200 }}
                                 InputProps={{ 
                                     endAdornment: contract.addressLine1 ? (
@@ -2038,11 +2197,12 @@ export default function Page() {
                                 }} 
                             />
                             <TextField 
-                                label="Address Line 2 (Optional)" 
+                                label="Address Line 2 & Landmark Details (Optional)" 
                                 fullWidth 
                                 size="small" 
                                 value={contract.addressLine2 || ""} 
                                 onChange={(e) => handleInputChange("addressLine2", e.target.value.slice(0, 200))} 
+                                placeholder="e.g., Subdivision, Village, Near SM Mall, Beside Jollibee, Gate 2, etc."
                                 inputProps={{ maxLength: 200 }}
                                 InputProps={{ 
                                     endAdornment: contract.addressLine2 ? (
@@ -2066,8 +2226,13 @@ export default function Page() {
                                             position: 'absolute',
                                             right: 0,
                                             top: 0,
-                                            color: 'error.main'
+                                            color: 'error.main',
+                                            '&:hover': {
+                                                backgroundColor: 'error.light',
+                                                color: 'error.contrastText'
+                                            }
                                         }}
+                                        title="Remove this passenger"
                                     >
                                         <CloseIcon />
                                     </IconButton>
@@ -2094,28 +2259,37 @@ export default function Page() {
                                             ) : null, 
                                         }} 
                                     />
-                                    <TextField 
-                                        label="Item Description" 
-                                        fullWidth 
-                                        size="small" 
-                                        value={form.itemDescription} 
-                                        onChange={(e) => handleLuggageFormChange(index, "itemDescription", e.target.value.slice(0, 200))} 
-                                        required 
-                                        error={!!(validationErrors.luggage && validationErrors.luggage[index] && validationErrors.luggage[index].itemDescription)}
-                                        helperText={validationErrors.luggage && validationErrors.luggage[index] && validationErrors.luggage[index].itemDescription}
-                                        inputProps={{ maxLength: 200 }}
-                                    />
+                                    {/* Dynamic luggage description fields based on quantity */}
+                                    {form.luggageDescriptions && form.luggageDescriptions.map((description, descIndex) => (
+                                        <TextField 
+                                            key={descIndex}
+                                            label={`Luggage Description ${descIndex + 1}`}
+                                            fullWidth 
+                                            size="small" 
+                                            value={description} 
+                                            onChange={(e) => handleLuggageDescriptionChange(index, descIndex, e.target.value.slice(0, 200))} 
+                                            required 
+                                            error={!!(validationErrors.luggage && validationErrors.luggage[index] && validationErrors.luggage[index].luggageDescriptions && validationErrors.luggage[index].luggageDescriptions[descIndex])}
+                                            helperText={validationErrors.luggage && validationErrors.luggage[index] && validationErrors.luggage[index].luggageDescriptions && validationErrors.luggage[index].luggageDescriptions[descIndex]}
+                                            inputProps={{ maxLength: 200 }}
+                                            sx={{ mb: 1 }}
+                                        />
+                                    ))}
                                     <Box sx={{ display: 'flex', gap: 2, width: '100%' }}>
                                         <TextField 
                                             label="Contact Number" 
                                             fullWidth 
                                             size="small" 
-                                            value={contract.contact} 
-                                            onChange={(e) => handleInputChange("contact", e.target.value)} 
-                                            onFocus={handlePhoneFocus}
+                                            value={form.contact} 
+                                            onChange={(e) => handleLuggageFormChange(index, "contact", e.target.value)} 
+                                            onFocus={() => {
+                                                if (!form.contact) {
+                                                    handleLuggageFormChange(index, "contact", "+63");
+                                                }
+                                            }}
                                             required 
-                                            error={!!validationErrors.contact}
-                                            helperText={validationErrors.contact}
+                                            error={!!(validationErrors.luggage && validationErrors.luggage[index] && validationErrors.luggage[index].contact)}
+                                            helperText={validationErrors.luggage && validationErrors.luggage[index] && validationErrors.luggage[index].contact}
                                             placeholder="+63 XXX XXX XXXX"
                                             sx={{ width: '40%' }}
                                             inputProps={{
@@ -2123,8 +2297,8 @@ export default function Page() {
                                                 maxLength: 17 // +63 XXX XXX XXXX format
                                             }}
                                             InputProps={{ 
-                                                endAdornment: contract.contact ? (
-                                                    <IconButton size="small" onClick={() => handleInputChange("contact", "")} edge="end">
+                                                endAdornment: form.contact ? (
+                                                    <IconButton size="small" onClick={() => handleLuggageFormChange(index, "contact", "")} edge="end">
                                                         <CloseIcon fontSize="small" />
                                                     </IconButton>
                                                 ) : null, 
@@ -2176,15 +2350,27 @@ export default function Page() {
                                 </Box>
                             </Box>
                         ))}
-                        <Button
-                            variant="outlined"
-                            onClick={handleAddLuggageForm}
-                            startIcon={<AddIcon />}
-                            disabled={luggageForms.length >= 15}
-                            sx={{ mt: 2 }}
-                        >
-                            Add Another Passenger
-                        </Button>
+                        
+                        <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
+                            <Button
+                                variant="outlined"
+                                onClick={handleAddLuggageForm}
+                                startIcon={<AddIcon />}
+                                disabled={luggageForms.length >= 15}
+                            >
+                                Add Another Passenger
+                            </Button>
+                            
+                            {luggageForms.length > 0 && luggageForms.length < 15 && (
+                                <Button
+                                    variant="outlined"
+                                    onClick={handleDuplicateLuggageForm}
+                                    startIcon={<AddIcon />}
+                                >
+                                    Duplicate Passenger
+                                </Button>
+                            )}
+                        </Box>
                     </Paper>
                     <Box sx={{ display: "flex", justifyContent: "center", mt: 4, gap: 2 }}>
                         <Button 
@@ -2196,7 +2382,6 @@ export default function Page() {
                             {isSubmitting ? 'Creating Booking...' : 'Create Booking'}
                         </Button>
                     </Box>
-                    <Box sx={{ textAlign: "center", mt: 6 }}><Typography variant="h6" fontWeight="bold">Partnered with:</Typography><Box sx={{ display: "flex", justifyContent: "center", gap: 4, mt: 2 }}><Image src="/brand-3.png" alt="AirAsia" width={60} height={60} /></Box></Box>
                 </Box>)}
                 <Snackbar 
                     open={snackbarOpen} 

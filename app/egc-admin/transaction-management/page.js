@@ -553,14 +553,14 @@ const TransactionManagement = () => {
     const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
     const [pendingPriceUpdate, setPendingPriceUpdate] = useState(null);
     
-    // Add new state for invoice confirmation dialog
-    const [invoiceConfirmDialogOpen, setInvoiceConfirmDialogOpen] = useState(false);
-    const [pendingInvoiceSummary, setPendingInvoiceSummary] = useState(null);
-    const [pendingInvoiceNumber, setPendingInvoiceNumber] = useState(null);
     
     // Add new state for complete confirmation dialog
     const [completeConfirmDialogOpen, setCompleteConfirmDialogOpen] = useState(false);
     const [pendingCompleteSummary, setPendingCompleteSummary] = useState(null);
+    
+    // Add new state for summarize confirmation dialog
+    const [summarizeConfirmDialogOpen, setSummarizeConfirmDialogOpen] = useState(false);
+    const [pendingSummarizeData, setPendingSummarizeData] = useState(null);
 
     const [podOpen, setPodOpen] = useState(false);
     const [podContract, setPodContract] = useState(null);
@@ -572,9 +572,11 @@ const TransactionManagement = () => {
     const [summaries, setSummaries] = useState([]);
     const [loadingSummaries, setLoadingSummaries] = useState(false);
     const [summariesError, setSummariesError] = useState(null);
+    const [summaryDateSpans, setSummaryDateSpans] = useState({});
+    const [loadingDateSpans, setLoadingDateSpans] = useState(false);
     
     // Sorting state for Summary table
-    const [summarySortField, setSummarySortField] = useState('created_at');
+    const [summarySortField, setSummarySortField] = useState('due_date');
     const [summarySortDirection, setSummarySortDirection] = useState('desc');
     
     // Sorting state for Pending table
@@ -1074,9 +1076,50 @@ const TransactionManagement = () => {
             body: JSON.stringify({ action: 'getSummaries', params: {} })
         })
             .then(res => res.json())
-            .then(json => {
+            .then(async json => {
                 if (json.error) throw new Error(json.error);
-                setSummaries(json.summaries || []);
+                const summaries = json.summaries || [];
+                setSummaries(summaries);
+                
+                // Fetch date spans for each summary
+                setLoadingDateSpans(true);
+                const dateSpanPromises = summaries.map(async (summary) => {
+                    try {
+                        const response = await fetch('/api/admin', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                action: 'getContractsBySingleSummaryId',
+                                params: { summaryId: summary.id }
+                            })
+                        });
+                        
+                        if (response.ok) {
+                            const data = await response.json();
+                            const contracts = data.contracts || [];
+                            
+                            if (contracts.length > 0) {
+                                const contractDates = contracts.map(c => new Date(c.created_at)).filter(date => !isNaN(date));
+                                const minDate = new Date(Math.min(...contractDates));
+                                const maxDate = new Date(Math.max(...contractDates));
+                                const dateSpan = `${formatDateFns(minDate, 'MMM d')} to ${formatDateFns(maxDate, 'MMM d, yyyy')}`;
+                                return { summaryId: summary.id, dateSpan };
+                            }
+                        }
+                        return { summaryId: summary.id, dateSpan: 'N/A' };
+                    } catch (error) {
+                        console.error(`Error fetching date span for summary ${summary.id}:`, error);
+                        return { summaryId: summary.id, dateSpan: 'N/A' };
+                    }
+                });
+                
+                const dateSpanResults = await Promise.all(dateSpanPromises);
+                const dateSpanMap = {};
+                dateSpanResults.forEach(result => {
+                    dateSpanMap[result.summaryId] = result.dateSpan;
+                });
+                setSummaryDateSpans(dateSpanMap);
+                setLoadingDateSpans(false);
             })
             .catch(err => setSummariesError(err.message || 'Failed to fetch summaries'))
             .finally(() => setLoadingSummaries(false));
@@ -1179,7 +1222,7 @@ const TransactionManagement = () => {
         setPodError(null);
     };
 
-    const handleSummarize = async () => {
+    const handleSummarize = () => {
         const contracts = getSelectedContracts();
         if (contracts.length === 0) {
             setSnackbar({
@@ -1190,24 +1233,58 @@ const TransactionManagement = () => {
             return;
         }
 
-        // Generate summary ID with format SUMyyyymmdd + 4 random alphanumeric characters
+        // Generate summary ID and invoice ID
         const today = new Date();
         const datePart = formatDateFns(today, 'yyyyMMdd');
-        const randomPart = Math.random().toString(36).substring(2, 6).toUpperCase(); // 4 random alphanumeric characters
+        const randomPart = Math.random().toString(36).substring(2, 6).toUpperCase();
         const summaryId = `SUM${datePart}${randomPart}`;
+        const invoiceId = `INV${datePart}${randomPart}`;
+
+        // Calculate date span for contracts
+        const contractDates = contracts.map(c => new Date(c.created_at)).filter(date => !isNaN(date));
+        const minDate = contractDates.length > 0 ? new Date(Math.min(...contractDates)) : new Date();
+        const maxDate = contractDates.length > 0 ? new Date(Math.max(...contractDates)) : new Date();
+        
+        const dateSpan = `${formatDateFns(minDate, 'MMM d')} to ${formatDateFns(maxDate, 'MMM d, yyyy')}`;
+
+        // Calculate summary statistics
+        const totalContracts = contracts.length;
+        const totalAmount = contracts.reduce((sum, c) => {
+            const delivery_charge = Number(c.delivery_charge) || 0;
+            const delivery_surcharge = Number(c.delivery_surcharge || c.surcharge) || 0;
+            const delivery_discount = Number(c.delivery_discount || c.discount) || 0;
+            return sum + Math.max(0, (delivery_charge + delivery_surcharge) - delivery_discount);
+        }, 0);
+        
+        const deliveredContracts = contracts.filter(c => c.contract_status?.status_name === 'Delivered').length;
+        const failedContracts = contracts.filter(c => c.contract_status?.status_name === 'Delivery Failed').length;
+
+        // Set pending data for confirmation dialog
+        setPendingSummarizeData({
+            summaryId,
+            invoiceId,
+            dateSpan,
+            totalContracts,
+            totalAmount,
+            deliveredContracts,
+            failedContracts,
+            contracts
+        });
+
+        // Show confirmation dialog
+        setSummarizeConfirmDialogOpen(true);
+    };
+
+    const handleSummaryClose = () => {
+        setSummaryOpen(false);
+        setSummaryData(null);
+    };
+
+    const handleConfirmSummarize = async () => {
+        if (!pendingSummarizeData) return;
 
         try {
-            // Calculate summary statistics
-            const totalContracts = contracts.length;
-            const totalAmount = contracts.reduce((sum, c) => {
-                const delivery_charge = Number(c.delivery_charge) || 0;
-                const delivery_surcharge = Number(c.delivery_surcharge || c.surcharge) || 0;
-                const delivery_discount = Number(c.delivery_discount || c.discount) || 0;
-                return sum + Math.max(0, (delivery_charge + delivery_surcharge) - delivery_discount);
-            }, 0);
-            
-            const deliveredContracts = contracts.filter(c => c.contract_status?.status_name === 'Delivered').length;
-            const failedContracts = contracts.filter(c => c.contract_status?.status_name === 'Delivery Failed').length;
+            const { summaryId, invoiceId, totalContracts, totalAmount, deliveredContracts, failedContracts, contracts } = pendingSummarizeData;
             
             // Create summary record and update contracts
             const contractIds = contracts.map(c => c.id);
@@ -1236,6 +1313,25 @@ const TransactionManagement = () => {
 
             const result = await createSummaryRes.json();
             
+            // Update the summary record with the generated invoice number
+            const invoiceResponse = await fetch('/api/admin', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'updateSummaryInvoiceId',
+                    params: {
+                        summaryId: result.summary.id,
+                        invoiceId: invoiceId
+                    }
+                })
+            });
+            
+            if (!invoiceResponse.ok) {
+                const errorData = await invoiceResponse.json();
+                throw new Error(errorData.error || 'Failed to update invoice number');
+            }
+
+            
             const summary = {
                 summaryId,
                 totalContracts,
@@ -1251,9 +1347,13 @@ const TransactionManagement = () => {
 
             setSnackbar({
                 open: true,
-                message: `Summary created successfully with ID: ${summaryId}`,
+                message: `Summary created successfully with ID: ${summaryId} and Invoice ID: ${invoiceId}. Status remains as Pending.`,
                 severity: 'success'
             });
+
+            // Close confirmation dialog
+            setSummarizeConfirmDialogOpen(false);
+            setPendingSummarizeData(null);
 
             // Refresh the data to reflect the changes
             window.location.reload();
@@ -1267,9 +1367,9 @@ const TransactionManagement = () => {
         }
     };
 
-    const handleSummaryClose = () => {
-        setSummaryOpen(false);
-        setSummaryData(null);
+    const handleCancelSummarize = () => {
+        setSummarizeConfirmDialogOpen(false);
+        setPendingSummarizeData(null);
     };
 
      const handleViewSummaryDetails = (summary) => {
@@ -1287,103 +1387,6 @@ const TransactionManagement = () => {
          setSummaryOpen(true);
      };
 
-     const generateInvoiceNumber = () => {
-         const today = new Date();
-         const datePart = formatDateFns(today, 'yyyyMMdd');
-         const randomPart = Math.random().toString(36).substring(2, 6).toUpperCase(); // 4 random alphanumeric characters
-         return `INV${datePart}${randomPart}`;
-     };
-
-         const handleGenerateSummaryInvoice = async (summary) => {
-        // Generate invoice number first
-        const invoiceNumber = generateInvoiceNumber();
-        
-        // Show confirmation dialog with the generated invoice number
-        setPendingInvoiceSummary(summary);
-        setPendingInvoiceNumber(invoiceNumber);
-        setInvoiceConfirmDialogOpen(true);
-    };
-
-         const handleConfirmGenerateInvoice = async () => {
-        if (!pendingInvoiceSummary || !pendingInvoiceNumber) return;
-
-        // Use the pre-generated invoice number
-        const invoiceNumber = pendingInvoiceNumber;
-         
-         try {
-             // Update the summary record with the generated invoice number
-             const response = await fetch('/api/admin', {
-                 method: 'POST',
-                 headers: { 'Content-Type': 'application/json' },
-                 body: JSON.stringify({
-                     action: 'updateSummaryInvoiceId',
-                     params: {
-                         summaryId: pendingInvoiceSummary.id,
-                         invoiceId: invoiceNumber
-                     }
-                 })
-             });
-             
-             if (!response.ok) {
-                 const errorData = await response.json();
-                 throw new Error(errorData.error || 'Failed to update invoice number');
-             }
-
-             // Update the summary status to Receipted (status_id = 2)
-             const statusResponse = await fetch('/api/admin', {
-                 method: 'POST',
-                 headers: { 'Content-Type': 'application/json' },
-                 body: JSON.stringify({
-                     action: 'updateSummaryStatus',
-                     params: {
-                         summaryId: pendingInvoiceSummary.id,
-                         statusId: 2
-                     }
-                 })
-             });
-
-             if (!statusResponse.ok) {
-                 const errorData = await statusResponse.json();
-                 throw new Error(errorData.error || 'Failed to update summary status');
-             }
-             
-             // Update the local state to reflect both changes
-             setSummaries(prev => prev.map(s => 
-                 s.id === pendingInvoiceSummary.id 
-                     ? { ...s, invoice_id: invoiceNumber, status_id: 2, status_name: 'Receipted' }
-                     : s
-             ));
-             
-             setSnackbar({
-                 open: true,
-                 message: `Invoice ${invoiceNumber} generated and status updated to Receipted for summary ${pendingInvoiceSummary.id}`,
-                 severity: 'success'
-             });
-             
-                            // Close the dialog
-               setInvoiceConfirmDialogOpen(false);
-               setPendingInvoiceSummary(null);
-               setPendingInvoiceNumber(null);
-         } catch (error) {
-             console.error('Error updating invoice number or status:', error);
-             setSnackbar({
-                 open: true,
-                 message: error.message || 'Failed to save invoice number or update status',
-                 severity: 'error'
-             });
-             
-                            // Close the dialog even on error
-               setInvoiceConfirmDialogOpen(false);
-               setPendingInvoiceSummary(null);
-               setPendingInvoiceNumber(null);
-         }
-     };
-
-         const handleCancelGenerateInvoice = () => {
-        setInvoiceConfirmDialogOpen(false);
-        setPendingInvoiceSummary(null);
-        setPendingInvoiceNumber(null);
-    };
 
     // Complete summary handlers
     const handleCompleteSummary = (summary) => {
@@ -1815,15 +1818,7 @@ const TransactionManagement = () => {
                                                  {getSortIcon('status_name')}
                                              </Box>
                                          </TableCell>
-                                         <TableCell 
-                                             sx={{ color: 'white', cursor: 'pointer', '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' } }}
-                                             onClick={() => handleSummarySort('created_at')}
-                                         >
-                                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                                 Created At
-                                                 {getSortIcon('created_at')}
-                                             </Box>
-                                         </TableCell>
+                                         <TableCell sx={{ color: 'white' }}>Date Span</TableCell>
                                          <TableCell 
                                              sx={{ color: 'white', cursor: 'pointer', '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' } }}
                                              onClick={() => handleSummarySort('due_date')}
@@ -1833,13 +1828,22 @@ const TransactionManagement = () => {
                                                  {getSortIcon('due_date')}
                                              </Box>
                                          </TableCell>
+                                         <TableCell 
+                                             sx={{ color: 'white', cursor: 'pointer', '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' } }}
+                                             onClick={() => handleSummarySort('created_at')}
+                                         >
+                                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                                 Created At
+                                                 {getSortIcon('created_at')}
+                                             </Box>
+                                         </TableCell>
                                         <TableCell sx={{ color: 'white' }}>Actions</TableCell>
                                     </TableRow>
                                 </TableHead>
                                 <TableBody>
                                      {summaries.length === 0 ? (
                                         <TableRow>
-                                             <TableCell colSpan={6} align="center">No summaries found</TableCell>
+                                             <TableCell colSpan={7} align="center">No summaries found</TableCell>
                                         </TableRow>
                                      ) : getSortedSummaries().map((summary) => (
                                          <TableRow key={summary.id}>
@@ -1862,13 +1866,24 @@ const TransactionManagement = () => {
                                                  </Box>
                                             </TableCell>
                                             <TableCell>
-                                                 {summary.created_at ? new Date(summary.created_at).toLocaleDateString(undefined, { 
-                                                     year: 'numeric', 
-                                                     month: 'long', 
-                                                     day: 'numeric',
-                                                     hour: '2-digit',
-                                                     minute: '2-digit'
-                                                 }) : ''}
+                                                 {loadingDateSpans ? (
+                                                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                         <CircularProgress size={16} />
+                                                         <Typography variant="body2" sx={{ 
+                                                             fontSize: '0.875rem',
+                                                             color: 'text.primary'
+                                                         }}>
+                                                             Loading...
+                                                         </Typography>
+                                                     </Box>
+                                                 ) : (
+                                                     <Typography variant="body2" sx={{ 
+                                                         fontSize: '0.875rem',
+                                                         color: 'text.primary'
+                                                     }}>
+                                                         {summaryDateSpans[summary.id] || 'N/A'}
+                                                     </Typography>
+                                                 )}
                                              </TableCell>
                                              <TableCell>
                                                  {summary.due_date ? new Date(summary.due_date).toLocaleDateString(undefined, { 
@@ -1878,23 +1893,16 @@ const TransactionManagement = () => {
                                                  }) : ''}
                                              </TableCell>
                                              <TableCell>
+                                                 {summary.created_at ? new Date(summary.created_at).toLocaleDateString(undefined, { 
+                                                     year: 'numeric', 
+                                                     month: 'long', 
+                                                     day: 'numeric',
+                                                     hour: '2-digit',
+                                                     minute: '2-digit'
+                                                 }) : ''}
+                                             </TableCell>
+                                             <TableCell>
                                                   <Box sx={{ display: 'flex', gap: 1 }}>
-                                                <Button
-                                                    variant="contained"
-                                                          size="small"
-                                                    color="primary"
-                                                          onClick={() => handleGenerateSummaryInvoice(summary)}
-                                                    disabled={summary.invoice_id !== null || summary.status_id === 3}
-                                                    sx={{
-                                                        backgroundColor: (summary.invoice_id !== null || summary.status_id === 3) ? '#ccc' : undefined,
-                                                        color: (summary.invoice_id !== null || summary.status_id === 3) ? '#666' : undefined,
-                                                        '&:hover': {
-                                                            backgroundColor: (summary.invoice_id !== null || summary.status_id === 3) ? '#ccc' : undefined
-                                                        }
-                                                    }}
-                                                >
-                                                          Generate Invoice
-                                                </Button>
                                                       <Button
                                                           variant="contained"
                                                           size="small"
@@ -2415,29 +2423,6 @@ const TransactionManagement = () => {
                 </DialogActions>
             </Dialog>
             
-            {/* Invoice Confirmation Dialog */}
-            <Dialog open={invoiceConfirmDialogOpen} onClose={handleCancelGenerateInvoice} maxWidth="sm" fullWidth>
-                <DialogTitle>Confirm Invoice Generation</DialogTitle>
-                           <DialogContent dividers>
-               <Typography variant="body1" sx={{ mb: 2 }}>
-                   Are you sure you want to generate an invoice for Summary ID: <strong>{pendingInvoiceSummary?.id}</strong>?
-               </Typography>
-               <Typography variant="body1" sx={{ mb: 2 }}>
-                   Invoice Number: <strong>{pendingInvoiceNumber}</strong>
-               </Typography>
-               <Typography variant="body2" color="text.secondary">
-                   This action will save the generated invoice number to the database. The invoice number will be displayed in the Summary table.
-               </Typography>
-           </DialogContent>
-                <DialogActions>
-                    <Button onClick={handleCancelGenerateInvoice} color="inherit">
-                        Cancel
-                    </Button>
-                    <Button onClick={handleConfirmGenerateInvoice} color="primary" variant="contained">
-                        Generate Invoice
-                    </Button>
-                </DialogActions>
-            </Dialog>
             
             {/* Complete Confirmation Dialog */}
             <Dialog open={completeConfirmDialogOpen} onClose={handleCancelComplete} maxWidth="sm" fullWidth>
@@ -2456,6 +2441,64 @@ const TransactionManagement = () => {
                     </Button>
                     <Button onClick={handleConfirmComplete} color="success" variant="contained">
                         Complete Summary
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Summarize Confirmation Dialog */}
+            <Dialog open={summarizeConfirmDialogOpen} onClose={handleCancelSummarize} maxWidth="md" fullWidth>
+                <DialogTitle>Confirm Summary Generation</DialogTitle>
+                <DialogContent dividers>
+                    {pendingSummarizeData && (
+                        <Box sx={{ minWidth: 400 }}>
+                            <Typography variant="h6" sx={{ color: 'primary.main', fontWeight: 700, mb: 2 }}>Summary Details</Typography>
+                            
+                            <Box sx={{ p: 2, bgcolor: 'primary.main', color: 'white', borderRadius: 1, mb: 3 }}>
+                                <Typography variant="body2" sx={{ mb: 1 }}>Summary ID</Typography>
+                                <Typography variant="h5" sx={{ fontWeight: 700, fontFamily: 'monospace' }}>{pendingSummarizeData.summaryId}</Typography>
+                            </Box>
+
+                            <Box sx={{ p: 2, bgcolor: 'success.main', color: 'white', borderRadius: 1, mb: 3 }}>
+                                <Typography variant="body2" sx={{ mb: 1 }}>Invoice ID</Typography>
+                                <Typography variant="h5" sx={{ fontWeight: 700, fontFamily: 'monospace' }}>{pendingSummarizeData.invoiceId}</Typography>
+                            </Box>
+
+                            <Box sx={{ p: 2, bgcolor: 'info.main', color: 'white', borderRadius: 1, mb: 3 }}>
+                                <Typography variant="body2" sx={{ mb: 1 }}>Date Span</Typography>
+                                <Typography variant="h6" sx={{ fontWeight: 700 }}>{pendingSummarizeData.dateSpan}</Typography>
+                            </Box>
+
+                            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 2, mb: 3 }}>
+                                <Box sx={{ p: 2, bgcolor: 'background.paper', borderRadius: 1, border: 1, borderColor: 'divider' }}>
+                                    <Typography variant="body2" color="text.secondary">Total Contracts</Typography>
+                                    <Typography variant="h4" sx={{ color: 'primary.main', fontWeight: 700 }}>{pendingSummarizeData.totalContracts}</Typography>
+                                </Box>
+                                <Box sx={{ p: 2, bgcolor: 'background.paper', borderRadius: 1, border: 1, borderColor: 'divider' }}>
+                                    <Typography variant="body2" color="text.secondary">Total Amount</Typography>
+                                    <Typography variant="h4" sx={{ color: 'primary.main', fontWeight: 700 }}>₱{pendingSummarizeData.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Typography>
+                                </Box>
+                                <Box sx={{ p: 2, bgcolor: 'background.paper', borderRadius: 1, border: 1, borderColor: 'divider' }}>
+                                    <Typography variant="body2" color="text.secondary">Delivered</Typography>
+                                    <Typography variant="h4" sx={{ color: 'success.main', fontWeight: 700 }}>{pendingSummarizeData.deliveredContracts}</Typography>
+                                </Box>
+                                <Box sx={{ p: 2, bgcolor: 'background.paper', borderRadius: 1, border: 1, borderColor: 'divider' }}>
+                                    <Typography variant="body2" color="text.secondary">Failed</Typography>
+                                    <Typography variant="h4" sx={{ color: 'error.main', fontWeight: 700 }}>{pendingSummarizeData.failedContracts}</Typography>
+                                </Box>
+                            </Box>
+
+                            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                                This action will create a summary with the above details and automatically generate an invoice. The summary will remain in "Pending" status.
+                            </Typography>
+                        </Box>
+                    )}
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={handleCancelSummarize} color="inherit">
+                        Cancel
+                    </Button>
+                    <Button onClick={handleConfirmSummarize} color="primary" variant="contained">
+                        Generate Summary & Invoice
                     </Button>
                 </DialogActions>
             </Dialog>
