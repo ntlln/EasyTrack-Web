@@ -8,7 +8,7 @@ import MoreVertIcon from '@mui/icons-material/MoreVert';
 /* Removed unused ChevronLeftIcon */
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
-import { PDFDownloadLink } from '@react-pdf/renderer';
+import { PDFDownloadLink, PDFViewer, pdf } from '@react-pdf/renderer';
 import { CombinedSOAInvoicePDF as CombinedPDFTemplate } from '../../../utils/pdf-templates';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
@@ -684,6 +684,14 @@ const TransactionManagement = () => {
     const [summariesError, setSummariesError] = useState(null);
     const [summaryDateSpans, setSummaryDateSpans] = useState({});
     const [loadingDateSpans, setLoadingDateSpans] = useState(false);
+    // Preview dialog state
+    const [previewOpen, setPreviewOpen] = useState(false);
+    const [previewSummary, setPreviewSummary] = useState(null);
+    const [previewLoading, setPreviewLoading] = useState(false);
+    const [previewError, setPreviewError] = useState('');
+    const [previewDoc, setPreviewDoc] = useState(null);
+    const [previewKey, setPreviewKey] = useState(0);
+    const [eSignatureDataUrl, setESignatureDataUrl] = useState(null);
     
     // Sorting state for Summary table
     const [summarySortField, setSummarySortField] = useState('due_date');
@@ -1509,7 +1517,7 @@ const TransactionManagement = () => {
         if (!pendingCompleteSummary) return;
 
         try {
-            // Update the summary status to Completed (status_id = 3)
+            // Update the summary status to Issued a receipt (status_id = 2)
             const response = await fetch('/api/admin', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -1517,7 +1525,7 @@ const TransactionManagement = () => {
                     action: 'updateSummaryStatus',
                     params: {
                         summaryId: pendingCompleteSummary.id,
-                        statusId: 3
+                        statusId: 2
                     }
                 })
             });
@@ -1530,13 +1538,13 @@ const TransactionManagement = () => {
             // Update the local state to reflect the change
             setSummaries(prev => prev.map(s => 
                 s.id === pendingCompleteSummary.id 
-                    ? { ...s, status_id: 3, status_name: 'Completed' }
+                    ? { ...s, status_id: 2, status_name: 'Issued a receipt' }
                     : s
             ));
             
             setSnackbar({
                 open: true,
-                message: `Summary ${pendingCompleteSummary.id} has been marked as completed`,
+                message: `Summary ${pendingCompleteSummary.id} has been marked as Issued a receipt`,
                 severity: 'success'
             });
             
@@ -1562,7 +1570,129 @@ const TransactionManagement = () => {
         setPendingCompleteSummary(null);
     };
 
-         const handleGenerateSummaryReport = async (summary) => {
+    const handlePreviewClose = () => {
+        setPreviewOpen(false);
+        setPreviewDoc(null);
+        setPreviewSummary(null);
+        setPreviewError('');
+    };
+
+    const handlePreviewSave = async () => {
+        try {
+            if (!previewDoc) return;
+            const blob = await pdf(previewDoc).toBlob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${previewSummary?.invoice_id || 'invoice'}.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+        } catch (err) {
+            setSnackbar({ open: true, message: err.message || 'Failed to save PDF', severity: 'error' });
+        }
+    };
+
+    const handlePreviewShare = async () => {
+        try {
+            if (!previewDoc) return;
+            const blob = await pdf(previewDoc).toBlob();
+            const fileName = `${previewSummary?.invoice_id || 'invoice'}.pdf`;
+            const file = new File([blob], fileName, { type: 'application/pdf' });
+            if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                await navigator.share({
+                    files: [file],
+                    title: 'Invoice & SOA',
+                    text: 'Please find the generated Invoice & SOA PDF attached.'
+                });
+            } else {
+                // Fallback to save if share is unsupported
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = fileName;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                URL.revokeObjectURL(url);
+                setSnackbar({ open: true, message: 'Sharing not supported. PDF downloaded instead.', severity: 'info' });
+            }
+        } catch (err) {
+            setSnackbar({ open: true, message: err.message || 'Failed to share PDF', severity: 'error' });
+        }
+    };
+
+    const openPreviewForSummary = async (summary) => {
+        try {
+            setPreviewLoading(true);
+            setPreviewError('');
+            setPreviewSummary(summary);
+            // Reuse fetch logic from handleGenerateSummaryReport but without auto-download
+            const response = await fetch('/api/admin', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'getContractsBySingleSummaryId',
+                    params: { summaryId: summary.id }
+                })
+            });
+            if (!response.ok) throw new Error('Failed to fetch contracts for summary');
+            const data = await response.json();
+            const contracts = data.contracts || [];
+            if (contracts.length === 0) throw new Error('No contracts found for this summary');
+
+            // Fetch proof of delivery for all contracts
+            const proofOfDeliveryData = {};
+            await Promise.all(contracts.map(async (contract) => {
+                try {
+                    const podResponse = await fetch('/api/admin', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            action: 'getProofOfDelivery',
+                            params: { contract_id: contract.id }
+                        })
+                    });
+                    if (podResponse.ok) {
+                        const podData = await podResponse.json();
+                        if (podData.proof_of_delivery) {
+                            proofOfDeliveryData[contract.id] = podData;
+                        }
+                    }
+                } catch {}
+            }));
+
+            const minDate = contracts.reduce((min, c) => c.created_at && c.created_at < min ? c.created_at : min, contracts[0].created_at);
+            const maxDate = contracts.reduce((max, c) => c.created_at && c.created_at > max ? c.created_at : max, contracts[0].created_at);
+            const dateRange = `${formatDate(minDate)} TO ${formatDate(maxDate)}`;
+
+            setCombinedPDFData({
+                contracts,
+                dateRange,
+                invoiceNumber: summary.invoice_id || null,
+                proofOfDeliveryData
+            });
+            setPreviewDoc(
+                <CombinedPDFTemplate 
+                    contracts={contracts}
+                    dateRange={dateRange}
+                    invoiceNumber={summary.invoice_id || null}
+                    proofOfDeliveryData={proofOfDeliveryData}
+                    eSignatureUrl={eSignatureDataUrl}
+                />
+            );
+            setPreviewKey(prev => prev + 1);
+            setPreviewOpen(true);
+        } catch (error) {
+            setPreviewError(error.message || 'Failed to load preview');
+            setSnackbar({ open: true, message: error.message || 'Failed to load preview', severity: 'error' });
+        } finally {
+            setPreviewLoading(false);
+        }
+    };
+
+    const handleGenerateSummaryReport = async (summary) => {
         try {
             // Prevent multiple simultaneous PDF generations
             if (shouldRenderCombinedPDF) {
@@ -2063,11 +2193,11 @@ const TransactionManagement = () => {
                                              </TableCell>
                                              <TableCell>
                                                   <Box sx={{ display: 'flex', gap: 1 }}>
-                                                      <Button
+                                                     <Button
                                                           variant="contained"
                                                           size="small"
                                                           color="primary"
-                                                          onClick={() => handleGenerateSummaryReport(summary)}
+                                                          onClick={() => openPreviewForSummary(summary)}
                                                           disabled={summary.status_id === 3}
                                                           sx={{
                                                               backgroundColor: summary.status_id === 3 ? '#ccc' : undefined,
@@ -2077,12 +2207,12 @@ const TransactionManagement = () => {
                                                               }
                                                           }}
                                                       >
-                                                          Generate Summary
+                                                          View Preview
                                                       </Button>
                                                       <Button
                                                           variant="contained"
                                                           size="small"
-                                                          color="success"
+                                                          color="primary"
                                                           onClick={() => handleCompleteSummary(summary)}
                                                           disabled={summary.status_id === 3}
                                                           sx={{
@@ -2093,7 +2223,7 @@ const TransactionManagement = () => {
                                                               }
                                                           }}
                                                       >
-                                                          Complete
+                                                          Mark as Complete
                                                       </Button>
                                                   </Box>
                                             </TableCell>
@@ -2129,6 +2259,114 @@ const TransactionManagement = () => {
                                 </PDFDownloadLink>
                             </Box>
                         )}
+                        {/* Preview Dialog */}
+                        <Dialog open={previewOpen} onClose={handlePreviewClose} maxWidth="lg" fullWidth>
+                            <DialogTitle>PDF Preview</DialogTitle>
+                            <DialogContent dividers>
+                                {previewLoading ? (
+                                    <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 300 }}>
+                                        <CircularProgress />
+                                    </Box>
+                                ) : previewError ? (
+                                    <Typography color="error">{previewError}</Typography>
+                                ) : previewDoc ? (
+                                    <Box sx={{ height: 600, border: '1px solid', borderColor: 'divider' }}>
+                                        <PDFViewer key={previewKey} width="100%" height="100%" showToolbar>
+                                            {previewDoc}
+                                        </PDFViewer>
+                                    </Box>
+                                ) : (
+                                    <Typography color="text.secondary">No preview available.</Typography>
+                                )}
+                                {/* E-Signature section */}
+                                <Divider sx={{ my: 2 }}>Upload e‑signature</Divider>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={async (e) => {
+                                            const file = e.target.files?.[0];
+                                            if (!file) return;
+                                            const reader = new FileReader();
+                                            reader.onload = () => {
+                                                const dataUrl = reader.result;
+                                                setESignatureDataUrl(dataUrl);
+                                                // Always rebuild from latest combinedPDFData; if absent, rebuild via previewSummary
+                                                if (combinedPDFData) {
+                                                    setPreviewDoc(
+                                                        <CombinedPDFTemplate
+                                                            contracts={combinedPDFData.contracts}
+                                                            dateRange={combinedPDFData.dateRange}
+                                                            invoiceNumber={combinedPDFData.invoiceNumber}
+                                                            proofOfDeliveryData={combinedPDFData.proofOfDeliveryData || {}}
+                                                            eSignatureUrl={dataUrl}
+                                                        />
+                                                    );
+                                                    setPreviewKey(prev => prev + 1);
+                                                } else if (previewSummary) {
+                                                    // In case user uploads before data is set, refetch lightweight rebuild using existing doc
+                                                    setPreviewDoc(prev => (
+                                                        <CombinedPDFTemplate
+                                                            {...prev?.props}
+                                                            eSignatureUrl={dataUrl}
+                                                        />
+                                                    ));
+                                                    setPreviewKey(prev => prev + 1);
+                                                }
+                                            };
+                                            reader.readAsDataURL(file);
+                                        }}
+                                    />
+                                    {eSignatureDataUrl && (
+                                        <>
+                                            <Typography variant="body2" color="text.secondary">Signature attached</Typography>
+                                            <Button 
+                                                variant="contained" 
+                                                size="small"
+                                                onClick={() => {
+                                                    setESignatureDataUrl(null);
+                                                    if (combinedPDFData) {
+                                                        setPreviewDoc(
+                                                            <CombinedPDFTemplate
+                                                                contracts={combinedPDFData.contracts}
+                                                                dateRange={combinedPDFData.dateRange}
+                                                                invoiceNumber={combinedPDFData.invoiceNumber}
+                                                                proofOfDeliveryData={combinedPDFData.proofOfDeliveryData || {}}
+                                                                eSignatureUrl={null}
+                                                            />
+                                                        );
+                                                        setPreviewKey(prev => prev + 1);
+                                                    } else {
+                                                        // Also clear from existing preview doc to handle subsequent uploads
+                                                        setPreviewDoc(prev => (
+                                                            <CombinedPDFTemplate
+                                                                {...prev?.props}
+                                                                eSignatureUrl={null}
+                                                            />
+                                                        ));
+                                                        setPreviewKey(prev => prev + 1);
+                                                    }
+                                                }}
+                                            >
+                                                Remove e‑signature
+                                            </Button>
+                                        </>
+                                    )}
+                                </Box>
+                            </DialogContent>
+                            <DialogActions>
+                                <Box sx={{ flex: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center', px: 1 }}>
+                                    <Typography variant="body2" color="text.secondary">
+                                        {previewSummary ? `Summary ID: ${previewSummary.id}` : ''}
+                                    </Typography>
+                                    <Box sx={{ display: 'flex', gap: 1 }}>
+                                        <Button onClick={handlePreviewSave} variant="contained" disabled={!previewDoc || previewLoading}>Save PDF</Button>
+                                        <Button onClick={handlePreviewShare} variant="contained" disabled={!previewDoc || previewLoading}>Share PDF</Button>
+                                        <Button onClick={handlePreviewClose} variant="contained">Close</Button>
+                                    </Box>
+                                </Box>
+                            </DialogActions>
+                        </Dialog>
                             </Box>
                     )}
                 </Box>
@@ -2593,7 +2831,7 @@ const TransactionManagement = () => {
                         Are you sure you want to mark Summary ID: <strong>{pendingCompleteSummary?.id}</strong> as completed?
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
-                        This action will mark the summary as completed and disable the Generate Summary button. This action cannot be undone.
+                        This action will mark the summary as completed and disable the View Preview button. This action cannot be undone.
                     </Typography>
                 </DialogContent>
                 <DialogActions>

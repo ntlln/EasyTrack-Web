@@ -17,7 +17,7 @@ try {
 } catch {}
 
 // Combined SOA + Invoice document
-export const CombinedSOAInvoicePDF = ({ contracts = [], dateRange, invoiceNumber = null, proofOfDeliveryData = {} }) => {
+export const CombinedSOAInvoicePDF = ({ contracts = [], dateRange, invoiceNumber = null, proofOfDeliveryData = {}, eSignatureUrl = null }) => {
     try {
         const today = new Date();
         const todayFormatted = formatDateFns(today, 'MMMM d, yyyy');
@@ -155,11 +155,25 @@ export const CombinedSOAInvoicePDF = ({ contracts = [], dateRange, invoiceNumber
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 16 }}>
                         <View style={{ width: '45%' }}>
                             <Text style={{ fontSize: 8, fontWeight: 'bold' }}>PREPARED BY:</Text>
-                            <View style={{ borderBottomWidth: 1, borderColor: '#000', marginTop: 16 }} />
+                            {eSignatureUrl ? (
+                                <View style={{ height: 44, justifyContent: 'center', marginTop: 4, marginBottom: 4 }}>
+                                    <Image src={eSignatureUrl} style={{ height: 36, width: 150, objectFit: 'contain' }} />
+                                </View>
+                            ) : (
+                                <View style={{ height: 44 }} />
+                            )}
+                            <View style={{ borderBottomWidth: 1, borderColor: '#000' }} />
                         </View>
                         <View style={{ width: '45%' }}>
                             <Text style={{ fontSize: 8, fontWeight: 'bold' }}>CHECKED BY:</Text>
-                            <View style={{ borderBottomWidth: 1, borderColor: '#000', marginTop: 16 }} />
+                            {eSignatureUrl ? (
+                                <View style={{ height: 44, justifyContent: 'center', marginTop: 4, marginBottom: 4 }}>
+                                    <Image src={eSignatureUrl} style={{ height: 36, width: 150, objectFit: 'contain' }} />
+                                </View>
+                            ) : (
+                                <View style={{ height: 44 }} />
+                            )}
+                            <View style={{ borderBottomWidth: 1, borderColor: '#000' }} />
                         </View>
                     </View>
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 12 }}>
