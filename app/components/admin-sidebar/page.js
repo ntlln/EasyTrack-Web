@@ -2,7 +2,8 @@
 
 import { useState, useContext, useEffect, useRef, Suspense } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { Box, Divider, List, ListItemButton, ListItemIcon, ListItemText, Collapse, Button, IconButton, useMediaQuery, Typography, Snackbar, Alert } from "@mui/material";
+import { Box, Divider, List, ListItemButton, ListItemIcon, ListItemText, Collapse, Button, IconButton, useMediaQuery, Typography, Snackbar, Alert, Avatar, Badge, Menu, MenuItem, ListItem, ListItemAvatar } from "@mui/material";
+import NotificationsIcon from '@mui/icons-material/Notifications';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import GroupsIcon from '@mui/icons-material/Groups';
@@ -23,15 +24,15 @@ import { ColorModeContext } from "../../layout";
 import { useTheme } from "@mui/material/styles";
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
-export default function Page() {
+export default function Page(props) {
     return (
         <Suspense fallback={<div>Loading...</div>}>
-            <AdminSidebarContent />
+            <AdminSidebarContent {...props} />
         </Suspense>
     );
 }
 
-function AdminSidebarContent() {
+function AdminSidebarContent({ notifications = [], markAllNotificationsRead }) {
     // State and context setup
     const [openPages, setOpenPages] = useState(() => typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('adminSidebarTransactionsOpen') || 'true') : true);
     const [isMinimized, setIsMinimized] = useState(true);
@@ -46,6 +47,8 @@ function AdminSidebarContent() {
     const prevUnreadRef = useRef(0);
     const didInitRef = useRef(false);
     const [toast, setToast] = useState({ open: false, title: '', message: '', severity: 'info', targetUserId: null });
+    const [profile, setProfile] = useState(null);
+    const [notifAnchor, setNotifAnchor] = useState(null);
     const prevUnreadByConvRef = useRef(new Map());
     const closeToast = () => setToast(prev => ({ ...prev, open: false }));
 
@@ -78,6 +81,14 @@ function AdminSidebarContent() {
                 router.push("/egc-admin/login");
                 return;
             }
+
+            // Fetch profile data
+            const { data: profileData } = await supabase
+                .from('profiles')
+                .select('first_name, middle_initial, last_name, email, pfp_id')
+                .eq('id', session.user.id)
+                .single();
+            setProfile(profileData || { email: session.user.email });
 
             // Start polling unread chat count
             const userId = session.user.id;
@@ -185,6 +196,82 @@ function AdminSidebarContent() {
             </Box>
 
             <Divider />
+
+            {isMinimized && (
+                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', py: 2, gap: 1 }}>
+                    <Avatar src={profile?.pfp_id || undefined} sx={{ width: 40, height: 40, bgcolor: 'primary.main', color: '#fff' }}>
+                        {((profile?.first_name?.[0] || '') + (profile?.last_name?.[0] || '')).toUpperCase() || (profile?.email?.[0] || 'A').toUpperCase()}
+                    </Avatar>
+                    <IconButton size="small" onClick={(e) => setNotifAnchor(e.currentTarget)}>
+                        <Badge color="primary" badgeContent={(notifications.filter(n => !n.read).length) > 99 ? '99+' : (notifications.filter(n => !n.read).length)} max={999}>
+                            <NotificationsIcon />
+                        </Badge>
+                    </IconButton>
+                    <Menu anchorEl={notifAnchor} open={Boolean(notifAnchor)} onClose={() => setNotifAnchor(null)} PaperProps={{ sx: { width: 320, maxHeight: 420 } }}>
+                        {notifications.length > 0 && (
+                            <MenuItem onClick={() => { if (markAllNotificationsRead) markAllNotificationsRead(); }} sx={{ justifyContent: 'center', color: 'primary.main', fontWeight: 600 }}>Mark all as read</MenuItem>
+                        )}
+                        {notifications.length === 0 && (
+                            <MenuItem disabled><Typography variant="body2">No notifications</Typography></MenuItem>
+                        )}
+                        {notifications.slice(0, 20).map((n) => (
+                            <MenuItem key={n.id} onClick={() => setNotifAnchor(null)} sx={{ whiteSpace: 'normal', alignItems: 'flex-start' }}>
+                                <ListItem disableGutters sx={{ p: 0 }}>
+                                    <ListItemAvatar>
+                                        <Avatar sx={{ bgcolor: 'primary.main', color: '#fff' }}>{(n.severity || 'i').slice(0, 1).toUpperCase()}</Avatar>
+                                    </ListItemAvatar>
+                                    <Box>
+                                        <Typography variant="body2" sx={{ fontWeight: 600 }}>{n.message}</Typography>
+                                        <Typography variant="caption" color="text.secondary">{new Date(n.timestamp).toLocaleString()}</Typography>
+                                    </Box>
+                                </ListItem>
+                            </MenuItem>
+                        ))}
+                    </Menu>
+                </Box>
+            )}
+
+            {!isMinimized && (
+                <Box sx={{ display: 'flex', alignItems: 'center', px: 2, py: 1, gap: 1 }}>
+                    <Avatar src={profile?.pfp_id || undefined} sx={{ bgcolor: 'primary.main', color: '#fff' }}>
+                        {((profile?.first_name?.[0] || '') + (profile?.last_name?.[0] || '')).toUpperCase() || (profile?.email?.[0] || 'A').toUpperCase()}
+                    </Avatar>
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                        <Typography variant="body2" noWrap sx={{ fontWeight: 600 }}>
+                            {`${profile?.first_name || ''} ${profile?.middle_initial || ''} ${profile?.last_name || ''}`.replace(/  +/g, ' ').trim() || profile?.email}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary" noWrap>
+                            {profile?.email}
+                        </Typography>
+                    </Box>
+                    <IconButton size="small" onClick={(e) => setNotifAnchor(e.currentTarget)}>
+                        <Badge color="primary" badgeContent={(notifications.filter(n => !n.read).length) > 99 ? '99+' : (notifications.filter(n => !n.read).length)} max={999}>
+                            <NotificationsIcon />
+                        </Badge>
+                    </IconButton>
+                    <Menu anchorEl={notifAnchor} open={Boolean(notifAnchor)} onClose={() => setNotifAnchor(null)} PaperProps={{ sx: { width: 320, maxHeight: 420 } }}>
+                        {notifications.length > 0 && (
+                            <MenuItem onClick={() => { if (markAllNotificationsRead) markAllNotificationsRead(); }} sx={{ justifyContent: 'center', color: 'primary.main', fontWeight: 600 }}>Mark all as read</MenuItem>
+                        )}
+                        {notifications.length === 0 && (
+                            <MenuItem disabled><Typography variant="body2">No notifications</Typography></MenuItem>
+                        )}
+                        {notifications.slice(0, 20).map((n) => (
+                            <MenuItem key={n.id} onClick={() => setNotifAnchor(null)} sx={{ whiteSpace: 'normal', alignItems: 'flex-start' }}>
+                                <ListItem disableGutters sx={{ p: 0 }}>
+                                    <ListItemAvatar>
+                                        <Avatar sx={{ bgcolor: 'primary.main', color: '#fff' }}>{(n.severity || 'i').slice(0, 1).toUpperCase()}</Avatar>
+                                    </ListItemAvatar>
+                                    <Box>
+                                        <Typography variant="body2" sx={{ fontWeight: 600 }}>{n.message}</Typography>
+                                        <Typography variant="caption" color="text.secondary">{new Date(n.timestamp).toLocaleString()}</Typography>
+                                    </Box>
+                                </ListItem>
+                            </MenuItem>
+                        ))}
+                    </Menu>
+                </Box>
+            )}
 
             <Box flexGrow={1}>
                 <List component="nav" sx={{ flexGrow: 1 }}>

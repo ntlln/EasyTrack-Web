@@ -27,6 +27,7 @@ function AdminLayoutContent({ children }) {
     const lastUserIdRef = useRef(null);
     const [toastQueue, setToastQueue] = useState([]);
     const [activeToast, setActiveToast] = useState(null);
+    const [notifications, setNotifications] = useState([]);
 
     // Auth page check
     const isAuthPage = pathname === "/egc-admin/login" || pathname === "/egc-admin/forgot-password" || pathname === "/egc-admin/reset-password" || pathname === "/egc-admin/verify" || pathname === "/egc-admin/otp";
@@ -100,7 +101,68 @@ function AdminLayoutContent({ children }) {
         };
     }, [isAuthPage, router]);
 
-    // Contracts realtime notifications
+  // Seed notifications on mount (recent contracts and unread messages)
+  useEffect(() => {
+    const seed = async () => {
+      if (isLoading) return;
+      if (isAuthPage) return;
+      try {
+        // Seed recent contracts
+        const res = await fetch('/api/admin?action=allContracts');
+        if (res.ok) {
+          const { data } = await res.json();
+          const recent = (data || []).slice(0, 20);
+          const statusNameById = new Map([
+            [1, 'Available'],
+            [2, 'Cancelled'],
+            [3, 'Accepted'],
+            [4, 'In Transit'],
+            [5, 'Delivered'],
+            [6, 'Delivery Failed'],
+            [7, 'In Transit']
+          ]);
+          const mapped = recent.map(c => ({
+            id: `seed-contract-${c.id}-${c.created_at}`,
+            message: `Contract ${c.id} • ${statusNameById.get(Number(c.contract_status_id)) || 'Updated'}`,
+            severity: 'info',
+            timestamp: c.created_at,
+            read: false
+          }));
+          setNotifications(prev => {
+            // Avoid duplicates if realtime already added
+            const existing = new Set(prev.map(n => n.id));
+            const merged = [...mapped.filter(m => !existing.has(m.id)), ...prev];
+            return merged.slice(0, 100);
+          });
+        }
+
+        // Seed unread message notifications using conversations endpoint
+        const userId = lastUserIdRef.current;
+        if (userId) {
+          const convRes = await fetch(`/api/admin?action=conversations&userId=${userId}`);
+          if (convRes.ok) {
+            const { conversations } = await convRes.json();
+            const unread = (conversations || []).filter(c => (c.unreadCount || 0) > 0);
+            const mappedMsgs = unread.map(c => ({
+              id: `seed-msg-${c.id}-${c.lastMessageTime}`,
+              message: `Message from ${c.name}`,
+              severity: 'info',
+              timestamp: c.lastMessageTime,
+              read: false
+            }));
+            setNotifications(prev => {
+              const existing = new Set(prev.map(n => n.id));
+              const merged = [...mappedMsgs.filter(m => !existing.has(m.id)), ...prev];
+              return merged.slice(0, 100);
+            });
+          }
+        }
+      } catch (_) { /* ignore seed errors */ }
+    };
+    seed();
+  }, [isLoading, isAuthPage]);
+
+    // Contracts and messages realtime notifications
     useEffect(() => {
         if (isLoading) return;
         if (isAuthPage) return;
@@ -132,7 +194,9 @@ function AdminLayoutContent({ children }) {
                 const statusId = Number(payload?.new?.contract_status_id) || 1;
                 const message = `New contract ${contractId} • ${statusNameById.get(statusId) || 'Available'}`;
                 const severity = severityByStatusId.get(statusId) || 'info';
+                const notif = { id: `${Date.now()}-${contractId}-insert`, message, severity, timestamp: new Date().toISOString(), read: false };
                 setToastQueue(prev => [...prev, { message, severity }]);
+                setNotifications(prev => [notif, ...prev].slice(0, 100));
             })
             .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'contracts' }, (payload) => {
                 const prevStatus = Number(payload?.old?.contract_status_id);
@@ -141,12 +205,45 @@ function AdminLayoutContent({ children }) {
                 const contractId = payload?.new?.id;
                 const message = `Contract ${contractId} • ${statusNameById.get(nextStatus) || 'Updated'}`;
                 const severity = severityByStatusId.get(nextStatus) || 'info';
+                const notif = { id: `${Date.now()}-${contractId}-update`, message, severity, timestamp: new Date().toISOString(), read: false };
                 setToastQueue(prev => [...prev, { message, severity }]);
+                setNotifications(prev => [notif, ...prev].slice(0, 100));
+            })
+            .subscribe();
+
+        // Messages channel for inbound messages to current user
+        const messagesChannel = supabase
+            .channel('messages-changes')
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, async (payload) => {
+                const msg = payload?.new;
+                if (!msg) return;
+                const currentUserId = lastUserIdRef.current;
+                if (!currentUserId || msg.receiver_id !== currentUserId) return;
+
+                // Fetch sender profile for friendly name
+                try {
+                    const { data: sender } = await supabase
+                        .from('profiles')
+                        .select('first_name, middle_initial, last_name, email')
+                        .eq('id', msg.sender_id)
+                        .single();
+                    const name = sender ? `${sender.first_name || ''} ${sender.middle_initial || ''} ${sender.last_name || ''}`.replace(/  +/g, ' ').trim() || sender.email : 'New message';
+                    const message = `Message from ${name}`;
+                    const notif = { id: `${Date.now()}-${msg.id}-message`, message, severity: 'info', timestamp: msg.created_at || new Date().toISOString(), read: false };
+                    setToastQueue(prev => [...prev, { message, severity: 'info' }]);
+                    setNotifications(prev => [notif, ...prev].slice(0, 100));
+                } catch (_) {
+                    const message = 'New message received';
+                    const notif = { id: `${Date.now()}-${msg.id}-message`, message, severity: 'info', timestamp: msg.created_at || new Date().toISOString(), read: false };
+                    setToastQueue(prev => [...prev, { message, severity: 'info' }]);
+                    setNotifications(prev => [notif, ...prev].slice(0, 100));
+                }
             })
             .subscribe();
 
         return () => {
             try { supabase.removeChannel(channel); } catch (_) {}
+            try { supabase.removeChannel(messagesChannel); } catch (_) {}
         };
     }, [isLoading, isAuthPage, supabase]);
 
@@ -168,7 +265,10 @@ function AdminLayoutContent({ children }) {
     if (isAuthPage) return <Box sx={containerStyles}><Box sx={authContentStyles}>{children}</Box></Box>;
     return (
         <Box sx={containerStyles}>
-            <AdminSidebar />
+            <AdminSidebar 
+                notifications={notifications}
+                markAllNotificationsRead={() => setNotifications(prev => prev.map(n => ({ ...n, read: true })))}
+            />
             <Box sx={contentStyles}>
                 {children}
             </Box>
