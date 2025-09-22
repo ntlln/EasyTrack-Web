@@ -1233,12 +1233,13 @@ const TransactionManagement = () => {
             return;
         }
 
-        // Generate summary ID and invoice ID
+        // Generate summary ID and invoice ID with same alphanumeric characters
         const today = new Date();
         const datePart = formatDateFns(today, 'yyyyMMdd');
         const randomPart = Math.random().toString(36).substring(2, 6).toUpperCase();
-        const summaryId = `SUM${datePart}${randomPart}`;
-        const invoiceId = `INV${datePart}${randomPart}`;
+        const commonId = `${datePart}${randomPart}`;
+        const summaryId = `SUM${commonId}`;
+        const invoiceId = `INV${commonId}`;
 
         // Calculate date span for contracts
         const contractDates = contracts.map(c => new Date(c.created_at)).filter(date => !isNaN(date));
