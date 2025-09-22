@@ -38,6 +38,10 @@ export const CombinedSOAInvoicePDF = ({ contracts = [], dateRange, invoiceNumber
         const totalAmount = safeContracts.reduce((sum, c) => sum + getRowAmount(c), 0);
         const vat = totalAmount * 0.12;
         const finalTotal = totalAmount;
+        // For SOA breakdown rows
+        const subtotal = safeContracts.reduce((sum, c) => sum + (Number(c.delivery_charge) || 0), 0);
+        const surchargeTotal = safeContracts.reduce((sum, c) => sum + (Number(c.delivery_surcharge || c.surcharge) || 0), 0);
+        const discountTotal = safeContracts.reduce((sum, c) => sum + (Number(c.delivery_discount || c.discount) || 0), 0);
 
         const formatDate = (dateString) => {
             if (!dateString) return 'N/A';
@@ -171,7 +175,66 @@ export const CombinedSOAInvoicePDF = ({ contracts = [], dateRange, invoiceNumber
                 </PDFPage>
 
                 {/* Second Page - SOA */}
-                {/* Keep existing SOA markup from the page if desired; omitted here for brevity. */}
+                <PDFPage size="A4" style={{ padding: 12, fontSize: 8, fontFamily: 'Roboto' }}>
+                    <View style={{ alignItems: 'center', marginBottom: 4 }}>
+                        <Text style={{ fontSize: 14, fontWeight: 'bold' }}>GHE TRANSMITTAL - AIRPORT CLIENTS PROPERTY IRREGULARITY SUMMARY REPORT</Text>
+                        <Text style={{ fontSize: 12, marginTop: 2 }}>{dateRange || 'No date range specified'}</Text>
+                    </View>
+                    <View style={{ borderWidth: 1, borderColor: '#000', marginBottom: 4 }}>
+                        <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderColor: '#000', borderStyle: 'solid' }}>
+                            <Text style={{ flex: 0.5, fontWeight: 'bold', padding: 2, fontSize: 8, borderRightWidth: 1, borderColor: '#000' }}>No.</Text>
+                            <Text style={{ flex: 1.2, fontWeight: 'bold', padding: 2, fontSize: 8, borderRightWidth: 1, borderColor: '#000' }}>Tracking ID</Text>
+                            <Text style={{ flex: 2.3, fontWeight: 'bold', padding: 2, fontSize: 8, borderRightWidth: 1, borderColor: '#000' }}>Luggage Owner</Text>
+                            <Text style={{ flex: 1, fontWeight: 'bold', padding: 2, fontSize: 8, borderRightWidth: 1, borderColor: '#000' }}>Flight No.</Text>
+                            <Text style={{ flex: 2.5, fontWeight: 'bold', padding: 2, fontSize: 8, borderRightWidth: 1, borderColor: '#000' }}>Address</Text>
+                            <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 2, fontSize: 8, borderRightWidth: 1, borderColor: '#000' }}>Date Received</Text>
+                            <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 2, fontSize: 8, borderRightWidth: 1, borderColor: '#000' }}>Status</Text>
+                            <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 2, fontSize: 8, borderRightWidth: 1, borderColor: '#000' }}>Amount</Text>
+                            <Text style={{ flex: 1, fontWeight: 'bold', padding: 2, fontSize: 8 }}>Remarks</Text>
+                        </View>
+                        {safeContracts.map((c, idx) => (
+                            <View key={c.id || idx} style={{ flexDirection: 'row', borderTopWidth: idx === 0 ? 1 : 0, borderBottomWidth: 1, borderColor: '#000', borderStyle: 'solid' }}>
+                                <Text style={{ flex: 0.5, padding: 2, fontSize: 8, borderRightWidth: 1, borderColor: '#000' }}>{idx + 1}</Text>
+                                <Text style={{ flex: 1.2, padding: 2, fontSize: 8, borderRightWidth: 1, borderColor: '#000' }}>{c.id}</Text>
+                                <Text style={{ flex: 2.3, padding: 2, fontSize: 8, borderRightWidth: 1, borderColor: '#000' }}>{c.owner_first_name || c.owner_middle_initial || c.owner_last_name ? `${c.owner_first_name || ''} ${c.owner_middle_initial || ''} ${c.owner_last_name || ''}`.replace(/  +/g, ' ').trim() : 'N/A'}</Text>
+                                <Text style={{ flex: 1, padding: 2, fontSize: 8, borderRightWidth: 1, borderColor: '#000' }}>{c.flight_number || 'N/A'}</Text>
+                                <Text style={{ flex: 2.5, padding: 2, fontSize: 8, borderRightWidth: 1, borderColor: '#000' }}>{c.drop_off_location || 'N/A'}</Text>
+                                <Text style={{ flex: 1.5, padding: 2, fontSize: 8, borderRightWidth: 1, borderColor: '#000' }}>{formatDate(c.delivered_at || c.created_at)}</Text>
+                                <Text style={{ flex: 1.5, padding: 2, fontSize: 8, borderRightWidth: 1, borderColor: '#000' }}>{c.contract_status?.status_name || 'N/A'}</Text>
+                                <Text style={{ flex: 1.5, padding: 2, fontSize: 8, borderRightWidth: 1, borderColor: '#000' }}>{'\u20B1\u00A0'}{getRowAmount(c).toFixed(2)}</Text>
+                                <Text style={{ flex: 1, padding: 2, fontSize: 8 }}>{c.contract_status?.status_name === 'Delivery Failed' ? 'Delivery Failed' : ''}</Text>
+                            </View>
+                        ))}
+                        <View style={{ flexDirection: 'row', borderTopWidth: 1, borderColor: '#000' }}>
+                            {/* Label aligned left spanning up to Amount column */}
+                            <Text style={{ flex: 10.5, fontWeight: 'bold', padding: 2, textAlign: 'left', fontSize: 8, borderRightWidth: 1, borderColor: '#000' }}>TOTAL</Text>
+                            {/* Spacer for Amount column (no divider here by request) */}
+                            <Text style={{ flex: 1.5, padding: 2, fontSize: 8 }}></Text>
+                            {/* Amount aligned with Remarks column (rightmost) */}
+                            <Text style={{ flex: 1, fontWeight: 'bold', padding: 2, fontSize: 8 }}>{'\u20B1\u00A0'}{totalAmount.toFixed(2)}</Text>
+                        </View>
+                    </View>
+                    {/* Permanent footer */}
+                    <View style={{
+                        position: 'absolute',
+                        left: 12,
+                        right: 12,
+                        bottom: 12,
+                        flexDirection: 'row',
+                        justifyContent: 'space-between',
+                        alignItems: 'flex-end'
+                    }}>
+                        <View>
+                            <Text style={{ fontSize: 8 }}>Received by: ___________, Date: ___________</Text>
+                            <Text style={{ fontWeight: 'bold', marginTop: 2, fontSize: 8 }}>AIRLINE'S REPRESENTATIVE</Text>
+                        </View>
+                        <View style={{ alignItems: 'flex-end' }}>
+                            <Text style={{ fontSize: 8 }}>GENERATED ON: {formatDate(new Date().toISOString())}</Text>
+                            <Text style={{ fontSize: 8 }}>*************SUBMITTED ALL ORIGINAL SIGNED PIR*****</Text>
+                            <Text style={{ fontSize: 8 }}>Total PIR submitted: {safeContracts.length}</Text>
+                        </View>
+                    </View>
+                </PDFPage>
 
                 {/* Proof of Delivery Pages */}
                 {safeContracts.map((contract, index) => {

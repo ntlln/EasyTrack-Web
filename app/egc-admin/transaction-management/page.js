@@ -2114,7 +2114,7 @@ const TransactionManagement = () => {
                                         invoiceNumber={combinedPDFData.invoiceNumber}
                                         proofOfDeliveryData={combinedPDFData.proofOfDeliveryData || {}}
                                     />}
-                                    fileName={`Combined-SOA-Invoice-${combinedPDFData.invoiceNumber || 'Summary'}.pdf`}
+                                    fileName={`${combinedPDFData.invoiceNumber || 'invoice'}.pdf`}
                                 >
                                     {({ loading, error }) => (
                                         <Button 
