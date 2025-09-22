@@ -724,6 +724,31 @@ const TransactionManagement = () => {
         fetchData();
     }, []);
 
+    // Silent background refresh every 5 seconds for Pending tab only
+    useEffect(() => {
+        if (tabValue !== 0) return; // Only refresh when Pending tab is active
+        let cancelled = false;
+
+        const refreshPendingQuietly = async () => {
+            try {
+                const res = await fetch('/api/admin');
+                const json = await res.json();
+                if (!cancelled && res.ok) {
+                    setData(json.data || []);
+                }
+            } catch {}
+        };
+
+        const interval = setInterval(() => {
+            refreshPendingQuietly();
+        }, 5000);
+
+        return () => {
+            cancelled = true;
+            clearInterval(interval);
+        };
+    }, [tabValue]);
+
     // Fetch pricing regions
     useEffect(() => {
         const fetchPricingRegions = async () => {

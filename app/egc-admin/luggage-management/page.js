@@ -138,7 +138,7 @@ const ContractList = ({ onTrackContract, initialSearch, setRedirectContractId })
     }
     setContractListError(null);
     try {
-      const response = await fetch('/api/admin');
+      const response = await fetch('/api/admin?action=allContracts');
       const result = await response.json();
 
       if (!response.ok) {
@@ -246,7 +246,7 @@ const ContractList = ({ onTrackContract, initialSearch, setRedirectContractId })
       setSnackbarMessage('Contract cancelled successfully');
       setSnackbarOpen(true);
       // Refresh the contract list
-      const contractsResponse = await fetch('/api/admin');
+      const contractsResponse = await fetch('/api/admin?action=allContracts');
       const contractsResult = await contractsResponse.json();
       if (!contractsResponse.ok) {
         throw new Error(contractsResult.error || 'Failed to fetch contracts');
