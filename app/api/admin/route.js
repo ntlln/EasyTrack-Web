@@ -491,6 +491,7 @@ export async function GET(request) {
           delivery_surcharge, delivery_discount,
           owner_first_name, owner_middle_initial, owner_last_name, owner_contact,
           flight_number, luggage_description, luggage_quantity,
+          remarks, passenger_form, proof_of_delivery,
           delivery_address, address_line_1, address_line_2,
           summary_id,
           airline:airline_id (*),
@@ -537,7 +538,8 @@ export async function GET(request) {
         airline_id, delivery_id, delivery_charge,
         delivery_surcharge, delivery_discount,
         owner_first_name, owner_middle_initial, owner_last_name, owner_contact,
-        flight_number, luggage_description, luggage_quantity,
+          flight_number, luggage_description, luggage_quantity,
+          remarks, passenger_form, proof_of_delivery,
         delivery_address, address_line_1, address_line_2,
         summary_id,
         airline:airline_id (*),
@@ -1251,7 +1253,8 @@ export async function POST(req) {
             airline_id, delivery_id, delivery_charge,
             delivery_surcharge, delivery_discount,
             owner_first_name, owner_middle_initial, owner_last_name, owner_contact,
-            flight_number, luggage_description, luggage_quantity,
+          flight_number, luggage_description, luggage_quantity,
+          remarks, passenger_form, proof_of_delivery,
             delivery_address, address_line_1, address_line_2,
             summary_id,
             airline:airline_id (*),
@@ -1311,7 +1314,8 @@ export async function POST(req) {
             airline_id, delivery_id, delivery_charge,
             delivery_surcharge, delivery_discount,
             owner_first_name, owner_middle_initial, owner_last_name, owner_contact,
-            flight_number, luggage_description, luggage_quantity,
+          flight_number, luggage_description, luggage_quantity,
+          remarks, passenger_form, proof_of_delivery,
             delivery_address, address_line_1, address_line_2,
             summary_id,
             airline:airline_id (*),
@@ -1465,16 +1469,17 @@ export async function POST(req) {
       return NextResponse.json({ data });
     }
 
-    // Handle proof of delivery fetch
+    // Handle proof of delivery/passenger form fetch depending on contract status
     if (action === 'getProofOfDelivery') {
       const { contract_id } = params;
       if (!contract_id) {
         return NextResponse.json({ error: 'Missing contract_id' }, { status: 400 });
       }
 
+      // Fetch status and both potential columns so we can decide what to return
       const { data, error } = await supabase
         .from('contracts')
-        .select('proof_of_delivery')
+        .select('contract_status_id, passenger_form, proof_of_delivery, delivered_at')
         .eq('id', contract_id)
         .single();
 
@@ -1482,11 +1487,23 @@ export async function POST(req) {
         return NextResponse.json({ error: error.message }, { status: 500 });
       }
 
-      if (!data || !data.proof_of_delivery) {
-        return NextResponse.json({ error: 'No proof of delivery found' }, { status: 404 });
+      if (!data) {
+        return NextResponse.json({ error: 'Contract not found' }, { status: 404 });
       }
 
-      return NextResponse.json({ proof_of_delivery: data.proof_of_delivery });
+      // Prefer passenger_form when available; otherwise fall back to proof_of_delivery
+      // This avoids relying on specific status IDs and ensures Delivered contracts with passenger_form work.
+      const payloadUrl = data.passenger_form || data.proof_of_delivery || null;
+
+      if (!payloadUrl) {
+        return NextResponse.json({ error: 'No proof available' }, { status: 404 });
+      }
+
+      // Keep response key as proof_of_delivery for backward compatibility
+      return NextResponse.json({ 
+        proof_of_delivery: payloadUrl,
+        delivery_timestamp: data.delivered_at || null
+      });
     }
 
     // If this is a Gemini insight request

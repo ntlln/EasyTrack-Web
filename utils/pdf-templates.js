@@ -202,7 +202,7 @@ export const CombinedSOAInvoicePDF = ({ contracts = [], dateRange, invoiceNumber
                                 <Text style={{ flex: 1.5, padding: 2, fontSize: 8, borderRightWidth: 1, borderColor: '#000' }}>{formatDate(c.delivered_at || c.created_at)}</Text>
                                 <Text style={{ flex: 1.5, padding: 2, fontSize: 8, borderRightWidth: 1, borderColor: '#000' }}>{c.contract_status?.status_name || 'N/A'}</Text>
                                 <Text style={{ flex: 1.5, padding: 2, fontSize: 8, borderRightWidth: 1, borderColor: '#000' }}>{'\u20B1\u00A0'}{getRowAmount(c).toFixed(2)}</Text>
-                                <Text style={{ flex: 1, padding: 2, fontSize: 8 }}>{c.contract_status?.status_name === 'Delivery Failed' ? 'Delivery Failed' : ''}</Text>
+                                <Text style={{ flex: 1, padding: 2, fontSize: 8 }}>{c.remarks || ''}</Text>
                             </View>
                         ))}
                         <View style={{ flexDirection: 'row', borderTopWidth: 1, borderColor: '#000' }}>
@@ -264,21 +264,27 @@ export const CombinedSOAInvoicePDF = ({ contracts = [], dateRange, invoiceNumber
                                     <Text style={{ fontSize: 10, marginBottom: 2 }}>Status: {contract.contract_status?.status_name || 'N/A'}</Text>
                                 </View>
                             </View>
-                            {podData && podData.proof_of_delivery ? (
+                            {(() => {
+                                 const statusName = String(contract.contract_status?.status_name || '').toLowerCase().trim();
+                                 // Always rely on API-provided URL in podData.proof_of_delivery.
+                                 // The API returns passenger_form for Delivered and proof_of_delivery for Delivery Failed.
+                                 const imageSrc = (podData && podData.proof_of_delivery) ? podData.proof_of_delivery : null;
+                                 return (statusName.includes('delivered') || statusName.includes('delivery failed')) && imageSrc ? (
                                 <View style={{ alignItems: 'center', marginBottom: 16 }}>
                                     <Text style={{ fontSize: 12, fontWeight: 'bold', marginBottom: 8 }}>Proof of Delivery Image:</Text>
                                     <View style={{ width: '100%', height: 400, border: '1px solid #ddd', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f9f9f9' }}>
-                                        <Image src={podData.proof_of_delivery} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} cache={false} />
+                                        <Image src={imageSrc} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} cache={false} />
                                     </View>
-                                    {podData.delivery_timestamp && (
+                                     {(podData && podData.delivery_timestamp) && (
                                         <Text style={{ fontSize: 10, marginTop: 8, color: '#666' }}>Delivered at: {formatDateLocal(podData.delivery_timestamp)}</Text>
                                     )}
                                 </View>
-                            ) : (
+                                 ) : (
                                 <View style={{ alignItems: 'center', marginBottom: 16, padding: 20, backgroundColor: '#f9f9f9', borderRadius: 4 }}>
                                     <Text style={{ fontSize: 12, color: '#666' }}>No proof of delivery available for this contract</Text>
                                 </View>
-                            )}
+                                 );
+                             })()}
                         </PDFPage>
                     );
                 })}
