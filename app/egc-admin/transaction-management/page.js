@@ -5,55 +5,56 @@ import { Box, Typography, Table, TableBody, TableCell, TableContainer, TableHead
 import { useRouter } from 'next/navigation';
 
 import MoreVertIcon from '@mui/icons-material/MoreVert';
-import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
+/* Removed unused ChevronLeftIcon */
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
-import { PDFDownloadLink, Document, Page as PDFPage, Text, View, Font, Image } from '@react-pdf/renderer';
+import { PDFDownloadLink } from '@react-pdf/renderer';
+import { CombinedSOAInvoicePDF as CombinedPDFTemplate } from '../../../utils/pdf-templates';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { format as formatDateFns } from 'date-fns';
-import VisibilityIcon from '@mui/icons-material/Visibility';
+/* Removed unused VisibilityIcon */
 
 // Register fonts from local public/fonts directory
 // Use a simple approach to avoid browser compatibility issues
 try {
-    Font.register({
-        family: 'Roboto',
-        fonts: [
-            {
-                src: '/fonts/Roboto-VariableFont_wdth,wght.ttf',
-                fontWeight: 'normal',
-                fontStyle: 'normal',
-            },
-            {
-                src: '/fonts/Roboto-VariableFont_wdth,wght.ttf',
-                fontWeight: 'bold',
-                fontStyle: 'normal',
-            },
-            {
-                src: '/fonts/Roboto-Italic-VariableFont_wdth,wght.ttf',
-                fontWeight: 'normal',
-                fontStyle: 'italic',
-            },
-            {
-                src: '/fonts/Roboto-Italic-VariableFont_wdth,wght.ttf',
-                fontWeight: 'bold',
-                fontStyle: 'italic',
-            },
-        ],
-    });
+Font.register({
+    family: 'Roboto',
+    fonts: [
+        {
+            src: '/fonts/Roboto-VariableFont_wdth,wght.ttf',
+            fontWeight: 'normal',
+            fontStyle: 'normal',
+        },
+        {
+            src: '/fonts/Roboto-VariableFont_wdth,wght.ttf',
+            fontWeight: 'bold',
+            fontStyle: 'normal',
+        },
+        {
+            src: '/fonts/Roboto-Italic-VariableFont_wdth,wght.ttf',
+            fontWeight: 'normal',
+            fontStyle: 'italic',
+        },
+        {
+            src: '/fonts/Roboto-Italic-VariableFont_wdth,wght.ttf',
+            fontWeight: 'bold',
+            fontStyle: 'italic',
+        },
+    ],
+});
 } catch (error) {
     // Font already registered, ignore error
     console.log('Roboto font already registered or error occurred:', error.message);
 }
 
 try {
-    Font.register({
-        family: 'NotoSans',
-        src: 'https://fonts.gstatic.com/s/notosans/v27/o-0IIpQlx3QUlC5A4PNb4g.woff2',
-    });
+Font.register({
+    family: 'NotoSans',
+    src: 'https://fonts.gstatic.com/s/notosans/v27/o-0IIpQlx3QUlC5A4PNb4g.woff2',
+});
 } catch (error) {
     // Font already registered, ignore error
     console.log('NotoSans font already registered or error occurred:', error.message);
@@ -182,7 +183,7 @@ const InvoicePDF = ({ contracts = [], invoiceNumber = null }) => {
     const monthEnd = endOfMonth(today);
     const dueDate = formatDateFns(monthEnd, 'MMMM d, yyyy');
     const desc = `PIR Luggage Delivery – ${formatDateFns(monthStart, 'MMMM d, yyyy')} to ${formatDateFns(monthEnd, 'MMMM d, yyyy')}`;
-    // Compute total amount
+    // Compute totals (VAT included in subtotal; VAT is not added on top)
     const subtotal = contracts.reduce((sum, c) => {
         const delivery_charge = Number(c.delivery_charge) || 0;
         const delivery_surcharge = Number(c.delivery_surcharge || c.surcharge) || 0;
@@ -190,7 +191,7 @@ const InvoicePDF = ({ contracts = [], invoiceNumber = null }) => {
         return sum + Math.max(0, (delivery_charge + delivery_surcharge) - delivery_discount);
     }, 0);
     const vat = subtotal * 0.12;
-    const totalAmount = subtotal + vat;
+    const totalAmount = subtotal; // Amount due is VAT-inclusive; do not add VAT on top
     return (
         <Document>
             <PDFPage size="A4" style={{ padding: 24, fontSize: 10, fontFamily: 'Roboto', position: 'relative' }}>
@@ -263,12 +264,12 @@ const InvoicePDF = ({ contracts = [], invoiceNumber = null }) => {
                 <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 8 }}>
                     <View style={{ width: 180, borderWidth: 1, borderColor: '#2d3991', padding: 8 }}>
                         <Text style={{ fontSize: 9 }}>RCBC ACCT NUMBER: 7591033191</Text>
-                        <Text style={{ fontSize: 9 }}>VATABLE: {`₱${subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</Text>
+                        <Text style={{ fontSize: 9 }}>VATABLE: {`₱${(subtotal - vat).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</Text>
                         <Text style={{ fontSize: 9 }}>VAT EXEMPT:</Text>
                         <Text style={{ fontSize: 9 }}>ZERO RATED:</Text>
                         <Text style={{ fontSize: 9 }}>TOTAL SALES:</Text>
                         <Text style={{ fontSize: 9 }}>TOTAL VAT: {`₱${vat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</Text>
-                        <Text style={{ fontSize: 9 }}>AMOUNT DUE: {`₱${totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</Text>
+                        <Text style={{ fontSize: 9 }}>AMOUNT DUE: {`₱${subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</Text>
                     </View>
                 </View>
                 {/* Footer Signature Block - Always at the bottom */}
@@ -303,141 +304,154 @@ const InvoicePDF = ({ contracts = [], invoiceNumber = null }) => {
 const CombinedSOAInvoicePDF = ({ contracts = [], dateRange, invoiceNumber = null, proofOfDeliveryData = {} }) => {
     // Add error boundary and validation
     try {
-        const today = new Date();
-        const todayFormatted = formatDateFns(today, 'MMMM d, yyyy');
-        const invoiceNo = invoiceNumber || formatDateFns(today, 'yyyyMMdd');
-        const monthStart = startOfMonth(today);
-        const monthEnd = endOfMonth(today);
-        const dueDate = formatDateFns(monthEnd, 'MMMM d, yyyy');
-        const desc = `PIR Luggage Delivery – ${formatDateFns(monthStart, 'MMMM d, yyyy')} to ${formatDateFns(monthEnd, 'MMMM d, yyyy')}`;
+    const today = new Date();
+    const todayFormatted = formatDateFns(today, 'MMMM d, yyyy');
+    const invoiceNo = invoiceNumber || formatDateFns(today, 'yyyyMMdd');
+    const monthStart = startOfMonth(today);
+    const monthEnd = endOfMonth(today);
+    const dueDate = formatDateFns(monthEnd, 'MMMM d, yyyy');
+    const desc = `PIR Luggage Delivery – ${formatDateFns(monthStart, 'MMMM d, yyyy')} to ${formatDateFns(monthEnd, 'MMMM d, yyyy')}`;
         
         // Ensure contracts is an array
         const safeContracts = Array.isArray(contracts) ? contracts : [];
-        
-        // Calculate totals safely
+        const soaNumber = (safeContracts[0] && (safeContracts[0].summary_id || safeContracts[0].summaryId)) || invoiceNo;
+    
+    // Calculate totals safely
+        // Totals for SOA (VAT is included in totals; do not add on top)
         const subtotal = safeContracts.reduce((sum, c) => sum + (Number(c.delivery_charge) || 0), 0);
         const surchargeTotal = safeContracts.reduce((sum, c) => sum + (Number(c.delivery_surcharge || c.surcharge) || 0), 0);
         const discountTotal = safeContracts.reduce((sum, c) => sum + (Number(c.delivery_discount || c.discount) || 0), 0);
-        const getRowAmount = (c) => {
-            const delivery_charge = Number(c.delivery_charge) || 0;
-            const delivery_surcharge = Number(c.delivery_surcharge || c.surcharge) || 0;
-            const delivery_discount = Number(c.delivery_discount || c.discount) || 0;
-            return Math.max(0, (delivery_charge + delivery_surcharge) - delivery_discount);
-        };
+    const getRowAmount = (c) => {
+        const delivery_charge = Number(c.delivery_charge) || 0;
+        const delivery_surcharge = Number(c.delivery_surcharge || c.surcharge) || 0;
+        const delivery_discount = Number(c.delivery_discount || c.discount) || 0;
+        return Math.max(0, (delivery_charge + delivery_surcharge) - delivery_discount);
+    };
         const totalAmount = safeContracts.reduce((sum, c) => sum + getRowAmount(c), 0);
-        const vat = totalAmount * 0.12;
-        const finalTotal = totalAmount + vat;
+    const vat = totalAmount * 0.12;
+        const finalTotal = totalAmount; // Amount due equals total; VAT not added on top
 
-        const formatDate = (dateString) => {
-            if (!dateString) return 'N/A';
-            try {
-                const date = new Date(dateString);
-                return date.toLocaleString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
-            } catch { return 'N/A'; }
-        };
+    const formatDate = (dateString) => {
+        if (!dateString) return 'N/A';
+        try {
+            const date = new Date(dateString);
+            return date.toLocaleString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+        } catch { return 'N/A'; }
+    };
 
     return (
         <Document>
             {/* First Page - Invoice */}
-            <PDFPage size="A4" style={{ padding: 24, fontSize: 10, fontFamily: 'Roboto', position: 'relative' }}>
+            <PDFPage size="A4" style={{ padding: 24, fontSize: 10, fontFamily: 'Roboto' }}>
                 {/* Header */}
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                     <View style={{ flex: 1 }}>
-                        <Text style={{ fontWeight: 'bold', color: '#2d3991', fontSize: 12 }}>GREEN HANGAR EMISSION TESTING CENTER</Text>
-                        <Text style={{ fontWeight: 'bold', color: '#2d3991', fontSize: 10 }}>PROPRIETOR: JONALIZ L. CABALUNA</Text>
+                        <Text style={{ fontWeight: 'bold', fontSize: 12 }}>GREEN HANGAR EMISSION TESTING CENTER</Text>
+                        <Text style={{ fontWeight: 'bold', fontSize: 10 }}>PROPRIETOR: JONALIZ L. CABALUNA</Text>
                         <Text style={{ fontSize: 9 }}>ATAYDE ST. BRGY.191 PASAY CITY</Text>
                         <Text style={{ fontSize: 9 }}>VAT REG. TIN: 234-449-892-00000</Text>
                     </View>
                     <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                        <Text style={{ fontWeight: 'bold', fontSize: 10 }}>BILL TO PHILLIPINES AIR ASIA INC.</Text>
+                        <Text style={{ fontWeight: 'bold', fontSize: 10 }}>BILL TO</Text>
+                        <Text style={{ fontSize: 9 }}>PHILIPPINES AIR ASIA INC.</Text>
                         <Text style={{ fontSize: 9 }}>2ND LEVEL MEZZANINE</Text>
                         <Text style={{ fontSize: 9 }}>AREA NAIA T3, PASAY CITY</Text>
                         <Text style={{ fontSize: 9 }}>TIN# 005-838-00016</Text>
-                        <Text style={{ fontSize: 9, marginTop: 4 }}>DATE      {todayFormatted}</Text>
-                        <Text style={{ fontSize: 9 }}>SOA #     {invoiceNo}</Text>
                     </View>
                 </View>
-                <Text style={{ fontWeight: 'bold', fontSize: 11, marginBottom: 8 }}>SALES INVOICE NO. {invoiceNo}</Text>
+                <View style={{ borderTopWidth: 1, borderColor: '#000', marginVertical: 10 }} />
+                {/* Date and SOA row */}
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <Text style={{ fontSize: 9, fontWeight: 'bold' }}>DATE:&nbsp;</Text>
+                        <Text style={{ fontSize: 9 }}>{todayFormatted}</Text>
+                    </View>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <Text style={{ fontSize: 9, fontWeight: 'bold' }}>SOA #:&nbsp;</Text>
+                        <Text style={{ fontSize: 9 }}>{soaNumber}</Text>
+                    </View>
+                </View>
+                <Text style={{ fontWeight: 'bold', fontSize: 12, textAlign: 'center', marginBottom: 8 }}>SALES INVOICE NO. {invoiceNo}</Text>
                 {/* Terms Table */}
-                <View style={{ flexDirection: 'row', backgroundColor: '#2d3991', color: 'white', fontWeight: 'bold', fontSize: 9 }}>
-                    <Text style={{ flex: 1, padding: 4 }}>TERMS</Text>
-                    <Text style={{ flex: 1, padding: 4 }}>PAYMENT METHOD</Text>
+                <View style={{ flexDirection: 'row', fontWeight: 'bold', fontSize: 9, borderWidth: 1, borderColor: '#000' }}>
+                    <Text style={{ flex: 1, padding: 4, borderRightWidth: 1, borderColor: '#000' }}>TERMS</Text>
+                    <Text style={{ flex: 1, padding: 4, borderRightWidth: 1, borderColor: '#000' }}>PAYMENT METHOD</Text>
                     <Text style={{ flex: 1, padding: 4 }}>DUE DATE</Text>
                 </View>
-                <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderColor: '#2d3991', fontSize: 9 }}>
-                    <Text style={{ flex: 1, padding: 4, backgroundColor: '#f7f3d6' }}>30 DAYS</Text>
-                    <Text style={{ flex: 1, padding: 4, backgroundColor: '#f7f3d6' }}>DOMESTIC FUNDS TRANSFER</Text>
-                    <Text style={{ flex: 1, padding: 4, backgroundColor: '#f7f3d6' }}>{dueDate}</Text>
+                <View style={{ flexDirection: 'row', fontSize: 9, borderLeftWidth: 1, borderRightWidth: 1, borderBottomWidth: 1, borderColor: '#000' }}>
+                    <Text style={{ flex: 1, padding: 4, borderRightWidth: 1, borderColor: '#000' }}>30 DAYS</Text>
+                    <Text style={{ flex: 1, padding: 4, borderRightWidth: 1, borderColor: '#000' }}>DOMESTIC FUND TRANSFER</Text>
+                    <Text style={{ flex: 1, padding: 4 }}>{dueDate}</Text>
                 </View>
                 {/* Invoice Table */}
                 <View style={{ marginTop: 12 }}>
-                    <View style={{ flexDirection: 'row', backgroundColor: '#2d3991', color: 'white', fontWeight: 'bold', fontSize: 9 }}>
-                        <Text style={{ flex: 0.5, padding: 4 }}>QTY</Text>
-                        <Text style={{ flex: 1, padding: 4 }}>UNIT</Text>
-                        <Text style={{ flex: 4, padding: 4 }}>DESCRIPTION</Text>
-                        <Text style={{ flex: 1, padding: 4 }}>AMOUNT</Text>
+                    <View style={{ flexDirection: 'row', fontWeight: 'bold', fontSize: 9, borderWidth: 1, borderColor: '#000' }}>
+                        <Text style={{ flex: 0.5, padding: 4, borderRightWidth: 1, borderColor: '#000' }}>QTY</Text>
+                        <Text style={{ flex: 1, padding: 4, borderRightWidth: 1, borderColor: '#000' }}>UNIT</Text>
+                        <Text style={{ flex: 4, padding: 4, borderRightWidth: 1, borderColor: '#000' }}>DESCRIPTION</Text>
+                        <Text style={{ flex: 1, padding: 4 }}>TOTAL AMOUNT DUE</Text>
                     </View>
-                    <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderColor: '#2d3991', fontSize: 9 }}>
-                        <Text style={{ flex: 0.5, padding: 4, backgroundColor: '#f7f3d6' }}>{safeContracts.length}</Text>
-                        <Text style={{ flex: 1, padding: 4, backgroundColor: '#f7f3d6' }}>PCS</Text>
-                        <Text style={{ flex: 4, padding: 4, backgroundColor: '#f7f3d6' }}>{desc}</Text>
-                        <Text style={{ flex: 1, padding: 4, backgroundColor: '#f7f3d6' }}>₱{totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+                    <View style={{ flexDirection: 'row', fontSize: 9, borderLeftWidth: 1, borderRightWidth: 1, borderBottomWidth: 1, borderColor: '#000', minHeight: 20, alignItems: 'center' }}>
+                        <Text style={{ flex: 0.5, padding: 4, borderRightWidth: 1, borderColor: '#000' }}>{safeContracts.length}</Text>
+                        <Text style={{ flex: 1, padding: 4, borderRightWidth: 1, borderColor: '#000' }}>PCS</Text>
+                        <Text style={{ flex: 4, padding: 4, borderRightWidth: 1, borderColor: '#000' }}>{`PIRs Luggage Delivery - (${formatDateFns(monthStart, 'dd/MM/yyyy')} to ${formatDateFns(monthEnd, 'dd/MM/yyyy')})`}</Text>
+                        <Text style={{ flex: 1, padding: 4 }}>PHP</Text>
                     </View>
-                    {/* Empty rows for formatting */}
                     {[...Array(7)].map((_, i) => (
-                        <View key={i} style={{ flexDirection: 'row', fontSize: 9 }}>
-                            <Text style={{ flex: 0.5, padding: 4, backgroundColor: '#f7f3d6' }}></Text>
-                            <Text style={{ flex: 1, padding: 4, backgroundColor: '#f7f3d6' }}></Text>
-                            <Text style={{ flex: 4, padding: 4, backgroundColor: '#f7f3d6' }}></Text>
-                            <Text style={{ flex: 1, padding: 4, backgroundColor: '#f7f3d6' }}></Text>
+                        <View key={i} style={{ flexDirection: 'row', fontSize: 9, borderLeftWidth: 1, borderRightWidth: 1, borderBottomWidth: 1, borderColor: '#000', minHeight: 20, alignItems: 'center' }}>
+                            <Text style={{ flex: 0.5, padding: 4, borderRightWidth: 1, borderColor: '#000' }}></Text>
+                            <Text style={{ flex: 1, padding: 4, borderRightWidth: 1, borderColor: '#000' }}></Text>
+                            <Text style={{ flex: 4, padding: 4, borderRightWidth: 1, borderColor: '#000' }}></Text>
+                            <Text style={{ flex: 1, padding: 4 }}></Text>
                         </View>
                     ))}
-                    {/* Note row */}
-                    <View style={{ flexDirection: 'row', fontSize: 9 }}>
-                        <Text style={{ flex: 6.5, padding: 4, backgroundColor: '#f7f3d6', fontWeight: 'bold' }}>Note: All Original Documents are Included in this statement</Text>
-                        <Text style={{ flex: 1, padding: 4, backgroundColor: '#f7f3d6' }}></Text>
+                    {/* Note row - keep all column lines continuous; text in Description column */}
+                    <View style={{ flexDirection: 'row', fontSize: 9, borderLeftWidth: 1, borderRightWidth: 1, borderBottomWidth: 1, borderColor: '#000', minHeight: 20, alignItems: 'center' }}>
+                        <Text style={{ flex: 0.5, padding: 4, borderRightWidth: 1, borderColor: '#000' }}></Text>
+                        <Text style={{ flex: 1, padding: 4, borderRightWidth: 1, borderColor: '#000' }}></Text>
+                        <Text style={{ flex: 4, padding: 4, borderRightWidth: 1, borderColor: '#000', fontWeight: 'bold' }}>Note: All Original Documents are Included in this statement</Text>
+                        <Text style={{ flex: 1, padding: 4 }}></Text>
                     </View>
-                    {/* Total row */}
-                    <View style={{ flexDirection: 'row', fontSize: 9 }}>
-                        <Text style={{ flex: 6.5, padding: 4, backgroundColor: '#f7f3d6', fontWeight: 'bold', textAlign: 'right' }}>Total Amount Due:</Text>
-                        <Text style={{ flex: 1, padding: 4, backgroundColor: '#f7f3d6', fontWeight: 'bold' }}>₱{finalTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+                    {/* Total row - align with columns and remove extra horizontal divider below */}
+                    <View style={{ flexDirection: 'row', fontSize: 9, borderLeftWidth: 1, borderRightWidth: 1, borderBottomWidth: 1, borderColor: '#000', minHeight: 20, alignItems: 'center' }}>
+                        <Text style={{ flex: 0.5, padding: 4, borderRightWidth: 1, borderColor: '#000' }}></Text>
+                        <Text style={{ flex: 1, padding: 4, borderRightWidth: 1, borderColor: '#000' }}></Text>
+                        <Text style={{ flex: 4, padding: 4, borderRightWidth: 1, borderColor: '#000', fontWeight: 'bold', textAlign: 'right' }}>Total Amount Due:</Text>
+                        <Text style={{ flex: 1, padding: 4, fontWeight: 'bold' }}>{`₱${totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</Text>
                     </View>
                 </View>
-                {/* Footer Notes */}
                 <Text style={{ fontSize: 9, marginTop: 8, fontWeight: 'bold' }}>Note: Please make check payable to JONALIZ L. CABALUNA</Text>
                 {/* Summary Box */}
                 <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 8 }}>
-                    <View style={{ width: 180, borderWidth: 1, borderColor: '#2d3991', padding: 8 }}>
+                    <View style={{ width: 180, borderWidth: 1, borderColor: '#000', padding: 8 }}>
                         <Text style={{ fontSize: 9 }}>RCBC ACCT NUMBER: 7591033191</Text>
-                        <Text style={{ fontSize: 9 }}>VATABLE: {`₱${totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</Text>
+                        <Text style={{ fontSize: 9 }}>VATABLE: {`₱${(totalAmount - vat).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</Text>
                         <Text style={{ fontSize: 9 }}>VAT EXEMPT:</Text>
                         <Text style={{ fontSize: 9 }}>ZERO RATED:</Text>
                         <Text style={{ fontSize: 9 }}>TOTAL SALES:</Text>
                         <Text style={{ fontSize: 9 }}>TOTAL VAT: {`₱${vat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</Text>
-                        <Text style={{ fontSize: 9 }}>AMOUNT DUE: {`₱${finalTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</Text>
+                        <Text style={{ fontSize: 9 }}>AMOUNT DUE: {`₱${totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</Text>
                     </View>
                 </View>
-                {/* Footer Signature Block - Always at the bottom */}
-                <View style={{
-                    position: 'absolute',
-                    left: 24,
-                    right: 24,
-                    bottom: 24,
-                    flexDirection: 'row',
-                    justifyContent: 'space-between',
-                    alignItems: 'flex-end',
-                }}>
-                    <View>
-                        <Text style={{ fontSize: 8, fontWeight: 'bold', color: '#2d3991' }}>Prepared by: K. SAMKIAN</Text>
-                        <Text style={{ fontSize: 8 }}>Revenue Supervisor</Text>
+                {/* Signature lines */}
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 16 }}>
+                    <View style={{ width: '45%' }}>
+                        <Text style={{ fontSize: 8, fontWeight: 'bold' }}>PREPARED BY:</Text>
+                        <View style={{ borderBottomWidth: 1, borderColor: '#000', marginTop: 16 }} />
                     </View>
-                    <View>
-                        <Text style={{ fontSize: 8, fontWeight: 'bold', color: '#2d3991' }}>CHECKED BY: J.LARA</Text>
-                        <Text style={{ fontSize: 8 }}>ACCOUNTING</Text>
+                    <View style={{ width: '45%' }}>
+                        <Text style={{ fontSize: 8, fontWeight: 'bold' }}>CHECKED BY:</Text>
+                        <View style={{ borderBottomWidth: 1, borderColor: '#000', marginTop: 16 }} />
                     </View>
-                    <View>
-                        <Text style={{ fontSize: 8, fontWeight: 'bold', color: '#2d3991' }}>RECEIVED BY: ___________</Text>
-                        <Text style={{ fontSize: 8, fontWeight: 'bold', color: '#2d3991' }}>DATE: {todayFormatted}</Text>
+                </View>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 12 }}>
+                    <View style={{ width: '45%' }}>
+                        <Text style={{ fontSize: 8, fontWeight: 'bold' }}>RECEIVED BY:</Text>
+                        <View style={{ borderBottomWidth: 1, borderColor: '#000', marginTop: 16 }} />
+                    </View>
+                    <View style={{ width: '45%' }}>
+                        <Text style={{ fontSize: 8, fontWeight: 'bold' }}>DATE:</Text>
+                        <View style={{ borderBottomWidth: 1, borderColor: '#000', marginTop: 16 }} />
                     </View>
                 </View>
             </PDFPage>
@@ -520,7 +534,7 @@ const CombinedSOAInvoicePDF = ({ contracts = [], dateRange, invoiceNumber = null
                         <View style={{ alignItems: 'center', marginBottom: 16 }}>
                             <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#2d3991' }}>PROOF OF DELIVERY</Text>
                             <Text style={{ fontSize: 12, marginTop: 4 }}>Contract ID: {contract.id}</Text>
-                        </View>
+                    </View>
                         
                         <View style={{ marginBottom: 16 }}>
                             <Text style={{ fontSize: 12, fontWeight: 'bold', marginBottom: 8 }}>Contract Details:</Text>
@@ -532,13 +546,13 @@ const CombinedSOAInvoicePDF = ({ contracts = [], dateRange, invoiceNumber = null
                                 <Text style={{ fontSize: 10, marginBottom: 2 }}>Drop-off Location: {contract.drop_off_location || 'N/A'}</Text>
                                 <Text style={{ fontSize: 10, marginBottom: 2 }}>Delivery Date: {formatDate(contract.delivered_at || contract.created_at)}</Text>
                                 <Text style={{ fontSize: 10, marginBottom: 2 }}>Status: {contract.contract_status?.status_name || 'N/A'}</Text>
-                            </View>
-                        </View>
+                    </View>
+                </View>
 
                         {podData && podData.proof_of_delivery ? (
                             <View style={{ alignItems: 'center', marginBottom: 16 }}>
                                 <Text style={{ fontSize: 12, fontWeight: 'bold', marginBottom: 8 }}>Proof of Delivery Image:</Text>
-                                <View style={{ 
+                <View style={{
                                     width: '100%', 
                                     height: 400,
                                     border: '1px solid #ddd',
@@ -556,17 +570,17 @@ const CombinedSOAInvoicePDF = ({ contracts = [], dateRange, invoiceNumber = null
                                         }} 
                                         cache={false}
                                     />
-                                </View>
+                    </View>
                                 {podData.delivery_timestamp && (
                                     <Text style={{ fontSize: 10, marginTop: 8, color: '#666' }}>
                                         Delivered at: {formatDate(podData.delivery_timestamp)}
                                     </Text>
                                 )}
-                            </View>
+                    </View>
                         ) : (
                             <View style={{ alignItems: 'center', marginBottom: 16, padding: 20, backgroundColor: '#f9f9f9', borderRadius: 4 }}>
                                 <Text style={{ fontSize: 12, color: '#666' }}>No proof of delivery available for this contract</Text>
-                            </View>
+                    </View>
                         )}
 
                         {/* Removed signature/date/time section as requested */}
@@ -583,10 +597,10 @@ const CombinedSOAInvoicePDF = ({ contracts = [], dateRange, invoiceNumber = null
                     <View style={{ alignItems: 'center', marginBottom: 8 }}>
                         <Text style={{ fontSize: 16, fontWeight: 'bold', color: 'red' }}>Error generating PDF</Text>
                         <Text style={{ fontSize: 12, marginTop: 4 }}>Please try again or contact support</Text>
-                    </View>
-                </PDFPage>
-            </Document>
-        );
+                </View>
+            </PDFPage>
+        </Document>
+    );
     }
 };
 
@@ -2094,7 +2108,7 @@ const TransactionManagement = () => {
                             <Box sx={{ display: 'none' }}>
                                 <PDFDownloadLink 
                                     ref={pdfDownloadRef}
-                                    document={<CombinedSOAInvoicePDF 
+                                    document={<CombinedPDFTemplate 
                                         contracts={combinedPDFData.contracts} 
                                         dateRange={combinedPDFData.dateRange}
                                         invoiceNumber={combinedPDFData.invoiceNumber}
