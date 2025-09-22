@@ -8,7 +8,7 @@ import MoreVertIcon from '@mui/icons-material/MoreVert';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
-import { PDFDownloadLink, Document, Page as PDFPage, Text, View, Font } from '@react-pdf/renderer';
+import { PDFDownloadLink, Document, Page as PDFPage, Text, View, Font, Image } from '@react-pdf/renderer';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
@@ -17,35 +17,47 @@ import { format as formatDateFns } from 'date-fns';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 
 // Register fonts from local public/fonts directory
-Font.register({
-    family: 'Roboto',
-    fonts: [
-        {
-            src: '/fonts/Roboto-VariableFont_wdth,wght.ttf',
-            fontWeight: 'normal',
-            fontStyle: 'normal',
-        },
-        {
-            src: '/fonts/Roboto-VariableFont_wdth,wght.ttf',
-            fontWeight: 'bold',
-            fontStyle: 'normal',
-        },
-        {
-            src: '/fonts/Roboto-Italic-VariableFont_wdth,wght.ttf',
-            fontWeight: 'normal',
-            fontStyle: 'italic',
-        },
-        {
-            src: '/fonts/Roboto-Italic-VariableFont_wdth,wght.ttf',
-            fontWeight: 'bold',
-            fontStyle: 'italic',
-        },
-    ],
-});
-Font.register({
-    family: 'NotoSans',
-    src: 'https://fonts.gstatic.com/s/notosans/v27/o-0IIpQlx3QUlC5A4PNb4g.woff2',
-});
+// Use a simple approach to avoid browser compatibility issues
+try {
+    Font.register({
+        family: 'Roboto',
+        fonts: [
+            {
+                src: '/fonts/Roboto-VariableFont_wdth,wght.ttf',
+                fontWeight: 'normal',
+                fontStyle: 'normal',
+            },
+            {
+                src: '/fonts/Roboto-VariableFont_wdth,wght.ttf',
+                fontWeight: 'bold',
+                fontStyle: 'normal',
+            },
+            {
+                src: '/fonts/Roboto-Italic-VariableFont_wdth,wght.ttf',
+                fontWeight: 'normal',
+                fontStyle: 'italic',
+            },
+            {
+                src: '/fonts/Roboto-Italic-VariableFont_wdth,wght.ttf',
+                fontWeight: 'bold',
+                fontStyle: 'italic',
+            },
+        ],
+    });
+} catch (error) {
+    // Font already registered, ignore error
+    console.log('Roboto font already registered or error occurred:', error.message);
+}
+
+try {
+    Font.register({
+        family: 'NotoSans',
+        src: 'https://fonts.gstatic.com/s/notosans/v27/o-0IIpQlx3QUlC5A4PNb4g.woff2',
+    });
+} catch (error) {
+    // Font already registered, ignore error
+    console.log('NotoSans font already registered or error occurred:', error.message);
+}
 
 // Utility: format date for table
 const formatDate = (date) => date ? new Date(date).toISOString().split('T')[0] : '';
@@ -220,7 +232,7 @@ const InvoicePDF = ({ contracts = [], invoiceNumber = null }) => {
                         <Text style={{ flex: 1, padding: 4 }}>AMOUNT</Text>
                     </View>
                     <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderColor: '#2d3991', fontSize: 9 }}>
-                        <Text style={{ flex: 0.5, padding: 4, backgroundColor: '#f7f3d6' }}>{contracts.length}</Text>
+                        <Text style={{ flex: 0.5, padding: 4, backgroundColor: '#f7f3d6' }}>{safeContracts.length}</Text>
                         <Text style={{ flex: 1, padding: 4, backgroundColor: '#f7f3d6' }}>PCS</Text>
                         <Text style={{ flex: 4, padding: 4, backgroundColor: '#f7f3d6' }}>{desc}</Text>
                         <Text style={{ flex: 1, padding: 4, backgroundColor: '#f7f3d6' }}>₱{subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
@@ -288,106 +300,45 @@ const InvoicePDF = ({ contracts = [], invoiceNumber = null }) => {
 };
 
 // --- COMBINED SOA AND INVOICE PDF COMPONENT ---
-const CombinedSOAInvoicePDF = ({ contracts = [], dateRange, invoiceNumber = null }) => {
-    const today = new Date();
-    const todayFormatted = formatDateFns(today, 'MMMM d, yyyy');
-    const invoiceNo = invoiceNumber || formatDateFns(today, 'yyyyMMdd');
-    const monthStart = startOfMonth(today);
-    const monthEnd = endOfMonth(today);
-    const dueDate = formatDateFns(monthEnd, 'MMMM d, yyyy');
-    const desc = `PIR Luggage Delivery – ${formatDateFns(monthStart, 'MMMM d, yyyy')} to ${formatDateFns(monthEnd, 'MMMM d, yyyy')}`;
-    
-    // Calculate totals safely
-    const subtotal = contracts.reduce((sum, c) => sum + (Number(c.delivery_charge) || 0), 0);
-    const surchargeTotal = contracts.reduce((sum, c) => sum + (Number(c.delivery_surcharge || c.surcharge) || 0), 0);
-    const discountTotal = contracts.reduce((sum, c) => sum + (Number(c.delivery_discount || c.discount) || 0), 0);
-    const getRowAmount = (c) => {
-        const delivery_charge = Number(c.delivery_charge) || 0;
-        const delivery_surcharge = Number(c.delivery_surcharge || c.surcharge) || 0;
-        const delivery_discount = Number(c.delivery_discount || c.discount) || 0;
-        return Math.max(0, (delivery_charge + delivery_surcharge) - delivery_discount);
-    };
-    const totalAmount = contracts.reduce((sum, c) => sum + getRowAmount(c), 0);
-    const vat = totalAmount * 0.12;
-    const finalTotal = totalAmount + vat;
+const CombinedSOAInvoicePDF = ({ contracts = [], dateRange, invoiceNumber = null, proofOfDeliveryData = {} }) => {
+    // Add error boundary and validation
+    try {
+        const today = new Date();
+        const todayFormatted = formatDateFns(today, 'MMMM d, yyyy');
+        const invoiceNo = invoiceNumber || formatDateFns(today, 'yyyyMMdd');
+        const monthStart = startOfMonth(today);
+        const monthEnd = endOfMonth(today);
+        const dueDate = formatDateFns(monthEnd, 'MMMM d, yyyy');
+        const desc = `PIR Luggage Delivery – ${formatDateFns(monthStart, 'MMMM d, yyyy')} to ${formatDateFns(monthEnd, 'MMMM d, yyyy')}`;
+        
+        // Ensure contracts is an array
+        const safeContracts = Array.isArray(contracts) ? contracts : [];
+        
+        // Calculate totals safely
+        const subtotal = safeContracts.reduce((sum, c) => sum + (Number(c.delivery_charge) || 0), 0);
+        const surchargeTotal = safeContracts.reduce((sum, c) => sum + (Number(c.delivery_surcharge || c.surcharge) || 0), 0);
+        const discountTotal = safeContracts.reduce((sum, c) => sum + (Number(c.delivery_discount || c.discount) || 0), 0);
+        const getRowAmount = (c) => {
+            const delivery_charge = Number(c.delivery_charge) || 0;
+            const delivery_surcharge = Number(c.delivery_surcharge || c.surcharge) || 0;
+            const delivery_discount = Number(c.delivery_discount || c.discount) || 0;
+            return Math.max(0, (delivery_charge + delivery_surcharge) - delivery_discount);
+        };
+        const totalAmount = safeContracts.reduce((sum, c) => sum + getRowAmount(c), 0);
+        const vat = totalAmount * 0.12;
+        const finalTotal = totalAmount + vat;
 
-    const formatDate = (dateString) => {
-        if (!dateString) return 'N/A';
-        try {
-            const date = new Date(dateString);
-            return date.toLocaleString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
-        } catch { return 'N/A'; }
-    };
+        const formatDate = (dateString) => {
+            if (!dateString) return 'N/A';
+            try {
+                const date = new Date(dateString);
+                return date.toLocaleString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+            } catch { return 'N/A'; }
+        };
 
     return (
         <Document>
-            {/* First Page - SOA */}
-            <PDFPage size="A4" style={{ padding: 12, fontSize: 8, fontFamily: 'Roboto' }}>
-                <View style={{ alignItems: 'center', marginBottom: 4 }}>
-                    <Text style={{ fontSize: 14, fontWeight: 'bold' }}>GHE TRANSMITTAL - AIRPORT CLIENTS PROPERTY IRREGULARITY SUMMARY REPORT</Text>
-                    <Text style={{ fontSize: 12, marginTop: 2 }}>{dateRange || 'No date range specified'}</Text>
-                </View>
-                <View style={{ borderWidth: 1, borderColor: '#000', marginBottom: 4 }}>
-                    <View style={{ flexDirection: 'row', backgroundColor: '#eee', borderBottomWidth: 1, borderColor: '#000' }}>
-                        <Text style={{ flex: 0.5, fontWeight: 'bold', padding: 2, fontSize: 8 }}>No.</Text>
-                        <Text style={{ flex: 1, fontWeight: 'bold', padding: 2, fontSize: 8 }}>Tracking ID</Text>
-                        <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 2, fontSize: 8 }}>Invoice No.</Text>
-                        <Text style={{ flex: 2, fontWeight: 'bold', padding: 2, fontSize: 8 }}>Luggage Owner</Text>
-                        <Text style={{ flex: 1, fontWeight: 'bold', padding: 2, fontSize: 8 }}>Flight No.</Text>
-                        <Text style={{ flex: 2.5, fontWeight: 'bold', padding: 2, fontSize: 8 }}>Address</Text>
-                        <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 2, fontSize: 8 }}>Date Received</Text>
-                        <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 2, fontSize: 8 }}>Status</Text>
-                        <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 2, fontSize: 8 }}>Amount</Text>
-                        <Text style={{ flex: 1, fontWeight: 'bold', padding: 2, fontSize: 8 }}>Remarks</Text>
-                    </View>
-                    {contracts.map((c, idx) => (
-                        <View key={c.id || idx} style={{ flexDirection: 'row', borderBottomWidth: 1, borderColor: '#000' }}>
-                            <Text style={{ flex: 0.5, padding: 2, fontSize: 8 }}>{idx + 1}</Text>
-                            <Text style={{ flex: 1, padding: 2, fontSize: 8 }}>{c.id}</Text>
-                            <Text style={{ flex: 1.5, padding: 2, fontSize: 8 }}>{c.summary_id || 'N/A'}</Text>
-                            <Text style={{ flex: 2, padding: 2, fontSize: 8 }}>{c.owner_first_name || c.owner_middle_initial || c.owner_last_name ? `${c.owner_first_name || ''} ${c.owner_middle_initial || ''} ${c.owner_last_name || ''}`.replace(/  +/g, ' ').trim() : 'N/A'}</Text>
-                            <Text style={{ flex: 1, padding: 2, fontSize: 8 }}>{c.flight_number || 'N/A'}</Text>
-                            <Text style={{ flex: 2.5, padding: 2, fontSize: 8 }}>{c.drop_off_location || 'N/A'}</Text>
-                            <Text style={{ flex: 1.5, padding: 2, fontSize: 8 }}>{formatDate(c.delivered_at || c.created_at)}</Text>
-                            <Text style={{ flex: 1.5, padding: 2, fontSize: 8 }}>{c.contract_status?.status_name || 'N/A'}</Text>
-                            <Text style={{ flex: 1.5, padding: 2, fontFamily: 'Roboto', fontSize: 8 }}>{'\u20B1\u00A0'}{getRowAmount(c).toFixed(2)}</Text>
-                            <Text style={{ flex: 1, padding: 2, fontSize: 8 }}>{c.contract_status?.status_name === 'Delivery Failed' ? 'Delivery Failed' : ''}</Text>
-                        </View>
-                    ))}
-                    <View style={{ flexDirection: 'row', borderTopWidth: 1, borderColor: '#000', backgroundColor: '#f7f7f7' }}>
-                        <Text style={{ flex: 9, fontWeight: 'bold', padding: 2, textAlign: 'right', fontSize: 8 }}>Subtotal:</Text>
-                        <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 2, fontFamily: 'Roboto', fontSize: 8 }}>{'\u20B1\u00A0'}{subtotal.toFixed(2)}</Text>
-                        <Text style={{ flex: 1 }}></Text>
-                    </View>
-                    <View style={{ flexDirection: 'row', borderTopWidth: 1, borderColor: '#000', backgroundColor: '#f7f7f7' }}>
-                        <Text style={{ flex: 9, fontWeight: 'bold', padding: 2, textAlign: 'right', fontSize: 8 }}>Surcharge Total:</Text>
-                        <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 2, fontFamily: 'Roboto', fontSize: 8 }}>{'\u20B1\u00A0'}{surchargeTotal.toFixed(2)}</Text>
-                        <Text style={{ flex: 1 }}></Text>
-                    </View>
-                    <View style={{ flexDirection: 'row', borderTopWidth: 1, borderColor: '#000', backgroundColor: '#f7f7f7' }}>
-                        <Text style={{ flex: 9, fontWeight: 'bold', padding: 2, textAlign: 'right', fontSize: 8 }}>Discount Total:</Text>
-                        <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 2, fontFamily: 'Roboto', fontSize: 8 }}>{'\u20B1\u00A0'}{discountTotal.toFixed(2)}</Text>
-                        <Text style={{ flex: 1 }}></Text>
-                    </View>
-                    <View style={{ flexDirection: 'row', borderTopWidth: 2, borderColor: '#000', backgroundColor: '#eee' }}>
-                        <Text style={{ flex: 10.5, fontWeight: 'bold', padding: 2, textAlign: 'right', fontSize: 8 }}>TOTAL</Text>
-                        <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 2, fontFamily: 'Roboto', fontSize: 8 }}>{'\u20B1\u00A0'}{totalAmount.toFixed(2)}</Text>
-                    </View>
-                </View>
-                <View style={{ flexDirection: 'row', marginTop: 12, justifyContent: 'space-between' }}>
-                    <View>
-                        <Text style={{ fontSize: 8 }}>Received by: _______________, Date: _______________</Text>
-                        <Text style={{ fontWeight: 'bold', marginTop: 4, fontSize: 8 }}>AIRLINE'S REPRESENTATIVE</Text>
-                    </View>
-                    <View style={{ alignItems: 'flex-end' }}>
-                        <Text style={{ fontSize: 8 }}>GENERATED ON: {formatDate(new Date().toISOString())}</Text>
-                        <Text style={{ fontSize: 8 }}>*************SUBMITTED ALL ORIGINAL SIGNED PIR*****</Text>
-                        <Text style={{ fontSize: 8 }}>Total PIR submitted: {contracts.length}</Text>
-                    </View>
-                </View>
-            </PDFPage>
-
-            {/* Second Page - Invoice */}
+            {/* First Page - Invoice */}
             <PDFPage size="A4" style={{ padding: 24, fontSize: 10, fontFamily: 'Roboto', position: 'relative' }}>
                 {/* Header */}
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 }}>
@@ -427,7 +378,7 @@ const CombinedSOAInvoicePDF = ({ contracts = [], dateRange, invoiceNumber = null
                         <Text style={{ flex: 1, padding: 4 }}>AMOUNT</Text>
                     </View>
                     <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderColor: '#2d3991', fontSize: 9 }}>
-                        <Text style={{ flex: 0.5, padding: 4, backgroundColor: '#f7f3d6' }}>{contracts.length}</Text>
+                        <Text style={{ flex: 0.5, padding: 4, backgroundColor: '#f7f3d6' }}>{safeContracts.length}</Text>
                         <Text style={{ flex: 1, padding: 4, backgroundColor: '#f7f3d6' }}>PCS</Text>
                         <Text style={{ flex: 4, padding: 4, backgroundColor: '#f7f3d6' }}>{desc}</Text>
                         <Text style={{ flex: 1, padding: 4, backgroundColor: '#f7f3d6' }}>₱{totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
@@ -490,8 +441,153 @@ const CombinedSOAInvoicePDF = ({ contracts = [], dateRange, invoiceNumber = null
                     </View>
                 </View>
             </PDFPage>
+
+            {/* Second Page - SOA */}
+            <PDFPage size="A4" style={{ padding: 12, fontSize: 8, fontFamily: 'Roboto' }}>
+                <View style={{ alignItems: 'center', marginBottom: 4 }}>
+                    <Text style={{ fontSize: 14, fontWeight: 'bold' }}>GHE TRANSMITTAL - AIRPORT CLIENTS PROPERTY IRREGULARITY SUMMARY REPORT</Text>
+                    <Text style={{ fontSize: 12, marginTop: 2 }}>{dateRange || 'No date range specified'}</Text>
+                </View>
+                <View style={{ borderWidth: 1, borderColor: '#000', marginBottom: 4 }}>
+                    <View style={{ flexDirection: 'row', backgroundColor: '#eee', borderBottomWidth: 1, borderColor: '#000' }}>
+                        <Text style={{ flex: 0.5, fontWeight: 'bold', padding: 2, fontSize: 8 }}>No.</Text>
+                        <Text style={{ flex: 1, fontWeight: 'bold', padding: 2, fontSize: 8 }}>Tracking ID</Text>
+                        <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 2, fontSize: 8 }}>Invoice No.</Text>
+                        <Text style={{ flex: 2, fontWeight: 'bold', padding: 2, fontSize: 8 }}>Luggage Owner</Text>
+                        <Text style={{ flex: 1, fontWeight: 'bold', padding: 2, fontSize: 8 }}>Flight No.</Text>
+                        <Text style={{ flex: 2.5, fontWeight: 'bold', padding: 2, fontSize: 8 }}>Address</Text>
+                        <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 2, fontSize: 8 }}>Date Received</Text>
+                        <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 2, fontSize: 8 }}>Status</Text>
+                        <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 2, fontSize: 8 }}>Amount</Text>
+                        <Text style={{ flex: 1, fontWeight: 'bold', padding: 2, fontSize: 8 }}>Remarks</Text>
+                    </View>
+                    {safeContracts.map((c, idx) => (
+                        <View key={c.id || idx} style={{ flexDirection: 'row', borderBottomWidth: 1, borderColor: '#000' }}>
+                            <Text style={{ flex: 0.5, padding: 2, fontSize: 8 }}>{idx + 1}</Text>
+                            <Text style={{ flex: 1, padding: 2, fontSize: 8 }}>{c.id}</Text>
+                            <Text style={{ flex: 1.5, padding: 2, fontSize: 8 }}>{c.summary_id || 'N/A'}</Text>
+                            <Text style={{ flex: 2, padding: 2, fontSize: 8 }}>{c.owner_first_name || c.owner_middle_initial || c.owner_last_name ? `${c.owner_first_name || ''} ${c.owner_middle_initial || ''} ${c.owner_last_name || ''}`.replace(/  +/g, ' ').trim() : 'N/A'}</Text>
+                            <Text style={{ flex: 1, padding: 2, fontSize: 8 }}>{c.flight_number || 'N/A'}</Text>
+                            <Text style={{ flex: 2.5, padding: 2, fontSize: 8 }}>{c.drop_off_location || 'N/A'}</Text>
+                            <Text style={{ flex: 1.5, padding: 2, fontSize: 8 }}>{formatDate(c.delivered_at || c.created_at)}</Text>
+                            <Text style={{ flex: 1.5, padding: 2, fontSize: 8 }}>{c.contract_status?.status_name || 'N/A'}</Text>
+                            <Text style={{ flex: 1.5, padding: 2, fontFamily: 'Roboto', fontSize: 8 }}>{'\u20B1\u00A0'}{getRowAmount(c).toFixed(2)}</Text>
+                            <Text style={{ flex: 1, padding: 2, fontSize: 8 }}>{c.contract_status?.status_name === 'Delivery Failed' ? 'Delivery Failed' : ''}</Text>
+                        </View>
+                    ))}
+                    <View style={{ flexDirection: 'row', borderTopWidth: 1, borderColor: '#000', backgroundColor: '#f7f7f7' }}>
+                        <Text style={{ flex: 9, fontWeight: 'bold', padding: 2, textAlign: 'right', fontSize: 8 }}>Subtotal:</Text>
+                        <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 2, fontFamily: 'Roboto', fontSize: 8 }}>{'\u20B1\u00A0'}{subtotal.toFixed(2)}</Text>
+                        <Text style={{ flex: 1 }}></Text>
+                    </View>
+                    <View style={{ flexDirection: 'row', borderTopWidth: 1, borderColor: '#000', backgroundColor: '#f7f7f7' }}>
+                        <Text style={{ flex: 9, fontWeight: 'bold', padding: 2, textAlign: 'right', fontSize: 8 }}>Surcharge Total:</Text>
+                        <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 2, fontFamily: 'Roboto', fontSize: 8 }}>{'\u20B1\u00A0'}{surchargeTotal.toFixed(2)}</Text>
+                        <Text style={{ flex: 1 }}></Text>
+                    </View>
+                    <View style={{ flexDirection: 'row', borderTopWidth: 1, borderColor: '#000', backgroundColor: '#f7f7f7' }}>
+                        <Text style={{ flex: 9, fontWeight: 'bold', padding: 2, textAlign: 'right', fontSize: 8 }}>Discount Total:</Text>
+                        <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 2, fontFamily: 'Roboto', fontSize: 8 }}>{'\u20B1\u00A0'}{discountTotal.toFixed(2)}</Text>
+                        <Text style={{ flex: 1 }}></Text>
+                    </View>
+                    <View style={{ flexDirection: 'row', borderTopWidth: 2, borderColor: '#000', backgroundColor: '#eee' }}>
+                        <Text style={{ flex: 10.5, fontWeight: 'bold', padding: 2, textAlign: 'right', fontSize: 8 }}>TOTAL</Text>
+                        <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 2, fontFamily: 'Roboto', fontSize: 8 }}>{'\u20B1\u00A0'}{totalAmount.toFixed(2)}</Text>
+                    </View>
+                </View>
+                <View style={{ flexDirection: 'row', marginTop: 12, justifyContent: 'space-between' }}>
+                    <View>
+                        <Text style={{ fontSize: 8 }}>Received by: _______________, Date: _______________</Text>
+                        <Text style={{ fontWeight: 'bold', marginTop: 4, fontSize: 8 }}>AIRLINE'S REPRESENTATIVE</Text>
+                    </View>
+                    <View style={{ alignItems: 'flex-end' }}>
+                        <Text style={{ fontSize: 8 }}>GENERATED ON: {formatDate(new Date().toISOString())}</Text>
+                        <Text style={{ fontSize: 8 }}>*************SUBMITTED ALL ORIGINAL SIGNED PIR*****</Text>
+                        <Text style={{ fontSize: 8 }}>Total PIR submitted: {safeContracts.length}</Text>
+                    </View>
+                </View>
+            </PDFPage>
+
+            {/* Proof of Delivery Pages - One per contract */}
+            {safeContracts.map((contract, index) => {
+                const podData = proofOfDeliveryData[contract.id];
+                const ownerName = contract.owner_first_name || contract.owner_middle_initial || contract.owner_last_name 
+                    ? `${contract.owner_first_name || ''} ${contract.owner_middle_initial || ''} ${contract.owner_last_name || ''}`.replace(/  +/g, ' ').trim()
+                    : 'N/A';
+                
+                return (
+                    <PDFPage key={`pod-${contract.id}`} size="A4" style={{ padding: 24, fontSize: 10, fontFamily: 'Roboto' }}>
+                        <View style={{ alignItems: 'center', marginBottom: 16 }}>
+                            <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#2d3991' }}>PROOF OF DELIVERY</Text>
+                            <Text style={{ fontSize: 12, marginTop: 4 }}>Contract ID: {contract.id}</Text>
+                        </View>
+                        
+                        <View style={{ marginBottom: 16 }}>
+                            <Text style={{ fontSize: 12, fontWeight: 'bold', marginBottom: 8 }}>Contract Details:</Text>
+                            <View style={{ padding: 8, backgroundColor: '#f5f5f5', borderRadius: 4 }}>
+                                <Text style={{ fontSize: 10, marginBottom: 2 }}>Contract ID: {contract.id}</Text>
+                                <Text style={{ fontSize: 10, marginBottom: 2 }}>Luggage Owner: {ownerName}</Text>
+                                <Text style={{ fontSize: 10, marginBottom: 2 }}>Flight Number: {contract.flight_number || 'N/A'}</Text>
+                                <Text style={{ fontSize: 10, marginBottom: 2 }}>Pickup Location: {contract.pickup_location || 'N/A'}</Text>
+                                <Text style={{ fontSize: 10, marginBottom: 2 }}>Drop-off Location: {contract.drop_off_location || 'N/A'}</Text>
+                                <Text style={{ fontSize: 10, marginBottom: 2 }}>Delivery Date: {formatDate(contract.delivered_at || contract.created_at)}</Text>
+                                <Text style={{ fontSize: 10, marginBottom: 2 }}>Status: {contract.contract_status?.status_name || 'N/A'}</Text>
+                            </View>
+                        </View>
+
+                        {podData && podData.proof_of_delivery ? (
+                            <View style={{ alignItems: 'center', marginBottom: 16 }}>
+                                <Text style={{ fontSize: 12, fontWeight: 'bold', marginBottom: 8 }}>Proof of Delivery Image:</Text>
+                                <View style={{ 
+                                    width: '100%', 
+                                    height: 400,
+                                    border: '1px solid #ddd',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    backgroundColor: '#f9f9f9'
+                                }}>
+                                    <Image 
+                                        src={podData.proof_of_delivery} 
+                                        style={{ 
+                                            maxWidth: '100%', 
+                                            maxHeight: '100%',
+                                            objectFit: 'contain'
+                                        }} 
+                                        cache={false}
+                                    />
+                                </View>
+                                {podData.delivery_timestamp && (
+                                    <Text style={{ fontSize: 10, marginTop: 8, color: '#666' }}>
+                                        Delivered at: {formatDate(podData.delivery_timestamp)}
+                                    </Text>
+                                )}
+                            </View>
+                        ) : (
+                            <View style={{ alignItems: 'center', marginBottom: 16, padding: 20, backgroundColor: '#f9f9f9', borderRadius: 4 }}>
+                                <Text style={{ fontSize: 12, color: '#666' }}>No proof of delivery available for this contract</Text>
+                            </View>
+                        )}
+
+                        {/* Removed signature/date/time section as requested */}
+                    </PDFPage>
+                );
+            })}
         </Document>
     );
+    } catch (error) {
+        console.error('Error in CombinedSOAInvoicePDF:', error);
+        return (
+            <Document>
+                <PDFPage size="A4" style={{ padding: 24, fontSize: 10, fontFamily: 'Roboto' }}>
+                    <View style={{ alignItems: 'center', marginBottom: 8 }}>
+                        <Text style={{ fontSize: 16, fontWeight: 'bold', color: 'red' }}>Error generating PDF</Text>
+                        <Text style={{ fontSize: 12, marginTop: 4 }}>Please try again or contact support</Text>
+                    </View>
+                </PDFPage>
+            </Document>
+        );
+    }
 };
 
 // Transaction management main logic
@@ -1454,6 +1550,20 @@ const TransactionManagement = () => {
 
          const handleGenerateSummaryReport = async (summary) => {
         try {
+            // Prevent multiple simultaneous PDF generations
+            if (shouldRenderCombinedPDF) {
+                setSnackbar({
+                    open: true,
+                    message: 'PDF generation in progress. Please wait...',
+                    severity: 'warning'
+                });
+                return;
+            }
+
+            // Reset previous PDF state
+            setShouldRenderCombinedPDF(false);
+            setCombinedPDFData(null);
+
             // Fetch contracts associated with this summary
             const response = await fetch('/api/admin', {
                 method: 'POST',
@@ -1480,6 +1590,32 @@ const TransactionManagement = () => {
                 return;
             }
             
+            // Fetch proof of delivery for all contracts
+            const proofOfDeliveryData = {};
+            const podPromises = contracts.map(async (contract) => {
+                try {
+                    const podResponse = await fetch('/api/admin', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            action: 'getProofOfDelivery',
+                            params: { contract_id: contract.id }
+                        })
+                    });
+                    
+                    if (podResponse.ok) {
+                        const podData = await podResponse.json();
+                        if (podData.proof_of_delivery) {
+                            proofOfDeliveryData[contract.id] = podData;
+                        }
+                    }
+                } catch (error) {
+                    console.error(`Error fetching proof of delivery for contract ${contract.id}:`, error);
+                }
+            });
+            
+            await Promise.all(podPromises);
+            
             // Generate date range for the contracts
             const minDate = contracts.reduce((min, c) => c.created_at && c.created_at < min ? c.created_at : min, contracts[0].created_at);
             const maxDate = contracts.reduce((max, c) => c.created_at && c.created_at > max ? c.created_at : max, contracts[0].created_at);
@@ -1489,7 +1625,8 @@ const TransactionManagement = () => {
             setCombinedPDFData({
                 contracts,
                 dateRange,
-                invoiceNumber: summary.invoice_id || null
+                invoiceNumber: summary.invoice_id || null,
+                proofOfDeliveryData
             });
             
             // Trigger PDF generation
@@ -1500,11 +1637,16 @@ const TransactionManagement = () => {
                 if (pdfDownloadRef.current) {
                     pdfDownloadRef.current.click();
                 }
-            }, 1000);
+                // Reset state after download
+                setTimeout(() => {
+                    setShouldRenderCombinedPDF(false);
+                    setCombinedPDFData(null);
+                }, 2000);
+            }, 1500);
             
             setSnackbar({
                 open: true,
-                message: `Combined SOA and Invoice PDF generated and downloaded for summary ${summary.id}`,
+                message: `Combined SOA and Invoice PDF with Proof of Delivery generated and downloaded for summary ${summary.id}`,
                 severity: 'success'
             });
         } catch (error) {
@@ -1514,6 +1656,9 @@ const TransactionManagement = () => {
                 message: error.message || 'Failed to generate combined PDF',
                 severity: 'error'
             });
+            // Reset state on error
+            setShouldRenderCombinedPDF(false);
+            setCombinedPDFData(null);
         }
     };
 
@@ -1953,6 +2098,7 @@ const TransactionManagement = () => {
                                         contracts={combinedPDFData.contracts} 
                                         dateRange={combinedPDFData.dateRange}
                                         invoiceNumber={combinedPDFData.invoiceNumber}
+                                        proofOfDeliveryData={combinedPDFData.proofOfDeliveryData || {}}
                                     />}
                                     fileName={`Combined-SOA-Invoice-${combinedPDFData.invoiceNumber || 'Summary'}.pdf`}
                                 >
