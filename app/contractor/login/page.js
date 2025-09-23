@@ -103,7 +103,9 @@ export default function Page() {
             if (profile.profiles_status?.status_name === "Archived") {
                 await supabase.auth.signOut();
                 console.log('Account archived, signing out.');
-                throw new Error("This account has been archived.");
+                setSnackbar({ open: true, message: "Account not found.", severity: "error" });
+                setEmail(""); setPassword(""); setIsLoading(false);
+                return;
             }
 
             console.log('User role_id:', profile.role_id);

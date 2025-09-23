@@ -88,7 +88,12 @@ export default function Page() {
 
       if (!profile) { await supabase.auth.signOut(); throw new Error("User profile not found."); }
       if (profile.profiles_status?.status_name === "Deactivated") { await supabase.auth.signOut(); throw new Error("This account has been deactivated."); }
-      if (profile.profiles_status?.status_name === "Archived") { await supabase.auth.signOut(); throw new Error("This account has been archived."); }
+      if (profile.profiles_status?.status_name === "Archived") {
+        await supabase.auth.signOut();
+        setSnackbar({ open: true, message: "Account not found.", severity: "error" });
+        setEmail(""); setPassword(""); setIsLoading(false);
+        return;
+      }
       if (Number(profile.role_id) !== adminRoleId) {
         await supabase.auth.signOut();
         setSnackbar({ open: true, message: "Access denied: Only administrators can log in here.", severity: "error" });
