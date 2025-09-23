@@ -1397,7 +1397,7 @@ export default function Page() {
     const handleExpandClick = (contractId) => { setExpandedContracts((prev) => prev.includes(contractId) ? prev.filter((id) => id !== contractId) : [...prev, contractId]); };
 
     const handleTrackContract = (contractId) => {
-        router.push(`/airline/luggage-tracking?contractId=${contractId}`);
+        router.push(`/contractor/luggage-tracking?contractId=${contractId}`);
     };
 
     const handleViewDetails = (contract) => {

@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useEffect, useRef, Suspense } from "react";
-import { Box, Typography, TextField, Paper, Divider, IconButton, Collapse, CircularProgress, Snackbar, Alert } from "@mui/material";
+import { Box, Typography, TextField, Paper, Divider, IconButton, Collapse, CircularProgress, Snackbar, Alert, Button } from "@mui/material";
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import CloseIcon from '@mui/icons-material/Close';
+import DirectionsIcon from '@mui/icons-material/Directions';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import dynamic from 'next/dynamic';
 import { useSearchParams, useRouter } from 'next/navigation';
@@ -26,7 +27,6 @@ function LuggageTrackingContent() {
   // State and hooks
   const searchParams = useSearchParams();
   const router = useRouter();
-  const [mounted, setMounted] = useState(false);
   const [contractId, setContractId] = useState("");
   const [contract, setContract] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -35,52 +35,47 @@ function LuggageTrackingContent() {
   const [map, setMap] = useState(null);
   const [isScriptLoaded, setIsScriptLoaded] = useState(false);
   const [mapError, setMapError] = useState(null);
-  const [progress, setProgress] = useState(0);
-  const [routeDetails, setRouteDetails] = useState({ distance: null, duration: null });
-  const [totalRouteDetails, setTotalRouteDetails] = useState({ distance: null, duration: null });
-  const [eta, setEta] = useState(null);
+  // Directions API related state
+  const [routeData, setRouteData] = useState({ eta: null, distanceRemaining: null, progress: 0, polyline: null, totalDistance: null });
+  const [isLoadingDirections, setIsLoadingDirections] = useState(false);
+  const [directionsError, setDirectionsError] = useState(null);
+  const [lastDirectionsRequest, setLastDirectionsRequest] = useState(0);
+  const [cooldownRemaining, setCooldownRemaining] = useState(0);
   const mapRef = useRef(null);
   const markerRef = useRef(null);
   const currentLocationMarkerRef = useRef(null);
-  const pathRef = useRef([]);
   const polylineRef = useRef(null);
   const directionsServiceRef = useRef(null);
-  const routeSegmentsRef = useRef([]);
   const supabase = createClientComponentClient();
   const previousValidContractIdRef = useRef("");
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState("");
   const [snackbarSeverity, setSnackbarSeverity] = useState("info");
-  
-  // Add refs to prevent loops
-  const scriptLoadingRef = useRef(false);
-  const mapInitializedRef = useRef(false);
-  const currentContractIdRef = useRef("");
 
-  // Mount effect
+  // Cooldown effect - updates every second
   useEffect(() => {
-    console.log('Component mounted');
-    setMounted(true);
-  }, []);
+    let cooldownInterval;
+    if (cooldownRemaining > 0) {
+      cooldownInterval = setInterval(() => {
+        setCooldownRemaining(prev => Math.max(0, prev - 1));
+      }, 1000);
+    }
+    return () => { if (cooldownInterval) clearInterval(cooldownInterval); };
+  }, [cooldownRemaining]);
 
   // Handle contract ID from URL
   useEffect(() => {
     const idFromUrl = searchParams.get('contractId');
     if (idFromUrl) {
-      console.log('Contract ID from URL:', idFromUrl);
       setContractId(idFromUrl);
-      // Don't call handleSearch here, let the contractId effect handle it
+      handleSearch(idFromUrl);
     }
   }, [searchParams]);
 
-  // Fetch contract and luggage info directly from Supabase (contracts table)
+  // Fetch contract and luggage info via API (mirror admin)
   const fetchData = async (id = contractId) => {
     if (!id.trim()) return;
     
-    console.log('fetchData called with ID:', id);
-    
-    // Only show errors if the current ID is longer than the previous valid ID
-    // This prevents showing errors when user is reducing the contract ID
     const shouldShowErrors = id.length >= previousValidContractIdRef.current.length;
     
     if (shouldShowErrors) {
@@ -89,146 +84,36 @@ function LuggageTrackingContent() {
     
     setLoading(true);
     try {
-      console.log('Fetching contract data for ID from Supabase (admin-like joined select):', id);
-      let joinedError = null;
-      const { data: joinedData, error: errJoined } = await supabase
-        .from('contracts')
-        .select(`
-          id, contract_status_id, airline_id, delivery_id,
-          owner_first_name, owner_middle_initial, owner_last_name, owner_contact,
-          luggage_description, luggage_quantity,
-          flight_number,
-          delivery_address, address_line_1, address_line_2,
-          pickup_location, current_location, drop_off_location,
-          pickup_location_geo, current_location_geo, drop_off_location_geo,
-          remarks, passenger_form, passenger_id, proof_of_delivery,
-          created_at, cancelled_at, accepted_at, pickup_at, delivered_at,
-          delivery_charge, delivery_surcharge, delivery_discount,
-          summary_id,
-          airline:airline_id (*),
-          delivery:delivery_id (*),
-          contract_status:contract_status_id (id, status_name)
-        `)
-        .eq('id', id)
-        .is('summary_id', null)
-        .single();
-
-      if (!errJoined && joinedData) {
-        previousValidContractIdRef.current = id;
-        const newContract = {
-          ...joinedData,
-          pickup_location_geo: joinedData.pickup_location_geo || null,
-          drop_off_location_geo: joinedData.drop_off_location_geo || null,
-          current_location_geo: joinedData.current_location_geo || null
-        };
-        setContract(prev => {
-          const shouldUpdate = JSON.stringify(prev) !== JSON.stringify(newContract);
-          return shouldUpdate ? newContract : prev;
-        });
-        return;
+      const response = await fetch(`/api/admin?contractId=${id}`);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to fetch contract data');
       }
-
-      joinedError = errJoined;
-      if (joinedError) {
-        console.warn('Joined select blocked or failed, falling back to base columns:', JSON.stringify(joinedError || {}, null, 2));
-      }
-
-      console.log('Fetching contract data (fallback base columns):', id);
-      const { data, error } = await supabase
-        .from('contracts')
-        .select(`
-          id, contract_status_id, airline_id, delivery_id,
-          owner_first_name, owner_middle_initial, owner_last_name, owner_contact,
-          luggage_description, luggage_weight, luggage_quantity,
-          flight_number, case_number,
-          delivery_address, address_line_1, address_line_2,
-          pickup_location, current_location, drop_off_location,
-          pickup_location_geo, current_location_geo, drop_off_location_geo,
-          remarks, passenger_form, passenger_id, proof_of_delivery,
-          created_at, cancelled_at, accepted_at, pickup_at, delivered_at,
-          delivery_charge, delivery_surcharge, delivery_discount,
-          summary_id
-        `)
-        .eq('id', id)
-        .is('summary_id', null)
-        .single();
-
-      if (error) {
-        // Gracefully handle 'no rows' to avoid noisy errors in UI
-        if (error.code === 'PGRST116' || (error.message && error.message.includes('no) rows returned'))) {
-          if (shouldShowErrors) {
-            setError('No contract data found');
-            setSnackbarMessage('Invalid luggage tracking ID. No contract found.');
-            setSnackbarSeverity('error');
-            setSnackbarOpen(true);
-          }
-          return; // Stop further processing
-        }
-        console.error('Supabase error fetching contract (fallback):', JSON.stringify(error || {}, null, 2));
-        throw new Error('Contract not found');
-      }
+      const { data } = await response.json();
 
       if (data) {
-        // Optionally fetch related rows if policies allow
-        let statusObj = null;
-        if (data.contract_status_id != null) {
-          const { data: statusRow } = await supabase
-            .from('contract_status')
-            .select('id, status_name')
-            .eq('id', data.contract_status_id)
-            .maybeSingle();
-          statusObj = statusRow || null;
-        }
-        let airlineObj = null;
-        if (data.airline_id) {
-          const { data: airlineRow } = await supabase
-            .from('profiles')
-            .select('id, first_name, middle_initial, last_name, suffix, email, contact_number')
-            .eq('id', data.airline_id)
-            .maybeSingle();
-          airlineObj = airlineRow || null;
-        }
-        let deliveryObj = null;
-        if (data.delivery_id) {
-          const { data: deliveryRow } = await supabase
-            .from('profiles')
-            .select('id, first_name, middle_initial, last_name, suffix, email, contact_number')
-            .eq('id', data.delivery_id)
-            .maybeSingle();
-          deliveryObj = deliveryRow || null;
-        }
-        // Update the previous valid contract ID
         previousValidContractIdRef.current = id;
-        
         const newContract = {
           ...data,
+          luggage: data.luggage || [],
           pickup_location_geo: data.pickup_location_geo || null,
           drop_off_location_geo: data.drop_off_location_geo || null,
           current_location_geo: data.current_location_geo || null,
-          contract_status: statusObj,
-          airline: airlineObj,
-          delivery: deliveryObj
+          route_history: data.route_history || []
         };
-        console.log('Processed contract data:', newContract);
-        setContract(prev => {
-          const shouldUpdate = JSON.stringify(prev) !== JSON.stringify(newContract);
-          console.log('Contract state update:', { shouldUpdate, prevContract: prev, newContract });
-          return shouldUpdate ? newContract : prev;
-        });
+        setContract(prev => (JSON.stringify(prev) !== JSON.stringify(newContract) ? newContract : prev));
+        setRouteData({ eta: null, distanceRemaining: null, progress: 0, polyline: null, totalDistance: null });
       } else {
         if (shouldShowErrors) {
           setError('No contract data found');
-          // Show toast notification for invalid contract ID
           setSnackbarMessage('Invalid luggage tracking ID. No contract found.');
           setSnackbarSeverity('error');
           setSnackbarOpen(true);
         }
       }
     } catch (err) { 
-      console.error('Error fetching contract:', err);
       if (shouldShowErrors) {
         setError(err.message || 'Failed to fetch contract');
-        // Show toast notification for invalid contract ID
         setSnackbarMessage('Invalid luggage tracking ID. No contract found.');
         setSnackbarSeverity('error');
         setSnackbarOpen(true);
@@ -242,22 +127,16 @@ function LuggageTrackingContent() {
   useEffect(() => {
     if (!contractId) return;
     
-    console.log('Contract ID changed, resetting map and fetching data:', contractId);
-    
-    // Reset initialization flags for new contract
-    mapInitializedRef.current = false;
-    currentContractIdRef.current = contractId;
-    
     // Reset map and markers
     if (map) setMap(null);
     if (markerRef.current) { markerRef.current.map = null; markerRef.current = null; }
     if (currentLocationMarkerRef.current) { currentLocationMarkerRef.current.map = null; currentLocationMarkerRef.current = null; }
-    
-    // Don't reset isScriptLoaded - keep the script loaded
+    if (polylineRef.current) { polylineRef.current.setMap(null); polylineRef.current = null; }
+    setIsScriptLoaded(false);
     fetchData(contractId);
   }, [contractId]);
 
-  // Real-time subscription for contract changes (mirror admin)
+  // Real-time subscription for contract changes
   useEffect(() => {
     if (!contractId) return;
 
@@ -271,24 +150,15 @@ function LuggageTrackingContent() {
           return merged;
         });
 
-        // Update path and map when current location changes
-        if (updatedRow?.current_location_geo?.coordinates) {
+        // Update current location marker if it exists
+        if (updatedRow?.current_location_geo?.coordinates && currentLocationMarkerRef.current && map) {
           const newPosition = {
             lat: updatedRow.current_location_geo.coordinates[1],
             lng: updatedRow.current_location_geo.coordinates[0]
           };
-
-          if (Array.isArray(pathRef.current)) {
-            const lastPoint = pathRef.current[pathRef.current.length - 1];
-            pathRef.current.push(newPosition);
-            if (lastPoint && map && window?.google) {
-              await updatePolylineWithDirections(lastPoint, newPosition);
-            }
-          }
-
-          // Only update map location if map is initialized and we have current location data
-          if (map && updatedRow.current_location_geo?.coordinates) {
-            await updateMapLocation();
+          if (currentLocationMarkerRef.current && currentLocationMarkerRef.current.map) {
+            currentLocationMarkerRef.current.position = newPosition;
+            map.setCenter(newPosition);
           }
         }
       } catch (err) {
@@ -328,7 +198,7 @@ function LuggageTrackingContent() {
       channelContract.unsubscribe();
       channelContracts.unsubscribe();
     };
-  }, [contractId, supabase]); // Removed map from dependencies to prevent re-subscription
+  }, [contractId, supabase, map]);
 
   // Update polyline with directions
   const updatePolylineWithDirections = async (start, end) => {
@@ -398,150 +268,35 @@ function LuggageTrackingContent() {
     }
   };
 
-  // Google Maps script loader - only load once
+  // Google Maps script loader (mirror admin)
   useEffect(() => {
-    console.log('Script loader effect:', { mounted, isScriptLoaded, hasGoogle: !!window.google, scriptLoading: scriptLoadingRef.current });
-    
-    if (mounted && !isScriptLoaded && !window.google && !scriptLoadingRef.current) {
-      console.log('Loading Google Maps script...');
-      scriptLoadingRef.current = true;
-      
+    if (contract && !isScriptLoaded && !window.google) {
       const script = document.createElement('script');
       script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places,marker`;
       script.async = true;
       script.defer = true;
-      script.onload = () => {
-        console.log('Google Maps script loaded successfully');
-        setIsScriptLoaded(true);
-        scriptLoadingRef.current = false;
-      };
-      script.onerror = (error) => {
-        console.error('Failed to load Google Maps:', error);
-        setMapError('Failed to load Google Maps');
-        scriptLoadingRef.current = false;
-      };
+      script.onload = () => { setIsScriptLoaded(true); };
+      script.onerror = () => { setMapError('Failed to load Google Maps'); };
       document.head.appendChild(script);
+      return () => {
+        if (document.head.contains(script)) {
+          document.head.removeChild(script);
+        }
+      };
     }
-  }, [mounted, isScriptLoaded]);
+  }, [contract, isScriptLoaded]);
 
-  // Initialize map when script is loaded and contract is available - only once per contract
+  // Initialize map
   useEffect(() => {
-    console.log('Map initialization effect triggered:', {
-      isScriptLoaded,
-      hasContract: !!contract,
-      hasMap: !!map,
-      hasMapRef: !!mapRef.current,
-      mapInitialized: mapInitializedRef.current,
-      currentContractId: currentContractIdRef.current,
-      contractId: contract?.id
-    });
-
-    if (isScriptLoaded && contract && !map && mapRef.current && !mapInitializedRef.current && currentContractIdRef.current === contract.id) {
-      // Check if we have at least pickup or dropoff location coordinates
-      const hasLocationData = contract.pickup_location_geo?.coordinates || 
-                             contract.drop_off_location_geo?.coordinates || 
-                             contract.current_location_geo?.coordinates;
-      
-      if (hasLocationData) {
-        console.log('Initializing map with location data...');
-        mapInitializedRef.current = true;
-        const timer = setTimeout(() => {
-          initMap();
-        }, 100);
-        return () => clearTimeout(timer);
-      } else {
-        console.log('No location data available, skipping map initialization');
-        // Mark as initialized even without location data to prevent infinite waiting
-        mapInitializedRef.current = true;
-      }
+    if (isScriptLoaded && contract && !map) {
+      initMap();
     }
   }, [isScriptLoaded, contract, map]);
 
-  // Additional effect to trigger map initialization when all conditions are met
-  useEffect(() => {
-    if (isScriptLoaded && contract && mapRef.current && !map && !mapInitializedRef.current) {
-      console.log('Additional map initialization check triggered');
-      
-      // Force a small delay to ensure DOM is ready
-      const timer = setTimeout(() => {
-        if (isScriptLoaded && contract && mapRef.current && !map && !mapInitializedRef.current) {
-          console.log('Forcing map initialization...');
-          mapInitializedRef.current = true;
-          initMap();
-        }
-      }, 200);
-      
-      return () => clearTimeout(timer);
-    }
-  }, [isScriptLoaded, contract, mapRef.current]);
-
-  // Debug effect to track initialization state
-  useEffect(() => {
-    console.log('Debug - Current state:', {
-      mounted,
-      isScriptLoaded,
-      hasContract: !!contract,
-      contractId: contract?.id,
-      hasMap: !!map,
-      hasMapRef: !!mapRef.current,
-      mapInitialized: mapInitializedRef.current,
-      currentContractId: currentContractIdRef.current,
-      hasLocationData: !!(contract?.pickup_location_geo?.coordinates || contract?.drop_off_location_geo?.coordinates || contract?.current_location_geo?.coordinates)
-    });
-  }, [mounted, isScriptLoaded, contract, map, mapRef.current]);
-
   // Map initialization
   const initMap = () => {
-    console.log('initMap called with:', {
-      hasGoogle: !!window.google,
-      hasMapRef: !!mapRef.current,
-      hasContract: !!contract,
-      currentContractId: currentContractIdRef.current,
-      contractId: contract?.id,
-      contractData: contract
-    });
-
-    if (!window.google || !mapRef.current || !contract || currentContractIdRef.current !== contract.id) {
-      console.log('Map initialization skipped:', {
-        hasGoogle: !!window.google,
-        hasMapRef: !!mapRef.current,
-        hasContract: !!contract,
-        currentContractId: currentContractIdRef.current,
-        contractId: contract?.id
-      });
-      return;
-    }
-    
-    // Check if we have any location data to display
-    const hasLocationData = contract.pickup_location_geo?.coordinates || 
-                           contract.drop_off_location_geo?.coordinates || 
-                           contract.current_location_geo?.coordinates;
-    
-    if (!hasLocationData) {
-      console.log('No location data available for map initialization');
-      return;
-    }
-    
+    if (!window.google || !mapRef.current || !contract) return;
     try {
-      console.log('Initializing map with contract:', contract);
-      // Load route_history if available
-      if (contract.route_history && Array.isArray(contract.route_history) && contract.route_history.length > 0) {
-        pathRef.current = contract.route_history.map(point => ({ lat: point.lat, lng: point.lng }));
-      } else if (contract.current_location_geo?.coordinates) {
-        pathRef.current = [{
-          lat: contract.current_location_geo.coordinates[1],
-          lng: contract.current_location_geo.coordinates[0]
-        }];
-      } else {
-        pathRef.current = [];
-      }
-      
-      if (polylineRef.current) {
-        polylineRef.current.forEach(polyline => polyline.setMap(null));
-        polylineRef.current = [];
-      }
-      routeSegmentsRef.current = [];
-
       const defaultCenter = { lat: 14.5350, lng: 120.9821 };
       const mapOptions = {
         center: defaultCenter,
@@ -549,7 +304,7 @@ function LuggageTrackingContent() {
         mapTypeControl: false,
         streetViewControl: false,
         fullscreenControl: false,
-        zoomControl: false,
+        zoomControl: true,
         scaleControl: false,
         rotateControl: false,
         panControl: false,
@@ -559,34 +314,16 @@ function LuggageTrackingContent() {
         draggableCursor: 'grab',
         draggingCursor: 'grabbing'
       };
-
-      console.log('Creating new map instance...');
       const newMap = new window.google.maps.Map(mapRef.current, mapOptions);
       setMap(newMap);
       directionsServiceRef.current = new window.google.maps.DirectionsService();
 
       const markers = [];
-
       if (contract.current_location_geo?.coordinates) {
-        console.log('Adding current location marker:', contract.current_location_geo.coordinates);
-        const currentPosition = {
-          lat: contract.current_location_geo.coordinates[1],
-          lng: contract.current_location_geo.coordinates[0]
-        };
-
+        const currentPosition = { lat: contract.current_location_geo.coordinates[1], lng: contract.current_location_geo.coordinates[0] };
         const currentLocationMarker = document.createElement('div');
         currentLocationMarker.innerHTML = `
-          <style>
-            @keyframes pulse {
-              0% { transform: scale(1); opacity: 1; }
-              50% { transform: scale(1.2); opacity: 0.8; }
-              100% { transform: scale(1); opacity: 1; }
-            }
-            .location-marker {
-              animation: pulse 2s infinite;
-              filter: drop-shadow(0 0 8px rgba(76, 175, 80, 0.8));
-            }
-          </style>
+          <style>@keyframes pulse {0% {transform: scale(1); opacity: 1;} 50% {transform: scale(1.2); opacity: 0.8;} 100% {transform: scale(1); opacity: 1;}} .location-marker {animation: pulse 2s infinite; filter: drop-shadow(0 0 8px rgba(76, 175, 80, 0.8));}</style>
           <div class="location-marker">
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <circle cx="12" cy="12" r="10" fill="#4CAF50" fill-opacity="0.6"/>
@@ -595,87 +332,31 @@ function LuggageTrackingContent() {
               <circle cx="12" cy="12" r="4" fill="#4CAF50"/>
               <circle cx="12" cy="12" r="2" fill="white"/>
             </svg>
-          </div>
-        `;
-        
+          </div>`;
         currentLocationMarkerRef.current = new window.google.maps.marker.AdvancedMarkerElement({
-          map: newMap,
-          position: currentPosition,
-          title: 'Current Location',
-          content: currentLocationMarker,
+          map: newMap, position: currentPosition, title: 'Current Location', content: currentLocationMarker,
           collisionBehavior: window.google.maps.CollisionBehavior.OPTIONAL_AND_HIDES_LOWER_PRIORITY
         });
-
         markers.push(currentPosition);
       }
-
       if (contract.pickup_location_geo?.coordinates) {
-        console.log('Adding pickup location marker:', contract.pickup_location_geo.coordinates);
-        const pickupMarker = new window.google.maps.marker.PinElement({
-          scale: 1,
-          background: '#2196F3',
-          borderColor: '#1976D2',
-          glyphColor: '#FFFFFF'
-        });
-
-        const pickupPosition = {
-          lat: contract.pickup_location_geo.coordinates[1],
-          lng: contract.pickup_location_geo.coordinates[0]
-        };
-
-        new window.google.maps.marker.AdvancedMarkerElement({
-          map: newMap,
-          position: pickupPosition,
-          title: 'Pickup Location',
-          content: pickupMarker.element,
-          collisionBehavior: window.google.maps.CollisionBehavior.OPTIONAL_AND_HIDES_LOWER_PRIORITY
-        });
-
+        const pickupMarker = new window.google.maps.marker.PinElement({ scale: 1, background: '#2196F3', borderColor: '#1976D2', glyphColor: '#FFFFFF' });
+        const pickupPosition = { lat: contract.pickup_location_geo.coordinates[1], lng: contract.pickup_location_geo.coordinates[0] };
+        new window.google.maps.marker.AdvancedMarkerElement({ map: newMap, position: pickupPosition, title: 'Pickup Location', content: pickupMarker.element, collisionBehavior: window.google.maps.CollisionBehavior.OPTIONAL_AND_HIDES_LOWER_PRIORITY });
         markers.push(pickupPosition);
       }
-
       if (contract.drop_off_location_geo?.coordinates) {
-        console.log('Adding drop-off location marker:', contract.drop_off_location_geo.coordinates);
-        const dropoffMarker = new window.google.maps.marker.PinElement({
-          scale: 1,
-          background: '#FF9800',
-          borderColor: '#F57C00',
-          glyphColor: '#FFFFFF'
-        });
-
-        const dropoffPosition = {
-          lat: contract.drop_off_location_geo.coordinates[1],
-          lng: contract.drop_off_location_geo.coordinates[0]
-        };
-
-        markerRef.current = new window.google.maps.marker.AdvancedMarkerElement({
-          map: newMap,
-          position: dropoffPosition,
-          title: 'Drop-off Location',
-          content: dropoffMarker.element,
-          collisionBehavior: window.google.maps.CollisionBehavior.OPTIONAL_AND_HIDES_LOWER_PRIORITY
-        });
-
+        const dropoffMarker = new window.google.maps.marker.PinElement({ scale: 1, background: '#FF9800', borderColor: '#F57C00', glyphColor: '#FFFFFF' });
+        const dropoffPosition = { lat: contract.drop_off_location_geo.coordinates[1], lng: contract.drop_off_location_geo.coordinates[0] };
+        markerRef.current = new window.google.maps.marker.AdvancedMarkerElement({ map: newMap, position: dropoffPosition, title: 'Drop-off Location', content: dropoffMarker.element, collisionBehavior: window.google.maps.CollisionBehavior.OPTIONAL_AND_HIDES_LOWER_PRIORITY });
         markers.push(dropoffPosition);
       }
-
-      // Draw complete route if we have route history
-      if (pathRef.current.length >= 2) {
-        console.log('Drawing route history:', pathRef.current);
-        drawCompleteRoute();
-      }
-
       if (markers.length > 0) {
         if (contract.current_location_geo?.coordinates) {
-          // If we have current location, center on it
-          const currentPosition = {
-            lat: contract.current_location_geo.coordinates[1],
-            lng: contract.current_location_geo.coordinates[0]
-          };
+          const currentPosition = { lat: contract.current_location_geo.coordinates[1], lng: contract.current_location_geo.coordinates[0] };
           newMap.setCenter(currentPosition);
           newMap.setZoom(15);
         } else {
-          // If no current location, fit bounds to show pickup and dropoff locations
           const bounds = new window.google.maps.LatLngBounds();
           markers.forEach(marker => bounds.extend(marker));
           newMap.fitBounds(bounds);
@@ -686,16 +367,8 @@ function LuggageTrackingContent() {
           bounds.extend({ lat: sw.lat() - padding, lng: sw.lng() - padding });
           newMap.fitBounds(bounds);
         }
-      } else {
-        // If no markers at all, use default center
-        console.log('No markers to display, using default center');
-        newMap.setCenter(defaultCenter);
-        newMap.setZoom(10);
       }
-
-      console.log('Map initialization completed successfully');
     } catch (error) {
-      console.error('Error initializing map:', error);
       setMapError(error.message);
     }
   };
@@ -786,99 +459,10 @@ function LuggageTrackingContent() {
     }
   };
 
-  // Update the polling effect with retry mechanism (mirror admin, use API)
-  useEffect(() => {
-    let pollInterval;
-    let retryCount = 0;
-    const MAX_RETRIES = 3;
-
-    const startPolling = () => {
-      if (contract?.id) {
-        console.log('Starting location polling for contract:', contract.id);
-        pollInterval = setInterval(async () => {
-          try {
-            const { data, error } = await supabase
-              .from('contracts')
-              .select(`
-                id, contract_status_id, airline_id, delivery_id,
-                owner_first_name, owner_middle_initial, owner_last_name, owner_contact,
-                luggage_description, luggage_weight, luggage_quantity,
-                flight_number, case_number,
-                delivery_address, address_line_1, address_line_2,
-                pickup_location, current_location, drop_off_location,
-                pickup_location_geo, current_location_geo, drop_off_location_geo,
-                remarks, passenger_form, passenger_id, proof_of_delivery,
-                created_at, cancelled_at, accepted_at, pickup_at, delivered_at,
-                delivery_charge, delivery_surcharge, delivery_discount,
-                summary_id
-              `)
-              .eq('id', contract.id)
-              .is('summary_id', null)
-              .single();
-
-            if (error) {
-              // Ignore 'no rows' during polling; just skip this tick
-              if (error.code === 'PGRST116' || (error.message && error.message.includes('no) rows returned'))) {
-                return;
-              }
-              throw error;
-            }
-
-            if (data) {
-              // If contract_status_name is shown in UI, try to fetch status once in polling as well
-              let statusObj = null;
-              if (data.contract_status_id != null) {
-                const { data: statusRow } = await supabase
-                  .from('contract_status')
-                  .select('id, status_name')
-                  .eq('id', data.contract_status_id)
-                  .maybeSingle();
-                statusObj = statusRow || null;
-              }
-
-              setContract(prev => ({
-                ...prev,
-                ...data,
-                contract_status: statusObj ?? prev?.contract_status ?? null
-              }));
-              if (data.current_location_geo?.coordinates) {
-                await updateMapLocation();
-              }
-              retryCount = 0;
-            }
-          } catch (error) {
-            console.error('Error polling location:', error);
-            retryCount++;
-            if (retryCount >= MAX_RETRIES) {
-              console.log('Max retries reached, stopping polling');
-              clearInterval(pollInterval);
-              setMapError('Failed to update location after multiple attempts');
-            }
-          }
-        }, 5000);
-      }
-    };
-
-    startPolling();
-
-    return () => {
-      if (pollInterval) {
-        console.log('Clearing polling interval');
-        clearInterval(pollInterval);
-      }
-    };
-  }, [contract?.id]);
+  // Removed Supabase polling to mirror admin behavior (API fetch + realtime updates only)
 
   // Replace handleSearch to use fetchData
-  const handleSearch = (id = contractId) => {
-    if (!id.trim()) {
-      setSnackbarMessage("Contract ID cannot be empty.");
-      setSnackbarSeverity("warning");
-      setSnackbarOpen(true);
-      return;
-    }
-    fetchData(id);
-  };
+  const handleSearch = (id = contractId) => { fetchData(id); };
 
   // Expand/collapse
   const handleExpandClick = () => { setExpanded(!expanded); };
@@ -888,8 +472,6 @@ function LuggageTrackingContent() {
     setContract(null);
     setError(null);
     previousValidContractIdRef.current = "";
-    currentContractIdRef.current = "";
-    mapInitializedRef.current = false;
     if (map) setMap(null);
     if (markerRef.current) {
       markerRef.current.map = null;
@@ -899,8 +481,12 @@ function LuggageTrackingContent() {
       currentLocationMarkerRef.current.map = null;
       currentLocationMarkerRef.current = null;
     }
-    // Don't reset isScriptLoaded - keep the script loaded for future use
-    setSnackbarOpen(false); // Close snackbar on clear
+    if (polylineRef.current) { polylineRef.current.setMap(null); polylineRef.current = null; }
+    setIsScriptLoaded(false);
+    setSnackbarOpen(false);
+    setRouteData({ eta: null, distanceRemaining: null, progress: 0, polyline: null, totalDistance: null });
+    setLastDirectionsRequest(0);
+    setCooldownRemaining(0);
   };
 
   // Show snackbar
@@ -911,152 +497,62 @@ function LuggageTrackingContent() {
     setSnackbarOpen(false);
   };
 
-  // Function to calculate distance between two points
-  const calculateDistance = (point1, point2) => {
-    const R = 6371; // Earth's radius in km
-    const dLat = (point2.lat - point1.lat) * Math.PI / 180;
-    const dLng = (point2.lng - point1.lng) * Math.PI / 180;
-    const a = 
-      Math.sin(dLat/2) * Math.sin(dLat/2) +
-      Math.cos(point1.lat * Math.PI / 180) * Math.cos(point2.lat * Math.PI / 180) * 
-      Math.sin(dLng/2) * Math.sin(dLng/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    return R * c; // Distance in km
-  };
-
-  // Function to calculate route details using Google Maps Directions Service
-  const calculateRouteDetails = async (origin, destination) => {
-    if (!directionsServiceRef.current || !origin || !destination) {
-      return { distance: null, duration: null };
-    }
-    
-    try {
-      const result = await directionsServiceRef.current.route({
-        origin: origin,
-        destination: destination,
-        travelMode: window.google.maps.TravelMode.DRIVING,
-        drivingOptions: {
-          departureTime: new Date(),
-          trafficModel: window.google.maps.TrafficModel.BEST_GUESS
-        }
-      });
-
-      if (result.routes && result.routes.length > 0) {
-        const route = result.routes[0].legs[0];
-        return {
-          distance: route.distance.value / 1000, // Convert meters to kilometers
-          duration: route.duration_in_traffic?.value || route.duration.value // Duration in seconds
-        };
-      }
-      return { distance: null, duration: null };
-    } catch (error) {
-      console.error('Error calculating route:', error);
-      return { distance: null, duration: null };
-    }
-  };
-
   // Function to format duration
   const formatDuration = (seconds) => {
-    if (!seconds) return 'Calculating...';
+    if (!seconds) return 'N/A';
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
-    
-    if (hours === 0) {
-      return `${minutes} min`;
-    } else if (minutes === 0) {
-      return `${hours} hr`;
-    } else {
-      return `${hours} hr ${minutes} min`;
-    }
+    if (hours === 0) return `${minutes} min`;
+    if (minutes === 0) return `${hours} hr`;
+    return `${hours} hr ${minutes} min`;
   };
 
-  // Update route details when location changes
-  useEffect(() => {
-    const updateRouteDetails = async () => {
-      console.log('Location changed, checking coordinates...');
-      
-      // Check if we have the minimum required coordinates
-      const hasCurrentLocation = contract?.current_location_geo?.coordinates;
-      const hasDropoffLocation = contract?.drop_off_location_geo?.coordinates;
-      const hasPickupLocation = contract?.pickup_location_geo?.coordinates;
-      
-      if (!hasDropoffLocation || !hasPickupLocation) {
-        console.log('Missing required coordinates:', {
-          dropoff: !!hasDropoffLocation,
-          pickup: !!hasPickupLocation
-        });
-        return;
-      }
-      
-      // If no current location, show total route only
-      if (!hasCurrentLocation) {
-        console.log('No current location, showing total route only');
-        const pickupLocation = {
-          lat: contract.pickup_location_geo.coordinates[1],
-          lng: contract.pickup_location_geo.coordinates[0]
-        };
-        const dropoffLocation = {
-          lat: contract.drop_off_location_geo.coordinates[1],
-          lng: contract.drop_off_location_geo.coordinates[0]
-        };
-        
-        // Calculate total route details
-        const totalDetails = await calculateRouteDetails(pickupLocation, dropoffLocation);
-        setTotalRouteDetails(totalDetails);
-        setRouteDetails({ distance: totalDetails.distance, duration: totalDetails.duration });
-        setProgress(0); // No progress since delivery hasn't started
-        return;
-      }
-
-      const currentLocation = {
-        lat: contract.current_location_geo.coordinates[1],
-        lng: contract.current_location_geo.coordinates[0]
-      };
-      const dropoffLocation = {
-        lat: contract.drop_off_location_geo.coordinates[1],
-        lng: contract.drop_off_location_geo.coordinates[0]
-      };
-      const pickupLocation = {
-        lat: contract.pickup_location_geo.coordinates[1],
-        lng: contract.pickup_location_geo.coordinates[0]
-      };
-
-      console.log('Calculating route details with coordinates:', {
-        current: currentLocation,
-        dropoff: dropoffLocation,
-        pickup: pickupLocation
-      });
-
-      // Calculate current route details
-      const details = await calculateRouteDetails(currentLocation, dropoffLocation);
-      setRouteDetails(details);
-
-      // Calculate total route details
-      const totalDetails = await calculateRouteDetails(pickupLocation, dropoffLocation);
-      setTotalRouteDetails(totalDetails);
-
-      // Calculate progress
-      if (totalDetails.distance) {
-        const progressPercentage = Math.max(0, Math.min(100, 
-          (1 - (details.distance / totalDetails.distance)) * 100
-        ));
-        console.log('Delivery Progress:', {
-          progress: `${Math.round(progressPercentage)}%`,
-          distanceRemaining: `${details.distance?.toFixed(1)} km`,
-          eta: details.duration ? formatDuration(details.duration) : 'Calculating...'
-        });
-        setProgress(progressPercentage);
-      }
-
-      // Calculate ETA
-      if (details.duration) {
-        const etaTime = new Date(Date.now() + details.duration * 1000);
-        setEta(etaTime);
-      }
-    };
-
-    updateRouteDetails();
-  }, [contract?.current_location_geo?.coordinates]);
+  // Button-triggered directions calculation - EXACTLY 2 API CALLS
+  const handleGetDirections = async () => {
+    if (!directionsServiceRef.current || !contract || !map) {
+      setDirectionsError('Map or directions service not available');
+      return;
+    }
+    if (!contract.current_location_geo?.coordinates || !contract.drop_off_location_geo?.coordinates || !contract.pickup_location_geo?.coordinates) {
+      setDirectionsError('Missing required location coordinates');
+      return;
+    }
+    const now = Date.now();
+    const timeSinceLastRequest = now - lastDirectionsRequest;
+    const cooldownTime = 60 * 1000;
+    if (timeSinceLastRequest < cooldownTime) {
+      const remaining = Math.ceil((cooldownTime - timeSinceLastRequest) / 1000);
+      setCooldownRemaining(remaining);
+      setDirectionsError(`Please wait ${remaining} seconds before requesting directions again`);
+      return;
+    }
+    setIsLoadingDirections(true);
+    setDirectionsError(null);
+    setLastDirectionsRequest(now);
+    try {
+      const currentLocation = { lat: contract.current_location_geo.coordinates[1], lng: contract.current_location_geo.coordinates[0] };
+      const dropoffLocation = { lat: contract.drop_off_location_geo.coordinates[1], lng: contract.drop_off_location_geo.coordinates[0] };
+      const pickupLocation = { lat: contract.pickup_location_geo.coordinates[1], lng: contract.pickup_location_geo.coordinates[0] };
+      const currentToDropoffPromise = directionsServiceRef.current.route({ origin: currentLocation, destination: dropoffLocation, travelMode: window.google.maps.TravelMode.DRIVING, drivingOptions: { departureTime: new Date(), trafficModel: window.google.maps.TrafficModel.BEST_GUESS } });
+      const pickupToDropoffPromise = directionsServiceRef.current.route({ origin: pickupLocation, destination: dropoffLocation, travelMode: window.google.maps.TravelMode.DRIVING });
+      const [currentToDropoffResult, pickupToDropoffResult] = await Promise.all([currentToDropoffPromise, pickupToDropoffPromise]);
+      const currentRoute = currentToDropoffResult.routes[0].legs[0];
+      const distanceRemaining = currentRoute.distance.value / 1000;
+      const duration = currentRoute.duration_in_traffic?.value || currentRoute.duration.value;
+      const eta = new Date(Date.now() + duration * 1000);
+      const totalRoute = pickupToDropoffResult.routes[0].legs[0];
+      const totalDistance = totalRoute.distance.value / 1000;
+      const progress = Math.max(0, Math.min(100, (1 - (distanceRemaining / totalDistance)) * 100));
+      if (polylineRef.current) { polylineRef.current.setMap(null); }
+      const routePath = currentToDropoffResult.routes[0].overview_path;
+      polylineRef.current = new window.google.maps.Polyline({ path: routePath, geodesic: true, strokeColor: '#4CAF50', strokeOpacity: 0.8, strokeWeight: 5, map: map });
+      setRouteData({ eta, distanceRemaining, progress, polyline: routePath, totalDistance });
+    } catch (error) {
+      setDirectionsError(error.message || 'Failed to calculate directions');
+    } finally {
+      setIsLoadingDirections(false);
+    }
+  };
 
   // Render
   return (
@@ -1071,7 +567,7 @@ function LuggageTrackingContent() {
           gap: 2
         }}>
           <Typography variant="h4" color="primary.main" fontWeight="bold" sx={{ mb: 2 }}>
-            Track Your Luggage
+            Track Luggage
           </Typography>
           <Box sx={{ 
             display: 'flex', 
@@ -1089,7 +585,6 @@ function LuggageTrackingContent() {
               onChange={(e) => setContractId(e.target.value)} 
               onKeyPress={(e) => e.key === 'Enter' && handleSearch()} 
               sx={{ width: "100%" }}
-              disabled={loading}
               InputProps={{
                 endAdornment: (
                   <>
@@ -1100,9 +595,7 @@ function LuggageTrackingContent() {
                         onClick={handleClearSearch}
                         sx={{ 
                           color: 'text.secondary',
-                          '&:hover': {
-                            color: 'text.primary'
-                          }
+                          '&:hover': { color: 'text.primary' }
                         }}
                       >
                         <CloseIcon fontSize="small" />
@@ -1113,12 +606,18 @@ function LuggageTrackingContent() {
               }}
             />
           </Box>
+          {error && (<Typography color="error" align="center">{error}</Typography>)}
+          <Snackbar open={snackbarOpen} autoHideDuration={6000} onClose={handleSnackbarClose}>
+            <Alert onClose={handleSnackbarClose} severity={snackbarSeverity} sx={{ width: '100%' }}>
+              {snackbarMessage}
+            </Alert>
+          </Snackbar>
         </Box>
       ) : (
         <>
           <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <IconButton onClick={() => router.push('/airline/booking')} sx={{ mr: 1, color: 'primary.main' }}><ChevronLeftIcon /></IconButton>
+              <IconButton onClick={() => router.push('/contractor/')} sx={{ mr: 1, color: 'primary.main' }}><ChevronLeftIcon /></IconButton>
               <Typography variant="h4" color="primary.main" fontWeight="bold">Luggage Tracking</Typography>
             </Box>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -1131,7 +630,6 @@ function LuggageTrackingContent() {
                 onChange={(e) => setContractId(e.target.value)} 
                 onKeyPress={(e) => e.key === 'Enter' && handleSearch()} 
                 sx={{ width: "300px" }}
-                disabled={loading}
                 InputProps={{
                   endAdornment: (
                     <>
@@ -1142,9 +640,7 @@ function LuggageTrackingContent() {
                           onClick={handleClearSearch}
                           sx={{ 
                             color: 'text.secondary',
-                            '&:hover': {
-                              color: 'text.primary'
-                            }
+                            '&:hover': { color: 'text.primary' }
                           }}
                         >
                           <CloseIcon fontSize="small" />
@@ -1336,7 +832,24 @@ function LuggageTrackingContent() {
             </Collapse>
           </Paper>
           <Paper elevation={3} sx={{ p: 3, borderRadius: 3, position: 'relative', overflow: 'hidden', border: '1px solid', borderColor: 'divider' }}>
-            <Typography variant="h6" sx={{ mb: 2 }}>Live Tracking</Typography>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+              <Typography variant="h6">Live Tracking</Typography>
+              <Button
+                variant="contained"
+                startIcon={isLoadingDirections ? <CircularProgress size={16} color="inherit" /> : <DirectionsIcon />}
+                onClick={handleGetDirections}
+                disabled={isLoadingDirections || !map || !directionsServiceRef.current || cooldownRemaining > 0}
+                size="small"
+                sx={{ minWidth: '140px', textTransform: 'none' }}
+              >
+                {isLoadingDirections ? 'Calculating...' : cooldownRemaining > 0 ? `Wait ${cooldownRemaining}s` : 'Get Directions'}
+              </Button>
+            </Box>
+            {directionsError && (
+              <Alert severity="error" sx={{ mb: 2 }}>
+                {directionsError}
+              </Alert>
+            )}
             <Box sx={{ display: 'flex', gap: 2, mb: 2, flexWrap: 'wrap' }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <Box sx={{ width: 16, height: 16, borderRadius: '50%', bgcolor: '#FF9800', border: '2px solid #F57C00' }} />
@@ -1346,114 +859,69 @@ function LuggageTrackingContent() {
                 <Box sx={{ width: 16, height: 16, borderRadius: '50%', bgcolor: '#2196F3', border: '2px solid #1976D2' }} />
                 <Typography variant="body2">Pickup Location</Typography>
               </Box>
-              {contract?.current_location_geo?.coordinates && (
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <Box sx={{ width: 16, height: 16, borderRadius: '50%', bgcolor: '#4CAF50', border: '2px solid #388E3C' }} />
-                  <Typography variant="body2">Current Location</Typography>
-                </Box>
-              )}
-            </Box>
-            {/* Progress and ETA Section */}
-            <Box sx={{ mb: 2 }}>
-              {contract?.current_location_geo?.coordinates ? (
-                // Show progress when we have current location
-                <>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                    <Typography variant="body2" color="text.secondary">
-                      Delivery Progress
-                    </Typography>
-                    <Typography variant="body2" color="primary.main" fontWeight="bold">
-                      {Math.round(progress)}%
-                    </Typography>
-                  </Box>
-                  <Box sx={{ width: '100%', bgcolor: 'grey.200', borderRadius: 1, height: 8, mb: 1 }}>
-                    <Box
-                      sx={{
-                        height: '100%',
-                        borderRadius: 1,
-                        bgcolor: 'primary.main',
-                        width: `${progress}%`,
-                        transition: 'width 0.5s ease-in-out'
-                      }}
-                    />
-                  </Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                    <Typography variant="body2" color="text.secondary">
-                      Distance Remaining
-                    </Typography>
-                    <Typography variant="body2" color="primary.main" fontWeight="bold">
-                      {routeDetails.distance ? `${routeDetails.distance.toFixed(1)} km` : 'Calculating...'}
-                    </Typography>
-                  </Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Typography variant="body2" color="text.secondary">
-                      Estimated Time of Arrival
-                    </Typography>
-                    <Typography variant="body2" color="primary.main" fontWeight="bold">
-                      {routeDetails.duration ? formatDuration(routeDetails.duration) : 'Calculating...'}
-                    </Typography>
-                  </Box>
-                </>
-              ) : (
-                // Show total route info when no current location
-                <>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                    <Typography variant="body2" color="text.secondary">
-                      Total Route Distance
-                    </Typography>
-                    <Typography variant="body2" color="primary.main" fontWeight="bold">
-                      {totalRouteDetails.distance ? `${totalRouteDetails.distance.toFixed(1)} km` : 'Calculating...'}
-                    </Typography>
-                  </Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                    <Typography variant="body2" color="text.secondary">
-                      Estimated Travel Time
-                    </Typography>
-                    <Typography variant="body2" color="primary.main" fontWeight="bold">
-                      {totalRouteDetails.duration ? formatDuration(totalRouteDetails.duration) : 'Calculating...'}
-                    </Typography>
-                  </Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Typography variant="body2" color="text.secondary">
-                      Status
-                    </Typography>
-                    <Typography variant="body2" color="warning.main" fontWeight="bold">
-                      Awaiting pickup
-                    </Typography>
-                  </Box>
-                </>
-              )}
-            </Box>
-            {mounted ? (
-              <>
-                {!isScriptLoaded && (
-                  <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '500px', flexDirection: 'column', gap: 2 }}>
-                    <CircularProgress />
-                    <Typography variant="body2" color="text.secondary">
-                      Loading map...
-                    </Typography>
-                  </Box>
-                )}
-                {isScriptLoaded && contract && (
-                  <MapComponent mapRef={mapRef} mapError={mapError} />
-                )}
-                {isScriptLoaded && !contract && (
-                  <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '500px', flexDirection: 'column', gap: 2 }}>
-                    <Typography variant="body2" color="text.secondary">
-                      No contract data available for map display
-                    </Typography>
-                  </Box>
-                )}
-              </>
-            ) : (
-              <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '500px' }}>
-                <CircularProgress />
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Box sx={{ width: 16, height: 16, borderRadius: '50%', bgcolor: '#4CAF50', border: '2px solid #388E3C' }} />
+                <Typography variant="body2">Current Location</Typography>
               </Box>
-            )}
+            </Box>
+            {/* Route Information Display */}
+            <Box sx={{ mb: 2 }}>
+              <Typography variant="subtitle2" sx={{ color: 'primary.main', fontWeight: 700, mb: 1 }}>
+                Route Information
+              </Typography>
+              <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 2, mb: 2 }}>
+                <Paper sx={{ p: 2, bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider' }}>
+                  <Typography variant="body2" color="text.secondary">Distance Remaining</Typography>
+                  <Typography variant="h6" color="primary.main" fontWeight="bold">
+                    {routeData.distanceRemaining ? `${routeData.distanceRemaining.toFixed(1)} km` : 'Click "Get Directions"'}
+                  </Typography>
+                </Paper>
+                <Paper sx={{ p: 2, bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider' }}>
+                  <Typography variant="body2" color="text.secondary">Estimated Time of Arrival</Typography>
+                  <Typography variant="h6" color="primary.main" fontWeight="bold">
+                    {routeData.eta ? routeData.eta.toLocaleTimeString() : 'Click "Get Directions"'}
+                  </Typography>
+                </Paper>
+                <Paper sx={{ p: 2, bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider' }}>
+                  <Typography variant="body2" color="text.secondary">Total Distance</Typography>
+                  <Typography variant="h6" color="primary.main" fontWeight="bold">
+                    {routeData.totalDistance ? `${routeData.totalDistance.toFixed(1)} km` : 'Click "Get Directions"'}
+                  </Typography>
+                </Paper>
+              </Box>
+              <Box sx={{ mb: 2 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    Delivery Progress
+                  </Typography>
+                  <Typography variant="body2" color="primary.main" fontWeight="bold">
+                    {Math.round(routeData.progress)}%
+                  </Typography>
+                </Box>
+                <Box sx={{ width: '100%', bgcolor: 'grey.200', borderRadius: 1, height: 8 }}>
+                  <Box
+                    sx={{
+                      height: '100%',
+                      borderRadius: 1,
+                      bgcolor: routeData.progress > 0 ? 'primary.main' : 'grey.300',
+                      width: `${routeData.progress}%`,
+                      transition: 'width 0.5s ease-in-out'
+                    }}
+                  />
+                </Box>
+                <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                  {routeData.progress > 0 ? 
+                    `Progress calculated from pickup to drop-off location` : 
+                    'Click "Get Directions" to calculate progress'
+                  }
+                </Typography>
+              </Box>
+            </Box>
+            <MapComponent mapRef={mapRef} mapError={mapError} />
           </Paper>
         </>
       )}
-      <Snackbar open={snackbarOpen} autoHideDuration={6000} onClose={handleSnackbarClose} anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}>
+      <Snackbar open={snackbarOpen} autoHideDuration={6000} onClose={handleSnackbarClose} anchorOrigin={{ vertical: 'top', horizontal: 'center' }}>
         <Alert onClose={handleSnackbarClose} severity={snackbarSeverity} sx={{ width: '100%' }}>
           {snackbarMessage}
         </Alert>

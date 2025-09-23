@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useEffect, useRef, Suspense } from "react";
-import { Box, Typography, TextField, Paper, Divider, IconButton, Collapse, CircularProgress, Snackbar, Alert } from "@mui/material";
+import { Box, Typography, TextField, Paper, Divider, IconButton, Collapse, CircularProgress, Snackbar, Alert, Button } from "@mui/material";
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import CloseIcon from '@mui/icons-material/Close';
+import DirectionsIcon from '@mui/icons-material/Directions';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import dynamic from 'next/dynamic';
 import { useSearchParams, useRouter } from 'next/navigation';
@@ -34,17 +35,25 @@ function LuggageTrackingContent() {
   const [map, setMap] = useState(null);
   const [isScriptLoaded, setIsScriptLoaded] = useState(false);
   const [mapError, setMapError] = useState(null);
-  const [eta, setEta] = useState(null);
-  const [progress, setProgress] = useState(0);
-  const [routeDetails, setRouteDetails] = useState({ distance: null, duration: null });
-  const [totalRouteDetails, setTotalRouteDetails] = useState({ distance: null, duration: null });
+  
+  // Directions API related state
+  const [routeData, setRouteData] = useState({
+    eta: null,
+    distanceRemaining: null,
+    progress: 0,
+    polyline: null,
+    totalDistance: null
+  });
+  const [isLoadingDirections, setIsLoadingDirections] = useState(false);
+  const [directionsError, setDirectionsError] = useState(null);
+  const [lastDirectionsRequest, setLastDirectionsRequest] = useState(0);
+  const [cooldownRemaining, setCooldownRemaining] = useState(0);
+  
   const mapRef = useRef(null);
   const markerRef = useRef(null);
   const currentLocationMarkerRef = useRef(null);
-  const pathRef = useRef([]);
   const polylineRef = useRef(null);
   const directionsServiceRef = useRef(null);
-  const routeSegmentsRef = useRef([]);
   const supabase = createClientComponentClient();
   const previousValidContractIdRef = useRef("");
   const [snackbarOpen, setSnackbarOpen] = useState(false);
@@ -60,12 +69,10 @@ function LuggageTrackingContent() {
     }
   }, [searchParams]);
 
-  // Fetch contract and luggage info (moved out for reuse)
+  // Fetch contract and luggage info
   const fetchData = async (id = contractId) => {
     if (!id.trim()) return;
     
-    // Only show errors if the current ID is longer than the previous valid ID
-    // This prevents showing errors when user is reducing the contract ID
     const shouldShowErrors = id.length >= previousValidContractIdRef.current.length;
     
     if (shouldShowErrors) {
@@ -83,10 +90,8 @@ function LuggageTrackingContent() {
       console.log('Received contract data:', data);
       
       if (data) {
-        // Update the previous valid contract ID
         previousValidContractIdRef.current = id;
         
-        // Ensure all required fields are present
         const newContract = {
           ...data,
           luggage: data.luggage || [],
@@ -100,10 +105,18 @@ function LuggageTrackingContent() {
         setContract(prev => {
           return JSON.stringify(prev) !== JSON.stringify(newContract) ? newContract : prev;
         });
+        
+        // Clear previous route data when contract changes
+        setRouteData({
+          eta: null,
+          distanceRemaining: null,
+          progress: 0,
+          polyline: null,
+          totalDistance: null
+        });
       } else {
         if (shouldShowErrors) {
           setError('No contract data found');
-          // Show toast notification for invalid contract ID
           setSnackbarMessage('Invalid luggage tracking ID. No contract found.');
           setSnackbarSeverity('error');
           setSnackbarOpen(true);
@@ -113,7 +126,6 @@ function LuggageTrackingContent() {
       console.error('Error fetching contract:', err);
       if (shouldShowErrors) {
         setError(err.message || 'Failed to fetch contract');
-        // Show toast notification for invalid contract ID
         setSnackbarMessage('Invalid luggage tracking ID. No contract found.');
         setSnackbarSeverity('error');
         setSnackbarOpen(true);
@@ -125,139 +137,13 @@ function LuggageTrackingContent() {
   useEffect(() => {
     if (!contractId) return;
     console.log('Contract ID changed:', contractId);
-    // Reset map and markers
     if (map) setMap(null);
     if (markerRef.current) { markerRef.current.map = null; markerRef.current = null; }
     if (currentLocationMarkerRef.current) { currentLocationMarkerRef.current.map = null; currentLocationMarkerRef.current = null; }
+    if (polylineRef.current) { polylineRef.current.setMap(null); polylineRef.current = null; }
     setIsScriptLoaded(false);
     fetchData(contractId);
   }, [contractId]);
-
-  // Poll for current location updates (map only)
-  const updateMapLocation = async () => {
-    if (!map || !window.google || !currentLocationMarkerRef.current) {
-      console.log('Map or marker not initialized yet, skipping location update');
-      return;
-    }
-
-    try {
-      if (contract?.current_location_geo?.coordinates) {
-        const newPosition = {
-          lat: contract.current_location_geo.coordinates[1],
-          lng: contract.current_location_geo.coordinates[0]
-        };
-
-        // Check if the marker is still valid
-        if (currentLocationMarkerRef.current && currentLocationMarkerRef.current.map) {
-          console.log('Updating marker position:', newPosition);
-          currentLocationMarkerRef.current.position = newPosition;
-          
-          // Update map center to follow the marker
-          map.setCenter(newPosition);
-          
-          // Add the new position to the path
-          if (pathRef.current) {
-            pathRef.current.push(newPosition);
-            
-            // Draw the new route segment
-            if (pathRef.current.length >= 2) {
-              const start = pathRef.current[pathRef.current.length - 2];
-              const end = pathRef.current[pathRef.current.length - 1];
-              await updatePolylineWithDirections(start, end);
-            }
-          }
-        } else {
-          console.log('Marker is no longer valid, recreating...');
-          // Recreate the marker if it's no longer valid
-          const currentLocationMarker = document.createElement('div');
-          currentLocationMarker.innerHTML = `
-            <style>
-              @keyframes pulse {
-                0% { transform: scale(1); opacity: 1; }
-                50% { transform: scale(1.2); opacity: 0.8; }
-                100% { transform: scale(1); opacity: 1; }
-              }
-              .location-marker {
-                animation: pulse 2s infinite;
-                filter: drop-shadow(0 0 8px rgba(76, 175, 80, 0.8));
-              }
-            </style>
-            <div class="location-marker">
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <circle cx="12" cy="12" r="10" fill="#4CAF50" fill-opacity="0.6"/>
-                <circle cx="12" cy="12" r="8" fill="#4CAF50" fill-opacity="0.8"/>
-                <circle cx="12" cy="12" r="6" fill="#4CAF50" fill-opacity="0.9"/>
-                <circle cx="12" cy="12" r="4" fill="#4CAF50"/>
-                <circle cx="12" cy="12" r="2" fill="white"/>
-              </svg>
-            </div>
-          `;
-          
-          currentLocationMarkerRef.current = new window.google.maps.marker.AdvancedMarkerElement({
-            map: map,
-            position: newPosition,
-            title: 'Current Location',
-            content: currentLocationMarker,
-            collisionBehavior: window.google.maps.CollisionBehavior.OPTIONAL_AND_HIDES_LOWER_PRIORITY
-          });
-        }
-      }
-    } catch (error) {
-      console.error('Error updating location:', error);
-      // If there's an error with the marker, try to recreate it
-      if (error.message.includes('Cannot read properties of undefined')) {
-        console.log('Attempting to recreate marker...');
-        currentLocationMarkerRef.current = null;
-        // The next location update will recreate the marker
-      }
-    }
-  };
-
-  // Update the polling effect to handle errors
-  useEffect(() => {
-    let pollInterval;
-    let retryCount = 0;
-    const MAX_RETRIES = 3;
-
-    const startPolling = () => {
-      if (contract?.id) {
-        console.log('Starting location polling for contract:', contract.id);
-        pollInterval = setInterval(async () => {
-          try {
-            const response = await fetch(`/api/admin?action=getContract&contractId=${contract.id}`);
-            if (!response.ok) throw new Error('Failed to fetch contract data');
-            
-            const result = await response.json();
-            if (result.error) throw new Error(result.error);
-            
-            if (result.data) {
-              setContract(result.data);
-              await updateMapLocation();
-              retryCount = 0; // Reset retry count on successful update
-            }
-          } catch (error) {
-            console.error('Error polling location:', error);
-            retryCount++;
-            
-            if (retryCount >= MAX_RETRIES) {
-              console.log('Max retries reached, stopping polling');
-              clearInterval(pollInterval);
-              setMapError('Failed to update location after multiple attempts');
-            }
-          }
-        }, 5000);
-      }
-    };
-
-    startPolling();
-
-    return () => {
-      if (pollInterval) {
-        console.log('Clearing polling interval');
-        clearInterval(pollInterval);
-      }
-    };
-  }, [contract?.id]);
 
   // Real-time subscription for contract changes
   useEffect(() => {
@@ -273,24 +159,16 @@ function LuggageTrackingContent() {
           return merged;
         });
 
-        // Update path and map when current location changes
-        if (updatedRow?.current_location_geo?.coordinates) {
+        // Update current location marker if it exists
+        if (updatedRow?.current_location_geo?.coordinates && currentLocationMarkerRef.current && map) {
           const newPosition = {
             lat: updatedRow.current_location_geo.coordinates[1],
             lng: updatedRow.current_location_geo.coordinates[0]
           };
-
-          if (Array.isArray(pathRef.current)) {
-            const lastPoint = pathRef.current[pathRef.current.length - 1];
-            pathRef.current.push(newPosition);
-            if (lastPoint && map && window?.google) {
-              await updatePolylineWithDirections(lastPoint, newPosition);
-            }
-          }
-
-          // If marker exists, update immediately
-          if (map) {
-            await updateMapLocation();
+          
+          if (currentLocationMarkerRef.current && currentLocationMarkerRef.current.map) {
+            currentLocationMarkerRef.current.position = newPosition;
+            map.setCenter(newPosition);
           }
         }
       } catch (err) {
@@ -298,7 +176,6 @@ function LuggageTrackingContent() {
       }
     };
 
-    // Subscribe to both possible table names
     const channelContract = supabase
       .channel(`contract-${contractId}`)
       .on(
@@ -332,74 +209,6 @@ function LuggageTrackingContent() {
       channelContracts.unsubscribe();
     };
   }, [contractId, supabase, map]);
-
-  // Update polyline with directions
-  const updatePolylineWithDirections = async (start, end) => {
-    if (!directionsServiceRef.current || !map) return;
-
-    try {
-      const result = await directionsServiceRef.current.route({
-        origin: start,
-        destination: end,
-        travelMode: window.google.maps.TravelMode.DRIVING,
-      });
-
-      const routePath = result.routes[0].overview_path;
-      routeSegmentsRef.current.push(routePath);
-
-      // Create a new polyline for this segment
-      const newPolyline = new window.google.maps.Polyline({
-        path: routePath,
-        geodesic: true,
-        strokeColor: '#4CAF50',
-        strokeOpacity: 0.8,
-        strokeWeight: 5,
-        map: map
-      });
-
-      // Store the polyline reference
-      if (!polylineRef.current) {
-        polylineRef.current = [];
-      }
-      polylineRef.current.push(newPolyline);
-    } catch (error) {
-      console.error('Error getting directions:', error);
-      // Fallback to straight line if directions service fails
-      const fallbackPath = [start, end];
-      routeSegmentsRef.current.push(fallbackPath);
-
-      const newPolyline = new window.google.maps.Polyline({
-        path: fallbackPath,
-        geodesic: true,
-        strokeColor: '#4CAF50',
-        strokeOpacity: 0.8,
-        strokeWeight: 6,
-        map: map
-      });
-
-      if (!polylineRef.current) {
-        polylineRef.current = [];
-      }
-      polylineRef.current.push(newPolyline);
-    }
-  };
-
-  // Draw complete route history
-  const drawCompleteRoute = async () => {
-    if (!directionsServiceRef.current || !map || pathRef.current.length < 2) return;
-
-    // Clear existing polylines
-    if (polylineRef.current) {
-      polylineRef.current.forEach(polyline => polyline.setMap(null));
-      polylineRef.current = [];
-    }
-    routeSegmentsRef.current = [];
-
-    // Draw route segments
-    for (let i = 0; i < pathRef.current.length - 1; i++) {
-      await updatePolylineWithDirections(pathRef.current[i], pathRef.current[i + 1]);
-    }
-  };
 
   // Google Maps script loader
   useEffect(() => {
@@ -447,24 +256,7 @@ function LuggageTrackingContent() {
     
     try {
       console.log('Initializing map with contract:', contract);
-      // Load route_history if available
-      if (contract.route_history && Array.isArray(contract.route_history) && contract.route_history.length > 0) {
-        pathRef.current = contract.route_history.map(point => ({ lat: point.lat, lng: point.lng }));
-      } else if (contract.current_location_geo?.coordinates) {
-        pathRef.current = [{
-          lat: contract.current_location_geo.coordinates[1],
-          lng: contract.current_location_geo.coordinates[0]
-        }];
-      } else {
-        pathRef.current = [];
-      }
       
-      if (polylineRef.current) {
-        polylineRef.current.forEach(polyline => polyline.setMap(null));
-        polylineRef.current = [];
-      }
-      routeSegmentsRef.current = [];
-
       const defaultCenter = { lat: 14.5350, lng: 120.9821 };
       const mapOptions = {
         center: defaultCenter,
@@ -472,7 +264,7 @@ function LuggageTrackingContent() {
         mapTypeControl: false,
         streetViewControl: false,
         fullscreenControl: false,
-        zoomControl: false,
+        zoomControl: true,
         scaleControl: false,
         rotateControl: false,
         panControl: false,
@@ -490,6 +282,7 @@ function LuggageTrackingContent() {
 
       const markers = [];
 
+      // Add current location marker
       if (contract.current_location_geo?.coordinates) {
         console.log('Adding current location marker:', contract.current_location_geo.coordinates);
         const currentPosition = {
@@ -501,18 +294,9 @@ function LuggageTrackingContent() {
         currentLocationMarker.innerHTML = `
           <style>
             @keyframes pulse {
-              0% {
-                transform: scale(1);
-                opacity: 1;
-              }
-              50% {
-                transform: scale(1.2);
-                opacity: 0.8;
-              }
-              100% {
-                transform: scale(1);
-                opacity: 1;
-              }
+              0% { transform: scale(1); opacity: 1; }
+              50% { transform: scale(1.2); opacity: 0.8; }
+              100% { transform: scale(1); opacity: 1; }
             }
             .location-marker {
               animation: pulse 2s infinite;
@@ -541,6 +325,7 @@ function LuggageTrackingContent() {
         markers.push(currentPosition);
       }
 
+      // Add pickup location marker
       if (contract.pickup_location_geo?.coordinates) {
         console.log('Adding pickup location marker:', contract.pickup_location_geo.coordinates);
         const pickupMarker = new window.google.maps.marker.PinElement({
@@ -566,6 +351,7 @@ function LuggageTrackingContent() {
         markers.push(pickupPosition);
       }
 
+      // Add drop-off location marker
       if (contract.drop_off_location_geo?.coordinates) {
         console.log('Adding drop-off location marker:', contract.drop_off_location_geo.coordinates);
         const dropoffMarker = new window.google.maps.marker.PinElement({
@@ -591,12 +377,7 @@ function LuggageTrackingContent() {
         markers.push(dropoffPosition);
       }
 
-      // Draw complete route if we have route history
-      if (pathRef.current.length >= 2) {
-        console.log('Drawing route history:', pathRef.current);
-        drawCompleteRoute();
-      }
-
+      // Fit bounds to show all markers
       if (markers.length > 0) {
         if (contract.current_location_geo?.coordinates) {
           const currentPosition = {
@@ -625,66 +406,9 @@ function LuggageTrackingContent() {
     }
   };
 
-  // Function to calculate distance between two points
-  const calculateDistance = (point1, point2) => {
-    const R = 6371; // Earth's radius in km
-    const dLat = (point2.lat - point1.lat) * Math.PI / 180;
-    const dLng = (point2.lng - point1.lng) * Math.PI / 180;
-    const a = 
-      Math.sin(dLat/2) * Math.sin(dLat/2) +
-      Math.cos(point1.lat * Math.PI / 180) * Math.cos(point2.lat * Math.PI / 180) * 
-      Math.sin(dLng/2) * Math.sin(dLng/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    return R * c; // Distance in km
-  };
-
-  // Function to calculate route details using Google Maps Directions Service
-  const calculateRouteDetails = async (origin, destination) => {
-    if (!directionsServiceRef.current || !origin || !destination) {
-      console.log('Missing required parameters for route calculation:', {
-        hasDirectionsService: !!directionsServiceRef.current,
-        origin,
-        destination
-      });
-      return { distance: null, duration: null };
-    }
-    
-    try {
-      console.log('Calculating route details with coordinates:', {
-        current: origin,
-        dropoff: destination,
-        pickup: contract?.pickup_location_geo?.coordinates
-      });
-
-      const result = await directionsServiceRef.current.route({
-        origin: origin,
-        destination: destination,
-        travelMode: window.google.maps.TravelMode.DRIVING,
-        drivingOptions: {
-          departureTime: new Date(),
-          trafficModel: window.google.maps.TrafficModel.BEST_GUESS
-        }
-      });
-
-      if (!result || !result.routes || result.routes.length === 0) {
-        console.warn('No routes found in the response:', result);
-        return { distance: null, duration: null };
-      }
-
-      const route = result.routes[0].legs[0];
-      return {
-        distance: route.distance.value / 1000, // Convert meters to kilometers
-        duration: route.duration_in_traffic?.value || route.duration.value // Duration in seconds
-      };
-    } catch (error) {
-      console.error('Error calculating route:', error);
-      return { distance: null, duration: null };
-    }
-  };
-
   // Function to format duration
   const formatDuration = (seconds) => {
-    if (!seconds) return 'Calculating...';
+    if (!seconds) return 'N/A';
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
     
@@ -697,21 +421,54 @@ function LuggageTrackingContent() {
     }
   };
 
-  // Update route details when location changes
+  // Cooldown effect - updates every second
   useEffect(() => {
-    const updateRouteDetails = async () => {
-      console.log('Location changed, checking coordinates...');
-      if (!contract?.current_location_geo?.coordinates || 
-          !contract?.drop_off_location_geo?.coordinates || 
-          !contract?.pickup_location_geo?.coordinates) {
-        console.log('Missing coordinates:', {
-          current: !!contract?.current_location_geo?.coordinates,
-          dropoff: !!contract?.drop_off_location_geo?.coordinates,
-          pickup: !!contract?.pickup_location_geo?.coordinates
-        });
-        return;
+    let cooldownInterval;
+    
+    if (cooldownRemaining > 0) {
+      cooldownInterval = setInterval(() => {
+        setCooldownRemaining(prev => Math.max(0, prev - 1));
+      }, 1000);
+    }
+    
+    return () => {
+      if (cooldownInterval) {
+        clearInterval(cooldownInterval);
       }
+    };
+  }, [cooldownRemaining]);
 
+  // Button-triggered directions calculation - EXACTLY 2 API CALLS
+  const handleGetDirections = async () => {
+    if (!directionsServiceRef.current || !contract || !map) {
+      setDirectionsError('Map or directions service not available');
+      return;
+    }
+
+    if (!contract.current_location_geo?.coordinates || 
+        !contract.drop_off_location_geo?.coordinates || 
+        !contract.pickup_location_geo?.coordinates) {
+      setDirectionsError('Missing required location coordinates');
+      return;
+    }
+
+    // Check cooldown
+    const now = Date.now();
+    const timeSinceLastRequest = now - lastDirectionsRequest;
+    const cooldownTime = 60 * 1000; // 60 seconds in milliseconds
+
+    if (timeSinceLastRequest < cooldownTime) {
+      const remaining = Math.ceil((cooldownTime - timeSinceLastRequest) / 1000);
+      setCooldownRemaining(remaining);
+      setDirectionsError(`Please wait ${remaining} seconds before requesting directions again`);
+      return;
+    }
+
+    setIsLoadingDirections(true);
+    setDirectionsError(null);
+    setLastDirectionsRequest(now);
+
+    try {
       const currentLocation = {
         lat: contract.current_location_geo.coordinates[1],
         lng: contract.current_location_geo.coordinates[0]
@@ -725,49 +482,93 @@ function LuggageTrackingContent() {
         lng: contract.pickup_location_geo.coordinates[0]
       };
 
-      console.log('Calculating route details with coordinates:', {
-        current: currentLocation,
-        dropoff: dropoffLocation,
-        pickup: pickupLocation
+      console.log('Making 2 Directions API requests...');
+      
+      // REQUEST 1: Current location to drop-off location (for ETA, distance remaining, and polyline)
+      const currentToDropoffPromise = directionsServiceRef.current.route({
+        origin: currentLocation,
+        destination: dropoffLocation,
+        travelMode: window.google.maps.TravelMode.DRIVING,
+        drivingOptions: {
+          departureTime: new Date(),
+          trafficModel: window.google.maps.TrafficModel.BEST_GUESS
+        }
       });
 
-      // Calculate current route details
-      const details = await calculateRouteDetails(currentLocation, dropoffLocation);
-      setRouteDetails(details);
+      // REQUEST 2: Pickup location to drop-off location (for total distance to calculate progress)
+      const pickupToDropoffPromise = directionsServiceRef.current.route({
+        origin: pickupLocation,
+        destination: dropoffLocation,
+        travelMode: window.google.maps.TravelMode.DRIVING
+      });
 
-      // Calculate total route details
-      const totalDetails = await calculateRouteDetails(pickupLocation, dropoffLocation);
-      setTotalRouteDetails(totalDetails);
+      // Wait for both requests to complete
+      const [currentToDropoffResult, pickupToDropoffResult] = await Promise.all([
+        currentToDropoffPromise,
+        pickupToDropoffPromise
+      ]);
+
+      console.log('Both Directions API requests completed');
+
+      // Process REQUEST 1 results
+      const currentRoute = currentToDropoffResult.routes[0].legs[0];
+      const distanceRemaining = currentRoute.distance.value / 1000; // Convert to km
+      const duration = currentRoute.duration_in_traffic?.value || currentRoute.duration.value; // Duration in seconds
+      const eta = new Date(Date.now() + duration * 1000);
+
+      // Process REQUEST 2 results
+      const totalRoute = pickupToDropoffResult.routes[0].legs[0];
+      const totalDistance = totalRoute.distance.value / 1000; // Convert to km
 
       // Calculate progress
-      if (totalDetails.distance) {
-        const progressPercentage = Math.max(0, Math.min(100, 
-          (1 - (details.distance / totalDetails.distance)) * 100
-        ));
-        console.log('Delivery Progress:', {
-          progress: `${Math.round(progressPercentage)}%`,
-          distanceRemaining: `${details.distance?.toFixed(1)} km`,
-          eta: details.duration ? formatDuration(details.duration) : 'Calculating...'
-        });
-        setProgress(progressPercentage);
+      const progress = Math.max(0, Math.min(100, 
+        (1 - (distanceRemaining / totalDistance)) * 100
+      ));
+
+      // Clear existing polyline
+      if (polylineRef.current) {
+        polylineRef.current.setMap(null);
       }
 
-      // Calculate ETA
-      if (details.duration) {
-        const etaTime = new Date(Date.now() + details.duration * 1000);
-        setEta(etaTime);
-      }
-    };
+      // Draw polyline from current location to drop-off
+      const routePath = currentToDropoffResult.routes[0].overview_path;
+      polylineRef.current = new window.google.maps.Polyline({
+        path: routePath,
+        geodesic: true,
+        strokeColor: '#4CAF50',
+        strokeOpacity: 0.8,
+        strokeWeight: 5,
+        map: map
+      });
 
-    updateRouteDetails();
-  }, [contract?.current_location_geo?.coordinates]);
+      // Update state with calculated values
+      setRouteData({
+        eta,
+        distanceRemaining,
+        progress,
+        polyline: routePath,
+        totalDistance
+      });
 
-  // Replace handleSearch to use fetchData
+      console.log('Route calculations completed:', {
+        distanceRemaining: `${distanceRemaining.toFixed(1)} km`,
+        progress: `${Math.round(progress)}%`,
+        eta: eta.toLocaleTimeString(),
+        totalDistance: `${totalDistance.toFixed(1)} km`
+      });
+
+    } catch (error) {
+      console.error('Error calculating directions:', error);
+      setDirectionsError(error.message || 'Failed to calculate directions');
+    } finally {
+      setIsLoadingDirections(false);
+    }
+  };
+
   const handleSearch = (id = contractId) => {
     fetchData(id);
   };
 
-  // Expand/collapse
   const handleExpandClick = () => { setExpanded(!expanded); };
 
   const handleClearSearch = () => {
@@ -784,11 +585,23 @@ function LuggageTrackingContent() {
       currentLocationMarkerRef.current.map = null;
       currentLocationMarkerRef.current = null;
     }
+    if (polylineRef.current) {
+      polylineRef.current.setMap(null);
+      polylineRef.current = null;
+    }
     setIsScriptLoaded(false);
-    setSnackbarOpen(false); // Close snackbar on clear
+    setSnackbarOpen(false);
+    setRouteData({
+      eta: null,
+      distanceRemaining: null,
+      progress: 0,
+      polyline: null,
+      totalDistance: null
+    });
+    setLastDirectionsRequest(0);
+    setCooldownRemaining(0);
   };
 
-  // Show snackbar
   const handleSnackbarClose = (event, reason) => {
     if (reason === 'clickaway') {
       return;
@@ -1069,7 +882,30 @@ function LuggageTrackingContent() {
             </Collapse>
           </Paper>
           <Paper elevation={3} sx={{ p: 3, borderRadius: 3, position: 'relative', overflow: 'hidden', border: '1px solid', borderColor: 'divider' }}>
-            <Typography variant="h6" sx={{ mb: 2 }}>Live Tracking</Typography>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+              <Typography variant="h6">Live Tracking</Typography>
+              <Button
+                variant="contained"
+                startIcon={isLoadingDirections ? <CircularProgress size={16} color="inherit" /> : <DirectionsIcon />}
+                onClick={handleGetDirections}
+                disabled={isLoadingDirections || !map || !directionsServiceRef.current || cooldownRemaining > 0}
+                size="small"
+                sx={{ 
+                  minWidth: '140px',
+                  textTransform: 'none'
+                }}
+              >
+                {isLoadingDirections ? 'Calculating...' : 
+                 cooldownRemaining > 0 ? `Wait ${cooldownRemaining}s` : 'Get Directions'}
+              </Button>
+            </Box>
+            
+            {directionsError && (
+              <Alert severity="error" sx={{ mb: 2 }}>
+                {directionsError}
+              </Alert>
+            )}
+            
             <Box sx={{ display: 'flex', gap: 2, mb: 2, flexWrap: 'wrap' }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <Box sx={{ width: 16, height: 16, borderRadius: '50%', bgcolor: '#FF9800', border: '2px solid #F57C00' }} />
@@ -1084,44 +920,63 @@ function LuggageTrackingContent() {
                 <Typography variant="body2">Current Location</Typography>
               </Box>
             </Box>
-            {/* Progress and ETA Section */}
+            
+            {/* Route Information Display */}
             <Box sx={{ mb: 2 }}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                <Typography variant="body2" color="text.secondary">
-                  Delivery Progress
-                </Typography>
-                <Typography variant="body2" color="primary.main" fontWeight="bold">
-                  {Math.round(progress)}%
-                </Typography>
+              <Typography variant="subtitle2" sx={{ color: 'primary.main', fontWeight: 700, mb: 1 }}>
+                Route Information
+              </Typography>
+              <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 2, mb: 2 }}>
+                <Paper sx={{ p: 2, bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider' }}>
+                  <Typography variant="body2" color="text.secondary">Distance Remaining</Typography>
+                  <Typography variant="h6" color="primary.main" fontWeight="bold">
+                    {routeData.distanceRemaining ? `${routeData.distanceRemaining.toFixed(1)} km` : 'Click "Get Directions"'}
+                  </Typography>
+                </Paper>
+                <Paper sx={{ p: 2, bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider' }}>
+                  <Typography variant="body2" color="text.secondary">Estimated Time of Arrival</Typography>
+                  <Typography variant="h6" color="primary.main" fontWeight="bold">
+                    {routeData.eta ? routeData.eta.toLocaleTimeString() : 'Click "Get Directions"'}
+                  </Typography>
+                </Paper>
+                <Paper sx={{ p: 2, bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider' }}>
+                  <Typography variant="body2" color="text.secondary">Total Distance</Typography>
+                  <Typography variant="h6" color="primary.main" fontWeight="bold">
+                    {routeData.totalDistance ? `${routeData.totalDistance.toFixed(1)} km` : 'Click "Get Directions"'}
+                  </Typography>
+                </Paper>
               </Box>
-              <Box sx={{ width: '100%', bgcolor: 'grey.200', borderRadius: 1, height: 8, mb: 1 }}>
-                <Box
-                  sx={{
-                    height: '100%',
-                    borderRadius: 1,
-                    bgcolor: 'primary.main',
-                    width: `${progress}%`,
-                    transition: 'width 0.5s ease-in-out'
-                  }}
-                />
-              </Box>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                <Typography variant="body2" color="text.secondary">
-                  Distance Remaining
-                </Typography>
-                <Typography variant="body2" color="primary.main" fontWeight="bold">
-                  {routeDetails.distance ? `${routeDetails.distance.toFixed(1)} km` : 'Calculating...'}
-                </Typography>
-              </Box>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Typography variant="body2" color="text.secondary">
-                  Estimated Time of Arrival
-                </Typography>
-                <Typography variant="body2" color="primary.main" fontWeight="bold">
-                  {routeDetails.duration ? formatDuration(routeDetails.duration) : 'Calculating...'}
+              
+              {/* Progress Bar Section */}
+              <Box sx={{ mb: 2 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    Delivery Progress
+                  </Typography>
+                  <Typography variant="body2" color="primary.main" fontWeight="bold">
+                    {Math.round(routeData.progress)}%
+                  </Typography>
+                </Box>
+                <Box sx={{ width: '100%', bgcolor: 'grey.200', borderRadius: 1, height: 8 }}>
+                  <Box
+                    sx={{
+                      height: '100%',
+                      borderRadius: 1,
+                      bgcolor: routeData.progress > 0 ? 'primary.main' : 'grey.300',
+                      width: `${routeData.progress}%`,
+                      transition: 'width 0.5s ease-in-out'
+                    }}
+                  />
+                </Box>
+                <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                  {routeData.progress > 0 ? 
+                    `Progress calculated from pickup to drop-off location` : 
+                    'Click "Get Directions" to calculate progress'
+                  }
                 </Typography>
               </Box>
             </Box>
+            
             <MapComponent mapRef={mapRef} mapError={mapError} />
           </Paper>
         </>
