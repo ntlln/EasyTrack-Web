@@ -50,6 +50,7 @@ export async function createUser(formData) {
             id: data.user.id,
             email: sanitizedEmail,
             role_id: formData.role_id,
+            corporation_id: formData.corporation_id || null,
         });
 
         if (profileError) {

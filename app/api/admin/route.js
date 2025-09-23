@@ -542,7 +542,7 @@ export async function GET(request) {
           remarks, passenger_form, proof_of_delivery,
         delivery_address, address_line_1, address_line_2,
         summary_id,
-        airline:airline_id (*),
+        airline:airline_id (id, first_name, middle_initial, last_name, email, contact_number, corporation_id),
         delivery:delivery_id (*)
       `)
       .is('summary_id', null)
@@ -912,7 +912,7 @@ export async function POST(req) {
 
     // Handle user status update
     if (action === 'updateUserStatus') {
-      const { userId, statusName, verifyStatusId } = params;
+      const { userId, statusName, verifyStatusId, corporationId } = params;
       
       // Prepare update data
       const updateData = {};
@@ -936,6 +936,15 @@ export async function POST(req) {
         updateData.verify_status_id = verifyStatusId;
       } else if (verifyStatusId === '') {
         updateData.verify_status_id = null;
+      }
+
+      // Handle corporation update
+      if (corporationId !== undefined) {
+        if (corporationId === '' || corporationId === null) {
+          updateData.corporation_id = null;
+        } else {
+          updateData.corporation_id = corporationId;
+        }
       }
 
       const { error, data } = await supabase
@@ -1147,6 +1156,20 @@ export async function POST(req) {
       }));
 
       return NextResponse.json({ pricing });
+    }
+
+    // Handle fetching all corporations (id and name)
+    if (action === 'getAllCorporations') {
+      const { data, error } = await supabase
+        .from('profiles_corporation')
+        .select('id, corporation_name')
+        .order('corporation_name', { ascending: true });
+
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+
+      return NextResponse.json({ corporations: data || [] });
     }
 
     // Handle fetching summaries
@@ -1491,9 +1514,18 @@ export async function POST(req) {
         return NextResponse.json({ error: 'Contract not found' }, { status: 404 });
       }
 
-      // Prefer passenger_form when available; otherwise fall back to proof_of_delivery
-      // This avoids relying on specific status IDs and ensures Delivered contracts with passenger_form work.
-      const payloadUrl = data.passenger_form || data.proof_of_delivery || null;
+      // Choose image source based on status:
+      // - Delivered (status_id 5): use passenger_form
+      // - Delivery Failed (status_id 6): use proof_of_delivery
+      // - Otherwise: prefer passenger_form then fallback to proof_of_delivery
+      let payloadUrl = null;
+      if (Number(data.contract_status_id) === 5) {
+        payloadUrl = data.passenger_form || null;
+      } else if (Number(data.contract_status_id) === 6) {
+        payloadUrl = data.proof_of_delivery || null;
+      } else {
+        payloadUrl = data.passenger_form || data.proof_of_delivery || null;
+      }
 
       if (!payloadUrl) {
         return NextResponse.json({ error: 'No proof available' }, { status: 404 });

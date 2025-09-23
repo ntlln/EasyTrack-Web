@@ -32,18 +32,19 @@ export default function Page() {
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
   const [editDialog, setEditDialog] = useState({ open: false, user: null });
   const [deleteDialog, setDeleteDialog] = useState({ open: false, userId: null });
-  const [editForm, setEditForm] = useState({ user_status_name: '', verify_status_id: '' });
+  const [editForm, setEditForm] = useState({ user_status_name: '', verify_status_id: '', corporation_id: '' });
   const [createDialog, setCreateDialog] = useState({ open: false });
-  const [createForm, setCreateForm] = useState({ email: "", role_id: "" });
+  const [createForm, setCreateForm] = useState({ email: "", role_id: "", corporation_id: "" });
   const [createLoading, setCreateLoading] = useState(false);
+  const [corporations, setCorporations] = useState([]);
 
   // Data fetching
-  useEffect(() => { fetchAccounts(); fetchStatusOptions(); fetchVerifyStatusOptions(); fetchUsers(); fetchRoles(); }, []);
+  useEffect(() => { fetchAccounts(); fetchStatusOptions(); fetchVerifyStatusOptions(); fetchUsers(); fetchRoles(); fetchCorporations(); }, []);
 
   const fetchAccounts = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase.from('profiles').select(`id, email, first_name, middle_initial, last_name, role_id, user_status_id, verify_status_id, profiles_status (status_name), profiles_roles (role_name), created_at, last_sign_in_at, updated_at`).order('created_at', { ascending: false });
+      const { data, error } = await supabase.from('profiles').select(`id, email, first_name, middle_initial, last_name, role_id, user_status_id, verify_status_id, corporation_id, profiles_status (status_name), profiles_roles (role_name), created_at, last_sign_in_at, updated_at`).order('created_at', { ascending: false });
       if (error) throw error;
       const formattedAccounts = data.map(account => ({
         id: account.id,
@@ -56,7 +57,8 @@ export default function Page() {
         verify_status_id: account.verify_status_id,
         created_at: account.created_at,
         last_sign_in_at: account.last_sign_in_at,
-        updated_at: account.updated_at
+        updated_at: account.updated_at,
+        corporation_id: account.corporation_id || ''
       }));
       setAccounts(formattedAccounts);
     } catch (error) {
@@ -110,6 +112,20 @@ export default function Page() {
     } catch (error) {
       console.error('Error fetching roles:', error);
       setSnackbar({ open: true, message: 'Error fetching roles', severity: 'error' });
+    }
+  };
+
+  const fetchCorporations = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles_corporation')
+        .select('id, corporation_name')
+        .order('corporation_name', { ascending: true });
+      if (error) throw error;
+      setCorporations(data || []);
+    } catch (error) {
+      console.error('Error fetching corporations:', error);
+      setSnackbar({ open: true, message: 'Error fetching corporations', severity: 'error' });
     }
   };
 
@@ -178,7 +194,8 @@ export default function Page() {
     
     setEditForm({ 
       user_status_name: selectedStatus ? selectedStatus.status_name : '',
-      verify_status_id: selectedAccount.verify_status_id || ''
+      verify_status_id: selectedAccount.verify_status_id || '',
+      corporation_id: selectedAccount.corporation_id || ''
     });
     handleCloseMenu();
   };
@@ -194,6 +211,7 @@ export default function Page() {
             userId: editDialog.user.id,
             statusName: editForm.user_status_name,
             verifyStatusId: editForm.verify_status_id,
+            corporationId: editForm.corporation_id,
           },
         }),
       });
@@ -227,7 +245,7 @@ export default function Page() {
   // Create account handlers
   const handleCreateFormChange = (e) => setCreateForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
   const handleCreateSubmit = async () => {
-    if (!createForm.email || !createForm.role_id) {
+    if (!createForm.email || !createForm.role_id || !createForm.corporation_id) {
       setSnackbar({ open: true, message: "Please fill in all required fields", severity: 'error' });
       return;
     }
@@ -236,7 +254,7 @@ export default function Page() {
     try {
       await createUser(createForm);
       setSnackbar({ open: true, message: "Account created successfully! Login credentials have been sent to the user's email.", severity: 'success' });
-      setCreateForm({ email: "", role_id: "" });
+      setCreateForm({ email: "", role_id: "", corporation_id: "" });
       setCreateDialog({ open: false });
       fetchAccounts(); // Refresh the accounts list
     } catch (error) {
@@ -247,7 +265,7 @@ export default function Page() {
   };
   const handleCreateClose = () => {
     setCreateDialog({ open: false });
-    setCreateForm({ email: "", role_id: "" });
+    setCreateForm({ email: "", role_id: "", corporation_id: "" });
   };
 
   // Styles
@@ -365,7 +383,6 @@ export default function Page() {
             {statusOptions.map((status) => <MenuItem key={status.id} value={status.status_name}>{status.status_name}</MenuItem>)}
           </TextField>
           <TextField select fullWidth label="Verification Status" value={editForm.verify_status_id} onChange={e => setEditForm(prev => ({ ...prev, verify_status_id: e.target.value }))} sx={dialogFieldStyles} disabled={verifyStatusLoading}>
-            <MenuItem value="">Select verification status</MenuItem>
             {verifyStatusLoading ? (
               <MenuItem disabled>Loading verification status options...</MenuItem>
             ) : verifyStatusOptions.length > 0 ? (
@@ -377,6 +394,11 @@ export default function Page() {
             ) : (
               <MenuItem disabled>No verification status options available</MenuItem>
             )}
+          </TextField>
+          <TextField select fullWidth label="Corporation" value={editForm.corporation_id} onChange={e => setEditForm(prev => ({ ...prev, corporation_id: e.target.value }))} sx={dialogFieldStyles}>
+            {corporations.map((corp) => (
+              <MenuItem key={corp.id} value={corp.id}>{corp.corporation_name}</MenuItem>
+            ))}
           </TextField>
         </DialogContent>
         <DialogActions>
@@ -419,6 +441,20 @@ export default function Page() {
               <MenuItem value="" disabled>Select a role</MenuItem>
               {roles.map((role) => (
                 <MenuItem key={role.id} value={role.id}>{role.role_name}</MenuItem>
+              ))}
+            </TextField>
+            <TextField 
+              fullWidth 
+              select 
+              label="Corporation" 
+              name="corporation_id" 
+              value={createForm.corporation_id} 
+              onChange={handleCreateFormChange} 
+              required
+            >
+              <MenuItem value="" disabled>Select a corporation</MenuItem>
+              {corporations.map((corp) => (
+                <MenuItem key={corp.id} value={corp.id}>{corp.corporation_name}</MenuItem>
               ))}
             </TextField>
           </Box>

@@ -2,8 +2,7 @@
 
 import { useState, useContext, useEffect, useRef, Suspense } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { Box, Divider, List, ListItemButton, ListItemIcon, ListItemText, Collapse, Button, IconButton, useMediaQuery, Typography, Snackbar, Alert, Avatar, Badge, Menu, MenuItem, ListItem, ListItemAvatar } from "@mui/material";
-import NotificationsIcon from '@mui/icons-material/Notifications';
+import { Box, Divider, List, ListItemButton, ListItemIcon, ListItemText, Collapse, Button, IconButton, useMediaQuery, Typography, Snackbar, Alert, Avatar } from "@mui/material";
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import GroupsIcon from '@mui/icons-material/Groups';
@@ -32,7 +31,7 @@ export default function Page(props) {
     );
 }
 
-function AdminSidebarContent({ notifications = [], markAllNotificationsRead }) {
+function AdminSidebarContent() {
     // State and context setup
     const [openPages, setOpenPages] = useState(() => typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('adminSidebarTransactionsOpen') || 'true') : true);
     const [isMinimized, setIsMinimized] = useState(true);
@@ -48,7 +47,8 @@ function AdminSidebarContent({ notifications = [], markAllNotificationsRead }) {
     const didInitRef = useRef(false);
     const [toast, setToast] = useState({ open: false, title: '', message: '', severity: 'info', targetUserId: null });
     const [profile, setProfile] = useState(null);
-    const [notifAnchor, setNotifAnchor] = useState(null);
+    const [corporationName, setCorporationName] = useState('');
+    
     const prevUnreadByConvRef = useRef(new Map());
     const closeToast = () => setToast(prev => ({ ...prev, open: false }));
 
@@ -82,13 +82,27 @@ function AdminSidebarContent({ notifications = [], markAllNotificationsRead }) {
                 return;
             }
 
-            // Fetch profile data
+            // Fetch profile data with role_id and corporation_id
             const { data: profileData } = await supabase
                 .from('profiles')
-                .select('first_name, middle_initial, last_name, email, pfp_id')
+                .select('first_name, middle_initial, last_name, email, pfp_id, role_id, corporation_id')
                 .eq('id', session.user.id)
                 .single();
             setProfile(profileData || { email: session.user.email });
+
+            // Fetch corporation name if available
+            if (profileData?.corporation_id) {
+                try {
+                    const { data: corp } = await supabase
+                        .from('profiles_corporation')
+                        .select('corporation_name')
+                        .eq('id', profileData.corporation_id)
+                        .single();
+                    setCorporationName(corp?.corporation_name || '');
+                } catch (_) { /* ignore */ }
+            } else {
+                setCorporationName('');
+            }
 
             // Start polling unread chat count
             const userId = session.user.id;
@@ -185,6 +199,7 @@ function AdminSidebarContent({ notifications = [], markAllNotificationsRead }) {
     const bottomSectionStyles = { p: 1, display: "flex", flexDirection: "column", gap: 1 };
     const buttonStyles = { textTransform: "none", minWidth: isMinimized ? 'auto' : undefined, px: isMinimized ? 1 : 2, justifyContent: isMinimized ? 'center' : 'flex-start', minHeight: 48, '& .MuiButton-startIcon': { margin: isMinimized ? 0 : undefined } };
     const modeButtonStyles = { ...buttonStyles, '& .MuiTypography-root': { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontSize: '0.875rem', lineHeight: 1.2 } };
+    const ROLE_NAME_BY_ID = { 1: 'Administrator', 2: 'Delivery Personnel', 3: 'Airline Personnel' };
     const transactionsButtonStyles = { ...listItemStyles("/egc-admin/transactions"), ...(isDropdownActive() ? activeStyles : {}) };
 
     return (
@@ -197,81 +212,7 @@ function AdminSidebarContent({ notifications = [], markAllNotificationsRead }) {
 
             <Divider />
 
-            {isMinimized && (
-                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', py: 2, gap: 1 }}>
-                    <Avatar src={profile?.pfp_id || undefined} sx={{ width: 40, height: 40, bgcolor: 'primary.main', color: '#fff' }}>
-                        {((profile?.first_name?.[0] || '') + (profile?.last_name?.[0] || '')).toUpperCase() || (profile?.email?.[0] || 'A').toUpperCase()}
-                    </Avatar>
-                    <IconButton size="small" onClick={(e) => setNotifAnchor(e.currentTarget)}>
-                        <Badge color="primary" badgeContent={(notifications.filter(n => !n.read).length) > 99 ? '99+' : (notifications.filter(n => !n.read).length)} max={999}>
-                            <NotificationsIcon />
-                        </Badge>
-                    </IconButton>
-                    <Menu anchorEl={notifAnchor} open={Boolean(notifAnchor)} onClose={() => setNotifAnchor(null)} PaperProps={{ sx: { width: 320, maxHeight: 420 } }}>
-                        {notifications.length > 0 && (
-                            <MenuItem onClick={() => { if (markAllNotificationsRead) markAllNotificationsRead(); }} sx={{ justifyContent: 'center', color: 'primary.main', fontWeight: 600 }}>Mark all as read</MenuItem>
-                        )}
-                        {notifications.length === 0 && (
-                            <MenuItem disabled><Typography variant="body2">No notifications</Typography></MenuItem>
-                        )}
-                        {notifications.slice(0, 20).map((n) => (
-                            <MenuItem key={n.id} onClick={() => setNotifAnchor(null)} sx={{ whiteSpace: 'normal', alignItems: 'flex-start' }}>
-                                <ListItem disableGutters sx={{ p: 0 }}>
-                                    <ListItemAvatar>
-                                        <Avatar sx={{ bgcolor: 'primary.main', color: '#fff' }}>{(n.severity || 'i').slice(0, 1).toUpperCase()}</Avatar>
-                                    </ListItemAvatar>
-                                    <Box>
-                                        <Typography variant="body2" sx={{ fontWeight: 600 }}>{n.message}</Typography>
-                                        <Typography variant="caption" color="text.secondary">{new Date(n.timestamp).toLocaleString()}</Typography>
-                                    </Box>
-                                </ListItem>
-                            </MenuItem>
-                        ))}
-                    </Menu>
-                </Box>
-            )}
-
-            {!isMinimized && (
-                <Box sx={{ display: 'flex', alignItems: 'center', px: 2, py: 1, gap: 1 }}>
-                    <Avatar src={profile?.pfp_id || undefined} sx={{ bgcolor: 'primary.main', color: '#fff' }}>
-                        {((profile?.first_name?.[0] || '') + (profile?.last_name?.[0] || '')).toUpperCase() || (profile?.email?.[0] || 'A').toUpperCase()}
-                    </Avatar>
-                    <Box sx={{ flex: 1, minWidth: 0 }}>
-                        <Typography variant="body2" noWrap sx={{ fontWeight: 600 }}>
-                            {`${profile?.first_name || ''} ${profile?.middle_initial || ''} ${profile?.last_name || ''}`.replace(/  +/g, ' ').trim() || profile?.email}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary" noWrap>
-                            {profile?.email}
-                        </Typography>
-                    </Box>
-                    <IconButton size="small" onClick={(e) => setNotifAnchor(e.currentTarget)}>
-                        <Badge color="primary" badgeContent={(notifications.filter(n => !n.read).length) > 99 ? '99+' : (notifications.filter(n => !n.read).length)} max={999}>
-                            <NotificationsIcon />
-                        </Badge>
-                    </IconButton>
-                    <Menu anchorEl={notifAnchor} open={Boolean(notifAnchor)} onClose={() => setNotifAnchor(null)} PaperProps={{ sx: { width: 320, maxHeight: 420 } }}>
-                        {notifications.length > 0 && (
-                            <MenuItem onClick={() => { if (markAllNotificationsRead) markAllNotificationsRead(); }} sx={{ justifyContent: 'center', color: 'primary.main', fontWeight: 600 }}>Mark all as read</MenuItem>
-                        )}
-                        {notifications.length === 0 && (
-                            <MenuItem disabled><Typography variant="body2">No notifications</Typography></MenuItem>
-                        )}
-                        {notifications.slice(0, 20).map((n) => (
-                            <MenuItem key={n.id} onClick={() => setNotifAnchor(null)} sx={{ whiteSpace: 'normal', alignItems: 'flex-start' }}>
-                                <ListItem disableGutters sx={{ p: 0 }}>
-                                    <ListItemAvatar>
-                                        <Avatar sx={{ bgcolor: 'primary.main', color: '#fff' }}>{(n.severity || 'i').slice(0, 1).toUpperCase()}</Avatar>
-                                    </ListItemAvatar>
-                                    <Box>
-                                        <Typography variant="body2" sx={{ fontWeight: 600 }}>{n.message}</Typography>
-                                        <Typography variant="caption" color="text.secondary">{new Date(n.timestamp).toLocaleString()}</Typography>
-                                    </Box>
-                                </ListItem>
-                            </MenuItem>
-                        ))}
-                    </Menu>
-                </Box>
-            )}
+            {/* Avatar moved to bottom section above theme button */}
 
             <Box flexGrow={1}>
                 <List component="nav" sx={{ flexGrow: 1 }}>
@@ -350,6 +291,28 @@ function AdminSidebarContent({ notifications = [], markAllNotificationsRead }) {
             <Divider />
 
             <Box sx={bottomSectionStyles}>
+				{isMinimized ? (
+					<Box sx={{ display: 'flex', justifyContent: 'center', py: 1 }}>
+						<Avatar src={profile?.pfp_id || undefined} sx={{ width: 40, height: 40, bgcolor: 'primary.main', color: '#fff' }}>
+							{((profile?.first_name?.[0] || '') + (profile?.last_name?.[0] || '')).toUpperCase() || (profile?.email?.[0] || 'A').toUpperCase()}
+						</Avatar>
+					</Box>
+				) : (
+					<Box sx={{ display: 'flex', alignItems: 'center', px: 1, py: 1, gap: 1 }}>
+						<Avatar src={profile?.pfp_id || undefined} sx={{ bgcolor: 'primary.main', color: '#fff' }}>
+							{((profile?.first_name?.[0] || '') + (profile?.last_name?.[0] || '')).toUpperCase() || (profile?.email?.[0] || 'A').toUpperCase()}
+						</Avatar>
+						<Box sx={{ flex: 1, minWidth: 0 }}>
+							<Typography variant="body2" noWrap sx={{ fontWeight: 600 }}>
+								{`${profile?.first_name || ''} ${profile?.middle_initial || ''} ${profile?.last_name || ''}`.replace(/  +/g, ' ').trim() || profile?.email}
+							</Typography>
+                            <Typography variant="caption" color="text.secondary" noWrap>
+                                {(ROLE_NAME_BY_ID[Number(profile?.role_id)] || 'No Role') + (corporationName ? ` - ${corporationName}` : '')}
+                            </Typography>
+						</Box>
+
+					</Box>
+				)}
                 <Button variant="contained" startIcon={mode === 'light' ? <DarkModeIcon /> : <LightModeIcon />} onClick={toggleMode} fullWidth sx={buttonStyles}>
                     {!isMinimized && <Typography noWrap>{mode === 'light' ? 'Dark Mode' : 'Light Mode'}</Typography>}
                 </Button>

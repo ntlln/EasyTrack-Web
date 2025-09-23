@@ -692,6 +692,9 @@ const TransactionManagement = () => {
     const [previewDoc, setPreviewDoc] = useState(null);
     const [previewKey, setPreviewKey] = useState(0);
     const [eSignatureDataUrl, setESignatureDataUrl] = useState(null);
+    // Corporations map for airline_id -> corporation name
+    const [corporationsById, setCorporationsById] = useState(new Map());
+    const [corporationFilter, setCorporationFilter] = useState('');
     
     // Sorting state for Summary table
     const [summarySortField, setSummarySortField] = useState('due_date');
@@ -711,9 +714,22 @@ const TransactionManagement = () => {
             setLoading(true);
             setError(null);
             try {
-                const res = await fetch('/api/admin');
+                const res = await fetch('/api/admin?action=allContracts');
                 const json = await res.json();
                 setData(json.data || []);
+                // Fetch corporations list once to map corporation_id -> name
+                try {
+                    const corpRes = await fetch('/api/admin', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ action: 'getAllCorporations' })
+                    });
+                    if (corpRes.ok) {
+                        const corpJson = await corpRes.json();
+                        const map = new Map((corpJson.corporations || []).map(c => [c.id, c.corporation_name]));
+                        setCorporationsById(map);
+                    }
+                } catch {}
             } catch (err) {
                 setError('Failed to fetch data');
             } finally {
@@ -731,7 +747,7 @@ const TransactionManagement = () => {
 
         const refreshPendingQuietly = async () => {
             try {
-                const res = await fetch('/api/admin');
+                const res = await fetch('/api/admin?action=allContracts');
                 const json = await res.json();
                 if (!cancelled && res.ok) {
                     setData(json.data || []);
@@ -885,17 +901,23 @@ const TransactionManagement = () => {
     // Filter data based on selected month using created_at
     // Additionally, only include contracts with Delivered or Delivery Failed statuses (IDs 5 and 6)
     const filteredData = React.useMemo(() => {
-        const monthStart = startOfMonth(selectedMonth);
-        const monthEnd = endOfMonth(selectedMonth);
-        
+        // Show ALL delivered or failed contracts regardless of month
         return data.filter(contract => {
-            const contractDate = new Date(contract.created_at);
-            const isInMonth = contractDate >= monthStart && contractDate <= monthEnd;
             const statusId = Number(contract.contract_status_id);
-            const isDeliveredOrFailed = statusId === 5 || statusId === 6;
-            return isInMonth && isDeliveredOrFailed;
+            const statusOk = statusId === 5 || statusId === 6;
+            if (!statusOk) return false;
+            if (!corporationFilter) return true;
+            const corpName = corporationsById.get(contract.airline?.corporation_id) || '';
+            return corpName === corporationFilter;
         });
-    }, [data, selectedMonth]);
+    }, [data, corporationFilter, corporationsById]);
+
+    // Helpers for selection lock (already summarized/invoiced)
+    const isRowLocked = (row) => {
+        // Lock selection if the contract already has a summary in contracts.summary_id
+        return Boolean(row.summary_id);
+    };
+    const selectableFilteredData = React.useMemo(() => filteredData.filter(row => !isRowLocked(row)), [filteredData]);
 
     // Table and dialog handlers
     const handleChangePage = (event, newPage) => setPage(newPage);
@@ -978,6 +1000,8 @@ const TransactionManagement = () => {
     };
     const isRowSelected = (id) => selectedRows.includes(id);
     const handleSelectRow = (id) => {
+        const row = filteredData.find(r => r.id === id);
+        if (row && isRowLocked(row)) return; // block selecting locked rows
         setSelectedRows((prev) => {
             const newSelection = prev.includes(id) 
                 ? prev.filter((rowId) => rowId !== id)
@@ -987,15 +1011,17 @@ const TransactionManagement = () => {
     };
     const handleSelectAll = (event) => {
         if (event.target.checked) {
-            const allIds = filteredData.map((row) => row.id);
+            const allIds = selectableFilteredData.map((row) => row.id);
             setSelectedRows((prev) => Array.from(new Set([...prev, ...allIds])));
         } else {
-            const monthIds = filteredData.map((row) => row.id);
+            const monthIds = selectableFilteredData.map((row) => row.id);
             setSelectedRows((prev) => prev.filter((id) => !monthIds.includes(id)));
         }
     };
-    const allPageRowsSelected = filteredData.length > 0 && filteredData.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).every((row) => selectedRows.includes(row.id));
-    const somePageRowsSelected = filteredData.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).some((row) => selectedRows.includes(row.id));
+    const pageRows = filteredData.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
+    const selectablePageRows = pageRows.filter(row => !isRowLocked(row));
+    const allPageRowsSelected = selectablePageRows.length > 0 && selectablePageRows.every((row) => selectedRows.includes(row.id));
+    const somePageRowsSelected = selectablePageRows.some((row) => selectedRows.includes(row.id));
     const getSelectedContracts = () => {
         try {
             const selectedContracts = data.filter(row => selectedRows.includes(row.id));
@@ -1291,6 +1317,10 @@ const TransactionManagement = () => {
                 case 'owner_name':
                     aValue = `${a.owner_first_name || ''} ${a.owner_middle_initial || ''} ${a.owner_last_name || ''}`.trim();
                     bValue = `${b.owner_first_name || ''} ${b.owner_middle_initial || ''} ${b.owner_last_name || ''}`.trim();
+                    break;
+                case 'corporation':
+                    aValue = (corporationsById.get(a.airline?.corporation_id) || '').toLowerCase();
+                    bValue = (corporationsById.get(b.airline?.corporation_id) || '').toLowerCase();
                     break;
                 case 'flight_number':
                     aValue = a.flight_number || '';
@@ -1930,9 +1960,9 @@ const TransactionManagement = () => {
                     aria-label="transaction management tabs"
                     centered
                 >
-                    <Tab label="Pending" />
-                    <Tab label="Summary" />
-                    <Tab label="Pricing Update" />
+                    <Tab label="Pay" />
+                    <Tab label="Invoice" />
+                    <Tab label="Rates" />
                 </Tabs>
             </Box>
 
@@ -1954,6 +1984,20 @@ const TransactionManagement = () => {
                                     }}
                                 />
                             </LocalizationProvider>
+                            <FormControl size="small" sx={{ minWidth: 220 }}>
+                                <InputLabel id="corp-filter-label">Filter by Corporation</InputLabel>
+                                <Select
+                                    labelId="corp-filter-label"
+                                    value={corporationFilter}
+                                    label="Filter by Corporation"
+                                    onChange={(e) => setCorporationFilter(e.target.value)}
+                                >
+                                    <MenuItem value="">All Corporations</MenuItem>
+                                    {Array.from(new Set(Array.from(corporationsById.values()))).sort((a,b)=>a.localeCompare(b)).map(name => (
+                                        <MenuItem key={name} value={name}>{name}</MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
                             <Button 
                                 variant="outlined" 
                                 color="primary"
@@ -1975,7 +2019,7 @@ const TransactionManagement = () => {
                                             inputProps={{ 'aria-label': 'select all contracts' }}
                                             sx={{ color: 'white', '&.Mui-checked': { color: 'white' } }}
                                         />
-                                    </TableCell>
+                                     </TableCell>
                                      <TableCell 
                                          sx={{ color: 'white', cursor: 'pointer', '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' } }}
                                          onClick={() => handlePendingSort('id')}
@@ -1994,6 +2038,15 @@ const TransactionManagement = () => {
                                              {getPendingSortIcon('owner_name')}
                                          </Box>
                                      </TableCell>
+                                    <TableCell 
+                                        sx={{ color: 'white', cursor: 'pointer', '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' } }}
+                                        onClick={() => handlePendingSort('corporation')}
+                                    >
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                            Corporation
+                                            {getPendingSortIcon('corporation')}
+                                        </Box>
+                                    </TableCell>
                                      <TableCell 
                                          sx={{ color: 'white', cursor: 'pointer', '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' } }}
                                          onClick={() => handlePendingSort('flight_number')}
@@ -2050,7 +2103,7 @@ const TransactionManagement = () => {
                                     const delivery_surcharge = Number(row.delivery_surcharge || row.surcharge) || 0;
                                     const delivery_discount = Number(row.delivery_discount || row.discount) || 0;
                                     const total = Math.max(0, (delivery_charge + delivery_surcharge) - delivery_discount);
-                                    const remarks = status === 'Delivery Failed' ? 'Delivery Failed' : '';
+                                    const remarks = row.remarks || '';
                                     
                                     // Format luggage owner name from contracts table fields
                                     const luggageOwner = row.owner_first_name || row.owner_middle_initial || row.owner_last_name 
@@ -2060,10 +2113,16 @@ const TransactionManagement = () => {
                                     return (
                                         <TableRow key={row.id} selected={isRowSelected(row.id)}>
                                             <TableCell padding="checkbox">
-                                                <Checkbox checked={isRowSelected(row.id)} onChange={() => handleSelectRow(row.id)} inputProps={{ 'aria-label': `select contract ${row.id}` }} />
+                                                <Checkbox 
+                                                    checked={isRowSelected(row.id)} 
+                                                    onChange={() => handleSelectRow(row.id)} 
+                                                    inputProps={{ 'aria-label': `select contract ${row.id}` }} 
+                                                    disabled={isRowLocked(row)}
+                                                />
                                             </TableCell>
                                             <TableCell>{row.id}</TableCell>
                                             <TableCell>{luggageOwner}</TableCell>
+                                            <TableCell>{corporationsById.get(row.airline?.corporation_id) || 'N/A'}</TableCell>
                                             <TableCell>{row.flight_number || 'N/A'}</TableCell>
                                             <TableCell>{row.drop_off_location || 'N/A'}</TableCell>
                                             <TableCell>{formatDate(row.delivered_at || row.created_at)}</TableCell>

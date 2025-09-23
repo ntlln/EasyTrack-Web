@@ -2,7 +2,7 @@
 
 import { useState, useContext, useEffect, useRef, Suspense } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { Box, Divider, List, ListItemButton, ListItemIcon, ListItemText, Collapse, Button, IconButton, useMediaQuery, Typography, Snackbar, Alert } from "@mui/material";
+import { Box, Divider, List, ListItemButton, ListItemIcon, ListItemText, Collapse, Button, IconButton, useMediaQuery, Typography, Snackbar, Alert, Avatar } from "@mui/material";
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 // import PaymentIcon from '@mui/icons-material/Payment';
@@ -46,6 +46,8 @@ function ContractorSidebarContent() {
     const prevUnreadByConvRef = useRef(new Map());
     const didInitRef = useRef(false);
     const [toast, setToast] = useState({ open: false, title: '', message: '', severity: 'info', targetUserId: null });
+    const [profile, setProfile] = useState(null);
+    const [corporationName, setCorporationName] = useState('');
     const closeToast = () => setToast(prev => ({ ...prev, open: false }));
 
     // Click outside handler
@@ -69,6 +71,28 @@ function ContractorSidebarContent() {
             const { data: { session } } = await supabase.auth.getSession();
             if (!session?.user) return;
             const userId = session.user.id;
+
+            // Fetch basic profile with role_id and corporation_id for avatar and role display
+            try {
+                const { data: profileData } = await supabase
+                    .from('profiles')
+                    .select('first_name, middle_initial, last_name, email, pfp_id, role_id, corporation_id')
+                    .eq('id', userId)
+                    .single();
+                setProfile(profileData || { email: session.user.email });
+                if (profileData?.corporation_id) {
+                    try {
+                        const { data: corp } = await supabase
+                            .from('profiles_corporation')
+                            .select('corporation_name')
+                            .eq('id', profileData.corporation_id)
+                            .single();
+                        setCorporationName(corp?.corporation_name || '');
+                    } catch (_) { /* ignore */ }
+                } else {
+                    setCorporationName('');
+                }
+            } catch (_) { /* ignore profile fetch errors */ }
 
             const fetchUnread = async () => {
                 try {
@@ -171,6 +195,7 @@ function ContractorSidebarContent() {
     const buttonStyles = { textTransform: "none", minWidth: isMinimized ? 'auto' : undefined, px: isMinimized ? 1 : 2, justifyContent: isMinimized ? 'center' : 'flex-start', minHeight: 48, '& .MuiButton-startIcon': { margin: isMinimized ? 0 : undefined } };
     const modeButtonStyles = { ...buttonStyles, '& .MuiTypography-root': { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontSize: '0.875rem', lineHeight: 1.2 } };
     const transactionsButtonStyles = { ...listItemStyles("/contractor/transactions"), ...(isDropdownActive() ? activeStyles : {}) };
+    const ROLE_NAME_BY_ID = { 1: 'Administrator', 2: 'Delivery Personnel', 3: 'Airline Personnel' };
 
     return (
         <>
@@ -241,6 +266,28 @@ function ContractorSidebarContent() {
             <Divider />
 
             <Box sx={bottomSectionStyles}>
+                {isMinimized ? (
+                    <Box sx={{ display: 'flex', justifyContent: 'center', py: 1 }}>
+                        <Avatar src={profile?.pfp_id || undefined} sx={{ width: 40, height: 40, bgcolor: 'primary.main', color: '#fff' }}>
+                            {((profile?.first_name?.[0] || '') + (profile?.last_name?.[0] || '')).toUpperCase() || (profile?.email?.[0] || 'A').toUpperCase()}
+                        </Avatar>
+                    </Box>
+                ) : (
+                    <Box sx={{ display: 'flex', alignItems: 'center', px: 1, py: 1, gap: 1 }}>
+                        <Avatar src={profile?.pfp_id || undefined} sx={{ bgcolor: 'primary.main', color: '#fff' }}>
+                            {((profile?.first_name?.[0] || '') + (profile?.last_name?.[0] || '')).toUpperCase() || (profile?.email?.[0] || 'A').toUpperCase()}
+                        </Avatar>
+                        <Box sx={{ flex: 1, minWidth: 0 }}>
+                            <Typography variant="body2" noWrap sx={{ fontWeight: 600 }}>
+                                {`${profile?.first_name || ''} ${profile?.middle_initial || ''} ${profile?.last_name || ''}`.replace(/  +/g, ' ').trim() || profile?.email}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary" noWrap>
+                                {(ROLE_NAME_BY_ID[Number(profile?.role_id)] || 'No Role') + (corporationName ? ` - ${corporationName}` : '')}
+                            </Typography>
+                        </Box>
+                        
+                    </Box>
+                )}
                 <Button variant="contained" startIcon={mode === 'light' ? <DarkModeIcon /> : <LightModeIcon />} onClick={toggleMode} fullWidth sx={buttonStyles}>
                     {!isMinimized && <Typography noWrap>{mode === 'light' ? 'Dark Mode' : 'Light Mode'}</Typography>}
                 </Button>

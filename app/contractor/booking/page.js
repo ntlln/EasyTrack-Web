@@ -124,7 +124,7 @@ export default function Page() {
     const [rowsPerPage, setRowsPerPage] = useState(10);
     const [validationErrors, setValidationErrors] = useState({});
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [searchTerm, setSearchTerm] = useState('');
+    
     
     // Location dropdown states for Google Places
     const [provinces, setProvinces] = useState([]);
@@ -1365,16 +1365,7 @@ export default function Page() {
 
     // Filter contracts based on status, date, and search term
     const filteredContracts = contractList.filter(contract => {
-        // First apply search filter
-        if (searchTerm.trim() !== '') {
-            const contractId = contract.id?.toLowerCase() || '';
-            const searchLower = searchTerm.toLowerCase();
-            if (!contractId.includes(searchLower)) {
-                return false;
-            }
-        }
-        
-        // Then apply status filter
+        // Apply status filter
         if (statusFilter !== 'all') {
             const status = contract.contract_status?.status_name?.toLowerCase();
             switch (statusFilter) {
@@ -1422,10 +1413,7 @@ export default function Page() {
         setPage(0);
     };
 
-    // Reset page when search term changes
-    useEffect(() => {
-        setPage(0);
-    }, [searchTerm]);
+    
 
     const filterOptions = [
         { value: 'all', label: 'All' },
@@ -1530,47 +1518,6 @@ export default function Page() {
                         {contractListError && (<Typography color="error" align="center">{contractListError}</Typography>)}
                         <Box sx={{ maxWidth: '800px', mx: 'auto', width: '100%', mb: 3 }}>
                             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, p: 1 }}>
-                                {/* Search Bar */}
-                                <Box sx={{ display: 'flex', justifyContent: 'center' }}>
-                                    <TextField
-                                        placeholder="Search by Contract ID..."
-                                        value={searchTerm}
-                                        onChange={(e) => setSearchTerm(e.target.value)}
-                                        size="small"
-                                        sx={{
-                                            minWidth: '300px',
-                                            '& .MuiOutlinedInput-root': {
-                                                borderRadius: '20px',
-                                                '& fieldset': {
-                                                    borderColor: 'divider',
-                                                },
-                                                '&:hover fieldset': {
-                                                    borderColor: 'primary.main',
-                                                },
-                                                '&.Mui-focused fieldset': {
-                                                    borderColor: 'primary.main',
-                                                },
-                                            }
-                                        }}
-                                        InputProps={{
-                                            startAdornment: (
-                                                <Box sx={{ display: 'flex', alignItems: 'center', mr: 1, color: 'text.secondary' }}>
-                                                    🔍
-                                                </Box>
-                                            ),
-                                            endAdornment: searchTerm && (
-                                                <IconButton
-                                                    size="small"
-                                                    onClick={() => setSearchTerm('')}
-                                                    edge="end"
-                                                >
-                                                    <CloseIcon fontSize="small" />
-                                                </IconButton>
-                                            )
-                                        }}
-                                    />
-                                </Box>
-                                
                                 {/* Filters */}
                                 <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 2 }}>
                                     <Box sx={{ display: 'flex', gap: 1, whiteSpace: 'nowrap' }}>
@@ -1621,11 +1568,7 @@ export default function Page() {
                             </Box>
                         </Box>
                         {!contractListLoading && !contractListError && contractList.length === 0 && (<Typography align="center" sx={{ mb: 4 }}>No contracts found</Typography>)}
-                        {!contractListLoading && !contractListError && contractList.length > 0 && dateFilteredContracts.length === 0 && searchTerm && (
-                            <Typography align="center" sx={{ mb: 4, color: 'text.secondary' }}>
-                                No contracts found matching "{searchTerm}"
-                            </Typography>
-                        )}
+                        
                         {mounted && (
                             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4, maxWidth: '800px', mx: 'auto', width: '100%' }}>
                                 {getPaginatedContracts().map((contract, idx) => (
