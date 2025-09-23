@@ -43,6 +43,8 @@ function AdminSidebarContent() {
     const isMobile = useMediaQuery(theme.breakpoints.down('md'));
     const [chatUnreadCount, setChatUnreadCount] = useState(0);
     const chatUnreadIntervalRef = useRef(null);
+    const [luggageAvailableCount, setLuggageAvailableCount] = useState(0);
+    const luggageIntervalRef = useRef(null);
     const prevUnreadRef = useRef(0);
     const didInitRef = useRef(false);
     const [toast, setToast] = useState({ open: false, title: '', message: '', severity: 'info', targetUserId: null });
@@ -146,10 +148,34 @@ function AdminSidebarContent() {
                 } catch (_) { /* ignore */ }
             };
 
+            // Luggage available counter (unassigned or status Available)
+            const fetchLuggageAvailable = async () => {
+                try {
+                    const res = await fetch('/api/admin?action=allContracts');
+                    if (!res.ok) return;
+                    const json = await res.json();
+                    const rows = Array.isArray(json.data) ? json.data : [];
+                    const count = rows.reduce((sum, c) => {
+                        try {
+                            const statusName = (c.contract_status?.status_name || '').toString().toLowerCase();
+                            const isAvailable = statusName.includes('available'); // e.g., "Available for Pickup"
+                            const isUnassigned = !c.delivery && !c.delivery_id && !c.delivery_personnel_id;
+                            const shouldCount = isAvailable && isUnassigned; // only count when both conditions are true
+                            return sum + (shouldCount ? 1 : 0);
+                        } catch { return sum; }
+                    }, 0);
+                    setLuggageAvailableCount(count);
+                } catch (_) { /* ignore */ }
+            };
+
             // initial fetch and interval
             fetchUnread();
             if (chatUnreadIntervalRef.current) clearInterval(chatUnreadIntervalRef.current);
             chatUnreadIntervalRef.current = setInterval(fetchUnread, 5000);
+
+            fetchLuggageAvailable();
+            if (luggageIntervalRef.current) clearInterval(luggageIntervalRef.current);
+            luggageIntervalRef.current = setInterval(fetchLuggageAvailable, 5000);
         };
         checkSession();
 
@@ -157,6 +183,10 @@ function AdminSidebarContent() {
             if (chatUnreadIntervalRef.current) {
                 clearInterval(chatUnreadIntervalRef.current);
                 chatUnreadIntervalRef.current = null;
+            }
+            if (luggageIntervalRef.current) {
+                clearInterval(luggageIntervalRef.current);
+                luggageIntervalRef.current = null;
             }
         };
     }, []);
@@ -232,7 +262,14 @@ function AdminSidebarContent() {
                     </ListItemButton>
 
                     <ListItemButton onClick={handleClickPages} sx={transactionsButtonStyles}>
-                        <ListItemIcon><InventoryIcon sx={{ color: isDropdownActive() ? theme.palette.primary.main : "primary.main" }} /></ListItemIcon>
+                        <ListItemIcon sx={{ position: 'relative' }}>
+                            <InventoryIcon sx={{ color: isDropdownActive() ? theme.palette.primary.main : "primary.main" }} />
+                            {isMinimized && luggageAvailableCount > 0 && (
+                                <Box sx={{ position: 'absolute', top: -2, right: -2, bgcolor: 'primary.main', color: '#fff', borderRadius: '10px', px: 0.5, minWidth: 16, height: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, lineHeight: 1 }}>
+                                    {luggageAvailableCount > 99 ? '99+' : luggageAvailableCount}
+                                </Box>
+                            )}
+                        </ListItemIcon>
                         {!isMinimized && <><ListItemText primary="Transactions" />{openPages ? <ExpandLess /> : <ExpandMore />}</>}
                     </ListItemButton>
 
@@ -243,9 +280,21 @@ function AdminSidebarContent() {
                                     <ListItemIcon><LocationOnIcon sx={iconStyles("/egc-admin/luggage-tracking")} /></ListItemIcon>
                                     <ListItemText primary="Luggage Tracking" />
                                 </ListItemButton>
-                                <ListItemButton sx={{ pl: 4, ...(isActive("/egc-admin/luggage-management") ? activeStyles : {}), ...listItemStyles("/egc-admin/luggage-management") }} onClick={() => handleNavigation("/egc-admin/luggage-management")}>
-                                    <ListItemIcon><MyLocationIcon sx={iconStyles("/egc-admin/luggage-management")} /></ListItemIcon>
+                                <ListItemButton sx={{ pl: 4, ...(isActive("/egc-admin/luggage-management") ? activeStyles : {}), ...listItemStyles("/egc-admin/luggage-management") }} onClick={() => handleNavigation("/egc-admin/luggage-management")}> 
+                                    <ListItemIcon sx={{ position: 'relative' }}>
+                                        <MyLocationIcon sx={iconStyles("/egc-admin/luggage-management")} />
+                                        {isMinimized && luggageAvailableCount > 0 && (
+                                            <Box sx={{ position: 'absolute', top: -2, right: -2, bgcolor: 'primary.main', color: '#fff', borderRadius: '10px', px: 0.5, minWidth: 16, height: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, lineHeight: 1 }}>
+                                                {luggageAvailableCount > 99 ? '99+' : luggageAvailableCount}
+                                            </Box>
+                                        )}
+                                    </ListItemIcon>
                                     <ListItemText primary="Luggage Management" />
+                                    {!isMinimized && luggageAvailableCount > 0 && (
+                                        <Box sx={{ ml: 1, bgcolor: 'primary.main', color: '#fff', borderRadius: '12px', px: 1, minWidth: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, lineHeight: 1 }}>
+                                            {luggageAvailableCount > 99 ? '99+' : luggageAvailableCount}
+                                        </Box>
+                                    )}
                                 </ListItemButton>
                                 <ListItemButton sx={{ pl: 4, ...(isActive("/egc-admin/transaction-management") ? activeStyles : {}), ...listItemStyles("/egc-admin/transaction-management") }} onClick={() => handleNavigation("/egc-admin/transaction-management")}>
                                     <ListItemIcon><AssignmentIcon sx={iconStyles("/egc-admin/transaction-management")} /></ListItemIcon>

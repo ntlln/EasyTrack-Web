@@ -740,18 +740,47 @@ const TransactionManagement = () => {
         fetchData();
     }, []);
 
-    // Silent background refresh every 5 seconds for Pending tab only
+    // Silent background refresh every 5 seconds for Pending (Pay) tab only
     useEffect(() => {
-        if (tabValue !== 0) return; // Only refresh when Pending tab is active
+        if (tabValue !== 0) return; // Only refresh when Pay tab is active
         let cancelled = false;
+        const controller = new AbortController();
+
+        const mergeUpdatedContracts = (prev, next) => {
+            const previousById = new Map(prev.map(row => [row.id, row]));
+            let hasChanges = false;
+
+            const merged = (Array.isArray(next) ? next : []).map(nextRow => {
+                const prevRow = previousById.get(nextRow.id);
+                if (!prevRow) { hasChanges = true; return nextRow; }
+
+                const isSame = (
+                    prevRow.updated_at === nextRow.updated_at &&
+                    prevRow.delivery_surcharge === nextRow.delivery_surcharge &&
+                    prevRow.delivery_discount === nextRow.delivery_discount &&
+                    prevRow.contract_status_id === nextRow.contract_status_id &&
+                    prevRow.delivered_at === nextRow.delivered_at &&
+                    prevRow.cancelled_at === nextRow.cancelled_at &&
+                    prevRow.pickup_at === nextRow.pickup_at &&
+                    prevRow.summary_id === nextRow.summary_id
+                );
+
+                if (isSame) return prevRow; // preserve reference to avoid re-render
+                hasChanges = true;
+                return { ...prevRow, ...nextRow };
+            });
+
+            if (!hasChanges && merged.length === prev.length) return prev;
+            return merged;
+        };
 
         const refreshPendingQuietly = async () => {
             try {
-                const res = await fetch('/api/admin?action=allContracts');
+                const res = await fetch('/api/admin?action=allContracts', { signal: controller.signal });
+                if (!res.ok) return;
                 const json = await res.json();
-                if (!cancelled && res.ok) {
-                    setData(json.data || []);
-                }
+                if (cancelled) return;
+                setData(prev => mergeUpdatedContracts(prev, json.data || []));
             } catch {}
         };
 
@@ -759,8 +788,12 @@ const TransactionManagement = () => {
             refreshPendingQuietly();
         }, 5000);
 
+        // initial silent refresh
+        refreshPendingQuietly();
+
         return () => {
             cancelled = true;
+            controller.abort();
             clearInterval(interval);
         };
     }, [tabValue]);
@@ -1960,7 +1993,7 @@ const TransactionManagement = () => {
                     aria-label="transaction management tabs"
                     centered
                 >
-                    <Tab label="Pay" />
+                    <Tab label="To Pay" />
                     <Tab label="Invoice" />
                     <Tab label="Rates" />
                 </Tabs>
@@ -1999,8 +2032,10 @@ const TransactionManagement = () => {
                                 </Select>
                             </FormControl>
                             <Button 
-                                variant="outlined" 
+                                variant="contained"
+                                size="small"
                                 color="primary"
+                                sx={{ height: 40 }}
                                 onClick={handleSummarize}
                             >
                                 Summarize
@@ -2130,7 +2165,41 @@ const TransactionManagement = () => {
                                             <TableCell>₱{total.toFixed(2)}</TableCell>
                                             <TableCell>{remarks}</TableCell>
                                             <TableCell>
-                                                <IconButton size="small" onClick={(e) => handleMenuClick(e, row)}><MoreVertIcon /></IconButton>
+                                                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                                                    <Button
+                                                        variant="contained"
+                                                        size="small"
+                                                        fullWidth
+                                                        onClick={() => { setDetailsContract(row); setDetailsOpen(true); }}
+                                                    >
+                                                        View Details
+                                                    </Button>
+                                                    <Button
+                                                        variant="contained"
+                                                        size="small"
+                                                        fullWidth
+                                                        onClick={() => { setSurchargeContract(row); setSurchargeValue(row.delivery_surcharge || ''); setSurchargeError(''); setSurchargeOpen(true); }}
+                                                    >
+                                                        Surcharge
+                                                    </Button>
+                                                    <Button
+                                                        variant="contained"
+                                                        size="small"
+                                                        fullWidth
+                                                        onClick={() => { setDiscountContract(row); setDiscountValue(row.delivery_discount || ''); setDiscountError(''); setDiscountOpen(true); }}
+                                                    >
+                                                        Discount
+                                                    </Button>
+                                                    <Button
+                                                        variant="contained"
+                                                        size="small"
+                                                        fullWidth
+                                                        sx={{ whiteSpace: 'nowrap' }}
+                                                        onClick={() => { setPodContract(row); setPodOpen(true); fetchProofOfDelivery(row.id); }}
+                                                    >
+                                                        Proof of Delivery
+                                                    </Button>
+                                                </Box>
                                             </TableCell>
                                         </TableRow>
                                     );
@@ -2612,46 +2681,164 @@ const TransactionManagement = () => {
                 <DialogContent dividers>
                     {detailsContract && (
                         <Box sx={{ minWidth: 400 }}>
-                            <Typography variant="subtitle1" sx={{ color: 'primary.main', fontWeight: 700, mb: 1 }}>Contract ID: <span style={{ color: '#bdbdbd', fontWeight: 400 }}>{detailsContract.id}</span></Typography>
+                            <Typography variant="subtitle1" sx={{ color: 'primary.main', fontWeight: 700, mb: 1 }}>
+                                Contract ID: <span style={{ color: 'primary.main', fontWeight: 400 }}>{detailsContract.id}</span>
+                            </Typography>
                             <Divider sx={{ my: 1 }} />
-                            <Typography variant="subtitle2" sx={{ color: 'primary.main', fontWeight: 700, mb: 1 }}>Location Information</Typography>
+
+                            <Typography variant="subtitle2" sx={{ color: 'primary.main', fontWeight: 700, mb: 1 }}>
+                                Location Information
+                            </Typography>
                             <Box sx={{ ml: 1, mb: 1 }}>
-                                <Typography variant="body2" sx={{ color: '#bdbdbd' }}><b>Pickup:</b> <span style={{ color: 'text.primary' }}>{detailsContract.pickup_location || 'N/A'}</span></Typography>
-                                {detailsContract.pickup_location_geo && (<Typography variant="body2" sx={{ color: '#bdbdbd' }}><b>Pickup Coordinates:</b> <span style={{ color: 'text.primary' }}>{detailsContract.pickup_location_geo.coordinates[1].toFixed(6)}, {detailsContract.pickup_location_geo.coordinates[0].toFixed(6)}</span></Typography>)}
-                                <Typography variant="body2" sx={{ color: '#bdbdbd' }}><b>Drop-off:</b> <span style={{ color: 'text.primary' }}>{detailsContract.drop_off_location || 'N/A'}</span></Typography>
-                                {detailsContract.drop_off_location_geo && (<Typography variant="body2" sx={{ color: '#bdbdbd' }}><b>Drop-off Coordinates:</b> <span style={{ color: 'text.primary' }}>{detailsContract.drop_off_location_geo.coordinates[1].toFixed(6)}, {detailsContract.drop_off_location_geo.coordinates[0].toFixed(6)}</span></Typography>)}
-                                {detailsContract.delivery_charge !== null && !isNaN(Number(detailsContract.delivery_charge)) ? (<Typography variant="body2" sx={{ color: '#bdbdbd' }}><b>Price:</b> <span style={{ color: 'text.primary' }}>₱{Number(detailsContract.delivery_charge).toLocaleString()}</span></Typography>) : (<Typography variant="body2" sx={{ color: '#bdbdbd' }}><b>Price:</b> <span style={{ color: 'text.primary' }}>N/A</span></Typography>)}
+                                <Typography variant="body2">
+                                    <b>Pickup:</b> <span>{detailsContract.pickup_location || 'N/A'}</span>
+                                </Typography>
+                                {detailsContract.pickup_location_geo && (
+                                    <Typography variant="body2">
+                                        <b>Pickup Coordinates:</b>{' '}
+                                        <span>
+                                            {detailsContract.pickup_location_geo.coordinates[1].toFixed(6)}, {detailsContract.pickup_location_geo.coordinates[0].toFixed(6)}
+                                        </span>
+                                    </Typography>
+                                )}
+                                <Typography variant="body2">
+                                    <b>Drop-off:</b> <span>{detailsContract.drop_off_location || 'N/A'}</span>
+                                </Typography>
+                                {detailsContract.drop_off_location_geo && (
+                                    <Typography variant="body2">
+                                        <b>Drop-off Coordinates:</b>{' '}
+                                        <span>
+                                            {detailsContract.drop_off_location_geo.coordinates[1].toFixed(6)}, {detailsContract.drop_off_location_geo.coordinates[0].toFixed(6)}
+                                        </span>
+                                    </Typography>
+                                )}
+                                {detailsContract.delivery_charge !== null && !isNaN(Number(detailsContract.delivery_charge)) ? (
+                                    <Typography variant="body2">
+                                        <b>Price:</b> <span>₱{Number(detailsContract.delivery_charge).toLocaleString()}</span>
+                                    </Typography>
+                                ) : (
+                                    <Typography variant="body2">
+                                        <b>Price:</b> <span>N/A</span>
+                                    </Typography>
+                                )}
                             </Box>
                             <Divider sx={{ my: 2 }} />
-                            <Typography variant="subtitle2" sx={{ color: 'primary.main', fontWeight: 700, mb: 1 }}>Contractor Information</Typography>
+
+                            <Typography variant="subtitle2" sx={{ color: 'primary.main', fontWeight: 700, mb: 1 }}>
+                                Passenger Information
+                            </Typography>
                             <Box sx={{ ml: 1, mb: 1 }}>
-                                <Typography variant="body2" sx={{ color: '#bdbdbd' }}><b>Contractor Name:</b> <span style={{ color: 'text.primary' }}>{detailsContract.airline ? `${detailsContract.airline.first_name || ''} ${detailsContract.airline.middle_initial || ''} ${detailsContract.airline.last_name || ''}${detailsContract.airline.suffix ? ` ${detailsContract.airline.suffix}` : ''}`.replace(/  +/g, ' ').trim() : 'N/A'}</span></Typography>
-                                <Typography variant="body2" sx={{ color: '#bdbdbd' }}><b>Contractor Email:</b> <span style={{ color: 'text.primary' }}>{detailsContract.airline?.email || 'N/A'}</span></Typography>
-                                <Typography variant="body2" sx={{ color: '#bdbdbd' }}><b>Contractor Contact:</b> <span style={{ color: 'text.primary' }}>{detailsContract.airline?.contact_number || 'N/A'}</span></Typography>
-                                <Typography variant="body2" sx={{ color: '#bdbdbd' }}><b>Subcontractor Name:</b> <span style={{ color: 'text.primary' }}>{detailsContract.delivery ? `${detailsContract.delivery.first_name || ''} ${detailsContract.delivery.middle_initial || ''} ${detailsContract.delivery.last_name || ''}${detailsContract.delivery.suffix ? ` ${detailsContract.delivery.suffix}` : ''}`.replace(/  +/g, ' ').trim() : 'N/A'}</span></Typography>
-                                <Typography variant="body2" sx={{ color: '#bdbdbd' }}><b>Subcontractor Email:</b> <span style={{ color: 'text.primary' }}>{detailsContract.delivery?.email || 'N/A'}</span></Typography>
-                                <Typography variant="body2" sx={{ color: '#bdbdbd' }}><b>Subcontractor Contact:</b> <span style={{ color: 'text.primary' }}>{detailsContract.delivery?.contact_number || 'N/A'}</span></Typography>
-                                <Typography variant="body2" sx={{ color: '#bdbdbd' }}><b>Status:</b> <span style={{ color: 'primary.main', fontWeight: 700 }}>{detailsContract.contract_status?.status_name || 'N/A'}</span></Typography>
+                                <Typography variant="body2">
+                                    <b>Name:</b>{' '}
+                                    <span>
+                                        {detailsContract.owner_first_name || detailsContract.owner_middle_initial || detailsContract.owner_last_name
+                                            ? `${detailsContract.owner_first_name || ''} ${detailsContract.owner_middle_initial || ''} ${detailsContract.owner_last_name || ''}`.replace(/  +/g, ' ').trim()
+                                            : 'N/A'}
+                                    </span>
+                                </Typography>
+                                <Typography variant="body2">
+                                    <b>Contact Number:</b> <span>{detailsContract.owner_contact || 'N/A'}</span>
+                                </Typography>
+                                <Typography variant="body2">
+                                    <b>Address:</b> <span>{detailsContract.owner_address || detailsContract.drop_off_location || 'N/A'}</span>
+                                </Typography>
                             </Box>
                             <Divider sx={{ my: 2 }} />
-                            <Typography variant="subtitle2" sx={{ color: 'primary.main', fontWeight: 700, mb: 1 }}>Luggage Information</Typography>
+
+                            <Typography variant="subtitle2" sx={{ color: 'primary.main', fontWeight: 700, mb: 1 }}>
+                                Airline Personnel Information
+                            </Typography>
                             <Box sx={{ ml: 1, mb: 1 }}>
-                                <Typography variant="body2" sx={{ color: '#bdbdbd' }}><b>Owner:</b> <span style={{ color: 'text.primary' }}>{detailsContract.owner_first_name || detailsContract.owner_middle_initial || detailsContract.owner_last_name ? `${detailsContract.owner_first_name || ''} ${detailsContract.owner_middle_initial || ''} ${detailsContract.owner_last_name || ''}`.replace(/  +/g, ' ').trim() : 'N/A'}</span></Typography>
-                                <Typography variant="body2" sx={{ color: '#bdbdbd' }}><b>Flight Number:</b> <span style={{ color: 'text.primary' }}>{detailsContract.flight_number || 'N/A'}</span></Typography>
-                                <Typography variant="body2" sx={{ color: '#bdbdbd' }}><b>Case Number:</b> <span style={{ color: 'text.primary' }}>{detailsContract.case_number || 'N/A'}</span></Typography>
-                                <Typography variant="body2" sx={{ color: '#bdbdbd' }}><b>Description:</b> <span style={{ color: 'text.primary' }}>{detailsContract.luggage_description || 'N/A'}</span></Typography>
-                                <Typography variant="body2" sx={{ color: '#bdbdbd' }}><b>Weight:</b> <span style={{ color: 'text.primary' }}>{detailsContract.luggage_weight ? `${detailsContract.luggage_weight} kg` : 'N/A'}</span></Typography>
-                                <Typography variant="body2" sx={{ color: '#bdbdbd' }}><b>Quantity:</b> <span style={{ color: 'text.primary' }}>{detailsContract.luggage_quantity || 'N/A'}</span></Typography>
-                                <Typography variant="body2" sx={{ color: '#bdbdbd' }}><b>Contact:</b> <span style={{ color: 'text.primary' }}>{detailsContract.owner_contact || 'N/A'}</span></Typography>
+                                <Typography variant="body2">
+                                    <b>Airline Personnel:</b>{' '}
+                                    <span>
+                                        {detailsContract.airline
+                                            ? `${detailsContract.airline.first_name || ''} ${detailsContract.airline.middle_initial || ''} ${detailsContract.airline.last_name || ''}${detailsContract.airline.suffix ? ` ${detailsContract.airline.suffix}` : ''}`.replace(/  +/g, ' ').trim()
+                                            : 'N/A'}
+                                    </span>
+                                </Typography>
+                                <Typography variant="body2">
+                                    <b>Email:</b> <span>{detailsContract.airline?.email || 'N/A'}</span>
+                                </Typography>
+                                <Typography variant="body2">
+                                    <b>Contact:</b> <span>{detailsContract.airline?.contact_number || 'N/A'}</span>
+                                </Typography>
                             </Box>
                             <Divider sx={{ my: 2 }} />
-                            <Typography variant="subtitle2" sx={{ color: 'primary.main', fontWeight: 700, mb: 1 }}>Timeline</Typography>
+
+                            <Typography variant="subtitle2" sx={{ color: 'primary.main', fontWeight: 700, mb: 1 }}>
+                                Delivery Personnel Information
+                            </Typography>
                             <Box sx={{ ml: 1, mb: 1 }}>
-                                <Typography variant="body2" sx={{ color: '#bdbdbd' }}><b>Created:</b> <span style={{ color: 'text.primary' }}>{formatDate(detailsContract.created_at)}</span></Typography>
-                                <Typography variant="body2" sx={{ color: '#bdbdbd' }}><b>Accepted:</b> <span style={{ color: 'text.primary' }}>{detailsContract.accepted_at ? formatDate(detailsContract.accepted_at) : 'N/A'}</span></Typography>
-                                <Typography variant="body2" sx={{ color: '#bdbdbd' }}><b>Pickup:</b> <span style={{ color: 'text.primary' }}>{detailsContract.pickup_at ? formatDate(detailsContract.pickup_at) : 'N/A'}</span></Typography>
-                                <Typography variant="body2" sx={{ color: '#bdbdbd' }}><b>Delivered:</b> <span style={{ color: 'text.primary' }}>{detailsContract.delivered_at ? formatDate(detailsContract.delivered_at) : 'N/A'}</span></Typography>
-                                <Typography variant="body2" sx={{ color: '#bdbdbd' }}><b>Cancelled:</b> <span style={{ color: 'text.primary' }}>{detailsContract.cancelled_at ? formatDate(detailsContract.cancelled_at) : 'N/A'}</span></Typography>
+                                <Typography variant="body2">
+                                    <b>Delivery Personnel:</b>{' '}
+                                    <span>
+                                        {detailsContract.delivery
+                                            ? `${detailsContract.delivery.first_name || ''} ${detailsContract.delivery.middle_initial || ''} ${detailsContract.delivery.last_name || ''}${detailsContract.delivery.suffix ? ` ${detailsContract.delivery.suffix}` : ''}`.replace(/  +/g, ' ').trim()
+                                            : 'N/A'}
+                                    </span>
+                                </Typography>
+                                <Typography variant="body2">
+                                    <b>Email:</b> <span>{detailsContract.delivery?.email || 'N/A'}</span>
+                                </Typography>
+                                <Typography variant="body2">
+                                    <b>Contact:</b> <span>{detailsContract.delivery?.contact_number || 'N/A'}</span>
+                                </Typography>
+                                <Typography variant="body2">
+                                    <b>Status:</b>{' '}
+                                    <span style={{ color: 'primary.main', fontWeight: 700 }}>
+                                        {detailsContract.contract_status?.status_name || 'N/A'}
+                                    </span>
+                                </Typography>
+                            </Box>
+                            <Divider sx={{ my: 2 }} />
+
+                            <Typography variant="subtitle2" sx={{ color: 'primary.main', fontWeight: 700, mb: 1 }}>
+                                Luggage Information
+                            </Typography>
+                            <Box sx={{ ml: 1, mb: 1 }}>
+                                <Typography variant="body2">
+                                    <b>Flight Number:</b> <span>{detailsContract.flight_number || 'N/A'}</span>
+                                </Typography>
+                                <Typography variant="body2">
+                                    <b>Case Number:</b> <span>{detailsContract.case_number || 'N/A'}</span>
+                                </Typography>
+                                <Typography variant="body2">
+                                    <b>Description:</b> <span>{detailsContract.luggage_description || 'N/A'}</span>
+                                </Typography>
+                                <Typography variant="body2">
+                                    <b>Weight:</b> <span>{detailsContract.luggage_weight ? `${detailsContract.luggage_weight} kg` : 'N/A'}</span>
+                                </Typography>
+                                <Typography variant="body2">
+                                    <b>Quantity:</b> <span>{detailsContract.luggage_quantity || 'N/A'}</span>
+                                </Typography>
+                            </Box>
+                            <Divider sx={{ my: 2 }} />
+
+                            <Typography variant="subtitle2" sx={{ color: 'primary.main', fontWeight: 700, mb: 1 }}>
+                                Timeline
+                            </Typography>
+                            <Box sx={{ ml: 1, mb: 1 }}>
+                                <Typography variant="body2">
+                                    <b>Created:</b>{' '}
+                                    <span>{formatDate(detailsContract.created_at)}</span>
+                                </Typography>
+                                <Typography variant="body2">
+                                    <b>Accepted:</b>{' '}
+                                    <span>{detailsContract.accepted_at ? formatDate(detailsContract.accepted_at) : 'N/A'}</span>
+                                </Typography>
+                                <Typography variant="body2">
+                                    <b>Pickup:</b>{' '}
+                                    <span>{detailsContract.pickup_at ? formatDate(detailsContract.pickup_at) : 'N/A'}</span>
+                                </Typography>
+                                <Typography variant="body2">
+                                    <b>Delivered:</b>{' '}
+                                    <span>{detailsContract.delivered_at ? formatDate(detailsContract.delivered_at) : 'N/A'}</span>
+                                </Typography>
+                                <Typography variant="body2">
+                                    <b>Cancelled:</b>{' '}
+                                    <span>{detailsContract.cancelled_at ? formatDate(detailsContract.cancelled_at) : 'N/A'}</span>
+                                </Typography>
                             </Box>
                         </Box>
                     )}

@@ -137,6 +137,7 @@ export default function Page() {
     const [deliveryImageUrl, setDeliveryImageUrl] = useState(null);
     const [deliveryLoading, setDeliveryLoading] = useState(false);
     const [deliveryError, setDeliveryError] = useState('');
+    const [confirmOpen, setConfirmOpen] = useState(false);
     
     
     // Location dropdown states for Google Places
@@ -310,6 +311,17 @@ export default function Page() {
         }));
     };
 
+    // Helper: infer province/region for a given city by scanning known lists
+    const findProvinceForCity = (cityName) => {
+        if (!cityName) return null;
+        const allProvinces = (provinces || []).map(p => p.value);
+        for (const prov of allProvinces) {
+            const list = getFallbackCities(prov).map(c => c.value.toLowerCase());
+            if (list.includes(String(cityName).toLowerCase())) return prov;
+        }
+        return null;
+    };
+
     // Fetch barangays for selected city using Google Places API
     const fetchBarangays = async (city, province) => {
         console.log('Fetching barangays for city:', city, 'province:', province);
@@ -476,6 +488,20 @@ export default function Page() {
         if (city && selectedProvince) {
             fetchBarangays(city, selectedProvince);
         }
+        // Auto-set postal code from city when available
+        const pc = generateMockPostalCode(selectedProvince, city, null);
+        if (pc && pc !== '0000') {
+            setContract(prev => ({ ...prev, postalCode: pc }));
+        }
+        // If province is empty, try to infer from city
+        if (!selectedProvince && city) {
+            const inferred = findProvinceForCity(city);
+            if (inferred) {
+                setSelectedProvince(inferred);
+                // refresh cities list for inferred province
+                fetchCities(inferred);
+            }
+        }
     };
 
     const handleBarangayChange = (event) => {
@@ -565,7 +591,14 @@ export default function Page() {
             }
         };
         
-        return postalCodeMap[province]?.[city] || '0000';
+        // Try province -> city
+        const direct = postalCodeMap[province]?.[city];
+        if (direct) return direct;
+        // Fallback: search all provinces for the city
+        for (const prov of Object.keys(postalCodeMap)) {
+            if (postalCodeMap[prov]?.[city]) return postalCodeMap[prov][city];
+        }
+        return '0000';
     };
 
     // Google Maps script
@@ -860,6 +893,25 @@ export default function Page() {
         fetchPricingData();
     }, []);
 
+    // Helper: resolve delivery charge from current selected city using pricingData
+    const getDeliveryChargeForCity = (cityName) => {
+        if (!cityName) return null;
+        const cleanCity = cityName.replace(/\s*City\s*$/i, '').trim();
+        // Exact match
+        if (pricingData[cleanCity] !== undefined) return pricingData[cleanCity];
+        // Case-insensitive match
+        const cityLower = cleanCity.toLowerCase();
+        const ciMatch = Object.keys(pricingData).find(k => k.toLowerCase() === cityLower);
+        if (ciMatch) return pricingData[ciMatch];
+        // Partial match
+        const partial = Object.keys(pricingData).find(k => k.toLowerCase().includes(cityLower) || cityLower.includes(k.toLowerCase()));
+        if (partial) return pricingData[partial];
+        return null;
+    };
+
+    const pricePerPassenger = getDeliveryChargeForCity(contract.city);
+    const estimatedTotalPrice = (Number(pricePerPassenger) || 0) * luggageForms.length;
+
     // Function to get city from coordinates
     const getCityFromCoordinates = async (lat, lng) => {
         if (!window.google) {
@@ -1144,53 +1196,12 @@ export default function Page() {
                 console.warn('No coordinates available for city determination');
             }
 
-            // Step 2: Fetch price for the determined city
+            // Step 2: Fetch price for the determined city (prefer contract.city live resolution)
             let deliveryCharge = null;
-            if (city) {
-                // Remove "City" suffix if present for database lookup
-                const cleanCity = city.replace(/\s*City\s*$/i, '').trim();
-                console.log('Clean city for lookup:', cleanCity);
-                
-                // Log all available cities in pricing data
-                console.log('Available cities in pricing data:', Object.keys(pricingData));
-                
-                // Try exact match first
-                deliveryCharge = pricingData[cleanCity];
-                
-                // If no exact match, try case-insensitive match
-                if (deliveryCharge === undefined) {
-                    const cityLower = cleanCity.toLowerCase();
-                    const matchingCity = Object.keys(pricingData).find(
-                        pricingCity => pricingCity.toLowerCase() === cityLower
-                    );
-                    if (matchingCity) {
-                        deliveryCharge = pricingData[matchingCity];
-                        console.log('Found case-insensitive match:', matchingCity);
-                    }
-                }
-
-                // If still no match, try partial match
-                if (deliveryCharge === undefined) {
-                    const cityLower = cleanCity.toLowerCase();
-                    const matchingCity = Object.keys(pricingData).find(
-                        pricingCity => pricingCity.toLowerCase().includes(cityLower) || 
-                                     cityLower.includes(pricingCity.toLowerCase())
-                    );
-                    if (matchingCity) {
-                        deliveryCharge = pricingData[matchingCity];
-                        console.log('Found partial match:', matchingCity);
-                    }
-                }
-
-                console.log('City lookup:', {
-                    original: city,
-                    clean: cleanCity,
-                    price: deliveryCharge,
-                    availableCities: Object.keys(pricingData),
-                    pricingData: pricingData
-                });
-            } else {
-                console.warn('Could not determine city for price lookup');
+            if (contract.city) {
+                deliveryCharge = getDeliveryChargeForCity(contract.city);
+            } else if (city) {
+                deliveryCharge = getDeliveryChargeForCity(city);
             }
 
             // Helper to split a full name into first/middle/last
@@ -1285,6 +1296,19 @@ export default function Page() {
             setIsSubmitting(false);
         }
     };
+
+    const openConfirm = () => {
+        // Validate first before opening confirm
+        const errors = validateForm();
+        if (Object.keys(errors).length > 0) {
+            setValidationErrors(errors);
+            setSnackbarMessage('Please fill in all required fields correctly');
+            setSnackbarOpen(true);
+            return;
+        }
+        setConfirmOpen(true);
+    };
+    const closeConfirm = () => setConfirmOpen(false);
 
     // Tab change
     const handleTabChange = (event, newValue) => { setActiveTab(newValue); };
@@ -1907,11 +1931,14 @@ export default function Page() {
                                             helperText={validationErrors.province}
                                         />
                                     )}
-                                    renderOption={(props, option) => (
-                                        <li {...props} key={option.value}>
-                                            {option.label}
-                                        </li>
-                                    )}
+                                    renderOption={(props, option) => {
+                                        const { key, ...rest } = props;
+                                        return (
+                                            <li key={key} {...rest}>
+                                                {option.label}
+                                            </li>
+                                        );
+                                    }}
                                     ListboxProps={{
                                         style: {
                                             maxHeight: 300,
@@ -1978,11 +2005,14 @@ export default function Page() {
                                             }}
                                         />
                                     )}
-                                    renderOption={(props, option) => (
-                                        <li {...props} key={option.value}>
-                                            {option.label}
-                                        </li>
-                                    )}
+                                    renderOption={(props, option) => {
+                                        const { key, ...rest } = props;
+                                        return (
+                                            <li key={key} {...rest}>
+                                                {option.label}
+                                            </li>
+                                        );
+                                    }}
                                     ListboxProps={{
                                         style: {
                                             maxHeight: 300,
@@ -2043,11 +2073,14 @@ export default function Page() {
                                             }}
                                         />
                                     )}
-                                    renderOption={(props, option) => (
-                                        <li {...props} key={option.value}>
-                                            {option.label}
-                                        </li>
-                                    )}
+                                    renderOption={(props, option) => {
+                                        const { key, ...rest } = props;
+                                        return (
+                                            <li key={key} {...rest}>
+                                                {option.label}
+                                            </li>
+                                        );
+                                    }}
                                     ListboxProps={{
                                         style: {
                                             maxHeight: 300,
@@ -2271,10 +2304,16 @@ export default function Page() {
                             )}
                         </Box>
                     </Paper>
+                    {/* Estimated Total */}
+                    <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
+                        <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
+                            Estimated Total: {pricePerPassenger != null ? `₱${estimatedTotalPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'N/A'}
+                        </Typography>
+                    </Box>
                     <Box sx={{ display: "flex", justifyContent: "center", mt: 4, gap: 2 }}>
                         <Button 
                             variant="contained" 
-                            onClick={handleSubmit}
+                            onClick={openConfirm}
                             disabled={isSubmitting}
                             startIcon={isSubmitting ? <CircularProgress size={20} color="inherit" /> : null}
                         >
@@ -2318,6 +2357,42 @@ export default function Page() {
                         >
                             {cancelling ? 'Cancelling...' : 'Yes, Cancel Contract'}
                         </Button>
+                    </DialogActions>
+                </Dialog>
+
+                {/* Booking Confirmation Dialog */}
+                <Dialog open={confirmOpen} onClose={closeConfirm} maxWidth="md" fullWidth>
+                    <DialogTitle>Confirm Booking Details</DialogTitle>
+                    <DialogContent dividers>
+                        <Box sx={{ minWidth: 400 }}>
+                            <Typography variant="subtitle2" sx={{ color: 'primary.main', fontWeight: 700, mb: 1 }}>Overview</Typography>
+                            <Box sx={{ ml: 1, mb: 2 }}>
+                                <Typography variant="body2"><b>Pickup:</b> <span>{pickupAddress.location || 'N/A'}</span></Typography>
+                                <Typography variant="body2"><b>Drop-off:</b> <span>{dropoffAddress.location || 'N/A'}</span></Typography>
+                                <Typography variant="body2"><b>Address:</b> <span>{[contract.addressLine1, contract.addressLine2].filter(Boolean).join(' ') || contract.delivery_address || 'N/A'}</span></Typography>
+                                <Typography variant="body2"><b>Province/City/Barangay:</b> <span>{[contract.province, contract.city, contract.barangay].filter(Boolean).join(', ') || 'N/A'}</span></Typography>
+                            </Box>
+                            <Divider sx={{ my: 2 }} />
+                            <Typography variant="subtitle2" sx={{ color: 'primary.main', fontWeight: 700, mb: 1 }}>Passengers</Typography>
+                            <Box sx={{ ml: 1, mb: 1 }}>
+                                {luggageForms.map((form, idx) => (
+                                    <Box key={`conf-pass-${idx}`} sx={{ mb: 1 }}>
+                                        <Typography variant="body2"><b>{idx + 1}.</b> {form.name || 'N/A'} — Flight: {form.flightNo || 'N/A'} — Qty: {form.quantity || '0'}</Typography>
+                                    </Box>
+                                ))}
+                            </Box>
+                            <Divider sx={{ my: 2 }} />
+                            <Typography variant="subtitle2" sx={{ color: 'primary.main', fontWeight: 700, mb: 1 }}>Pricing</Typography>
+                            <Box sx={{ ml: 1 }}>
+                                <Typography variant="body2"><b>Price per passenger:</b> <span>{pricePerPassenger != null ? `₱${Number(pricePerPassenger).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'N/A'}</span></Typography>
+                                <Typography variant="body2"><b>Passengers:</b> <span>{luggageForms.length}</span></Typography>
+                                <Typography variant="h6" sx={{ mt: 1, fontWeight: 700 }}>Total: {pricePerPassenger != null ? `₱${estimatedTotalPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'N/A'}</Typography>
+                            </Box>
+                        </Box>
+                    </DialogContent>
+                    <DialogActions>
+                        <Button onClick={closeConfirm} disabled={isSubmitting}>Cancel</Button>
+                        <Button onClick={async () => { setConfirmOpen(false); await handleSubmit(); }} variant="contained" disabled={isSubmitting}>Confirm & Create</Button>
                     </DialogActions>
                 </Dialog>
 
