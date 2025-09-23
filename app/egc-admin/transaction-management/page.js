@@ -664,9 +664,7 @@ const TransactionManagement = () => {
     const [pendingPriceUpdate, setPendingPriceUpdate] = useState(null);
     
     
-    // Add new state for complete confirmation dialog
-    const [completeConfirmDialogOpen, setCompleteConfirmDialogOpen] = useState(false);
-    const [pendingCompleteSummary, setPendingCompleteSummary] = useState(null);
+    // Removed complete confirmation dialog state
     
     // Add new state for summarize confirmation dialog
     const [summarizeConfirmDialogOpen, setSummarizeConfirmDialogOpen] = useState(false);
@@ -692,6 +690,10 @@ const TransactionManagement = () => {
     const [previewDoc, setPreviewDoc] = useState(null);
     const [previewKey, setPreviewKey] = useState(0);
     const [eSignatureDataUrl, setESignatureDataUrl] = useState(null);
+    const [isEmailPreview, setIsEmailPreview] = useState(false);
+    const [showShareEmailField, setShowShareEmailField] = useState(false);
+    const [shareEmail, setShareEmail] = useState('');
+    const [shareEmailError, setShareEmailError] = useState('');
     // Corporations map for airline_id -> corporation name
     const [corporationsById, setCorporationsById] = useState(new Map());
     const [corporationFilter, setCorporationFilter] = useState('');
@@ -1595,74 +1597,17 @@ const TransactionManagement = () => {
      };
 
 
-    // Complete summary handlers
-    const handleCompleteSummary = (summary) => {
-        setPendingCompleteSummary(summary);
-        setCompleteConfirmDialogOpen(true);
-    };
-
-    const handleConfirmComplete = async () => {
-        if (!pendingCompleteSummary) return;
-
-        try {
-            // Update the summary status to Issued a receipt (status_id = 2)
-            const response = await fetch('/api/admin', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    action: 'updateSummaryStatus',
-                    params: {
-                        summaryId: pendingCompleteSummary.id,
-                        statusId: 2
-                    }
-                })
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || 'Failed to update summary status');
-            }
-            
-            // Update the local state to reflect the change
-            setSummaries(prev => prev.map(s => 
-                s.id === pendingCompleteSummary.id 
-                    ? { ...s, status_id: 2, status_name: 'Issued a receipt' }
-                    : s
-            ));
-            
-            setSnackbar({
-                open: true,
-                message: `Summary ${pendingCompleteSummary.id} has been marked as Issued a receipt`,
-                severity: 'success'
-            });
-            
-            // Close the dialog
-            setCompleteConfirmDialogOpen(false);
-            setPendingCompleteSummary(null);
-        } catch (error) {
-            console.error('Error completing summary:', error);
-            setSnackbar({
-                open: true,
-                message: error.message || 'Failed to complete summary',
-                severity: 'error'
-            });
-            
-            // Close the dialog even on error
-            setCompleteConfirmDialogOpen(false);
-            setPendingCompleteSummary(null);
-        }
-    };
-
-    const handleCancelComplete = () => {
-        setCompleteConfirmDialogOpen(false);
-        setPendingCompleteSummary(null);
-    };
+    // Removed complete summary handlers
 
     const handlePreviewClose = () => {
         setPreviewOpen(false);
         setPreviewDoc(null);
         setPreviewSummary(null);
         setPreviewError('');
+        setIsEmailPreview(false);
+        setShowShareEmailField(false);
+        setShareEmail('');
+        setShareEmailError('');
     };
 
     const handlePreviewSave = async () => {
@@ -1684,30 +1629,95 @@ const TransactionManagement = () => {
 
     const handlePreviewShare = async () => {
         try {
-            if (!previewDoc) return;
-            const blob = await pdf(previewDoc).toBlob();
-            const fileName = `${previewSummary?.invoice_id || 'invoice'}.pdf`;
-            const file = new File([blob], fileName, { type: 'application/pdf' });
-            if (navigator.canShare && navigator.canShare({ files: [file] })) {
-                await navigator.share({
-                    files: [file],
-                    title: 'Invoice & SOA',
-                    text: 'Please find the generated Invoice & SOA PDF attached.'
-                });
+            // Toggle the email share field. When closing, clear inputs and errors.
+            if (showShareEmailField) {
+                setShowShareEmailField(false);
+                setShareEmail('');
+                setShareEmailError('');
             } else {
-                // Fallback to save if share is unsupported
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = fileName;
-                document.body.appendChild(a);
-                a.click();
-                a.remove();
-                URL.revokeObjectURL(url);
-                setSnackbar({ open: true, message: 'Sharing not supported. PDF downloaded instead.', severity: 'info' });
+                setShowShareEmailField(true);
             }
         } catch (err) {
             setSnackbar({ open: true, message: err.message || 'Failed to share PDF', severity: 'error' });
+        }
+    };
+
+    const handleSendEmailPdf = async () => {
+        // Basic email validation
+        const email = (shareEmail || '').trim();
+        // Allow empty email to send-to-self via API fallback
+        if (email) {
+            const emailRegex = /[^\s@]+@[^\s@]+\.[^\s@]+/;
+            if (!emailRegex.test(email)) {
+                setShareEmailError('Enter a valid email address');
+                return;
+            }
+        }
+        setShareEmailError('');
+        try {
+            if (!previewDoc) throw new Error('PDF is not ready');
+            const blob = await pdf(previewDoc).toBlob();
+            // Convert Blob -> Base64 using FileReader to avoid large spread causing stack overflow
+            const base64 = await new Promise((resolve, reject) => {
+                try {
+                    const reader = new FileReader();
+                    reader.onerror = () => reject(new Error('Failed to read PDF blob'));
+                    reader.onload = () => {
+                        const result = reader.result;
+                        // result is like: data:application/pdf;base64,JVBERi0x...
+                        const commaIdx = typeof result === 'string' ? result.indexOf(',') : -1;
+                        const b64 = commaIdx >= 0 ? result.substring(commaIdx + 1) : result;
+                        resolve(b64);
+                    };
+                    reader.readAsDataURL(blob);
+                } catch (e) {
+                    reject(e);
+                }
+            });
+            const fileName = `${previewSummary?.invoice_id || 'invoice'}.pdf`;
+
+            const res = await fetch('/api/send-invoice', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    to: email || undefined,
+                    subject: `Invoice ${previewSummary?.invoice_id || ''}`.trim(),
+                    html: `<p>Please find attached the PDF for invoice <b>${previewSummary?.invoice_id || ''}</b>.</p>`,
+                    text: `Please find attached the PDF for invoice ${previewSummary?.invoice_id || ''}.`,
+                    pdfBase64: base64,
+                    fileName
+                })
+            });
+
+            const json = await res.json();
+            if (!res.ok) throw new Error(json.error || 'Failed to send email');
+
+            setSnackbar({ open: true, message: 'Email sent successfully', severity: 'success' });
+
+            // After successful email, mark summary as "Issued a receipt" (status_id = 2)
+            if (previewSummary?.id) {
+                try {
+                    const updateRes = await fetch('/api/admin', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            action: 'updateSummaryStatus',
+                            params: { summaryId: previewSummary.id, statusId: 2 }
+                        })
+                    });
+                    // Optimistically update UI if request accepted
+                    if (updateRes.ok) {
+                        setSummaries(prev => prev.map(s => s.id === previewSummary.id ? { ...s, status_id: 2, status_name: 'Issued a receipt' } : s));
+                    }
+                } catch {}
+            }
+
+            // Close share input after sending
+            setShowShareEmailField(false);
+            setShareEmail('');
+            setShareEmailError('');
+        } catch (err) {
+            setSnackbar({ open: true, message: err.message || 'Failed to send email', severity: 'error' });
         }
     };
 
@@ -1778,6 +1788,11 @@ const TransactionManagement = () => {
         } finally {
             setPreviewLoading(false);
         }
+    };
+
+    const openPreviewForEmail = async (summary) => {
+        setIsEmailPreview(true);
+        await openPreviewForSummary(summary);
     };
 
     const handleGenerateSummaryReport = async (summary) => {
@@ -2366,17 +2381,9 @@ const TransactionManagement = () => {
                                                           variant="contained"
                                                           size="small"
                                                           color="primary"
-                                                          onClick={() => handleCompleteSummary(summary)}
-                                                          disabled={summary.status_id === 3}
-                                                          sx={{
-                                                              backgroundColor: summary.status_id === 3 ? '#ccc' : undefined,
-                                                              color: summary.status_id === 3 ? '#666' : undefined,
-                                                              '&:hover': {
-                                                                  backgroundColor: summary.status_id === 3 ? '#ccc' : undefined
-                                                              }
-                                                          }}
+                                                          onClick={() => openPreviewForEmail(summary)}
                                                       >
-                                                          Mark as Complete
+                                                          Email Invoice
                                                       </Button>
                                                   </Box>
                                             </TableCell>
@@ -2512,9 +2519,29 @@ const TransactionManagement = () => {
                                     <Typography variant="body2" color="text.secondary">
                                         {previewSummary ? `Summary ID: ${previewSummary.id}` : ''}
                                     </Typography>
-                                    <Box sx={{ display: 'flex', gap: 1 }}>
-                                        <Button onClick={handlePreviewSave} variant="contained" disabled={!previewDoc || previewLoading}>Save PDF</Button>
-                                        <Button onClick={handlePreviewShare} variant="contained" disabled={!previewDoc || previewLoading}>Share PDF</Button>
+                                    <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                                        {showShareEmailField && (
+                                            <>
+                                                <TextField
+                                                    size="small"
+                                                    label="Recipient Email"
+                                                    value={shareEmail}
+                                                    onChange={(e) => setShareEmail(e.target.value)}
+                                                    error={!!shareEmailError}
+                                                    helperText={shareEmailError}
+                                                    sx={{ minWidth: 260 }}
+                                                />
+                                                <Button onClick={handleSendEmailPdf} variant="contained" color="primary" disabled={!previewDoc || previewLoading}>
+                                                    Send
+                                                </Button>
+                                            </>
+                                        )}
+                                        {!showShareEmailField && (
+                                            <Button onClick={handlePreviewSave} variant="contained" disabled={!previewDoc || previewLoading}>Save PDF</Button>
+                                        )}
+                                        <Button onClick={handlePreviewShare} variant="contained" disabled={!previewDoc || previewLoading}>
+                                            {showShareEmailField ? 'Close Share' : 'Share PDF'}
+                                        </Button>
                                         <Button onClick={handlePreviewClose} variant="contained">Close</Button>
                                     </Box>
                                 </Box>
@@ -3094,26 +3121,7 @@ const TransactionManagement = () => {
             </Dialog>
             
             
-            {/* Complete Confirmation Dialog */}
-            <Dialog open={completeConfirmDialogOpen} onClose={handleCancelComplete} maxWidth="sm" fullWidth>
-                <DialogTitle>Confirm Summary Completion</DialogTitle>
-                <DialogContent dividers>
-                    <Typography variant="body1" sx={{ mb: 2 }}>
-                        Are you sure you want to mark Summary ID: <strong>{pendingCompleteSummary?.id}</strong> as completed?
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                        This action will mark the summary as completed and disable the View Preview button. This action cannot be undone.
-                    </Typography>
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={handleCancelComplete} color="inherit">
-                        Cancel
-                    </Button>
-                    <Button onClick={handleConfirmComplete} color="success" variant="contained">
-                        Complete Summary
-                    </Button>
-                </DialogActions>
-            </Dialog>
+            {/* Removed Complete Confirmation Dialog */}
 
             {/* Summarize Confirmation Dialog */}
             <Dialog open={summarizeConfirmDialogOpen} onClose={handleCancelSummarize} maxWidth="md" fullWidth>
