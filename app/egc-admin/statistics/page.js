@@ -14,6 +14,79 @@ const regionList = [
   'Batangas', 'Bulacan', 'Cavite', 'Laguna', 'NCR', 'North Luzon', 'Pampanga', 'Rizal', 'South Luzon'
 ];
 
+
+// Price-to-region lookup using actual pricing data
+let priceToRegionMap = new Map();
+
+// Function to fetch pricing data and build price-to-region mapping
+async function fetchPricingData() {
+  try {
+    const response = await fetch('/api/admin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'getAllPricing' })
+    });
+    
+    if (!response.ok) {
+      console.error('Failed to fetch pricing data:', response.status);
+      return null;
+    }
+    
+    const data = await response.json();
+    const pricingData = data.pricing || [];
+    
+    // Build price-to-region mapping
+    priceToRegionMap.clear();
+    pricingData.forEach(item => {
+      if (item.price && item.region) {
+        priceToRegionMap.set(Number(item.price), item.region);
+      }
+    });
+    
+    console.log('Pricing data loaded:', {
+      totalPricingEntries: pricingData.length,
+      priceToRegionMappings: priceToRegionMap.size
+    });
+    
+    return pricingData;
+  } catch (error) {
+    console.error('Error fetching pricing data:', error);
+    return null;
+  }
+}
+
+// Function to detect region based on delivery charge using actual pricing data
+function detectRegionFromPrice(deliveryCharge) {
+  if (!deliveryCharge || deliveryCharge <= 0) return null;
+  
+  const price = Number(deliveryCharge);
+  
+  // Direct lookup in pricing data
+  if (priceToRegionMap.has(price)) {
+    return priceToRegionMap.get(price);
+  }
+  
+  // If exact match not found, try to find closest price
+  let minDifference = Infinity;
+  let closestRegion = null;
+  
+  for (const [pricingPrice, region] of priceToRegionMap.entries()) {
+    const difference = Math.abs(price - pricingPrice);
+    if (difference < minDifference) {
+      minDifference = difference;
+      closestRegion = region;
+    }
+  }
+  
+  // If we found a close match (within 10% difference), use it
+  if (closestRegion && minDifference <= price * 0.1) {
+    return closestRegion;
+  }
+  
+  return null;
+}
+
+
 const dateOptions = [
   { label: 'All Time', value: 'all' },
   { label: 'Today', value: 'today' },
@@ -92,6 +165,9 @@ export default function Page() {
   const [dateFilter, setDateFilter] = useState('all');
   const [insightLoading, setInsightLoading] = useState(false);
   const [insight, setInsight] = useState("");
+  const [regionData, setRegionData] = useState({});
+  const [geocodingLoading, setGeocodingLoading] = useState(false);
+  const [pricingLoaded, setPricingLoaded] = useState(false);
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
   const router = useRouter();
@@ -112,6 +188,42 @@ export default function Page() {
     fetchContracts();
   }, []);
 
+  // Fetch pricing data on component mount
+  useEffect(() => {
+    async function loadPricingData() {
+      const data = await fetchPricingData();
+      setPricingLoaded(!!data);
+    }
+    loadPricingData();
+  }, []);
+
+  // Process contracts to detect regions based on price
+  useEffect(() => {
+    function processRegions() {
+      if (contracts.length === 0 || !pricingLoaded) return;
+      
+      setGeocodingLoading(true);
+      const newRegionData = {};
+      
+      contracts.forEach(contract => {
+        // Use delivery charge to detect region from pricing table
+        if (contract.delivery_charge) {
+          const detectedRegion = detectRegionFromPrice(contract.delivery_charge);
+          if (detectedRegion) {
+            newRegionData[contract.id] = detectedRegion;
+          }
+        }
+      });
+      
+      console.log(`Region processing complete: ${Object.keys(newRegionData).length}/${contracts.length} contracts mapped to regions`);
+      
+      setRegionData(newRegionData);
+      setGeocodingLoading(false);
+    }
+    
+    processRegions();
+  }, [contracts, pricingLoaded]);
+
   // Filtered contracts by date
   const filteredContracts = filterByDate(contracts, dateFilter);
 
@@ -128,9 +240,12 @@ export default function Page() {
     .filter(mins => mins > 0);
   const avgDeliveryTime = deliveryTimes.length ? Math.round(deliveryTimes.reduce((a, b) => a + b, 0) / deliveryTimes.length) : 0;
 
-  // Deliveries by region
+  // Deliveries by region using pricing data
   const deliveriesByRegion = regionList.map(region => {
-    const count = filteredContracts.filter(c => (c.region || c.drop_off_location || '').toLowerCase().includes(region.toLowerCase())).length;
+    const count = filteredContracts.filter(c => {
+      const detectedRegion = regionData[c.id];
+      return detectedRegion === region;
+    }).length;
     return { region, count };
   });
 
@@ -359,7 +474,13 @@ export default function Page() {
           </CardContent>
         </Card>
       </Box>
-      {loading && <Typography>Loading...</Typography>}
+      {loading && <Typography>Loading contracts...</Typography>}
+      {geocodingLoading && (
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+          <CircularProgress size={20} />
+          <Typography>Processing regions using pricing table data...</Typography>
+        </Box>
+      )}
     </Box>
   );
 }
