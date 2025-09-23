@@ -181,10 +181,12 @@ export default function Page() {
   const handleSearchChange = (event) => { setSearchQuery(event.target.value); setPage(0); };
   const handleDepartmentChange = (event) => { setSelectedDepartment(event.target.value); setPage(0); };
   const handleMenuClick = (event, user) => { setAnchorEl(event.currentTarget); setSelectedAccount(user); };
-  const handleEditClick = () => {
-    setEditDialog({ open: true, user: selectedAccount });
-    const selectedStatus = statusOptions.find(opt => opt.id === selectedAccount.user_status_id);
-    const selectedVerifyStatus = verifyStatusOptions.find(opt => opt.id === selectedAccount.verify_status_id);
+  const handleEditClick = (accountParam) => {
+    const acc = accountParam || selectedAccount;
+    if (!acc) return;
+    setEditDialog({ open: true, user: acc });
+    const selectedStatus = statusOptions.find(opt => opt.id === acc.user_status_id);
+    const selectedVerifyStatus = verifyStatusOptions.find(opt => opt.id === acc.verify_status_id);
     console.log('verifyStatusOptions when opening edit dialog:', verifyStatusOptions);
     
     // Ensure verify status options are loaded
@@ -194,8 +196,8 @@ export default function Page() {
     
     setEditForm({ 
       user_status_name: selectedStatus ? selectedStatus.status_name : '',
-      verify_status_id: selectedAccount.verify_status_id || '',
-      corporation_id: selectedAccount.corporation_id || ''
+      verify_status_id: acc.verify_status_id || '',
+      corporation_id: acc.corporation_id || ''
     });
     handleCloseMenu();
   };
@@ -344,7 +346,26 @@ export default function Page() {
                   <TableCell>{account.created_at ? new Date(account.created_at).toLocaleString() : 'N/A'}</TableCell>
                   <TableCell>{account.last_sign_in_at ? new Date(account.last_sign_in_at).toLocaleString() : 'N/A'}</TableCell>
                   <TableCell>{account.updated_at ? new Date(account.updated_at).toLocaleString() : 'N/A'}</TableCell>
-                  <TableCell><IconButton onClick={(event) => handleMenuClick(event, account)}><MoreVertIcon /></IconButton></TableCell>
+                  <TableCell>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 160 }}>
+                      <Button
+                        variant="contained"
+                        size="small"
+                        fullWidth
+                        onClick={() => router.push(`/egc-admin/user-management/view-profile/${account.id}`)}
+                      >
+                        View Profile
+                      </Button>
+                      <Button
+                        variant="contained"
+                        size="small"
+                        fullWidth
+                        onClick={() => handleEditClick(account)}
+                      >
+                        Edit User
+                      </Button>
+                    </Box>
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -364,17 +385,7 @@ export default function Page() {
         </TableContainer>
       </Box>
 
-      <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleCloseMenu} anchorOrigin={{ vertical: "top", horizontal: "left" }} transformOrigin={{ vertical: "top", horizontal: "left" }}>
-        <MenuItem onClick={() => {
-          router.push(`/egc-admin/user-management/view-profile/${selectedAccount.id}`);
-          handleCloseMenu();
-        }}>
-          <PersonIcon fontSize="small" sx={iconStyles} /> View Profile
-        </MenuItem>
-        <MenuItem onClick={handleEditClick}>
-          <EditIcon fontSize="small" sx={iconStyles} /> Edit User
-        </MenuItem>
-      </Menu>
+      {/* Context menu removed in favor of stacked action buttons per row */}
 
       <Dialog open={editDialog.open} onClose={() => setEditDialog({ open: false, user: null })}>
         <DialogTitle>Edit User</DialogTitle>

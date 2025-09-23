@@ -8,6 +8,7 @@ import { Gauge } from '@mui/x-charts/Gauge';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import IconButton from '@mui/material/IconButton';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 
 const regionList = [
   'Batangas', 'Bulacan', 'Cavite', 'Laguna', 'NCR', 'North Luzon', 'Pampanga', 'Rizal', 'South Luzon'
@@ -247,14 +248,25 @@ export default function Page() {
       <Box sx={{ mb: 3 }}>
         <Grid container spacing={2} justifyContent="center">
           {statusList.map((status) => {
+            const statusFilterMap = {
+              1: 'available',
+              2: 'cancelled',
+              3: 'accepted',
+              4: 'transit',
+              5: 'delivered',
+              6: 'failed'
+            };
+            const filterValue = statusFilterMap[status.id];
             const value = totalDeliveries ? Math.round((statusCounts[status.id] || 0) / totalDeliveries * 100) : 0;
             return (
               <Grid item xs={12} sm={6} md={4} lg={2} key={status.id}>
-                <Card sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', py: 2, width: 180, height: 180, m: 'auto', bgcolor: theme.palette.background.paper, borderRadius: 2, boxShadow: isDark ? 2 : 1, border: isDark ? `1px solid ${theme.palette.divider}` : undefined, transition: 'background 0.3s' }}>
-                  <Typography variant="subtitle2" color="primary.main" fontWeight="bold" mb={1} textAlign="center">{status.name}</Typography>
-                  <Gauge value={value} width={100} height={100} startAngle={0} endAngle={360} innerRadius="80%" outerRadius="100%" text={`${value}%`} />
-                  <Typography variant="body2" color="primary.main" mt={1}>{statusCounts[status.id] || 0} / {totalDeliveries}</Typography>
-                </Card>
+                <Link href={`/egc-admin/luggage-management?status=${encodeURIComponent(filterValue)}`} style={{ textDecoration: 'none' }}>
+                  <Card sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', py: 2, width: 180, height: 180, m: 'auto', bgcolor: theme.palette.background.paper, borderRadius: 2, boxShadow: isDark ? 2 : 1, border: isDark ? `1px solid ${theme.palette.divider}` : undefined, transition: 'transform 0.2s ease-in-out', cursor: 'pointer', '&:hover': { transform: 'scale(1.02)' } }}>
+                    <Typography variant="subtitle2" color="primary.main" fontWeight="bold" mb={1} textAlign="center">{status.name}</Typography>
+                    <Gauge value={value} width={100} height={100} startAngle={0} endAngle={360} innerRadius="80%" outerRadius="100%" text={`${value}%`} />
+                    <Typography variant="body2" color="primary.main" mt={1}>{statusCounts[status.id] || 0} / {totalDeliveries}</Typography>
+                  </Card>
+                </Link>
               </Grid>
             );
           })}

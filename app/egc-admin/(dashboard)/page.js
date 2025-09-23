@@ -7,6 +7,7 @@ import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import GroupsIcon from '@mui/icons-material/Groups';
 import MyLocationIcon from '@mui/icons-material/MyLocation';
 import AssignmentIcon from '@mui/icons-material/Assignment';
+import HistoryIcon from '@mui/icons-material/History';
 import BarChartIcon from '@mui/icons-material/BarChart';
 import SupportAgentIcon from '@mui/icons-material/SupportAgent';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
@@ -27,6 +28,7 @@ export default function Page() {
     { title: "Transaction Management", route: "/egc-admin/transaction-management", icon: AssignmentIcon },
     { title: "Statistics", route: "/egc-admin/statistics", icon: BarChartIcon },
     { title: "Chat Support", route: "/egc-admin/chat-support", icon: SupportAgentIcon },
+    { title: "System Logs", route: "/egc-admin/logs", icon: HistoryIcon },
   ];
 
   // Contract status definitions (from image)
@@ -120,14 +122,25 @@ export default function Page() {
         <Typography variant="h6" color="primary.main" fontWeight="bold" mb={2}>Performance Overview</Typography>
         <Grid container spacing={3} justifyContent="center">
           {statusList.map((status) => {
+            const statusFilterMap = {
+              1: 'available',
+              2: 'cancelled',
+              3: 'accepted',
+              4: 'transit',
+              5: 'delivered',
+              6: 'failed'
+            };
+            const filterValue = statusFilterMap[status.id];
             const value = totalDeliveries ? Math.round((statusCounts[status.id] || 0) / totalDeliveries * 100) : 0;
             return (
               <Grid item xs={12} sm={6} md={4} lg={2} key={status.id}>
-                <Card sx={gaugeCardStyles}>
-                  <Typography variant="subtitle2" color="primary.main" fontWeight="bold" mb={1} textAlign="center">{status.name}</Typography>
-                  <Gauge value={value} width={100} height={100} startAngle={0} endAngle={360} innerRadius="80%" outerRadius="100%" text={`${value}%`} />
-                  <Typography variant="body2" color="primary.main" mt={1}>{statusCounts[status.id] || 0} / {totalDeliveries}</Typography>
-                </Card>
+                <Link href={`/egc-admin/luggage-management?status=${encodeURIComponent(filterValue)}`} style={linkStyles}>
+                  <Card sx={{ ...gaugeCardStyles, cursor: 'pointer', '&:hover': { transform: 'scale(1.02)', transition: 'transform 0.2s ease-in-out' } }}>
+                    <Typography variant="subtitle2" color="primary.main" fontWeight="bold" mb={1} textAlign="center">{status.name}</Typography>
+                    <Gauge value={value} width={100} height={100} startAngle={0} endAngle={360} innerRadius="80%" outerRadius="100%" text={`${value}%`} />
+                    <Typography variant="body2" color="primary.main" mt={1}>{statusCounts[status.id] || 0} / {totalDeliveries}</Typography>
+                  </Card>
+                </Link>
               </Grid>
             );
           })}

@@ -379,6 +379,44 @@ export async function GET(request) {
       return NextResponse.json({ data: contractWithLuggage });
     }
 
+    // Handle audit logs fetch from audit_logs table
+    if (action === 'audit-logs') {
+      try {
+        const { data: logs, error } = await supabase
+          .from('audit_logs')
+          .select('table_name, event_type, row_data, old_data, created_at, action_by')
+          .order('created_at', { ascending: false });
+        if (error) {
+          return NextResponse.json({ error: error.message }, { status: 500 });
+        }
+
+        const logsArray = logs || [];
+        const actorIds = Array.from(new Set(logsArray.map(l => l.action_by).filter(Boolean)));
+        let idToName = new Map();
+        if (actorIds.length > 0) {
+          const { data: profiles, error: profilesError } = await supabase
+            .from('profiles')
+            .select('id, first_name, middle_initial, last_name, email')
+            .in('id', actorIds);
+          if (!profilesError && profiles) {
+            profiles.forEach(p => {
+              const name = `${p.first_name || ''} ${p.middle_initial || ''} ${p.last_name || ''}`.replace(/  +/g, ' ').trim();
+              idToName.set(p.id, name || p.email || p.id);
+            });
+          }
+        }
+
+        const enriched = logsArray.map(l => ({
+          ...l,
+          action_by_name: l.action_by ? (idToName.get(l.action_by) || l.action_by) : 'N/A',
+        }));
+
+        return NextResponse.json({ data: enriched });
+      } catch (e) {
+        return NextResponse.json({ error: e.message || 'Failed to fetch audit logs' }, { status: 500 });
+      }
+    }
+
     // Handle contract location request
     if (contractId) {
       const { data: contract, error: contractError } = await supabase
@@ -452,6 +490,30 @@ export async function GET(request) {
       };
 
       return NextResponse.json({ data: contractWithLuggage });
+    }
+
+    // Handle proof of pickup fetch
+    if (action === 'getProofOfPickup') {
+      const contractIdParam = searchParams.get('contractId');
+      if (!contractIdParam) {
+        return NextResponse.json({ error: 'Missing contractId' }, { status: 400 });
+      }
+
+      const { data, error } = await supabase
+        .from('contracts')
+        .select('proof_of_pickup, pickup_at')
+        .eq('id', contractIdParam)
+        .single();
+
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+
+      if (!data || !data.proof_of_pickup) {
+        return NextResponse.json({ error: 'No proof of pickup available' }, { status: 404 });
+      }
+
+      return NextResponse.json({ proof_of_pickup: data.proof_of_pickup, pickup_timestamp: data.pickup_at || null });
     }
 
     // Handle delivery personnel request

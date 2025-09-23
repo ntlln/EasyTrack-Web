@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Box, Typography, TextField, Button, Paper, useTheme, IconButton, Grid, Select, MenuItem, FormControl, InputLabel, Tabs, Tab, Autocomplete, CircularProgress, Snackbar, Divider, Collapse, Dialog, DialogTitle, DialogContent, DialogActions, TablePagination } from "@mui/material";
+import { Box, Typography, TextField, Button, Paper, useTheme, IconButton, Grid, Select, MenuItem, FormControl, InputLabel, Tabs, Tab, Autocomplete, CircularProgress, Snackbar, Divider, Collapse, Dialog, DialogTitle, DialogContent, DialogActions, TablePagination, Table, TableHead, TableBody, TableRow, TableCell, TableContainer } from "@mui/material";
+import SearchIcon from '@mui/icons-material/Search';
+import ClearIcon from '@mui/icons-material/Clear';
 import CloseIcon from "@mui/icons-material/Close";
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
@@ -124,6 +126,17 @@ export default function Page() {
     const [rowsPerPage, setRowsPerPage] = useState(10);
     const [validationErrors, setValidationErrors] = useState({});
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [detailsOpen, setDetailsOpen] = useState(false);
+    const [detailsContract, setDetailsContract] = useState(null);
+    const [pickupDialogOpen, setPickupDialogOpen] = useState(false);
+    const [pickupImageUrl, setPickupImageUrl] = useState(null);
+    const [pickupLoading, setPickupLoading] = useState(false);
+    const [pickupError, setPickupError] = useState('');
+    const [deliveryDialogOpen, setDeliveryDialogOpen] = useState(false);
+    const [deliveryImageUrl, setDeliveryImageUrl] = useState(null);
+    const [deliveryLoading, setDeliveryLoading] = useState(false);
+    const [deliveryError, setDeliveryError] = useState('');
     
     
     // Location dropdown states for Google Places
@@ -1363,7 +1376,55 @@ export default function Page() {
         router.push(`/airline/luggage-tracking?contractId=${contractId}`);
     };
 
-    // Filter contracts based on status, date, and search term
+    const handleViewDetails = (contract) => {
+        setDetailsContract(contract);
+        setDetailsOpen(true);
+    };
+
+    const handleDetailsClose = () => {
+        setDetailsOpen(false);
+        setDetailsContract(null);
+    };
+
+    const openProofOfPickup = async (contractId) => {
+        setPickupDialogOpen(true);
+        setPickupLoading(true);
+        setPickupError('');
+        setPickupImageUrl(null);
+        try {
+            const res = await fetch(`/api/admin?action=getProofOfPickup&contractId=${contractId}`);
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Failed to fetch proof of pickup');
+            setPickupImageUrl(data.proof_of_pickup);
+        } catch (e) {
+            setPickupError(e.message || 'Failed to fetch proof of pickup');
+        } finally {
+            setPickupLoading(false);
+        }
+    };
+
+    const openProofOfDelivery = async (contractId) => {
+        setDeliveryDialogOpen(true);
+        setDeliveryLoading(true);
+        setDeliveryError('');
+        setDeliveryImageUrl(null);
+        try {
+            const res = await fetch('/api/admin', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'getProofOfDelivery', params: { contract_id: contractId } })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Failed to fetch proof of delivery');
+            setDeliveryImageUrl(data.proof_of_delivery);
+        } catch (e) {
+            setDeliveryError(e.message || 'Failed to fetch proof of delivery');
+        } finally {
+            setDeliveryLoading(false);
+        }
+    };
+
+    // Filter contracts based on status
     const filteredContracts = contractList.filter(contract => {
         // Apply status filter
         if (statusFilter !== 'all') {
@@ -1394,8 +1455,19 @@ export default function Page() {
         return true;
     });
 
+    // Apply search filter (by ID, locations, or status)
+    const searchNormalized = searchQuery.trim().toLowerCase();
+    const filteredContractsWithSearch = filteredContracts.filter(contract => {
+        if (!searchNormalized) return true;
+        const idMatch = String(contract.id).toLowerCase().includes(searchNormalized);
+        const pickupMatch = (contract.pickup_location || '').toLowerCase().includes(searchNormalized);
+        const dropoffMatch = (contract.drop_off_location || '').toLowerCase().includes(searchNormalized);
+        const statusMatch = (contract.contract_status?.status_name || '').toLowerCase().includes(searchNormalized);
+        return idMatch || pickupMatch || dropoffMatch || statusMatch;
+    });
+
     // Apply date filter
-    const dateFilteredContracts = filterByDate(filteredContracts, dateFilter);
+    const dateFilteredContracts = filterByDate(filteredContractsWithSearch, dateFilter);
 
     // Get paginated contracts
     const getPaginatedContracts = () => {
@@ -1516,46 +1588,45 @@ export default function Page() {
                     <Box>
                         {contractListLoading && (<Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}><CircularProgress /></Box>)}
                         {contractListError && (<Typography color="error" align="center">{contractListError}</Typography>)}
-                        <Box sx={{ maxWidth: '800px', mx: 'auto', width: '100%', mb: 3 }}>
-                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, p: 1 }}>
-                                {/* Filters */}
-                                <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 2 }}>
-                                    <Box sx={{ display: 'flex', gap: 1, whiteSpace: 'nowrap' }}>
-                                        {filterOptions.map((option) => (
-                                            <Button
-                                                key={option.value}
-                                                variant={statusFilter === option.value ? "contained" : "outlined"}
-                                                onClick={() => setStatusFilter(option.value)}
-                                                sx={{
-                                                    borderRadius: '20px',
-                                                    textTransform: 'none',
-                                                    px: 2,
-                                                    whiteSpace: 'nowrap',
-                                                    minWidth: '100px',
-                                                    borderColor: statusFilter === option.value ? 'primary.main' : 'divider',
-                                                    '&:hover': {
-                                                        borderColor: 'primary.main',
-                                                        bgcolor: statusFilter === option.value ? 'primary.main' : 'transparent'
-                                                    }
-                                                }}
-                                            >
-                                                {option.label}
-                                            </Button>
-                                        ))}
-                                    </Box>
-                                    <Divider orientation="vertical" flexItem />
-                                    <FormControl size="small" sx={{ minWidth: 180, flexShrink: 0 }}>
+                        {/* Old centered filters removed; using top toolbar with pagination, filters, and search below */}
+                        {!contractListLoading && !contractListError && contractList.length === 0 && (<Typography align="center" sx={{ mb: 4 }}>No contracts found</Typography>)}
+                        
+                        {mounted && (
+                            <>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1, gap: 2, flexWrap: 'wrap' }}>
+                                <Box sx={{ flexShrink: 0 }}>
+                                    <TablePagination
+                                        rowsPerPageOptions={[10, 25, 50, 100]}
+                                        component="div"
+                                        count={dateFilteredContracts.length}
+                                        rowsPerPage={rowsPerPage}
+                                        page={page}
+                                        onPageChange={handleChangePage}
+                                        onRowsPerPageChange={handleChangeRowsPerPage}
+                                        labelRowsPerPage="Rows per page:"
+                                    />
+                                </Box>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+                                    <FormControl size="small" sx={{ minWidth: 180 }}>
+                                        <InputLabel>Filter by Status</InputLabel>
+                                        <Select
+                                            value={statusFilter}
+                                            onChange={(e) => setStatusFilter(e.target.value)}
+                                            label="Filter by Status"
+                                        >
+                                            {filterOptions.map((option) => (
+                                                <MenuItem key={option.value} value={option.value}>
+                                                    {option.label}
+                                                </MenuItem>
+                                            ))}
+                                        </Select>
+                                    </FormControl>
+                                    <FormControl size="small" sx={{ minWidth: 180 }}>
                                         <InputLabel>Filter by Date</InputLabel>
                                         <Select
                                             value={dateFilter}
                                             onChange={(e) => setDateFilter(e.target.value)}
                                             label="Filter by Date"
-                                            sx={{
-                                                borderRadius: '20px',
-                                                '& .MuiSelect-select': {
-                                                    textTransform: 'none'
-                                                }
-                                            }}
                                         >
                                             {dateOptions.map((option) => (
                                                 <MenuItem key={option.value} value={option.value}>
@@ -1564,243 +1635,128 @@ export default function Page() {
                                             ))}
                                         </Select>
                                     </FormControl>
+                                    <TextField
+                                        size="small"
+                                        placeholder="Search Contract"
+                                        value={searchQuery}
+                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                        sx={{ minWidth: 240 }}
+                                        InputProps={{
+                                            startAdornment: <SearchIcon fontSize="small" sx={{ color: 'text.secondary', mr: 0.5 }} />,
+                                            endAdornment: (
+                                                searchQuery ?
+                                                    <ClearIcon 
+                                                        fontSize="small" 
+                                                        onClick={() => setSearchQuery('')} 
+                                                        sx={{ cursor: 'pointer', color: 'text.secondary' }}
+                                                    /> : null
+                                            )
+                                        }}
+                                    />
                                 </Box>
                             </Box>
-                        </Box>
-                        {!contractListLoading && !contractListError && contractList.length === 0 && (<Typography align="center" sx={{ mb: 4 }}>No contracts found</Typography>)}
-                        
-                        {mounted && (
-                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4, maxWidth: '800px', mx: 'auto', width: '100%' }}>
-                                {getPaginatedContracts().map((contract, idx) => (
-                                    <Paper key={`contract-${contract.id}`} elevation={3} sx={{ p: 3, borderRadius: 3, mb: 2, width: '100%' }}>
-                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', position: 'relative' }}>
-                                            <Box sx={{ flex: 1 }}>
-                                                <Typography variant="subtitle1" sx={{ color: 'primary.main', fontWeight: 700, mb: 1 }}>
-                                                    Contract ID: <span style={{ color: 'primary.main', fontWeight: 400 }}>{contract.id}</span>
-                                                </Typography>
-                                                <Divider sx={{ my: 1 }} />
-                                                <Typography variant="subtitle2" sx={{ color: 'primary.main', fontWeight: 700, mb: 1 }}>
-                                                    Location Information
-                                                </Typography>
-                                                <Box sx={{ ml: 1, mb: 1 }}>
-                                                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                                                        <b>Pickup:</b> <span style={{ color: theme.palette.text.primary }}>{contract.pickup_location || 'N/A'}</span>
-                                                    </Typography>
-                                                    {contract.pickup_location_geo && (
-                                                        <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                                                            <b>Pickup Coordinates:</b>{' '}
-                                                            <span style={{ color: theme.palette.text.primary }}>
-                                                                {contract.pickup_location_geo.coordinates[1].toFixed(6)}, {contract.pickup_location_geo.coordinates[0].toFixed(6)}
-                                                            </span>
-                                                        </Typography>
-                                                    )}
-                                                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                                                        <b>Drop-off:</b> <span style={{ color: theme.palette.text.primary }}>{contract.drop_off_location || 'N/A'}</span>
-                                                    </Typography>
-                                                    {contract.city && (
-                                                        <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                                                            <b>City:</b> <span style={{ color: theme.palette.text.primary }}>{contract.city}</span>
-                                                        </Typography>
-                                                    )}
-                                                    {contract.price !== null && (
-                                                        <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                                                            <b>Price:</b> <span style={{ color: theme.palette.text.primary }}>₱{Number(contract.delivery_charge).toLocaleString()}</span>
-                                                        </Typography>
-                                                    )}
-                                                    {contract.drop_off_location_geo && (
-                                                        <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                                                            <b>Drop-off Coordinates:</b>{' '}
-                                                            <span style={{ color: theme.palette.text.primary }}>
-                                                                {contract.drop_off_location_geo.coordinates[1].toFixed(6)}, {contract.drop_off_location_geo.coordinates[0].toFixed(6)}
-                                                            </span>
-                                                        </Typography>
-                                                    )}
-                                                </Box>
-                                            </Box>
-                                            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', ml: 2 }}>
-                                                <Button
-                                                    variant="contained"
-                                                    startIcon={<LocationOnIcon />}
-                                                    onClick={() => handleTrackContract(contract.id)}
-                                                    sx={{ mb: 1, minWidth: '120px' }}
-                                                    disabled={contract.contract_status?.status_name?.toLowerCase() === 'cancelled'}
-                                                >
-                                                    Track
-                                                </Button>
-                                                <Button
-                                                    variant="outlined"
-                                                    color="error"
-                                                    onClick={() => handleCancelClick(contract.id)}
-                                                    sx={{ mb: 1, minWidth: '120px' }}
-                                                    disabled={contract.contract_status?.status_name?.toLowerCase() === 'cancelled'}
-                                                >
-                                                    Cancel
-                                                </Button>
-                                                <IconButton
-                                                    onClick={() => handleExpandClick(contract.id)}
-                                                    aria-expanded={expandedContracts.includes(contract.id)}
-                                                    aria-label="show more"
-                                                    size="small"
-                                                    sx={{ 
-                                                        transform: expandedContracts.includes(contract.id) ? 'rotate(180deg)' : 'rotate(0deg)',
-                                                        transition: 'transform 0.3s',
-                                                        color: 'primary.main',
-                                                        '&:hover': {
-                                                            color: 'primary.dark'
-                                                        },
-                                                        mt: 3
-                                                    }}
-                                                >
-                                                    <ExpandMoreIcon />
-                                                </IconButton>
-                                            </Box>
-                                        </Box>
-                                        <Collapse in={expandedContracts.includes(contract.id)} timeout="auto" unmountOnExit>
-                                            <Divider sx={{ my: 2 }} />
-                                            <Typography variant="subtitle2" sx={{ color: 'primary.main', fontWeight: 700, mb: 1 }}>
-                                                Passenger Information
-                                            </Typography>
-                                            <Box sx={{ ml: 1, mb: 1 }}>
-                                                {!contract.luggage_description && !contract.case_number && !contract.flight_number && (
-                                                    <Typography variant="body2">
-                                                        No luggage info.
-                                                    </Typography>
-                                                )}
-                                                <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                                                    <b>Name:</b> <span style={{ color: theme.palette.text.primary }}>{`${contract.owner_first_name || ''}${contract.owner_middle_initial ? ' ' + contract.owner_middle_initial : ''}${contract.owner_last_name ? ' ' + contract.owner_last_name : ''}`.trim() || 'N/A'}</span>
-                                                </Typography>
-                                                <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                                                    <b>Contact Number:</b> <span style={{ color: theme.palette.text.primary }}>{contract.owner_contact || 'N/A'}</span>
-                                                </Typography>
-                                                <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                                                    <b>Address:</b> <span style={{ color: theme.palette.text.primary }}>{contract.delivery_address || 'N/A'}</span>
-                                                </Typography>
-                                                {contract.address_line_1 && (
-                                                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                                                        <b>Address Line 1:</b> <span style={{ color: theme.palette.text.primary }}>{contract.address_line_1}</span>
-                                                    </Typography>
-                                                )}
-                                                {contract.address_line_2 && (
-                                                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                                                        <b>Address Line 2 / Landmark Details:</b> <span style={{ color: theme.palette.text.primary }}>{contract.address_line_2}</span>
-                                                    </Typography>
-                                                )}
-                                                <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                                                    <b>Quantity:</b> <span style={{ color: theme.palette.text.primary }}>{contract.luggage_quantity || 'N/A'}</span>
-                                                </Typography>
-                                                {contract.luggage_description ? (
-                                                    contract.luggage_description.split(', ').map((desc, index) => (
-                                                        <Typography key={index} variant="body2" sx={{ color: 'text.secondary' }}>
-                                                            <b>Luggage Description {index + 1}:</b> <span style={{ color: theme.palette.text.primary }}>{desc.trim()}</span>
-                                                        </Typography>
-                                                    ))
-                                                ) : (
-                                                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                                                        <span style={{ color: theme.palette.text.primary }}>N/A</span>
-                                                    </Typography>
-                                                )}
-                                                <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                                                    <b>Flight Number:</b> <span style={{ color: theme.palette.text.primary }}>{contract.flight_number || 'N/A'}</span>
-                                                </Typography>
-                                            </Box>
-                                            <Divider sx={{ my: 2 }} />
-                                            <Typography variant="subtitle2" sx={{ color: 'primary.main', fontWeight: 700, mb: 1 }}>
-                                                Airline Personnel Information
-                                            </Typography>
-                                            <Box sx={{ ml: 1, mb: 1 }}>
-                                                <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                                                    <b>Airline Personnel:</b>{' '}
-                                                    <span style={{ color: theme.palette.text.primary }}>
-                                                        {contract.airline
-                                                            ? `${contract.airline.first_name || ''} ${contract.airline.middle_initial || ''} ${
-                                                                contract.airline.last_name || ''
-                                                            }${contract.airline.suffix ? ` ${contract.airline.suffix}` : ''}`
-                                                                .replace(/  +/g, ' ')
-                                                                .trim()
+                            <TableContainer component={Paper} elevation={3} sx={{ borderRadius: 2 }}>
+                                <Table>
+                                    <TableHead>
+                                        <TableRow sx={{ backgroundColor: 'primary.main' }}>
+                                            <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Contract ID</TableCell>
+                                            <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Pickup Location</TableCell>
+                                            <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Drop-off Location</TableCell>
+                                            <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Flight Number</TableCell>
+                                            <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Address</TableCell>
+                                            <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Price</TableCell>
+                                            <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Status</TableCell>
+                                            <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Timeline</TableCell>
+                                            <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Actions</TableCell>
+                                        </TableRow>
+                                    </TableHead>
+                                    <TableBody>
+                                        {dateFilteredContracts.length === 0 ? (
+                                            <TableRow>
+                                                <TableCell colSpan={9} align="center">
+                                                    <Typography color="text.secondary">No contracts found</Typography>
+                                                </TableCell>
+                                            </TableRow>
+                                        ) : (
+                                            getPaginatedContracts().map((contract) => (
+                                                <TableRow key={`contract-${contract.id}`} hover>
+                                                    <TableCell>{contract.id}</TableCell>
+                                                    <TableCell>{contract.pickup_location || 'N/A'}</TableCell>
+                                                    <TableCell>{contract.drop_off_location || 'N/A'}</TableCell>
+                                                    <TableCell>{contract.flight_number || 'N/A'}</TableCell>
+                                                    <TableCell>
+                                                        {contract.delivery_address || `${contract.address_line_1 || ''} ${contract.address_line_2 || ''}`.replace(/  +/g, ' ').trim() || 'N/A'}
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        {contract.delivery_charge !== null && contract.delivery_charge !== undefined && !isNaN(Number(contract.delivery_charge))
+                                                            ? `₱${Number(contract.delivery_charge).toLocaleString()}`
                                                             : 'N/A'}
-                                                    </span>
-                                                </Typography>
-                                                <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                                                    <b>Email:</b>{' '}
-                                                    <span style={{ color: theme.palette.text.primary }}>{contract.airline?.email || 'N/A'}</span>
-                                                </Typography>
-                                                <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                                                    <b>Contact:</b>{' '}
-                                                    <span style={{ color: theme.palette.text.primary }}>{contract.airline?.contact_number || 'N/A'}</span>
-                                                </Typography>
-                                            </Box>
-                                            <Divider sx={{ my: 2 }} />
-                                            <Typography variant="subtitle2" sx={{ color: 'primary.main', fontWeight: 700, mb: 1 }}>
-                                                Delivery Personnel Information
-                                            </Typography>
-                                            <Box sx={{ ml: 1, mb: 1 }}>
-                                                <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                                                    <b>Delivery Personnel:</b>{' '}
-                                                    <span style={{ color: theme.palette.text.primary }}>
-                                                        {contract.delivery
-                                                            ? `${contract.delivery.first_name || ''} ${contract.delivery.middle_initial || ''} ${
-                                                                contract.delivery.last_name || ''
-                                                            }${contract.delivery.suffix ? ` ${contract.delivery.suffix}` : ''}`
-                                                                .replace(/  +/g, ' ')
-                                                                .trim()
-                                                            : 'N/A'}
-                                                    </span>
-                                                </Typography>
-                                                <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                                                    <b>Email:</b>{' '}
-                                                    <span style={{ color: theme.palette.text.primary }}>{contract.delivery?.email || 'N/A'}</span>
-                                                </Typography>
-                                                <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                                                    <b>Contact:</b>{' '}
-                                                    <span style={{ color: theme.palette.text.primary }}>{contract.delivery?.contact_number || 'N/A'}</span>
-                                                </Typography>
-                                                <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                                                    <b>Status:</b>{' '}
-                                                    <span style={{ color: theme.palette.text.primary, fontWeight: 700 }}>
-                                                        {contract.contract_status?.status_name || 'N/A'}
-                                                    </span>
-                                                </Typography>
-                                            </Box>
-                                            <Divider sx={{ my: 2 }} />
-                                            <Typography variant="subtitle2" sx={{ color: 'primary.main', fontWeight: 700, mb: 1 }}>
-                                                Timeline
-                                            </Typography>
-                                            <Box sx={{ ml: 1, mb: 1 }}>
-                                                <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                                                    <b>Created:</b>{' '}
-                                                    <span style={{ color: theme.palette.text.primary }}>
-                                                        {contract.created_at ? new Date(contract.created_at).toLocaleString() : 'N/A'}
-                                                    </span>
-                                                </Typography>
-                                                <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                                                    <b>Accepted:</b>{' '}
-                                                    <span style={{ color: theme.palette.text.primary }}>
-                                                        {contract.accepted_at ? new Date(contract.accepted_at).toLocaleString() : 'N/A'}
-                                                    </span>
-                                                </Typography>
-                                                <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                                                    <b>Pickup:</b>{' '}
-                                                    <span style={{ color: theme.palette.text.primary }}>
-                                                        {contract.pickup_at ? new Date(contract.pickup_at).toLocaleString() : 'N/A'}
-                                                    </span>
-                                                </Typography>
-                                                <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                                                    <b>Delivered:</b>{' '}
-                                                    <span style={{ color: theme.palette.text.primary }}>
-                                                        {contract.delivered_at ? new Date(contract.delivered_at).toLocaleString() : 'N/A'}
-                                                    </span>
-                                                </Typography>
-                                                <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                                                    <b>Cancelled:</b>{' '}
-                                                    <span style={{ color: theme.palette.text.primary }}>
-                                                        {contract.cancelled_at ? new Date(contract.cancelled_at).toLocaleString() : 'N/A'}
-                                                    </span>
-                                                </Typography>
-                                            </Box>
-                                        </Collapse>
-                                    </Paper>
-                                ))}
-                            </Box>
+                                                    </TableCell>
+                                                    <TableCell>{contract.contract_status?.status_name || 'N/A'}</TableCell>
+                                                    <TableCell>
+                                                        <Typography variant="body2"><b>Created:</b> {contract.created_at ? new Date(contract.created_at).toLocaleString() : 'N/A'}</Typography>
+                                                        <Typography variant="body2"><b>Accepted:</b> {contract.accepted_at ? new Date(contract.accepted_at).toLocaleString() : 'N/A'}</Typography>
+                                                        <Typography variant="body2"><b>Pickup:</b> {contract.pickup_at ? new Date(contract.pickup_at).toLocaleString() : 'N/A'}</Typography>
+                                                        <Typography variant="body2"><b>Delivered:</b> {contract.delivered_at ? new Date(contract.delivered_at).toLocaleString() : 'N/A'}</Typography>
+                                                        <Typography variant="body2"><b>Cancelled:</b> {contract.cancelled_at ? new Date(contract.cancelled_at).toLocaleString() : 'N/A'}</Typography>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 160 }}>
+                                                            <Button
+                                                                variant="contained"
+                                                                size="small"
+                                                                startIcon={<LocationOnIcon />}
+                                                                onClick={() => handleTrackContract(contract.id)}
+                                                                disabled={(() => { const s = (contract.contract_status?.status_name || '').toLowerCase(); return ['delivered','failed','cancelled'].some(k => s.includes(k)); })()}
+                                                                fullWidth
+                                                            >
+                                                                Track
+                                                            </Button>
+                                                            <Button
+                                                                variant="contained"
+                                                                size="small"
+                                                                onClick={() => handleViewDetails(contract)}
+                                                                fullWidth
+                                                            >
+                                                                View Details
+                                                            </Button>
+                                                            <Button
+                                                                variant="contained"
+                                                                size="small"
+                                                                onClick={() => openProofOfPickup(contract.id)}
+                                                                disabled={(contract.contract_status?.status_name || '').toLowerCase() === 'cancelled'}
+                                                                fullWidth
+                                                            >
+                                                                Proof of Pickup
+                                                            </Button>
+                                                            <Button
+                                                                variant="contained"
+                                                                size="small"
+                                                                onClick={() => openProofOfDelivery(contract.id)}
+                                                                disabled={(contract.contract_status?.status_name || '').toLowerCase() === 'cancelled'}
+                                                                fullWidth
+                                                            >
+                                                                Proof of Delivery
+                                                            </Button>
+                                                            <Button
+                                                                variant="outlined"
+                                                                size="small"
+                                                                color="error"
+                                                                onClick={() => handleCancelClick(contract.id)}
+                                                                disabled={(() => { const s = (contract.contract_status?.status_name || '').toLowerCase(); return ['delivered','failed','cancelled'].some(k => s.includes(k)); })()}
+                                                                fullWidth
+                                                            >
+                                                                Cancel
+                                                            </Button>
+                                                        </Box>
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))
+                                        )}
+                                    </TableBody>
+                                </Table>
+                            </TableContainer>
+                            </>
                         )}
                         {/* Add pagination controls */}
                         {!contractListLoading && !contractListError && dateFilteredContracts.length > 0 && (
@@ -2362,6 +2318,208 @@ export default function Page() {
                         >
                             {cancelling ? 'Cancelling...' : 'Yes, Cancel Contract'}
                         </Button>
+                    </DialogActions>
+                </Dialog>
+
+                {/* View Details Dialog */}
+                <Dialog open={detailsOpen} onClose={handleDetailsClose} maxWidth="md" fullWidth>
+                    <DialogTitle>Contract Details</DialogTitle>
+                    <DialogContent dividers>
+                        {detailsContract && (
+                            <Box sx={{ minWidth: 400 }}>
+                                <Typography variant="subtitle1" sx={{ color: 'primary.main', fontWeight: 700, mb: 1 }}>
+                                    Contract ID: <span style={{ color: 'primary.main', fontWeight: 400 }}>{detailsContract.id}</span>
+                                </Typography>
+                                <Divider sx={{ my: 1 }} />
+                                <Typography variant="subtitle2" sx={{ color: 'primary.main', fontWeight: 700, mb: 1 }}>
+                                    Location Information
+                                </Typography>
+                                <Box sx={{ ml: 1, mb: 1 }}>
+                                    <Typography variant="body2">
+                                        <b>Pickup:</b> <span>{detailsContract.pickup_location || 'N/A'}</span>
+                                    </Typography>
+                                    <Typography variant="body2">
+                                        <b>Drop-off:</b> <span>{detailsContract.drop_off_location || 'N/A'}</span>
+                                    </Typography>
+                                    {detailsContract.delivery_charge !== null && detailsContract.delivery_charge !== undefined && !isNaN(Number(detailsContract.delivery_charge)) ? (
+                                        <Typography variant="body2">
+                                            <b>Price:</b> <span>₱{Number(detailsContract.delivery_charge).toLocaleString()}</span>
+                                        </Typography>
+                                    ) : (
+                                        <Typography variant="body2">
+                                            <b>Price:</b> <span>N/A</span>
+                                        </Typography>
+                                    )}
+                                </Box>
+                                <Divider sx={{ my: 2 }} />
+                                <Typography variant="subtitle2" sx={{ color: 'primary.main', fontWeight: 700, mb: 1 }}>
+                                    Passenger Information
+                                </Typography>
+                                <Box sx={{ ml: 1, mb: 1 }}>
+                                    <Typography variant="body2">
+                                        <b>Name:</b> <span>{`${detailsContract.owner_first_name || ''}${detailsContract.owner_middle_initial ? ' ' + detailsContract.owner_middle_initial : ''}${detailsContract.owner_last_name ? ' ' + detailsContract.owner_last_name : ''}`.trim() || 'N/A'}</span>
+                                    </Typography>
+                                    <Typography variant="body2">
+                                        <b>Contact Number:</b> <span>{detailsContract.owner_contact || 'N/A'}</span>
+                                    </Typography>
+                                    <Typography variant="body2">
+                                        <b>Address:</b> <span>{detailsContract.delivery_address || 'N/A'}</span>
+                                    </Typography>
+                                    {detailsContract.address_line_1 && (
+                                        <Typography variant="body2">
+                                            <b>Address Line 1:</b> <span>{detailsContract.address_line_1}</span>
+                                        </Typography>
+                                    )}
+                                    {detailsContract.address_line_2 && (
+                                        <Typography variant="body2">
+                                            <b>Address Line 2 / Landmark Details:</b> <span>{detailsContract.address_line_2}</span>
+                                        </Typography>
+                                    )}
+                                    <Typography variant="body2">
+                                        <b>Quantity:</b> <span>{detailsContract.luggage_quantity || 'N/A'}</span>
+                                    </Typography>
+                                    <Typography variant="body2">
+                                        <b>Luggage Description(s):</b> <span>{detailsContract.luggage_description || 'N/A'}</span>
+                                    </Typography>
+                                    <Typography variant="body2">
+                                        <b>Flight Number:</b> <span>{detailsContract.flight_number || 'N/A'}</span>
+                                    </Typography>
+                                </Box>
+                                <Divider sx={{ my: 2 }} />
+                                <Typography variant="subtitle2" sx={{ color: 'primary.main', fontWeight: 700, mb: 1 }}>
+                                    Airline Personnel Information
+                                </Typography>
+                                <Box sx={{ ml: 1, mb: 1 }}>
+                                    <Typography variant="body2">
+                                        <b>Airline Personnel:</b>{' '}
+                                        <span>
+                                            {detailsContract.airline
+                                                ? `${detailsContract.airline.first_name || ''} ${detailsContract.airline.middle_initial || ''} ${
+                                                    detailsContract.airline.last_name || ''
+                                                }${detailsContract.airline.suffix ? ` ${detailsContract.airline.suffix}` : ''}`
+                                                    .replace(/  +/g, ' ')
+                                                    .trim()
+                                                : 'N/A'}
+                                        </span>
+                                    </Typography>
+                                    <Typography variant="body2">
+                                        <b>Email:</b>{' '}
+                                        <span>{detailsContract.airline?.email || 'N/A'}</span>
+                                    </Typography>
+                                    <Typography variant="body2">
+                                        <b>Contact:</b>{' '}
+                                        <span>{detailsContract.airline?.contact_number || 'N/A'}</span>
+                                    </Typography>
+                                </Box>
+                                <Divider sx={{ my: 2 }} />
+                                <Typography variant="subtitle2" sx={{ color: 'primary.main', fontWeight: 700, mb: 1 }}>
+                                    Delivery Personnel Information
+                                </Typography>
+                                <Box sx={{ ml: 1, mb: 1 }}>
+                                    <Typography variant="body2">
+                                        <b>Delivery Personnel:</b>{' '}
+                                        <span>
+                                            {detailsContract.delivery
+                                                ? `${detailsContract.delivery.first_name || ''} ${detailsContract.delivery.middle_initial || ''} ${
+                                                    detailsContract.delivery.last_name || ''
+                                                }${detailsContract.delivery.suffix ? ` ${detailsContract.delivery.suffix}` : ''}`
+                                                    .replace(/  +/g, ' ')
+                                                    .trim()
+                                                : 'N/A'}
+                                        </span>
+                                    </Typography>
+                                    <Typography variant="body2">
+                                        <b>Email:</b>{' '}
+                                        <span>{detailsContract.delivery?.email || 'N/A'}</span>
+                                    </Typography>
+                                    <Typography variant="body2">
+                                        <b>Contact:</b>{' '}
+                                        <span>{detailsContract.delivery?.contact_number || 'N/A'}</span>
+                                    </Typography>
+                                    <Typography variant="body2">
+                                        <b>Status:</b>{' '}
+                                        <span style={{ color: 'primary.main', fontWeight: 700 }}>
+                                            {detailsContract.contract_status?.status_name || 'N/A'}
+                                        </span>
+                                    </Typography>
+                                </Box>
+                                <Divider sx={{ my: 2 }} />
+                                <Typography variant="subtitle2" sx={{ color: 'primary.main', fontWeight: 700, mb: 1 }}>
+                                    Timeline
+                                </Typography>
+                                <Box sx={{ ml: 1, mb: 1 }}>
+                                    <Typography variant="body2">
+                                        <b>Created:</b>{' '}
+                                        <span>{detailsContract.created_at ? new Date(detailsContract.created_at).toLocaleString() : 'N/A'}</span>
+                                    </Typography>
+                                    <Typography variant="body2">
+                                        <b>Accepted:</b>{' '}
+                                        <span>{detailsContract.accepted_at ? new Date(detailsContract.accepted_at).toLocaleString() : 'N/A'}</span>
+                                    </Typography>
+                                    <Typography variant="body2">
+                                        <b>Pickup:</b>{' '}
+                                        <span>{detailsContract.pickup_at ? new Date(detailsContract.pickup_at).toLocaleString() : 'N/A'}</span>
+                                    </Typography>
+                                    <Typography variant="body2">
+                                        <b>Delivered:</b>{' '}
+                                        <span>{detailsContract.delivered_at ? new Date(detailsContract.delivered_at).toLocaleString() : 'N/A'}</span>
+                                    </Typography>
+                                    <Typography variant="body2">
+                                        <b>Cancelled:</b>{' '}
+                                        <span>{detailsContract.cancelled_at ? new Date(detailsContract.cancelled_at).toLocaleString() : 'N/A'}</span>
+                                    </Typography>
+                                </Box>
+                            </Box>
+                        )}
+                    </DialogContent>
+                    <DialogActions>
+                        <Button onClick={handleDetailsClose} color="primary">Close</Button>
+                    </DialogActions>
+                </Dialog>
+
+                {/* Proof of Pickup Dialog */}
+                <Dialog open={pickupDialogOpen} onClose={() => setPickupDialogOpen(false)} maxWidth="md" fullWidth>
+                    <DialogTitle>Proof of Pickup</DialogTitle>
+                    <DialogContent dividers>
+                        {pickupLoading && (
+                            <Box sx={{ display: 'flex', justifyContent: 'center', my: 3 }}>
+                                <CircularProgress />
+                            </Box>
+                        )}
+                        {!pickupLoading && pickupError && (
+                            <Typography color="error">{pickupError}</Typography>
+                        )}
+                        {!pickupLoading && !pickupError && pickupImageUrl && (
+                            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '40vh' }}>
+                                <img src={pickupImageUrl} alt="Proof of Pickup" style={{ maxWidth: '100%', maxHeight: '70vh', width: 'auto', height: 'auto', objectFit: 'contain', borderRadius: 8 }} />
+                            </Box>
+                        )}
+                    </DialogContent>
+                    <DialogActions>
+                        <Button onClick={() => setPickupDialogOpen(false)}>Close</Button>
+                    </DialogActions>
+                </Dialog>
+
+                {/* Proof of Delivery Dialog */}
+                <Dialog open={deliveryDialogOpen} onClose={() => setDeliveryDialogOpen(false)} maxWidth="md" fullWidth>
+                    <DialogTitle>Proof of Delivery</DialogTitle>
+                    <DialogContent dividers>
+                        {deliveryLoading && (
+                            <Box sx={{ display: 'flex', justifyContent: 'center', my: 3 }}>
+                                <CircularProgress />
+                            </Box>
+                        )}
+                        {!deliveryLoading && deliveryError && (
+                            <Typography color="error">{deliveryError}</Typography>
+                        )}
+                        {!deliveryLoading && !deliveryError && deliveryImageUrl && (
+                            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '40vh' }}>
+                                <img src={deliveryImageUrl} alt="Proof of Delivery" style={{ maxWidth: '100%', maxHeight: '70vh', width: 'auto', height: 'auto', objectFit: 'contain', borderRadius: 8 }} />
+                            </Box>
+                        )}
+                    </DialogContent>
+                    <DialogActions>
+                        <Button onClick={() => setDeliveryDialogOpen(false)}>Close</Button>
                     </DialogActions>
                 </Dialog>
             </>)}

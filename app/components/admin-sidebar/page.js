@@ -281,10 +281,10 @@ function AdminSidebarContent() {
                         {!isMinimized && <ListItemText primary="Statistics" />}
                     </ListItemButton>
 
-                    {/* <ListItemButton onClick={() => handleNavigation("/egc-admin/logs")} sx={listItemStyles("/egc-admin/logs")}>
+                    <ListItemButton onClick={() => handleNavigation("/egc-admin/logs")} sx={listItemStyles("/egc-admin/logs")}>
                         <ListItemIcon><HistoryIcon sx={iconStyles("/egc-admin/logs")} /></ListItemIcon>
                         {!isMinimized && <ListItemText primary="System Logs" />}
-                    </ListItemButton> */}
+                    </ListItemButton>
                 </List>
             </Box>
 
