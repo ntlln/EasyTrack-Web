@@ -152,10 +152,70 @@ export default function Page() {
     // Mount component
     useEffect(() => { setMounted(true); setIsFormMounted(true); }, []);
 
-    // Empty dropdown options
-    const provinces = [];
-    const cities = [];
-    const barangays = [];
+    // Load Philippine address data
+    useEffect(() => {
+        const loadAddressData = async () => {
+            try {
+                // Load regions and filter by specified region codes
+                const regionResponse = await fetch('/ph-address/region.json');
+                const allRegions = await regionResponse.json();
+                const allowedRegionCodes = ['01', '02', '03', '04', '05', '13', '14', '17'];
+                const filteredRegions = allRegions.filter(region => 
+                    allowedRegionCodes.includes(region.region_code)
+                );
+                setRegions(filteredRegions);
+
+                // Load provinces and filter by allowed regions
+                const provinceResponse = await fetch('/ph-address/province.json');
+                const allProvinces = await provinceResponse.json();
+                const filteredProvinces = allProvinces.filter(province => 
+                    allowedRegionCodes.includes(province.region_code)
+                );
+                setProvinces(filteredProvinces);
+
+                // Load cities
+                const cityResponse = await fetch('/ph-address/city.json');
+                const allCities = await cityResponse.json();
+                setCities(allCities);
+
+                // Load barangays
+                const barangayResponse = await fetch('/ph-address/barangay.json');
+                const allBarangays = await barangayResponse.json();
+                setBarangays(allBarangays);
+
+                setAddressData({
+                    regions: filteredRegions,
+                    provinces: filteredProvinces,
+                    cities: allCities,
+                    barangays: allBarangays
+                });
+            } catch (error) {
+                console.error('Error loading address data:', error);
+            }
+        };
+
+        loadAddressData();
+    }, []);
+
+    // Philippine address data state
+    const [regions, setRegions] = useState([]);
+    const [provinces, setProvinces] = useState([]);
+    const [cities, setCities] = useState([]);
+    const [barangays, setBarangays] = useState([]);
+    const [selectedRegion, setSelectedRegion] = useState('');
+    const [selectedProvince, setSelectedProvince] = useState('');
+    const [selectedCity, setSelectedCity] = useState('');
+    const [addressData, setAddressData] = useState({
+        regions: [],
+        provinces: [],
+        cities: [],
+        barangays: []
+    });
+
+    // Filtered data based on selections
+    const [filteredProvinces, setFilteredProvinces] = useState([]);
+    const [filteredCities, setFilteredCities] = useState([]);
+    const [filteredBarangays, setFilteredBarangays] = useState([]);
 
     // Load Google Maps script
     useEffect(() => {
@@ -389,6 +449,52 @@ export default function Page() {
                 }));
             }
         });
+    };
+
+    // Cascading dropdown handlers
+    const handleRegionChange = (value) => {
+        setSelectedRegion(value);
+        setSelectedProvince('');
+        setSelectedCity('');
+        setContract(prev => ({ ...prev, province: '', city: '', barangay: '' }));
+        
+        // Filter provinces by selected region
+        const filtered = provinces.filter(province => province.region_code === value);
+        setFilteredProvinces(filtered);
+        setFilteredCities([]);
+        setFilteredBarangays([]);
+    };
+
+    const handleProvinceChange = (value) => {
+        setSelectedProvince(value);
+        setSelectedCity('');
+        setContract(prev => ({ ...prev, city: '', barangay: '' }));
+        
+        // Find the province code for the selected province name
+        const selectedProvinceData = provinces.find(province => province.province_name === value);
+        if (selectedProvinceData) {
+            // Filter cities by selected province code
+            const filtered = cities.filter(city => city.province_code === selectedProvinceData.province_code);
+            setFilteredCities(filtered);
+        } else {
+            setFilteredCities([]);
+        }
+        setFilteredBarangays([]);
+    };
+
+    const handleCityChange = (value) => {
+        setSelectedCity(value);
+        setContract(prev => ({ ...prev, barangay: '' }));
+        
+        // Find the city code for the selected city name
+        const selectedCityData = cities.find(city => city.city_name === value);
+        if (selectedCityData) {
+            // Filter barangays by selected city code
+            const filtered = barangays.filter(barangay => barangay.city_code === selectedCityData.city_code);
+            setFilteredBarangays(filtered);
+        } else {
+            setFilteredBarangays([]);
+        }
     };
 
     // Contract form handlers
@@ -683,6 +789,9 @@ export default function Page() {
         }
 
         // Validate delivery address fields
+        if (!selectedRegion || selectedRegion.trim() === '') {
+            errors.region = 'Region is required';
+        }
         if (!contract.province || contract.province.trim() === '') {
             errors.province = 'Province is required';
         }
@@ -859,6 +968,12 @@ export default function Page() {
                 postalCode: "",
                 contact: ""
             });
+            setSelectedRegion('');
+            setSelectedProvince('');
+            setSelectedCity('');
+            setFilteredProvinces([]);
+            setFilteredCities([]);
+            setFilteredBarangays([]);
             setLuggageForms([{ name: "", flightNo: "", luggageDescriptions: [""], quantity: "", contact: "" }]);
             setPickupAddress({ location: "", addressLine1: "", addressLine2: "", province: "", city: "", barangay: "", postalCode: "" });
             setDropoffAddress({ location: null, lat: null, lng: null });
@@ -1456,16 +1571,39 @@ export default function Page() {
                         <Typography variant="h6" fontWeight="bold" align="center" mb={3}>Delivery Information</Typography>
                         <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mb: 2 }}>
                             <Box sx={{ display: 'flex', gap: 2, width: '100%' }}>
+                                <FormControl fullWidth size="small" required error={!!validationErrors.region}>
+                                    <InputLabel>Region</InputLabel>
+                                    <Select
+                                        value={selectedRegion}
+                                        label="Region"
+                                        onChange={(e) => handleRegionChange(e.target.value)}
+                                    >
+                                        {regions.map((region) => (
+                                            <MenuItem key={region.region_code} value={region.region_code}>
+                                                {region.region_name}
+                                            </MenuItem>
+                                        ))}
+                                    </Select>
+                                    {validationErrors.region && (
+                                        <Typography variant="caption" color="error" sx={{ mt: 0.5, ml: 1.5 }}>
+                                            {validationErrors.region}
+                                        </Typography>
+                                    )}
+                                </FormControl>
                                 <FormControl fullWidth size="small" required error={!!validationErrors.province}>
                                     <InputLabel>Province</InputLabel>
                                     <Select
                                         value={contract.province}
                                         label="Province"
-                                        onChange={(e) => handleInputChange("province", e.target.value)}
+                                        onChange={(e) => {
+                                            handleProvinceChange(e.target.value);
+                                            handleInputChange("province", e.target.value);
+                                        }}
+                                        disabled={!selectedRegion}
                                     >
-                                        {provinces.map((province) => (
-                                            <MenuItem key={province.value} value={province.value}>
-                                                {province.label}
+                                        {filteredProvinces.map((province) => (
+                                            <MenuItem key={province.province_code} value={province.province_name}>
+                                                {province.province_name}
                                             </MenuItem>
                                         ))}
                                     </Select>
@@ -1475,16 +1613,22 @@ export default function Page() {
                                         </Typography>
                                     )}
                                 </FormControl>
+                            </Box>
+                            <Box sx={{ display: 'flex', gap: 2, width: '100%' }}>
                                 <FormControl fullWidth size="small" required error={!!validationErrors.city}>
                                     <InputLabel>City/Municipality</InputLabel>
                                     <Select
                                         value={contract.city}
                                         label="City/Municipality"
-                                        onChange={(e) => handleInputChange("city", e.target.value)}
+                                        onChange={(e) => {
+                                            handleCityChange(e.target.value);
+                                            handleInputChange("city", e.target.value);
+                                        }}
+                                        disabled={!selectedProvince}
                                     >
-                                        {cities.map((city) => (
-                                            <MenuItem key={city.value} value={city.value}>
-                                                {city.label}
+                                        {filteredCities.map((city) => (
+                                            <MenuItem key={city.city_code} value={city.city_name}>
+                                                {city.city_name}
                                             </MenuItem>
                                         ))}
                                     </Select>
@@ -1494,18 +1638,17 @@ export default function Page() {
                                         </Typography>
                                     )}
                                 </FormControl>
-                            </Box>
-                            <Box sx={{ display: 'flex', gap: 2, width: '100%' }}>
                                 <FormControl fullWidth size="small" required error={!!validationErrors.barangay}>
                                     <InputLabel>Barangay</InputLabel>
                                     <Select
                                         value={contract.barangay}
                                         label="Barangay"
                                         onChange={(e) => handleInputChange("barangay", e.target.value)}
+                                        disabled={!selectedCity}
                                     >
-                                        {barangays.map((barangay) => (
-                                            <MenuItem key={barangay.value} value={barangay.value}>
-                                                {barangay.label}
+                                        {filteredBarangays.map((barangay) => (
+                                            <MenuItem key={barangay.brgy_code} value={barangay.brgy_name}>
+                                                {barangay.brgy_name}
                                             </MenuItem>
                                         ))}
                                     </Select>
