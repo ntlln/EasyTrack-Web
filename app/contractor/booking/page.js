@@ -114,7 +114,7 @@ export default function Page() {
         postalCode: "",
         contact: ""
     });
-    const [luggageForms, setLuggageForms] = useState([{ name: "", flightNo: "", luggageDescriptions: [""], quantity: "", contact: "" }]);
+    const [luggageForms, setLuggageForms] = useState([{ firstName: "", middleInitial: "", lastName: "", suffix: "", flightNo: "", luggageDescriptions: [""], quantity: "1", contact: "" }]);
     const [pickupAddress, setPickupAddress] = useState({ location: "" });
     const [dropoffAddress, setDropoffAddress] = useState({ location: null, lat: null, lng: null });
     const [placeOptions, setPlaceOptions] = useState([]);
@@ -148,6 +148,9 @@ export default function Page() {
     const [deliveryLoading, setDeliveryLoading] = useState(false);
     const [deliveryError, setDeliveryError] = useState('');
     const [confirmOpen, setConfirmOpen] = useState(false);
+    const [flightPrefix, setFlightPrefix] = useState('');
+    const [mapCity, setMapCity] = useState('');
+    const [mapCityPrice, setMapCityPrice] = useState(0);
 
     // Mount component
     useEffect(() => { setMounted(true); setIsFormMounted(true); }, []);
@@ -216,6 +219,30 @@ export default function Page() {
     const [filteredProvinces, setFilteredProvinces] = useState([]);
     const [filteredCities, setFilteredCities] = useState([]);
     const [filteredBarangays, setFilteredBarangays] = useState([]);
+
+    // Fetch flight prefix based on user's corporation
+    useEffect(() => {
+        const fetchFlightPrefix = async () => {
+            try {
+                const { data: { user } } = await supabase.auth.getUser();
+                if (!user) return;
+                const { data: profile } = await supabase
+                    .from('profiles')
+                    .select('corporation_id')
+                    .eq('id', user.id)
+                    .single();
+                const corporationId = profile?.corporation_id;
+                if (!corporationId) return;
+                const { data: corp } = await supabase
+                    .from('profiles_corporation')
+                    .select('flight_prefix')
+                    .eq('id', corporationId)
+                    .single();
+                setFlightPrefix(corp?.flight_prefix || '');
+            } catch (_) { /* ignore */ }
+        };
+        fetchFlightPrefix();
+    }, []);
 
     // Load Google Maps script
     useEffect(() => {
@@ -590,24 +617,62 @@ export default function Page() {
         fetchPricingData();
     }, []);
 
+    // Normalize strings for city matching (e.g., Ã±/ñ -> n, remove accents)
+    const normalizeCityString = (value) => {
+        if (!value) return '';
+        return value
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '') // strip diacritics
+            .replace(/ñ/g, 'n')
+            .replace(/Ã±/g, 'n')
+            .trim();
+    };
+
     // Get delivery charge for city
     const getDeliveryChargeForCity = (cityName) => {
         if (!cityName) return null;
         const cleanCity = cityName.replace(/\s*City\s*$/i, '').trim();
-        // Exact match
-        if (pricingData[cleanCity] !== undefined) return pricingData[cleanCity];
-        // Case-insensitive match
-        const cityLower = cleanCity.toLowerCase();
-        const ciMatch = Object.keys(pricingData).find(k => k.toLowerCase() === cityLower);
-        if (ciMatch) return pricingData[ciMatch];
-        // Partial match
-        const partial = Object.keys(pricingData).find(k => k.toLowerCase().includes(cityLower) || cityLower.includes(k.toLowerCase()));
-        if (partial) return pricingData[partial];
+        const normTarget = normalizeCityString(cleanCity);
+
+        // Exact normalized match
+        const exactKey = Object.keys(pricingData).find((k) => normalizeCityString(k) === normTarget);
+        if (exactKey !== undefined) return pricingData[exactKey];
+
+        // Partial normalized match
+        const partialKey = Object.keys(pricingData).find((k) => {
+            const nk = normalizeCityString(k);
+            return nk.includes(normTarget) || normTarget.includes(nk);
+        });
+        if (partialKey !== undefined) return pricingData[partialKey];
+
         return null;
     };
 
-    const pricePerPassenger = 0; // No pricing without city information
-    const estimatedTotalPrice = 0;
+    // Compute pricing display based on drop-off map city
+    const pricePerPassenger = mapCityPrice || 0;
+    const estimatedTotalPrice = (pricePerPassenger || 0) * (luggageForms?.length || 0);
+
+    // When drop-off coordinates change, derive city via Google and price via pricing table
+    useEffect(() => {
+        const updateMapCityAndPrice = async () => {
+            try {
+                if (!dropoffAddress.lat || !dropoffAddress.lng) {
+                    setMapCity('');
+                    setMapCityPrice(0);
+                    return;
+                }
+                const cityName = await getCityFromCoordinates(dropoffAddress.lat, dropoffAddress.lng);
+                setMapCity(cityName || '');
+                const price = cityName ? getDeliveryChargeForCity(cityName) : null;
+                setMapCityPrice(typeof price === 'number' ? price : 0);
+            } catch (_) {
+                setMapCity('');
+                setMapCityPrice(0);
+            }
+        };
+        updateMapCityAndPrice();
+    }, [dropoffAddress.lat, dropoffAddress.lng, pricingData]);
 
     // Get city from coordinates
     const getCityFromCoordinates = async (lat, lng) => {
@@ -676,8 +741,11 @@ export default function Page() {
                     const formatted = formatPhoneNumber(value);
                     newForms[index] = { ...newForms[index], [field]: formatted };
                 }
-            } else {
+            } else if (['firstName', 'middleInitial', 'lastName', 'suffix', 'flightNo', 'quantity'].includes(field)) {
                 newForms[index] = { ...newForms[index], [field]: value };
+            } else if (field === 'name') {
+                // Backward compatibility no-op if any old code calls with 'name'
+                newForms[index] = { ...newForms[index] };
             }
 
             // If quantity is being changed, update luggage descriptions array
@@ -686,7 +754,7 @@ export default function Page() {
                 const currentDescriptions = newForms[index].luggageDescriptions || [""];
 
                 if (quantity > currentDescriptions.length) {
-                    // Add empty descriptions for new items
+                    // Add empty descriptions for new items - only up to the quantity specified
                     const newDescriptions = [...currentDescriptions];
                     for (let i = currentDescriptions.length; i < quantity; i++) {
                         newDescriptions.push("");
@@ -696,6 +764,7 @@ export default function Page() {
                     // Remove excess descriptions
                     newForms[index].luggageDescriptions = currentDescriptions.slice(0, quantity);
                 }
+
             }
 
             return newForms;
@@ -741,27 +810,34 @@ export default function Page() {
     // Add new passenger form
     const handleAddLuggageForm = () => {
         if (luggageForms.length < 15) {
-            setLuggageForms(prev => [...prev, { name: "", flightNo: "", luggageDescriptions: [""], quantity: "", contact: "" }]);
+            setLuggageForms(prev => [...prev, { firstName: "", middleInitial: "", lastName: "", suffix: "", flightNo: "", luggageDescriptions: [""], quantity: "1", contact: "" }]);
         }
     };
 
-    // Duplicate passenger form
-    const handleDuplicateLuggageForm = () => {
-        if (luggageForms.length < 15 && luggageForms.length > 0) {
-            // Duplicate the last passenger form (name and flight number only, NOT contact)
-            const lastForm = luggageForms[luggageForms.length - 1];
-            const duplicatedForm = {
-                name: lastForm.name,
-                flightNo: lastForm.flightNo,
-                luggageDescriptions: [""], // Reset descriptions for new form
-                quantity: "", // Reset quantity for new form
-                contact: "" // Reset contact for new form
-            };
+    // Add another luggage description to the current form
+    const handleAddLuggageDescription = (formIndex) => {
+        setLuggageForms((previousForms) => {
+            // Defensive copy of forms
+            const updatedForms = previousForms.map((form) => ({ ...form }));
+            const targetForm = updatedForms[formIndex];
 
-            // Add the duplicated form at the end
-            setLuggageForms(prev => [...prev, duplicatedForm]);
-        }
+            // Ensure luggageDescriptions is an array
+            const currentDescriptions = Array.isArray(targetForm.luggageDescriptions)
+                ? [...targetForm.luggageDescriptions]
+                : [""];
+
+            // Guard: do not exceed 10 fields
+            if (currentDescriptions.length >= 10) {
+                return previousForms;
+            }
+
+            // Append exactly one new empty description
+            targetForm.luggageDescriptions = [...currentDescriptions, ""];
+
+            return updatedForms;
+        });
     };
+
 
     // Remove luggage form
     const handleRemoveLuggageForm = (index) => {
@@ -812,11 +888,38 @@ export default function Page() {
 
         // Validate luggage forms
         const luggageErrors = [];
+
+        // Precompute duplicate full names (First + Middle Initial + Last + Suffix), case-insensitive
+        const normalizedFullNameCounts = luggageForms.reduce((acc, form) => {
+            const parts = [form.firstName, form.middleInitial, form.lastName, form.suffix]
+                .map(v => (v || '').trim())
+                .filter(Boolean);
+            const norm = parts.join(' ').toLowerCase();
+            if (norm) acc[norm] = (acc[norm] || 0) + 1;
+            return acc;
+        }, {});
+
         luggageForms.forEach((form, index) => {
             const formErrors = {};
 
-            if (!form.name || form.name.trim() === '') {
-                formErrors.name = 'Name is required';
+            // Require first and last names
+            if (!form.firstName || form.firstName.trim() === '') {
+                formErrors.firstName = 'First name is required';
+            }
+            if (!form.lastName || form.lastName.trim() === '') {
+                formErrors.lastName = 'Last name is required';
+            }
+
+            // Duplicate full-name validation
+            const normalized = [form.firstName, form.middleInitial, form.lastName, form.suffix]
+                .map(v => (v || '').trim())
+                .filter(Boolean)
+                .join(' ')
+                .toLowerCase();
+            if (normalized && normalizedFullNameCounts[normalized] > 1) {
+                formErrors.firstName = formErrors.firstName || 'Duplicate passenger name';
+                // Also surface on lastName to make it obvious
+                formErrors.lastName = formErrors.lastName || 'Duplicate passenger name';
             }
             if (!form.flightNo || form.flightNo.trim() === '') {
                 formErrors.flightNo = 'Flight number is required';
@@ -896,8 +999,12 @@ export default function Page() {
                 console.warn('No coordinates available for city determination');
             }
 
-            // Step 2: Set delivery charge to 0 since no city information is available
+            // Step 2: Determine delivery charge strictly by city derived from coordinates
             let deliveryCharge = 0;
+            if (city) {
+                const charge = getDeliveryChargeForCity(city);
+                if (typeof charge === 'number') deliveryCharge = charge;
+            }
 
             // Helper to split a full name into first/middle/last
             const splitName = (fullName) => {
@@ -911,8 +1018,6 @@ export default function Page() {
             // Step 3: Create contracts for each form (no more separate luggage table)
             for (let i = 0; i < luggageForms.length; i++) {
                 const form = luggageForms[i];
-                const names = splitName(form.name);
-
                 // Prepare contract data for this luggage
                 const contractData = {
                     id: contractTrackingIDs[i],
@@ -922,13 +1027,13 @@ export default function Page() {
                     drop_off_location: dropoffAddress.location,
                     drop_off_location_geo: { type: 'Point', coordinates: [dropoffAddress.lng, dropoffAddress.lat] },
                     // Owner and luggage details
-                    owner_first_name: names.first,
-                    owner_middle_initial: names.middle,
-                    owner_last_name: names.last,
+                    owner_first_name: form.firstName || null,
+                    owner_middle_initial: form.middleInitial || null,
+                    owner_last_name: `${form.lastName || ''}${form.suffix ? ` ${form.suffix}` : ''}`.trim() || null,
                     owner_contact: form.contact,
                     luggage_description: form.luggageDescriptions.join(', '),
                     luggage_quantity: form.quantity,
-                    flight_number: form.flightNo,
+                    flight_number: `${flightPrefix || ''}${form.flightNo || ''}`.trim(),
                     // Delivery address fields
                     delivery_address: [
                         contract.province,
@@ -974,7 +1079,7 @@ export default function Page() {
             setFilteredProvinces([]);
             setFilteredCities([]);
             setFilteredBarangays([]);
-            setLuggageForms([{ name: "", flightNo: "", luggageDescriptions: [""], quantity: "", contact: "" }]);
+            setLuggageForms([{ firstName: "", middleInitial: "", lastName: "", suffix: "", flightNo: "", luggageDescriptions: [""], quantity: "1", contact: "" }]);
             setPickupAddress({ location: "", addressLine1: "", addressLine2: "", province: "", city: "", barangay: "", postalCode: "" });
             setDropoffAddress({ location: null, lat: null, lng: null });
             // Clear validation errors
@@ -1734,24 +1839,76 @@ export default function Page() {
                                     Passenger {index + 1}
                                 </Typography>
                                 <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                                    <TextField
-                                        label="Name"
-                                        fullWidth
-                                        size="small"
-                                        value={form.name}
-                                        onChange={(e) => handleLuggageFormChange(index, "name", e.target.value.slice(0, 100))}
-                                        required
-                                        error={!!(validationErrors.luggage && validationErrors.luggage[index] && validationErrors.luggage[index].name)}
-                                        helperText={validationErrors.luggage && validationErrors.luggage[index] && validationErrors.luggage[index].name}
-                                        inputProps={{ maxLength: 100 }}
-                                        InputProps={{
-                                            endAdornment: form.name ? (
-                                                <IconButton size="small" onClick={() => handleLuggageFormChange(index, "name", "")} edge="end">
-                                                    <CloseIcon fontSize="small" />
-                                                </IconButton>
-                                            ) : null,
-                                        }}
-                                    />
+                                    <Box sx={{ display: 'flex', gap: 2, width: '100%' }}>
+                                        <TextField
+                                            label="First Name"
+                                            fullWidth
+                                            size="small"
+                                            value={form.firstName}
+                                            onChange={(e) => handleLuggageFormChange(index, "firstName", e.target.value.slice(0, 100))}
+                                            required
+                                            error={!!(validationErrors.luggage && validationErrors.luggage[index] && validationErrors.luggage[index].firstName)}
+                                            helperText={validationErrors.luggage && validationErrors.luggage[index] && validationErrors.luggage[index].firstName}
+                                            inputProps={{ maxLength: 100 }}
+                                            InputProps={{
+                                                endAdornment: form.firstName ? (
+                                                    <IconButton size="small" onClick={() => handleLuggageFormChange(index, "firstName", "")} edge="end">
+                                                        <CloseIcon fontSize="small" />
+                                                    </IconButton>
+                                                ) : null,
+                                            }}
+                                        />
+                                        <TextField
+                                            label="Middle Initial"
+                                            fullWidth
+                                            size="small"
+                                            value={form.middleInitial}
+                                            onChange={(e) => handleLuggageFormChange(index, "middleInitial", e.target.value.slice(0, 5))}
+                                            inputProps={{ maxLength: 5 }}
+                                            InputProps={{
+                                                endAdornment: form.middleInitial ? (
+                                                    <IconButton size="small" onClick={() => handleLuggageFormChange(index, "middleInitial", "")} edge="end">
+                                                        <CloseIcon fontSize="small" />
+                                                    </IconButton>
+                                                ) : null,
+                                            }}
+                                        />
+                                    </Box>
+                                    <Box sx={{ display: 'flex', gap: 2, width: '100%' }}>
+                                        <TextField
+                                            label="Last Name"
+                                            fullWidth
+                                            size="small"
+                                            value={form.lastName}
+                                            onChange={(e) => handleLuggageFormChange(index, "lastName", e.target.value.slice(0, 100))}
+                                            required
+                                            error={!!(validationErrors.luggage && validationErrors.luggage[index] && validationErrors.luggage[index].lastName)}
+                                            helperText={validationErrors.luggage && validationErrors.luggage[index] && validationErrors.luggage[index].lastName}
+                                            inputProps={{ maxLength: 100 }}
+                                            InputProps={{
+                                                endAdornment: form.lastName ? (
+                                                    <IconButton size="small" onClick={() => handleLuggageFormChange(index, "lastName", "")} edge="end">
+                                                        <CloseIcon fontSize="small" />
+                                                    </IconButton>
+                                                ) : null,
+                                            }}
+                                        />
+                                        <TextField
+                                            label="Suffix"
+                                            fullWidth
+                                            size="small"
+                                            value={form.suffix}
+                                            onChange={(e) => handleLuggageFormChange(index, "suffix", e.target.value.slice(0, 20))}
+                                            inputProps={{ maxLength: 20 }}
+                                            InputProps={{
+                                                endAdornment: form.suffix ? (
+                                                    <IconButton size="small" onClick={() => handleLuggageFormChange(index, "suffix", "")} edge="end">
+                                                        <CloseIcon fontSize="small" />
+                                                    </IconButton>
+                                                ) : null,
+                                            }}
+                                        />
+                                    </Box>
                                     {/* Dynamic luggage description fields based on quantity */}
                                     {form.luggageDescriptions && form.luggageDescriptions.map((description, descIndex) => (
                                         <TextField
@@ -1816,6 +1973,13 @@ export default function Page() {
                                                 maxLength: 8,
                                                 pattern: '^[a-zA-Z0-9]{1,8}$'
                                             }}
+                                            InputProps={{
+                                                startAdornment: !!flightPrefix ? (
+                                                    <Typography variant="body2" sx={{ mr: 1, color: 'text.secondary', whiteSpace: 'nowrap' }}>
+                                                        {flightPrefix}
+                                                    </Typography>
+                                                ) : undefined
+                                            }}
                                         />
                                         <TextField
                                             label="Luggage Quantity"
@@ -1854,20 +2018,26 @@ export default function Page() {
                                 Add Another Passenger
                             </Button>
 
-                            {luggageForms.length > 0 && luggageForms.length < 15 && (
-                                <Button
-                                    variant="outlined"
-                                    onClick={handleDuplicateLuggageForm}
-                                    startIcon={<AddIcon />}
-                                >
-                                    Duplicate Passenger
-                                </Button>
-                            )}
+                            <Button
+                                variant="outlined"
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    // Add luggage description to the last passenger form
+                                    const lastFormIndex = luggageForms.length - 1;
+                                    if (lastFormIndex >= 0) {
+                                        handleAddLuggageDescription(lastFormIndex);
+                                    }
+                                }}
+                                startIcon={<AddIcon />}
+                                disabled={luggageForms.length === 0 || luggageForms[luggageForms.length - 1]?.quantity !== "3" || (luggageForms[luggageForms.length - 1]?.luggageDescriptions?.length >= 10)}
+                            >
+                                Add Another Luggage
+                            </Button>
                         </Box>
                     </Paper>
                     <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
                         <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
-                            Estimated Total: ₱0.00
+                            Estimated Total: ₱{Number(estimatedTotalPrice).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </Typography>
                     </Box>
                     <Box sx={{ display: "flex", justifyContent: "center", mt: 4, gap: 2 }}>
@@ -1936,16 +2106,18 @@ export default function Page() {
                             <Box sx={{ ml: 1, mb: 1 }}>
                                 {luggageForms.map((form, idx) => (
                                     <Box key={`conf-pass-${idx}`} sx={{ mb: 1 }}>
-                                        <Typography variant="body2"><b>{idx + 1}.</b> {form.name || 'N/A'} — Flight: {form.flightNo || 'N/A'} — Qty: {form.quantity || '0'}</Typography>
+                                        <Typography variant="body2">
+                                            <b>{idx + 1}.</b> {`${form.firstName || ''} ${form.middleInitial || ''} ${form.lastName || ''}${form.suffix ? ` ${form.suffix}` : ''}`.replace(/  +/g, ' ').trim() || 'N/A'} — Flight: {form.flightNo || 'N/A'} — Qty: {form.quantity || '0'}
+                                        </Typography>
                                     </Box>
                                 ))}
                             </Box>
                             <Divider sx={{ my: 2 }} />
                             <Typography variant="subtitle2" sx={{ color: 'primary.main', fontWeight: 700, mb: 1 }}>Pricing</Typography>
                             <Box sx={{ ml: 1 }}>
-                                <Typography variant="body2"><b>Price per passenger:</b> <span>₱0.00</span></Typography>
+                                <Typography variant="body2"><b>Price per passenger:</b> <span>₱{Number(pricePerPassenger || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></Typography>
                                 <Typography variant="body2"><b>Passengers:</b> <span>{luggageForms.length}</span></Typography>
-                                <Typography variant="h6" sx={{ mt: 1, fontWeight: 700 }}>Total: ₱0.00</Typography>
+                                <Typography variant="h6" sx={{ mt: 1, fontWeight: 700 }}>Total: ₱{Number(estimatedTotalPrice || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Typography>
                             </Box>
                         </Box>
                     </DialogContent>
@@ -1990,7 +2162,7 @@ export default function Page() {
                                 </Typography>
                                 <Box sx={{ ml: 1, mb: 1 }}>
                                     <Typography variant="body2">
-                                        <b>Name:</b> <span>{`${detailsContract.owner_first_name || ''}${detailsContract.owner_middle_initial ? ' ' + detailsContract.owner_middle_initial : ''}${detailsContract.owner_last_name ? ' ' + detailsContract.owner_last_name : ''}`.trim() || 'N/A'}</span>
+                                        <b>Name:</b> <span>{`${detailsContract.owner_first_name || ''}${detailsContract.owner_middle_initial ? ' ' + detailsContract.owner_middle_initial : ''}${detailsContract.owner_last_name ? ' ' + detailsContract.owner_last_name : ''}${detailsContract.owner_suffix ? ' ' + detailsContract.owner_suffix : ''}`.trim() || 'N/A'}</span>
                                     </Typography>
                                     <Typography variant="body2">
                                         <b>Contact Number:</b> <span>{detailsContract.owner_contact || 'N/A'}</span>
@@ -2011,9 +2183,29 @@ export default function Page() {
                                     <Typography variant="body2">
                                         <b>Quantity:</b> <span>{detailsContract.luggage_quantity || 'N/A'}</span>
                                     </Typography>
-                                    <Typography variant="body2">
-                                        <b>Luggage Description(s):</b> <span>{detailsContract.luggage_description || 'N/A'}</span>
-                                    </Typography>
+                                    <Box>
+                                        <Typography variant="body2" sx={{ mb: 0.5 }}>
+                                            <b>Luggage Description(s):</b>
+                                        </Typography>
+                                        {(() => {
+                                            const items = (detailsContract.luggage_description || '')
+                                                .split(',')
+                                                .map((s) => s.trim())
+                                                .filter(Boolean);
+                                            if (items.length === 0) {
+                                                return (
+                                                    <Typography variant="body2">N/A</Typography>
+                                                );
+                                            }
+                                            return (
+                                                <Box sx={{ ml: 2 }}>
+                                                    {items.map((desc, idx) => (
+                                                        <Typography key={`desc-${idx}`} variant="body2">{idx + 1}. {desc}</Typography>
+                                                    ))}
+                                                </Box>
+                                            );
+                                        })()}
+                                    </Box>
                                     <Typography variant="body2">
                                         <b>Flight Number:</b> <span>{detailsContract.flight_number || 'N/A'}</span>
                                     </Typography>
