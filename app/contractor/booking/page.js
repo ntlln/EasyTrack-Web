@@ -722,9 +722,15 @@ export default function Page() {
         return null;
     };
 
-    // Compute pricing display based on drop-off map city
-    const pricePerPassenger = mapCityPrice || 0;
-    const estimatedTotalPrice = (pricePerPassenger || 0) * (luggageForms?.length || 0);
+    // Compute pricing based on total luggages using tier rule (every 3 luggages adds base price)
+    const totalLuggages = (luggageForms || []).reduce((sum, form) => {
+        const qty = Number(form?.quantity || 0);
+        return sum + (isNaN(qty) ? 0 : qty);
+    }, 0);
+    const basePrice = mapCityPrice || 0;
+    const surchargeMultiplier = totalLuggages > 0 ? Math.floor((totalLuggages - 1) / 3) : 0;
+    const deliverySurcharge = basePrice * surchargeMultiplier;
+    const estimatedTotalPrice = basePrice + deliverySurcharge;
 
     // When drop-off coordinates change, derive city via Google and price via pricing table
     useEffect(() => {
@@ -2188,8 +2194,9 @@ export default function Page() {
                             <Divider sx={{ my: 2 }} />
                             <Typography variant="subtitle2" sx={{ color: 'primary.main', fontWeight: 700, mb: 1 }}>Pricing</Typography>
                             <Box sx={{ ml: 1 }}>
-                                <Typography variant="body2"><b>Price per passenger:</b> <span>₱{Number(pricePerPassenger || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></Typography>
-                                <Typography variant="body2"><b>Passengers:</b> <span>{luggageForms.length}</span></Typography>
+                                <Typography variant="body2"><b>Base price:</b> <span>₱{Number(basePrice || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></Typography>
+                                <Typography variant="body2"><b>Luggages:</b> <span>{totalLuggages}</span></Typography>
+                                <Typography variant="body2"><b>Delivery surcharge:</b> <span>₱{Number(deliverySurcharge || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></Typography>
                                 <Typography variant="h6" sx={{ mt: 1, fontWeight: 700 }}>Total: ₱{Number(estimatedTotalPrice || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Typography>
                             </Box>
                         </Box>
