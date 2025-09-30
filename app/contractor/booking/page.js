@@ -200,6 +200,18 @@ export default function Page() {
         loadAddressData();
     }, []);
 
+    // Load PH postal codes dataset once
+    useEffect(() => {
+        const loadPostalCodes = async () => {
+            try {
+                const resp = await fetch('/ph-address/postal-codes.json');
+                const data = await resp.json();
+                if (Array.isArray(data)) setPostalCodes(data);
+            } catch (_) { /* ignore */ }
+        };
+        loadPostalCodes();
+    }, []);
+
     // Philippine address data state
     const [regions, setRegions] = useState([]);
     const [provinces, setProvinces] = useState([]);
@@ -214,6 +226,7 @@ export default function Page() {
         cities: [],
         barangays: []
     });
+    const [postalCodes, setPostalCodes] = useState([]);
 
     // Filtered data based on selections
     const [filteredProvinces, setFilteredProvinces] = useState([]);
@@ -495,7 +508,7 @@ export default function Page() {
     const handleProvinceChange = (value) => {
         setSelectedProvince(value);
         setSelectedCity('');
-        setContract(prev => ({ ...prev, city: '', barangay: '' }));
+        setContract(prev => ({ ...prev, city: '', barangay: '', postalCode: '' }));
         
         // Find the province code for the selected province name
         const selectedProvinceData = provinces.find(province => province.province_name === value);
@@ -511,18 +524,89 @@ export default function Page() {
 
     const handleCityChange = (value) => {
         setSelectedCity(value);
-        setContract(prev => ({ ...prev, barangay: '' }));
+        setContract(prev => ({ ...prev, barangay: '', postalCode: '' }));
         
         // Find the city code for the selected city name
         const selectedCityData = cities.find(city => city.city_name === value);
         if (selectedCityData) {
             // Filter barangays by selected city code
-            const filtered = barangays.filter(barangay => barangay.city_code === selectedCityData.city_code);
+            let filtered = barangays.filter(barangay => barangay.city_code === selectedCityData.city_code);
+
+            // Special handling for Manila Tondo split: Barangays 1-146 => Tondo I, others => Tondo II
+            if (value && (value.toLowerCase() === 'tondo i' || value.toLowerCase() === 'tondo ii')) {
+                filtered = filtered.filter((brgy) => {
+                    const match = (brgy.brgy_name || '').match(/barangay\s*(\d+)/i);
+                    const num = match ? parseInt(match[1], 10) : null;
+                    if (num == null) return value.toLowerCase() === 'tondo ii';
+                    return value.toLowerCase() === 'tondo i' ? num >= 1 && num <= 146 : num > 146;
+                });
+            }
+
             setFilteredBarangays(filtered);
         } else {
             setFilteredBarangays([]);
         }
     };
+
+    // Extract postal code helper
+    const extractPostalCode = (results) => {
+        if (!Array.isArray(results)) return null;
+        for (const res of results) {
+            const comp = (res.address_components || []).find((c) => c.types && c.types.includes('postal_code'));
+            if (comp && comp.long_name) return comp.long_name;
+        }
+        return null;
+    };
+
+    // Extract postal code from a formatted address string as fallback
+    const extractPostalFromString = (formattedAddress) => {
+        if (!formattedAddress || typeof formattedAddress !== 'string') return null;
+        // Common PH zips are 4 digits; sometimes 5-6 appear in Google data
+        const match = formattedAddress.match(/\b(\d{4,6})\b/);
+        return match ? match[1] : null;
+    };
+
+    // Municipality dataset lookup
+    const getPostalCodeForMunicipality = (municipalityName, provinceName) => {
+        if (!municipalityName) return null;
+        const target = normalizeCityString(municipalityName);
+        const provinceNorm = normalizeCityString(provinceName || '');
+        if (!Array.isArray(postalCodes) || postalCodes.length === 0) return null;
+
+        // Normalize Tondo variants
+        const isTondoI = target === 'tondo i' || target === 'tondo 1' || target === 'tondoi';
+        const isTondoII = target === 'tondo ii' || target === 'tondo 2' || target === 'tondoii';
+
+        const exactMatches = postalCodes.filter((row) => normalizeCityString(row.municipality) === target);
+        if (exactMatches.length === 1) return String(exactMatches[0].post_code || '');
+        if (exactMatches.length > 1) {
+            const provinceFiltered = exactMatches.filter((row) => {
+                const loc = normalizeCityString(row.location || '');
+                return loc === provinceNorm || loc.includes(provinceNorm) || provinceNorm.includes(loc);
+            });
+            if (provinceFiltered.length > 0) return String(provinceFiltered[0].post_code || '');
+            return String(exactMatches[0].post_code || '');
+        }
+
+        const partial = postalCodes.find((row) => {
+            const m = normalizeCityString(row.municipality);
+            return m.includes(target) || target.includes(m);
+        });
+        return partial ? String(partial.post_code || '') : null;
+    };
+
+    // Auto-fill postal code ONLY after a barangay is selected, using dataset via city
+    useEffect(() => {
+        const ready = Boolean(contract.barangay && contract.city && contract.province);
+        if (!ready) return;
+        const zip = getPostalCodeForMunicipality(contract.city, contract.province);
+        if (zip) {
+            setContract((prev) => (prev.postalCode === zip ? prev : { ...prev, postalCode: zip }));
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [contract.barangay, contract.city, contract.province, postalCodes]);
+
+    // Remove Google-based and drop-off parsing logic (no longer used)
 
     // Contract form handlers
     const handlePickupAddressChange = (field, value) => {
@@ -1732,7 +1816,7 @@ export default function Page() {
                                         disabled={!selectedProvince}
                                     >
                                         {filteredCities.map((city) => (
-                                            <MenuItem key={city.city_code} value={city.city_name}>
+                                            <MenuItem key={`${city.city_code}-${city.city_name}`} value={city.city_name}>
                                                 {city.city_name}
                                             </MenuItem>
                                         ))}

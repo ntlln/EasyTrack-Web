@@ -9444,7 +9444,14 @@
     },
     {
         "city_code": "133901",
-        "city_name": "Tondo I / Ii",
+        "city_name": "Tondo I",
+        "province_code": "1339",
+        "psgc_code": "133901000",
+        "region_desc": "13"
+    },
+    {
+        "city_code": "133901",
+        "city_name": "Tondo II",
         "province_code": "1339",
         "psgc_code": "133901000",
         "region_desc": "13"
