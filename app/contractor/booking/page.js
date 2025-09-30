@@ -530,18 +530,7 @@ export default function Page() {
         const selectedCityData = cities.find(city => city.city_name === value);
         if (selectedCityData) {
             // Filter barangays by selected city code
-            let filtered = barangays.filter(barangay => barangay.city_code === selectedCityData.city_code);
-
-            // Special handling for Manila Tondo split: Barangays 1-146 => Tondo I, others => Tondo II
-            if (value && (value.toLowerCase() === 'tondo i' || value.toLowerCase() === 'tondo ii')) {
-                filtered = filtered.filter((brgy) => {
-                    const match = (brgy.brgy_name || '').match(/barangay\s*(\d+)/i);
-                    const num = match ? parseInt(match[1], 10) : null;
-                    if (num == null) return value.toLowerCase() === 'tondo ii';
-                    return value.toLowerCase() === 'tondo i' ? num >= 1 && num <= 146 : num > 146;
-                });
-            }
-
+            const filtered = barangays.filter(barangay => barangay.city_code === selectedCityData.city_code);
             setFilteredBarangays(filtered);
         } else {
             setFilteredBarangays([]);
