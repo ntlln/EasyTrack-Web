@@ -29,6 +29,12 @@ function ForgotPasswordContent() {
         setSnackbar({ open: false, message: '', severity: 'error' });
         setIsLoading(true);
         try {
+            // Validate email format
+            if (!email || !email.includes('@')) {
+                setSnackbar({ open: true, message: 'Please enter a valid email address.', severity: 'error' });
+                return;
+            }
+
             // First check if the user exists and is verified
             const response = await fetch('/api/check-verification', {
                 method: 'POST',
@@ -47,20 +53,24 @@ function ForgotPasswordContent() {
 
             // Only proceed with password reset if user is verified
             const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, { 
-                redirectTo: `${window.location.origin}/egc-admin/forgot-password` 
+                redirectTo: `${window.location.origin}/egc-admin/reset-password` 
             });
             
             if (resetError) { 
+                console.error('Password reset error:', resetError);
                 if (resetError.message.includes('seconds')) {
                     setSnackbar({ open: true, message: resetError.message, severity: 'error' });
+                } else if (resetError.message.includes('rate limit')) {
+                    setSnackbar({ open: true, message: 'Too many requests. Please wait a moment before trying again.', severity: 'error' });
                 } else {
-                    setSnackbar({ open: true, message: resetError.message, severity: 'error' });
+                    setSnackbar({ open: true, message: 'Failed to send reset email. Please try again later.', severity: 'error' });
                 }
                 return; 
             }
             
-            setSnackbar({ open: true, message: 'Password reset link has been sent to your email.', severity: 'success' });
+            setSnackbar({ open: true, message: 'Password reset link has been sent to your email. Please check your inbox and spam folder.', severity: 'success' });
         } catch (error) {
+            console.error('Reset password error:', error);
             setSnackbar({ open: true, message: 'An unexpected error occurred. Please try again.', severity: 'error' });
         } finally { 
             setIsLoading(false); 
@@ -93,7 +103,18 @@ function ForgotPasswordContent() {
                     <Typography variant="h3" sx={{ color: "primary.main", fontWeight: "bold" }}>EasyTrack</Typography>
                     <Typography color="secondary.main">Forgot Password</Typography>
                     <form onSubmit={handleSubmit} style={formStyles}>
-                        <TextField label="Email" type="email" placeholder="Email" required sx={textFieldStyles} value={email} onChange={(e) => setEmail(e.target.value)} disabled={isLoading} />
+                        <TextField 
+                            label="Email" 
+                            type="email" 
+                            placeholder="Enter your email address" 
+                            required 
+                            sx={textFieldStyles} 
+                            value={email} 
+                            onChange={(e) => setEmail(e.target.value)} 
+                            disabled={isLoading}
+                            autoComplete="email"
+                            inputProps={{ 'aria-label': 'Email address for password reset' }}
+                        />
                         <Button type="submit" variant="contained" color="primary" sx={buttonStyles} disabled={isLoading}>
                             {!isLoading ? "Send Email Reset Link" : <CircularProgress size={24} sx={progressStyles} />}
                         </Button>
