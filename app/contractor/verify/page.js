@@ -30,7 +30,7 @@ export default function Page() {
             
             if (error) throw error;
             
-            setSnackbar({ open: true, message: "Verification email sent! Please check your email and click the verification link.", severity: "success" });
+            setSnackbar({ open: true, message: "Magic link sent! Check your email and click the link to sign in.", severity: "success" });
             setEmail("");
         } catch (error) {
             console.log('Verification error:', error);
@@ -60,7 +60,45 @@ export default function Page() {
             container.style.backgroundPosition = "center";
             container.style.backgroundOpacity = "30%";
         }
-    }, []);
+
+        const handleExchangeFromUrl = async () => {
+            try {
+                const url = new URL(window.location.href);
+
+                // If already signed in, go straight to dashboard
+                const existingSession = await supabase.auth.getSession();
+                if (existingSession?.data?.session) {
+                    router.replace('/contractor');
+                    return;
+                }
+
+                const errorDescription = url.searchParams.get('error_description');
+                if (errorDescription) {
+                    setSnackbar({ open: true, message: decodeURIComponent(errorDescription), severity: 'error' });
+                }
+
+                const hasCode = !!url.searchParams.get('code');
+                if (!hasCode) return;
+
+                setIsLoading(true);
+                // Use full URL so the SDK can parse params and use stored PKCE verifier
+                const { error } = await supabase.auth.exchangeCodeForSession(window.location.href);
+                if (error) throw error;
+
+                const { data: { session } } = await supabase.auth.getSession();
+                if (!session) throw new Error('No active session after verification');
+
+                router.replace('/contractor');
+            } catch (err) {
+                console.log('Exchange error:', err);
+                setSnackbar({ open: true, message: err.message || 'Failed to verify magic link', severity: 'error' });
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        handleExchangeFromUrl();
+    }, [router, supabase]);
 
     const formContainerStyles = { 
         display: "flex", 

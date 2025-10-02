@@ -2377,14 +2377,7 @@ const TransactionManagement = () => {
                                                       >
                                                           View Preview
                                                       </Button>
-                                                      <Button
-                                                          variant="contained"
-                                                          size="small"
-                                                          color="primary"
-                                                          onClick={() => openPreviewForEmail(summary)}
-                                                      >
-                                                          Email Invoice
-                                                      </Button>
+                                                     
                                                   </Box>
                                             </TableCell>
                                         </TableRow>
