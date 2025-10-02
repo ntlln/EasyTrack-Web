@@ -68,9 +68,11 @@ export default function Page() {
       if (error) {
         console.warn('[AdminLogin] signInWithPassword error:', error);
         if (error.message?.toLowerCase().includes('email not confirmed')) {
-          setSnackbar({ open: true, message: "Email not confirmed. Please verify your email to continue.", severity: "error" });
+          setSnackbar({ open: true, message: "Please verify your email first.", severity: "info" });
           setEmail(""); setPassword(""); setIsLoading(false);
-          flowComplete = true; // no session created, but we've handled UX
+          // Redirect to verify page
+          router.push("/egc-admin/verify");
+          flowComplete = true;
           return;
         }
         const attempts = incrementLoginAttempt(email);
@@ -147,9 +149,6 @@ export default function Page() {
   const handleClickShowPassword = () => setShowPassword((show) => !show);
   const handleMouseDownPassword = (event) => event.preventDefault();
 
-  const handleOtpLogin = async () => {
-    router.push('/egc-admin/otp');
-  };
 
   // Styles
   const containerStyles = {
@@ -260,11 +259,21 @@ export default function Page() {
               <Typography color="secondary.main" variant="body2">or</Typography>
             </Box>
             <Typography
-              color="primary.main"
-              onClick={() => { if (!isLoading && loginStatus?.canAttempt) handleOtpLogin(); }}
-              sx={{ width: '40%', mt: 0.1, fontSize: '0.85rem', textAlign: 'center', cursor: (isLoading || !loginStatus?.canAttempt) ? 'not-allowed' : 'pointer', opacity: (isLoading || !loginStatus?.canAttempt) ? 0.6 : 1, '&:hover': { textDecoration: (isLoading || !loginStatus?.canAttempt) ? 'none' : 'underline', color: (isLoading || !loginStatus?.canAttempt) ? 'primary.main' : 'primary.main' } }}
+              color="white"
+              onClick={() => router.push("/egc-admin/verify")}
+              sx={{ 
+                width: '40%', 
+                mt: 0.1, 
+                fontSize: '0.85rem', 
+                textAlign: 'center', 
+                cursor: 'pointer', 
+                '&:hover': { 
+                  textDecoration: 'underline', 
+                  color: 'primary.main' 
+                } 
+              }}
             >
-              Login with OTP
+              Login with Email
             </Typography>
           </Box>
         </Box>

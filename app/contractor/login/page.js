@@ -57,16 +57,11 @@ export default function Page() {
             
             if (signInError) {
                 if (signInError.message.includes('Email not confirmed')) {
-                    const { error: otpError } = await supabase.auth.signInWithOtp({
-                        email: email,
-                        options: { emailRedirectTo: `${window.location.origin}/contractor/verify` }
-                    });
-                    
-                    if (otpError) throw otpError;
-                    
-                    setSnackbar({ open: true, message: "Please check your email for a verification link.", severity: "info" });
+                    setSnackbar({ open: true, message: "Please verify your email first.", severity: "info" });
                     setEmail(""); setPassword(""); setIsLoading(false);
-                    flowComplete = true; // handled with info prompt; no session created
+                    // Redirect to verify page
+                    router.push("/contractor/verify");
+                    flowComplete = true;
                     return;
                 }
 
@@ -174,22 +169,6 @@ export default function Page() {
         event.preventDefault();
     };
 
-    const handleOtpLogin = async () => {
-        try {
-            console.log('[ContractorLogin] OTP button clicked', {
-                isLoading,
-                canAttempt: loginStatus?.canAttempt,
-                emailPresent: Boolean(email)
-            });
-            const target = '/contractor/otp';
-            console.log('[ContractorLogin] Navigating to', target);
-            router.push(target);
-            console.log('[ContractorLogin] router.push issued');
-        } catch (err) {
-            console.error('[ContractorLogin] OTP navigation error:', err);
-            setSnackbar({ open: true, message: err.message || 'Failed to open OTP page', severity: 'error' });
-        }
-    };
 
     // Styles
     const containerStyles = { 
@@ -275,11 +254,21 @@ export default function Page() {
                             <Typography color="secondary.main" variant="body2">or</Typography>
                         </Box>
                         <Typography
-                            color="primary.main"
-                            onClick={() => { if (!isLoading && loginStatus?.canAttempt) handleOtpLogin(); }}
-                            sx={{ width: '40%', mt: 0.1, fontSize: '0.85rem', textAlign: 'center', cursor: (isLoading || !loginStatus?.canAttempt) ? 'not-allowed' : 'pointer', opacity: (isLoading || !loginStatus?.canAttempt) ? 0.6 : 1, '&:hover': { textDecoration: (isLoading || !loginStatus?.canAttempt) ? 'none' : 'underline', color: (isLoading || !loginStatus?.canAttempt) ? 'primary.main' : 'primary.main' } }}
+                            color="white"
+                            onClick={() => router.push("/contractor/verify")}
+                            sx={{ 
+                                width: '40%', 
+                                mt: 0.1, 
+                                fontSize: '0.85rem', 
+                                textAlign: 'center', 
+                                cursor: 'pointer', 
+                                '&:hover': { 
+                                    textDecoration: 'underline', 
+                                    color: 'primary.main' 
+                                } 
+                            }}
                         >
-                            Login with OTP
+                            Login with Email
                         </Typography>
                     </Box>
                 </Box>
