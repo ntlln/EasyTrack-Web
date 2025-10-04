@@ -757,17 +757,21 @@ export default function Page() {
         return null;
     };
 
-    // Compute pricing based on total luggages using tier rule (every 3 luggages adds base price)
+    // Calculate total luggages and pricing
     const totalLuggages = (luggageForms || []).reduce((sum, form) => {
         const qty = Number(form?.quantity || 0);
         return sum + (isNaN(qty) ? 0 : qty);
     }, 0);
     const basePrice = mapCityPrice || 0;
-    const surchargeMultiplier = totalLuggages > 0 ? Math.floor((totalLuggages - 1) / 3) : 0;
-    const deliverySurcharge = basePrice * surchargeMultiplier;
-    const estimatedTotalPrice = basePrice + deliverySurcharge;
+    
+    // Pricing tiers: 1-3 luggages = 1x, 4-6 = 2x, 7-9 = 3x, 10-12 = 4x
+    let surchargeMultiplier = 1;
+    if (totalLuggages >= 4) surchargeMultiplier++;
+    if (totalLuggages >= 7) surchargeMultiplier++;
+    if (totalLuggages >= 10) surchargeMultiplier++;
+    const estimatedTotalPrice = basePrice * surchargeMultiplier;
 
-    // When drop-off coordinates change, derive city via Google and price via pricing table
+    // Update city and price when drop-off coordinates change
     useEffect(() => {
         const updateMapCityAndPrice = async () => {
             try {
@@ -788,103 +792,66 @@ export default function Page() {
         updateMapCityAndPrice();
     }, [dropoffAddress.lat, dropoffAddress.lng, pricingData]);
 
-    // Get city from coordinates
     const getCityFromCoordinates = async (lat, lng) => {
-        if (!window.google) {
-            console.error('Google Maps not loaded');
-            return null;
-        }
+        if (!window.google) return null;
 
         try {
             const geocoder = new window.google.maps.Geocoder();
             const response = await new Promise((resolve, reject) => {
-                geocoder.geocode(
-                    { location: { lat, lng } },
-                    (results, status) => {
-                        if (status === 'OK') resolve(results);
-                        else reject(new Error(`Geocoding failed: ${status}`));
-                    }
-                );
+                geocoder.geocode({ location: { lat, lng } }, (results, status) => {
+                    if (status === 'OK') resolve(results);
+                    else reject(new Error(`Geocoding failed: ${status}`));
+                });
             });
 
-            if (!response || !response[0]) {
-                console.warn('No results found for coordinates:', { lat, lng });
-                return null;
-            }
+            if (!response?.[0]) return null;
 
-            // Log the full address components for debugging
-            console.log('Full address components:', response[0].address_components);
-
-            // First try to find the city (locality)
             let city = response[0].address_components.find(
                 component => component.types.includes('locality')
             )?.long_name;
 
-            // If no city found, try administrative_area_level_1 (province)
             if (!city) {
                 city = response[0].address_components.find(
                     component => component.types.includes('administrative_area_level_1')
                 )?.long_name;
             }
 
-            if (!city) {
-                console.warn('No city/province found in address components:', response[0].address_components);
-                return null;
-            }
-
-            // Remove "City" suffix if present
-            city = city.replace(/\s*City\s*$/i, '').trim();
-            console.log('Found city/province:', city);
-            return city;
+            return city?.replace(/\s*City\s*$/i, '').trim() || null;
         } catch (error) {
             console.error('Error getting city from coordinates:', error);
             return null;
         }
     };
 
-    // Handle luggage form changes
     const handleLuggageFormChange = (index, field, value) => {
         setLuggageForms(prev => {
             const newForms = [...prev];
 
-            // Handle phone number formatting for contact field
             if (field === 'contact') {
-                if (!value) {
-                    newForms[index] = { ...newForms[index], [field]: '' };
-                } else {
-                    const formatted = formatPhoneNumber(value);
-                    newForms[index] = { ...newForms[index], [field]: formatted };
-                }
+                newForms[index] = { ...newForms[index], [field]: value ? formatPhoneNumber(value) : '' };
             } else if (['firstName', 'middleInitial', 'lastName', 'suffix', 'flightNo', 'quantity'].includes(field)) {
                 newForms[index] = { ...newForms[index], [field]: value };
-            } else if (field === 'name') {
-                // Backward compatibility no-op if any old code calls with 'name'
-                newForms[index] = { ...newForms[index] };
             }
 
-            // If quantity is being changed, update luggage descriptions array
             if (field === 'quantity') {
                 const quantity = parseInt(value) || 0;
                 const currentDescriptions = newForms[index].luggageDescriptions || [""];
 
                 if (quantity > currentDescriptions.length) {
-                    // Add empty descriptions for new items - only up to the quantity specified
                     const newDescriptions = [...currentDescriptions];
                     for (let i = currentDescriptions.length; i < quantity; i++) {
                         newDescriptions.push("");
                     }
                     newForms[index].luggageDescriptions = newDescriptions;
                 } else if (quantity < currentDescriptions.length) {
-                    // Remove excess descriptions
                     newForms[index].luggageDescriptions = currentDescriptions.slice(0, quantity);
                 }
-
             }
 
             return newForms;
         });
-        // Clear validation error for this field
-        if (validationErrors.luggage && validationErrors.luggage[index] && validationErrors.luggage[index][field]) {
+
+        if (validationErrors.luggage?.[index]?.[field]) {
             setValidationErrors(prev => ({
                 ...prev,
                 luggage: prev.luggage.map((formErrors, i) =>
@@ -894,7 +861,6 @@ export default function Page() {
         }
     };
 
-    // Handle luggage description changes
     const handleLuggageDescriptionChange = (formIndex, descIndex, value) => {
         setLuggageForms(prev => {
             const newForms = [...prev];
@@ -904,106 +870,74 @@ export default function Page() {
             return newForms;
         });
 
-        // Clear validation error for this field
-        if (validationErrors.luggage && validationErrors.luggage[formIndex] && validationErrors.luggage[formIndex].luggageDescriptions && validationErrors.luggage[formIndex].luggageDescriptions[descIndex]) {
+        if (validationErrors.luggage?.[formIndex]?.luggageDescriptions?.[descIndex]) {
             setValidationErrors(prev => ({
                 ...prev,
                 luggage: prev.luggage.map((formErrors, i) =>
                     i === formIndex ? {
                         ...formErrors,
-                        luggageDescriptions: formErrors.luggageDescriptions ?
-                            formErrors.luggageDescriptions.map((descError, j) =>
-                                j === descIndex ? null : descError
-                            ) : formErrors.luggageDescriptions
+                        luggageDescriptions: formErrors.luggageDescriptions?.map((descError, j) =>
+                            j === descIndex ? null : descError
+                        )
                     } : formErrors
                 )
             }));
         }
     };
 
-    // Add new passenger form
     const handleAddLuggageForm = () => {
         if (luggageForms.length < 15) {
-            setLuggageForms(prev => [...prev, { firstName: "", middleInitial: "", lastName: "", suffix: "", flightNo: "", luggageDescriptions: [""], quantity: "1", contact: "" }]);
+            setLuggageForms(prev => [...prev, { 
+                firstName: "", middleInitial: "", lastName: "", suffix: "", 
+                flightNo: "", luggageDescriptions: [""], quantity: "1", contact: "" 
+            }]);
         }
     };
 
-    // Add another luggage description to the current form
-    const handleAddLuggageDescription = (formIndex) => {
-        setLuggageForms((previousForms) => {
-            // Defensive copy of forms
-            const updatedForms = previousForms.map((form) => ({ ...form }));
-            const targetForm = updatedForms[formIndex];
-
-            // Ensure luggageDescriptions is an array
-            const currentDescriptions = Array.isArray(targetForm.luggageDescriptions)
-                ? [...targetForm.luggageDescriptions]
-                : [""];
-
-            // Guard: do not exceed 10 fields
-            if (currentDescriptions.length >= 10) {
-                return previousForms;
-            }
-
-            // Append exactly one new empty description
-            targetForm.luggageDescriptions = [...currentDescriptions, ""];
-
-            return updatedForms;
-        });
-    };
 
 
-    // Remove luggage form
     const handleRemoveLuggageForm = (index) => {
         setLuggageForms(prev => prev.filter((_, i) => i !== index));
     };
 
 
-    // Validate form
     const validateForm = () => {
         const errors = {};
 
-        // Validate pickup location
-        if (!pickupAddress.location || pickupAddress.location.trim() === '') {
+        if (!pickupAddress.location?.trim()) {
             errors.pickupLocation = 'Pickup location is required';
         }
 
-        // Validate dropoff location
-        if (!dropoffAddress.location || dropoffAddress.location.trim() === '') {
+        if (!dropoffAddress.location?.trim()) {
             errors.dropoffLocation = 'Drop-off location is required';
         }
 
-        // Validate dropoff coordinates
         if (!dropoffAddress.lat || !dropoffAddress.lng) {
             errors.dropoffCoordinates = 'Please select a valid drop-off location on the map';
         }
 
-        // Validate delivery address fields
-        if (!selectedRegion || selectedRegion.trim() === '') {
+        if (!selectedRegion?.trim()) {
             errors.region = 'Region is required';
         }
-        if (!contract.province || contract.province.trim() === '') {
+        if (!contract.province?.trim()) {
             errors.province = 'Province is required';
         }
-        if (!contract.city || contract.city.trim() === '') {
+        if (!contract.city?.trim()) {
             errors.city = 'City/Municipality is required';
         }
-        if (!contract.barangay || contract.barangay.trim() === '') {
+        if (!contract.barangay?.trim()) {
             errors.barangay = 'Barangay is required';
         }
-        if (!contract.postalCode || contract.postalCode.trim() === '') {
+        if (!contract.postalCode?.trim()) {
             errors.postalCode = 'Postal code is required';
         }
-        if (!contract.addressLine1 || contract.addressLine1.trim() === '') {
+        if (!contract.addressLine1?.trim()) {
             errors.addressLine1 = 'Address line 1 is required';
         }
 
-        // Contact number validation is now handled per passenger form
-
-        // Validate luggage forms
         const luggageErrors = [];
 
-        // Precompute duplicate full names (First + Middle Initial + Last + Suffix), case-insensitive
+        // Check for duplicate passenger names
         const normalizedFullNameCounts = luggageForms.reduce((acc, form) => {
             const parts = [form.firstName, form.middleInitial, form.lastName, form.suffix]
                 .map(v => (v || '').trim())
@@ -1024,7 +958,6 @@ export default function Page() {
                 formErrors.lastName = 'Last name is required';
             }
 
-            // Duplicate full-name validation
             const normalized = [form.firstName, form.middleInitial, form.lastName, form.suffix]
                 .map(v => (v || '').trim())
                 .filter(Boolean)
@@ -1032,7 +965,6 @@ export default function Page() {
                 .toLowerCase();
             if (normalized && normalizedFullNameCounts[normalized] > 1) {
                 formErrors.firstName = formErrors.firstName || 'Duplicate passenger name';
-                // Also surface on lastName to make it obvious
                 formErrors.lastName = formErrors.lastName || 'Duplicate passenger name';
             }
             if (!form.flightNo || form.flightNo.trim() === '') {
@@ -1043,13 +975,12 @@ export default function Page() {
             } else if (!/^\+63\s\d{3}\s\d{3}\s\d{4}$/.test(form.contact.trim())) {
                 formErrors.contact = 'Contact number must be in format: +63 XXX XXX XXXX';
             }
-            // Validate luggage descriptions
-            if (!form.luggageDescriptions || form.luggageDescriptions.length === 0) {
+            if (!form.luggageDescriptions?.length) {
                 formErrors.luggageDescriptions = ['Luggage descriptions are required'];
             } else {
                 const descriptionErrors = [];
                 form.luggageDescriptions.forEach((desc, descIndex) => {
-                    if (!desc || desc.trim() === '') {
+                    if (!desc?.trim()) {
                         descriptionErrors[descIndex] = 'Luggage description is required';
                     }
                 });
@@ -1059,8 +990,8 @@ export default function Page() {
             }
             if (!form.quantity || form.quantity.trim() === '') {
                 formErrors.quantity = 'Quantity is required';
-            } else if (Number(form.quantity) < 1 || Number(form.quantity) > 10) {
-                formErrors.quantity = 'Quantity must be between 1 and 10';
+            } else if (Number(form.quantity) < 1 || Number(form.quantity) > 9) {
+                formErrors.quantity = 'Quantity must be between 1 and 9';
             }
 
             if (Object.keys(formErrors).length > 0) {
@@ -1075,12 +1006,9 @@ export default function Page() {
         return errors;
     };
 
-    // Handle form submission
     const handleSubmit = async () => {
-        // Clear previous validation errors
         setValidationErrors({});
 
-        // Validate form
         const errors = validateForm();
         if (Object.keys(errors).length > 0) {
             setValidationErrors(errors);
@@ -1100,47 +1028,27 @@ export default function Page() {
                 return;
             }
 
-            // Generate tracking IDs for each luggage form
             const contractTrackingIDs = luggageForms.map(() => generateTrackingID());
-            const luggageTrackingIDs = luggageForms.map(() => generateLuggageTrackingID());
 
-            // Step 1: Determine the city from coordinates
             let city = null;
             if (dropoffAddress.lat && dropoffAddress.lng) {
                 city = await getCityFromCoordinates(dropoffAddress.lat, dropoffAddress.lng);
-                console.log('Determined city:', city);
-            } else {
-                console.warn('No coordinates available for city determination');
             }
 
-            // Step 2: Determine delivery charge strictly by city derived from coordinates
             let deliveryCharge = 0;
             if (city) {
                 const charge = getDeliveryChargeForCity(city);
                 if (typeof charge === 'number') deliveryCharge = charge;
             }
 
-            // Helper to split a full name into first/middle/last
-            const splitName = (fullName) => {
-                if (!fullName) return { first: null, middle: null, last: null };
-                const parts = fullName.trim().split(/\s+/);
-                if (parts.length === 1) return { first: parts[0], middle: null, last: null };
-                if (parts.length === 2) return { first: parts[0], middle: null, last: parts[1] };
-                return { first: parts[0], middle: parts.slice(1, -1).join(' '), last: parts[parts.length - 1] };
-            };
-
-            // Step 3: Create contracts for each form (no more separate luggage table)
             for (let i = 0; i < luggageForms.length; i++) {
                 const form = luggageForms[i];
-                // Prepare contract data for this luggage
                 const contractData = {
                     id: contractTrackingIDs[i],
                     airline_id: user.id,
-                    // Pickup and drop-off
                     pickup_location: pickupAddress.location,
                     drop_off_location: dropoffAddress.location,
                     drop_off_location_geo: { type: 'Point', coordinates: [dropoffAddress.lng, dropoffAddress.lat] },
-                    // Owner and luggage details
                     owner_first_name: form.firstName || null,
                     owner_middle_initial: form.middleInitial || null,
                     owner_last_name: `${form.lastName || ''}${form.suffix ? ` ${form.suffix}` : ''}`.trim() || null,
@@ -1148,7 +1056,6 @@ export default function Page() {
                     luggage_description: form.luggageDescriptions.join(', '),
                     luggage_quantity: form.quantity,
                     flight_number: `${flightPrefix || ''}${form.flightNo || ''}`.trim(),
-                    // Delivery address fields
                     delivery_address: [
                         contract.province,
                         contract.city,
@@ -1160,14 +1067,9 @@ export default function Page() {
                     delivery_charge: deliveryCharge
                 };
 
-                console.log('Submitting contract data:', contractData);
-
-                // Insert contract data
-                const { data: insertedContract, error: contractError } = await supabase
+                const { error: contractError } = await supabase
                     .from('contracts')
-                    .insert(contractData)
-                    .select()
-                    .single();
+                    .insert(contractData);
 
                 if (contractError) {
                     console.error('Error inserting contract:', contractError);
@@ -1177,15 +1079,11 @@ export default function Page() {
 
             setSnackbarMessage('Booking created successfully!');
             setSnackbarOpen(true);
+            
             // Reset form
             setContract({
-                province: "",
-                city: "",
-                addressLine1: "",
-                addressLine2: "",
-                barangay: "",
-                postalCode: "",
-                contact: ""
+                province: "", city: "", addressLine1: "", addressLine2: "",
+                barangay: "", postalCode: "", contact: ""
             });
             setSelectedRegion('');
             setSelectedProvince('');
@@ -1194,11 +1092,9 @@ export default function Page() {
             setFilteredCities([]);
             setFilteredBarangays([]);
             setLuggageForms([{ firstName: "", middleInitial: "", lastName: "", suffix: "", flightNo: "", luggageDescriptions: [""], quantity: "1", contact: "" }]);
-            setPickupAddress({ location: "", addressLine1: "", addressLine2: "", province: "", city: "", barangay: "", postalCode: "" });
+            setPickupAddress({ location: "" });
             setDropoffAddress({ location: null, lat: null, lng: null });
-            // Clear validation errors
             setValidationErrors({});
-            // Switch to contract list tab and refresh
             setActiveTab(0);
             router.refresh();
         } catch (error) {
@@ -1211,7 +1107,6 @@ export default function Page() {
     };
 
     const openConfirm = () => {
-        // Validate first before opening confirm
         const errors = validateForm();
         if (Object.keys(errors).length > 0) {
             setValidationErrors(errors);
@@ -1223,12 +1118,9 @@ export default function Page() {
     };
     const closeConfirm = () => setConfirmOpen(false);
 
-    // Handle tab change
     const handleTabChange = (event, newValue) => { setActiveTab(newValue); };
 
-    // Fetch contract list
     const fetchContracts = async (isInitialLoad = false) => {
-        // Only show loading indicator on initial load, not on auto-refresh
         if (isInitialLoad) {
             setContractListLoading(true);
         }
@@ -1243,45 +1135,19 @@ export default function Page() {
             const { data: contracts, error: contractError } = await supabase
                 .from('contracts')
                 .select(`
-                    id,
-                    created_at,
-                    accepted_at,
-                    pickup_at,
-                    delivered_at,
-                    cancelled_at,
-                    pickup_location,
-                    pickup_location_geo,
-                    drop_off_location,
-                    drop_off_location_geo,
-                    contract_status_id,
-                    contract_status(status_name),
-                    airline_id,
-                    delivery_id,
-                    delivery_charge,
-                    owner_first_name,
-                    owner_middle_initial,
-                    owner_last_name,
-                    owner_contact,
-                    luggage_description,
-                    luggage_quantity,
-                    flight_number,
-                    delivery_address,
-                    address_line_1,
-                    address_line_2,
-                    airline:airline_id (*),
-                    delivery:delivery_id (*)
+                    id, created_at, accepted_at, pickup_at, delivered_at, cancelled_at,
+                    pickup_location, pickup_location_geo, drop_off_location, drop_off_location_geo,
+                    contract_status_id, contract_status(status_name), airline_id, delivery_id,
+                    delivery_charge, owner_first_name, owner_middle_initial, owner_last_name,
+                    owner_contact, luggage_description, luggage_quantity, flight_number,
+                    delivery_address, address_line_1, address_line_2,
+                    airline:airline_id (*), delivery:delivery_id (*)
                 `)
                 .eq('airline_id', user.id)
                 .order('created_at', { ascending: false });
 
             if (contractError) throw contractError;
-
-            if (!contracts || contracts.length === 0) {
-                setContractList([]);
-                return;
-            }
-
-            setContractList(contracts);
+            setContractList(contracts || []);
         } catch (err) {
             setContractListError(err.message || 'Failed to fetch contracts');
         } finally {
@@ -1293,21 +1159,12 @@ export default function Page() {
 
     useEffect(() => {
         if (activeTab === 0) {
-            // Initial fetch with loading indicator
             fetchContracts(true);
-
-            // Set up auto-refresh every 5 seconds (quiet refresh)
-            const interval = setInterval(() => {
-                fetchContracts(false);
-            }, 5000);
-
-            // Cleanup interval on unmount or tab change
+            const interval = setInterval(() => fetchContracts(false), 5000);
             return () => clearInterval(interval);
         }
     }, [activeTab]);
 
-    // Handle expand/collapse
-    const handleExpandClick = (contractId) => { setExpandedContracts((prev) => prev.includes(contractId) ? prev.filter((id) => id !== contractId) : [...prev, contractId]); };
 
     const handleTrackContract = (contractId) => {
         router.push(`/contractor/luggage-tracking?contractId=${contractId}`);
@@ -2176,7 +2033,7 @@ export default function Page() {
                                             value={form.quantity}
                                             onChange={(e) => {
                                                 const value = e.target.value;
-                                                if (value === '' || (Number(value) >= 1 && Number(value) <= 3)) {
+                                                if (value === '' || (Number(value) >= 1 && Number(value) <= 9)) {
                                                     handleLuggageFormChange(index, "quantity", value);
                                                 }
                                             }}
@@ -2186,7 +2043,7 @@ export default function Page() {
                                             sx={{ width: '30%' }}
                                             inputProps={{
                                                 min: 1,
-                                                max: 3,
+                                                max: 9,
                                                 step: 1
                                             }}
                                         />
@@ -2204,25 +2061,22 @@ export default function Page() {
                             >
                                 Add Another Passenger
                             </Button>
-
-                            <Button
-                                variant="outlined"
-                                onClick={(e) => {
-                                    e.preventDefault();
-                                    // Add luggage description to the last passenger form
-                                    const lastFormIndex = luggageForms.length - 1;
-                                    if (lastFormIndex >= 0) {
-                                        handleAddLuggageDescription(lastFormIndex);
-                                    }
-                                }}
-                                startIcon={<AddIcon />}
-                                disabled={luggageForms.length === 0 || luggageForms[luggageForms.length - 1]?.quantity !== "3" || (luggageForms[luggageForms.length - 1]?.luggageDescriptions?.length >= 10)}
-                            >
-                                Add Another Luggage
-                            </Button>
                         </Box>
                     </Paper>
-                    <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
+                    <Box sx={{ 
+                        position: 'fixed', 
+                        top: '50%', 
+                        right: 20, 
+                        transform: 'translateY(-50%)',
+                        display: 'flex', 
+                        justifyContent: 'flex-end', 
+                        zIndex: 1000,
+                        backgroundColor: theme.palette.background.paper,
+                        padding: 2,
+                        borderRadius: 2,
+                        boxShadow: 3,
+                        border: `1px solid ${theme.palette.divider}`
+                    }}>
                         <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
                             Estimated Total: ₱{Number(estimatedTotalPrice).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </Typography>
@@ -2302,9 +2156,9 @@ export default function Page() {
                             <Divider sx={{ my: 2 }} />
                             <Typography variant="subtitle2" sx={{ color: 'primary.main', fontWeight: 700, mb: 1 }}>Pricing</Typography>
                             <Box sx={{ ml: 1 }}>
-                                <Typography variant="body2"><b>Base price:</b> <span>₱{Number(basePrice || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></Typography>
-                                <Typography variant="body2"><b>Luggages:</b> <span>{totalLuggages}</span></Typography>
-                                <Typography variant="body2"><b>Delivery surcharge:</b> <span>₱{Number(deliverySurcharge || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></Typography>
+                                <Typography variant="body2"><b>Base price per tier:</b> <span>₱{Number(basePrice || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></Typography>
+                                <Typography variant="body2"><b>Total luggages:</b> <span>{totalLuggages}</span></Typography>
+                                <Typography variant="body2"><b>Pricing tiers:</b> <span>{surchargeMultiplier} tier(s) × ₱{Number(basePrice || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></Typography>
                                 <Typography variant="h6" sx={{ mt: 1, fontWeight: 700 }}>Total: ₱{Number(estimatedTotalPrice || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Typography>
                             </Box>
                         </Box>
