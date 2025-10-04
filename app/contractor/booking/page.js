@@ -103,6 +103,8 @@ export default function Page() {
     const [mapError, setMapError] = useState(null);
     const [mounted, setMounted] = useState(false);
     const [isFormMounted, setIsFormMounted] = useState(false);
+    const [isVerified, setIsVerified] = useState(false);
+    const [verificationLoading, setVerificationLoading] = useState(true);
     const [activeTab, setActiveTab] = useState(0);
     const [isGoogleMapsReady, setIsGoogleMapsReady] = useState(false);
     const [contract, setContract] = useState({
@@ -154,6 +156,39 @@ export default function Page() {
 
     // Mount component
     useEffect(() => { setMounted(true); setIsFormMounted(true); }, []);
+
+    // Check verification status
+    useEffect(() => {
+        const checkVerification = async () => {
+            try {
+                const { data: { session } } = await supabase.auth.getSession();
+                if (!session?.user) {
+                    router.push('/contractor/login');
+                    return;
+                }
+
+                const { data: profile } = await supabase
+                    .from('profiles')
+                    .select('verify_status_id, verify_status(status_name)')
+                    .eq('id', session.user.id)
+                    .single();
+
+                const verified = profile?.verify_status?.status_name === 'Verified';
+                setIsVerified(verified);
+                
+                if (!verified) {
+                    console.log('[BookingPage] User not verified');
+                }
+            } catch (error) {
+                console.error('[BookingPage] Error checking verification:', error);
+                setIsVerified(false);
+            } finally {
+                setVerificationLoading(false);
+            }
+        };
+
+        checkVerification();
+    }, [supabase, router]);
 
     // Load Philippine address data
     useEffect(() => {
@@ -1476,6 +1511,79 @@ export default function Page() {
         setCancelDialogOpen(false);
         setSelectedContractId(null);
     };
+
+    // Show loading while checking verification
+    if (verificationLoading) {
+        return (
+            <Box sx={{ 
+                minHeight: "100vh", 
+                bgcolor: theme.palette.background.default, 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center' 
+            }}>
+                <Box sx={{ textAlign: 'center' }}>
+                    <CircularProgress size={60} />
+                    <Typography variant="h6" sx={{ mt: 2 }}>
+                        Checking verification status...
+                    </Typography>
+                </Box>
+            </Box>
+        );
+    }
+
+    // Show verification message if not verified
+    if (!isVerified) {
+        return (
+            <Box sx={{ 
+                minHeight: "100vh", 
+                bgcolor: theme.palette.background.default, 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center',
+                p: 4
+            }}>
+                <Box sx={{ 
+                    textAlign: 'center', 
+                    maxWidth: 500,
+                    p: 4,
+                    borderRadius: 2,
+                    bgcolor: 'background.paper',
+                    boxShadow: 2
+                }}>
+                    <Box sx={{ 
+                        width: 80, 
+                        height: 80, 
+                        borderRadius: '50%', 
+                        bgcolor: 'warning.main', 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'center',
+                        mx: 'auto',
+                        mb: 3
+                    }}>
+                        <Typography variant="h3" sx={{ color: 'white' }}>⚠️</Typography>
+                    </Box>
+                    <Typography variant="h4" sx={{ mb: 2, fontWeight: 'bold', color: 'warning.main' }}>
+                        Account Not Verified
+                    </Typography>
+                    <Typography variant="body1" sx={{ mb: 3, color: theme.palette.mode === 'dark' ? 'white' : 'black' }}>
+                        You need to complete your profile verification before accessing the booking system. 
+                        Please complete your profile information and upload your government ID documents.
+                    </Typography>
+                    <Button 
+                        variant="contained" 
+                        color="primary" 
+                        size="large"
+                        onClick={() => router.push('/contractor/profile')}
+                        sx={{ px: 4, py: 1.5 }}
+                    >
+                        Complete Profile Verification
+                    </Button>
+                </Box>
+            </Box>
+        );
+    }
 
     return (
         <Box sx={{ minHeight: "100vh", bgcolor: theme.palette.background.default, color: theme.palette.text.primary, p: 2 }}>

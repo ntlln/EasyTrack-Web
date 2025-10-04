@@ -2,7 +2,7 @@
 
 import { useState, useContext, useEffect, useRef, Suspense } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { Box, Divider, List, ListItemButton, ListItemIcon, ListItemText, Collapse, Button, IconButton, useMediaQuery, Typography, Snackbar, Alert, Avatar } from "@mui/material";
+import { Box, Divider, List, ListItemButton, ListItemIcon, ListItemText, Collapse, Button, IconButton, useMediaQuery, Typography, Snackbar, Alert, Avatar, Tooltip } from "@mui/material";
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 // import PaymentIcon from '@mui/icons-material/Payment';
@@ -18,6 +18,7 @@ import LogoutIcon from '@mui/icons-material/Logout';
 import DarkModeIcon from '@mui/icons-material/DarkMode';
 import LightModeIcon from '@mui/icons-material/LightMode';
 import MenuIcon from '@mui/icons-material/Menu';
+import WarningIcon from '@mui/icons-material/Warning';
 import { ColorModeContext } from "../../layout";
 import { useTheme } from "@mui/material/styles";
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
@@ -48,6 +49,8 @@ function ContractorSidebarContent() {
     const [toast, setToast] = useState({ open: false, title: '', message: '', severity: 'info', targetUserId: null });
     const [profile, setProfile] = useState(null);
     const [corporationName, setCorporationName] = useState('');
+    const [isVerified, setIsVerified] = useState(false);
+    const [verificationStatus, setVerificationStatus] = useState(null);
     const closeToast = () => setToast(prev => ({ ...prev, open: false }));
 
     // Click outside handler
@@ -72,14 +75,29 @@ function ContractorSidebarContent() {
             if (!session?.user) return;
             const userId = session.user.id;
 
-            // Fetch basic profile with role_id and corporation_id for avatar and role display
+            // Fetch basic profile with role_id, corporation_id, and verification status
             try {
                 const { data: profileData } = await supabase
                     .from('profiles')
-                    .select('first_name, middle_initial, last_name, email, pfp_id, role_id, corporation_id')
+                    .select(`
+                        first_name, middle_initial, last_name, email, pfp_id, role_id, corporation_id,
+                        verify_status_id, verify_status(status_name)
+                    `)
                     .eq('id', userId)
                     .single();
                 setProfile(profileData || { email: session.user.email });
+                
+                // Set verification status
+                const verified = profileData?.verify_status?.status_name === 'Verified';
+                setIsVerified(verified);
+                setVerificationStatus(profileData?.verify_status?.status_name || 'Not Verified');
+                
+                console.log('[ContractorSidebar] Verification status:', {
+                    verifyStatusId: profileData?.verify_status_id,
+                    statusName: profileData?.verify_status?.status_name,
+                    isVerified: verified
+                });
+                
                 if (profileData?.corporation_id) {
                     try {
                         const { data: corp } = await supabase
@@ -227,9 +245,41 @@ function ContractorSidebarContent() {
                     {!isMinimized && openPages && (
                         <Collapse in={openPages} timeout="auto" unmountOnExit>
                             <List component="div" disablePadding sx={{ pl: 2 }}>
-                                <ListItemButton sx={{ pl: 4, ...(isActive("/contractor/booking") ? activeStyles : {}), ...listItemStyles("/contractor/booking") }} onClick={() => handleNavigation("/contractor/booking")}>
-                                    <ListItemIcon><ArticleIcon sx={iconStyles("/contractor/booking")} /></ListItemIcon>
-                                    <ListItemText primary="Booking" />
+                                <ListItemButton 
+                                    sx={{ 
+                                        pl: 4, 
+                                        ...(isActive("/contractor/booking") ? activeStyles : {}), 
+                                        ...listItemStyles("/contractor/booking"),
+                                        ...(isVerified ? {} : { 
+                                            opacity: 0.5, 
+                                            cursor: 'not-allowed',
+                                            '&:hover': { backgroundColor: 'transparent' }
+                                        })
+                                    }} 
+                                    onClick={() => isVerified ? handleNavigation("/contractor/booking") : null}
+                                    disabled={!isVerified}
+                                >
+                                    <ListItemIcon>
+                                        <ArticleIcon sx={{
+                                            ...iconStyles("/contractor/booking"),
+                                            ...(isVerified ? {} : { opacity: 0.5 })
+                                        }} />
+                                    </ListItemIcon>
+                                    <ListItemText 
+                                        primary={
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                <span>Booking</span>
+                                                {!isVerified && (
+                                                    <Tooltip title="Complete account verification" arrow>
+                                                        <WarningIcon sx={{ 
+                                                            color: 'warning.main',
+                                                            fontSize: '1rem'
+                                                        }} />
+                                                    </Tooltip>
+                                                )}
+                                            </Box>
+                                        } 
+                                    />
                                 </ListItemButton>
 
                                 <ListItemButton sx={{ pl: 4, ...(isActive("/contractor/luggage-tracking") ? activeStyles : {}), ...listItemStyles("/contractor/luggage-tracking") }} onClick={() => handleNavigation("/contractor/luggage-tracking")}>
@@ -284,6 +334,17 @@ function ContractorSidebarContent() {
                             <Typography variant="caption" color="text.secondary" noWrap>
                                 {(ROLE_NAME_BY_ID[Number(profile?.role_id)] || 'No Role') + (corporationName ? ` - ${corporationName}` : '')}
                             </Typography>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5 }}>
+                                <Box sx={{ 
+                                    width: 8, 
+                                    height: 8, 
+                                    borderRadius: '50%', 
+                                    bgcolor: isVerified ? 'success.main' : 'warning.main' 
+                                }} />
+                                <Typography variant="caption" color={isVerified ? 'success.main' : 'warning.main'} sx={{ fontWeight: 500 }}>
+                                    {verificationStatus}
+                                </Typography>
+                            </Box>
                         </Box>
                         
                     </Box>
@@ -310,6 +371,7 @@ function ContractorSidebarContent() {
                 </Box>
             </Alert>
         </Snackbar>
+
         </>
     );
 }

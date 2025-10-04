@@ -2,7 +2,7 @@
 
 import { useState, useContext, useEffect, useRef, Suspense } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { Box, Divider, List, ListItemButton, ListItemIcon, ListItemText, Collapse, Button, IconButton, useMediaQuery, Typography, Snackbar, Alert, Avatar } from "@mui/material";
+import { Box, Divider, List, ListItemButton, ListItemIcon, ListItemText, Collapse, Button, IconButton, useMediaQuery, Typography, Snackbar, Alert, Avatar, Tooltip } from "@mui/material";
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import GroupsIcon from '@mui/icons-material/Groups';
@@ -18,6 +18,7 @@ import LogoutIcon from '@mui/icons-material/Logout';
 import DarkModeIcon from '@mui/icons-material/DarkMode';
 import LightModeIcon from '@mui/icons-material/LightMode';
 import MenuIcon from '@mui/icons-material/Menu';
+import WarningIcon from '@mui/icons-material/Warning';
 import HistoryIcon from '@mui/icons-material/History';
 import { ColorModeContext } from "../../layout";
 import { useTheme } from "@mui/material/styles";
@@ -50,6 +51,8 @@ function AdminSidebarContent() {
     const [toast, setToast] = useState({ open: false, title: '', message: '', severity: 'info', targetUserId: null });
     const [profile, setProfile] = useState(null);
     const [corporationName, setCorporationName] = useState('');
+    const [isVerified, setIsVerified] = useState(false);
+    const [verificationStatus, setVerificationStatus] = useState(null);
     
     const prevUnreadByConvRef = useRef(new Map());
     const closeToast = () => setToast(prev => ({ ...prev, open: false }));
@@ -84,13 +87,27 @@ function AdminSidebarContent() {
                 return;
             }
 
-            // Fetch profile data with role_id and corporation_id
+            // Fetch profile data with role_id, corporation_id, and verification status
             const { data: profileData } = await supabase
                 .from('profiles')
-                .select('first_name, middle_initial, last_name, email, pfp_id, role_id, corporation_id')
+                .select(`
+                    first_name, middle_initial, last_name, email, pfp_id, role_id, corporation_id,
+                    verify_status_id, verify_status(status_name)
+                `)
                 .eq('id', session.user.id)
                 .single();
             setProfile(profileData || { email: session.user.email });
+            
+            // Set verification status
+            const verified = profileData?.verify_status?.status_name === 'Verified';
+            setIsVerified(verified);
+            setVerificationStatus(profileData?.verify_status?.status_name || 'Not Verified');
+            
+            console.log('[AdminSidebar] Verification status:', {
+                verifyStatusId: profileData?.verify_status_id,
+                statusName: profileData?.verify_status?.status_name,
+                isVerified: verified
+            });
 
             // Fetch corporation name if available
             if (profileData?.corporation_id) {
@@ -256,9 +273,41 @@ function AdminSidebarContent() {
                         {!isMinimized && <ListItemText primary="Profile" />}
                     </ListItemButton>
 
-                    <ListItemButton onClick={() => handleNavigation("/egc-admin/user-management")} sx={listItemStyles("/egc-admin/user-management")}>
-                        <ListItemIcon><GroupsIcon sx={iconStyles("/egc-admin/user-management")} /></ListItemIcon>
-                        {!isMinimized && <ListItemText primary="User Management" />}
+                    <ListItemButton 
+                        sx={{ 
+                            ...listItemStyles("/egc-admin/user-management"),
+                            ...(isVerified ? {} : { 
+                                opacity: 0.5, 
+                                cursor: 'not-allowed',
+                                '&:hover': { backgroundColor: 'transparent' }
+                            })
+                        }} 
+                        onClick={() => isVerified ? handleNavigation("/egc-admin/user-management") : null}
+                        disabled={!isVerified}
+                    >
+                        <ListItemIcon>
+                            <GroupsIcon sx={{
+                                ...iconStyles("/egc-admin/user-management"),
+                                ...(isVerified ? {} : { opacity: 0.5 })
+                            }} />
+                        </ListItemIcon>
+                        {!isMinimized && (
+                            <ListItemText 
+                                primary={
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                        <span>User Management</span>
+                                        {!isVerified && (
+                                            <Tooltip title="Complete account verification" arrow>
+                                                <WarningIcon sx={{ 
+                                                    color: 'warning.main',
+                                                    fontSize: '1rem'
+                                                }} />
+                                            </Tooltip>
+                                        )}
+                                    </Box>
+                                }
+                            />
+                        )}
                     </ListItemButton>
 
                     <ListItemButton onClick={handleClickPages} sx={transactionsButtonStyles}>
@@ -280,25 +329,87 @@ function AdminSidebarContent() {
                                     <ListItemIcon><LocationOnIcon sx={iconStyles("/egc-admin/luggage-tracking")} /></ListItemIcon>
                                     <ListItemText primary="Luggage Tracking" />
                                 </ListItemButton>
-                                <ListItemButton sx={{ pl: 4, ...(isActive("/egc-admin/luggage-management") ? activeStyles : {}), ...listItemStyles("/egc-admin/luggage-management") }} onClick={() => handleNavigation("/egc-admin/luggage-management")}> 
+                                <ListItemButton 
+                                    sx={{ 
+                                        pl: 4, 
+                                        ...(isActive("/egc-admin/luggage-management") ? activeStyles : {}), 
+                                        ...listItemStyles("/egc-admin/luggage-management"),
+                                        ...(isVerified ? {} : { 
+                                            opacity: 0.5, 
+                                            cursor: 'not-allowed',
+                                            '&:hover': { backgroundColor: 'transparent' }
+                                        })
+                                    }} 
+                                    onClick={() => isVerified ? handleNavigation("/egc-admin/luggage-management") : null}
+                                    disabled={!isVerified}
+                                > 
                                     <ListItemIcon sx={{ position: 'relative' }}>
-                                        <MyLocationIcon sx={iconStyles("/egc-admin/luggage-management")} />
-                                        {isMinimized && luggageAvailableCount > 0 && (
+                                        <MyLocationIcon sx={{
+                                            ...iconStyles("/egc-admin/luggage-management"),
+                                            ...(isVerified ? {} : { opacity: 0.5 })
+                                        }} />
+                                        {isMinimized && luggageAvailableCount > 0 && isVerified && (
                                             <Box sx={{ position: 'absolute', top: -2, right: -2, bgcolor: 'primary.main', color: '#fff', borderRadius: '10px', px: 0.5, minWidth: 16, height: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, lineHeight: 1 }}>
                                                 {luggageAvailableCount > 99 ? '99+' : luggageAvailableCount}
                                             </Box>
                                         )}
                                     </ListItemIcon>
-                                    <ListItemText primary="Luggage Management" />
-                                    {!isMinimized && luggageAvailableCount > 0 && (
-                                        <Box sx={{ ml: 1, bgcolor: 'primary.main', color: '#fff', borderRadius: '12px', px: 1, minWidth: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, lineHeight: 1 }}>
-                                            {luggageAvailableCount > 99 ? '99+' : luggageAvailableCount}
-                                        </Box>
-                                    )}
+                                    <ListItemText 
+                                        primary={
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                <span>Luggage Management</span>
+                                                {!isVerified && (
+                                                    <Tooltip title="Complete account verification" arrow>
+                                                        <WarningIcon sx={{ 
+                                                            color: 'warning.main',
+                                                            fontSize: '1rem'
+                                                        }} />
+                                                    </Tooltip>
+                                                )}
+                                                {isVerified && luggageAvailableCount > 0 && (
+                                                    <Box sx={{ ml: 1, bgcolor: 'primary.main', color: '#fff', borderRadius: '12px', px: 1, minWidth: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, lineHeight: 1 }}>
+                                                        {luggageAvailableCount > 99 ? '99+' : luggageAvailableCount}
+                                                    </Box>
+                                                )}
+                                            </Box>
+                                        } 
+                                    />
                                 </ListItemButton>
-                                <ListItemButton sx={{ pl: 4, ...(isActive("/egc-admin/transaction-management") ? activeStyles : {}), ...listItemStyles("/egc-admin/transaction-management") }} onClick={() => handleNavigation("/egc-admin/transaction-management")}>
-                                    <ListItemIcon><AssignmentIcon sx={iconStyles("/egc-admin/transaction-management")} /></ListItemIcon>
-                                    <ListItemText primary="Transaction Management" />
+                                <ListItemButton 
+                                    sx={{ 
+                                        pl: 4, 
+                                        ...(isActive("/egc-admin/transaction-management") ? activeStyles : {}), 
+                                        ...listItemStyles("/egc-admin/transaction-management"),
+                                        ...(isVerified ? {} : { 
+                                            opacity: 0.5, 
+                                            cursor: 'not-allowed',
+                                            '&:hover': { backgroundColor: 'transparent' }
+                                        })
+                                    }} 
+                                    onClick={() => isVerified ? handleNavigation("/egc-admin/transaction-management") : null}
+                                    disabled={!isVerified}
+                                >
+                                    <ListItemIcon>
+                                        <AssignmentIcon sx={{
+                                            ...iconStyles("/egc-admin/transaction-management"),
+                                            ...(isVerified ? {} : { opacity: 0.5 })
+                                        }} />
+                                    </ListItemIcon>
+                                    <ListItemText 
+                                        primary={
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                <span>Transaction Management</span>
+                                                {!isVerified && (
+                                                    <Tooltip title="Complete account verification" arrow>
+                                                        <WarningIcon sx={{ 
+                                                            color: 'warning.main',
+                                                            fontSize: '1rem'
+                                                        }} />
+                                                    </Tooltip>
+                                                )}
+                                            </Box>
+                                        } 
+                                    />
                                 </ListItemButton>
                             </List>
                         </Collapse>
@@ -358,6 +469,17 @@ function AdminSidebarContent() {
                             <Typography variant="caption" color="text.secondary" noWrap>
                                 {(ROLE_NAME_BY_ID[Number(profile?.role_id)] || 'No Role') + (corporationName ? ` - ${corporationName}` : '')}
                             </Typography>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5 }}>
+                                <Box sx={{ 
+                                    width: 8, 
+                                    height: 8, 
+                                    borderRadius: '50%', 
+                                    bgcolor: isVerified ? 'success.main' : 'warning.main' 
+                                }} />
+                                <Typography variant="caption" color={isVerified ? 'success.main' : 'warning.main'} sx={{ fontWeight: 500 }}>
+                                    {verificationStatus}
+                                </Typography>
+                            </Box>
 						</Box>
 
 					</Box>
@@ -384,6 +506,7 @@ function AdminSidebarContent() {
                 </Box>
             </Alert>
         </Snackbar>
+
         </>
     );
 }

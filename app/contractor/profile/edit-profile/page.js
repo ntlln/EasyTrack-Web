@@ -22,6 +22,7 @@ export default function Page() {
   const [snackbarMessage, setSnackbarMessage] = useState("");
   const [snackbarSeverity, setSnackbarSeverity] = useState("success");
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+  const [incompleteDialogOpen, setIncompleteDialogOpen] = useState(false);
   const [form, setForm] = useState({ first_name: "", middle_initial: "", last_name: "", suffix: "", contact_number: "", birth_date: "", emergency_contact_name: "", emergency_contact_number: "", gov_id_number: "", gov_id_proof: "", gov_id_proof_back: "" });
 
   // Suffix options
@@ -70,19 +71,51 @@ export default function Page() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session || !session.user) { setLoading(false); return; }
       const userEmail = session.user.email;
-      const { data, error } = await supabase.from('profiles').select('first_name, middle_initial, last_name, suffix, contact_number, birth_date, emergency_contact_name, emergency_contact_number, gov_id_type, gov_id_number, gov_id_proof, gov_id_proof_back').eq('email', userEmail).single();
+      
+      // Fetch all profile data including verification status
+      const { data, error } = await supabase.from('profiles').select(`
+        first_name, middle_initial, last_name, suffix, contact_number, birth_date, 
+        emergency_contact_name, emergency_contact_number, gov_id_type, gov_id_number, 
+        gov_id_proof, gov_id_proof_back, verify_status_id, updated_at
+      `).eq('email', userEmail).single();
+      
       if (data) {
-        const cleanData = { first_name: data.first_name || "", middle_initial: data.middle_initial || "", last_name: data.last_name || "", suffix: data.suffix || "", contact_number: data.contact_number || "", birth_date: data.birth_date || "", emergency_contact_name: data.emergency_contact_name || "", emergency_contact_number: data.emergency_contact_number || "", gov_id_number: data.gov_id_number || "", gov_id_proof: data.gov_id_proof || "", gov_id_proof_back: data.gov_id_proof_back || "" };
+        const cleanData = { 
+          first_name: data.first_name || "", 
+          middle_initial: data.middle_initial || "", 
+          last_name: data.last_name || "", 
+          suffix: data.suffix || "", 
+          contact_number: data.contact_number || "", 
+          birth_date: data.birth_date || "", 
+          emergency_contact_name: data.emergency_contact_name || "", 
+          emergency_contact_number: data.emergency_contact_number || "", 
+          gov_id_number: data.gov_id_number || "", 
+          gov_id_proof: data.gov_id_proof || "", 
+          gov_id_proof_back: data.gov_id_proof_back || "" 
+        };
         setForm(cleanData);
         setOriginal({ ...cleanData, gov_id_type: data.gov_id_type });
-        if (data.gov_id_type !== null && data.gov_id_type !== undefined) setSelectedGovIdType(Number(data.gov_id_type));
+        if (data.gov_id_type !== null && data.gov_id_type !== undefined) {
+          setSelectedGovIdType(Number(data.gov_id_type));
+        }
+        
+        // Log profile completion status for debugging
+        console.log('[ProfileEdit] Loaded profile data:', {
+          hasAllFields: Object.values(cleanData).every(value => value && value.trim() !== ''),
+          hasGovIdType: data.gov_id_type !== null && data.gov_id_type !== undefined,
+          hasGovIdImages: !!(data.gov_id_proof && data.gov_id_proof_back),
+          verifyStatusId: data.verify_status_id,
+          updatedAt: data.updated_at
+        });
       }
       setLoading(false);
     };
+    
     const fetchGovIdTypes = async () => {
       const { data, error } = await supabase.from('verify_info_type').select('id, id_type_name');
       if (data) setGovIdTypes(data);
     };
+    
     fetchProfile();
     fetchGovIdTypes();
   }, []);
@@ -155,6 +188,50 @@ export default function Page() {
     setConfirmDialogOpen(false);
   };
 
+  // Check if profile is complete for automatic verification
+  const checkProfileCompleteness = () => {
+    const requiredFields = [
+      'first_name', 'middle_initial', 'last_name', 'contact_number', 'birth_date',
+      'emergency_contact_name', 'emergency_contact_number', 'gov_id_number'
+    ];
+    
+    // Check if all required fields are filled (excluding optional suffix)
+    const hasRequiredFields = requiredFields.every(field => 
+      form[field] && form[field].trim() !== ''
+    );
+    
+    // Check if government ID type is selected
+    const hasGovIdType = selectedGovIdType !== null && selectedGovIdType !== undefined;
+    
+    // Check if both government ID images are uploaded
+    const hasGovIdImages = form.gov_id_proof && form.gov_id_proof_back;
+    
+    const isComplete = hasRequiredFields && hasGovIdType && hasGovIdImages;
+    
+    console.log('[ProfileEdit] Profile completeness check:', {
+      hasRequiredFields,
+      hasGovIdType,
+      hasGovIdImages,
+      isComplete,
+      form: {
+        first_name: form.first_name,
+        middle_initial: form.middle_initial,
+        last_name: form.last_name,
+        contact_number: form.contact_number,
+        birth_date: form.birth_date,
+        emergency_contact_name: form.emergency_contact_name,
+        emergency_contact_number: form.emergency_contact_number,
+        gov_id_number: form.gov_id_number,
+        gov_id_proof: !!form.gov_id_proof,
+        gov_id_proof_back: !!form.gov_id_proof_back,
+        suffix: form.suffix // Optional field - not required for verification
+      },
+      selectedGovIdType
+    });
+    
+    return isComplete;
+  };
+
   const handleSave = async () => {
     setLoading(true);
     const { data: { session } } = await supabase.auth.getSession();
@@ -165,9 +242,39 @@ export default function Page() {
     if (selectedGovIdType !== null && selectedGovIdType !== undefined) updates.gov_id_type = Number(selectedGovIdType);
     if (Object.keys(updates).length === 0) { setLoading(false); router.push("/contractor/profile"); return; }
     updates.updated_at = new Date().toISOString();
+    
+    // Check if profile is complete for automatic verification
+    const isProfileComplete = checkProfileCompleteness();
+    if (isProfileComplete) {
+      // Get the "Verified" status ID
+      const { data: verifiedStatus } = await supabase
+        .from('verify_status')
+        .select('id')
+        .eq('status_name', 'Verified')
+        .single();
+      
+      if (verifiedStatus) {
+        updates.verify_status_id = verifiedStatus.id;
+        console.log('[ProfileEdit] Auto-verifying user due to complete profile');
+      }
+    }
+    
     const { error } = await supabase.from('profiles').update(updates).eq('email', userEmail);
     setLoading(false);
-    if (!error) router.push("/contractor/profile");
+    if (!error) {
+      if (isProfileComplete) {
+        setSnackbarMessage('Profile updated and verified successfully!');
+        setSnackbarSeverity('success');
+        setSnackbarOpen(true);
+        
+        // Refresh the page and redirect after a short delay to show the success message
+        setTimeout(() => {
+          window.location.reload();
+        }, 2000);
+      } else {
+        router.push("/contractor/profile");
+      }
+    }
   };
 
   const handleFileUpload = async (event, type) => {
@@ -272,6 +379,13 @@ export default function Page() {
         </Grid>
 
         <Typography variant="h6" fontWeight="bold" mb={2} color="primary">Identification & Verification</Typography>
+        {checkProfileCompleteness() && (
+          <Alert severity="success" sx={{ mb: 2 }}>
+            <Typography variant="body2">
+              <strong>Profile Complete!</strong> Your profile will be automatically verified when you save these changes.
+            </Typography>
+          </Alert>
+        )}
         <Grid container spacing={2} mb={4}>
           <Grid item xs={12} sm={6}>
             <TextField fullWidth sx={formStyles} label="Government ID Type" select SelectProps={{ MenuProps: menuProps }} value={selectedGovIdType ?? ''} onChange={e => setSelectedGovIdType(Number(e.target.value))} required onKeyPress={handleKeyPress}>
