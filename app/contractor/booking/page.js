@@ -764,11 +764,12 @@ export default function Page() {
     }, 0);
     const basePrice = mapCityPrice || 0;
     
-    // Pricing tiers: 1-3 luggages = 1x, 4-6 = 2x, 7-9 = 3x, 10-12 = 4x
+    // Pricing tiers: 1-3 luggages = 1x, 4-6 = 2x, 7-9 = 3x, 10-12 = 4x, 13-15 = 5x
     let surchargeMultiplier = 1;
     if (totalLuggages >= 4) surchargeMultiplier++;
     if (totalLuggages >= 7) surchargeMultiplier++;
     if (totalLuggages >= 10) surchargeMultiplier++;
+    if (totalLuggages >= 13) surchargeMultiplier++;
     const estimatedTotalPrice = basePrice * surchargeMultiplier;
 
     // Update city and price when drop-off coordinates change
@@ -990,8 +991,8 @@ export default function Page() {
             }
             if (!form.quantity || form.quantity.trim() === '') {
                 formErrors.quantity = 'Quantity is required';
-            } else if (Number(form.quantity) < 1 || Number(form.quantity) > 9) {
-                formErrors.quantity = 'Quantity must be between 1 and 9';
+            } else if (Number(form.quantity) < 1 || Number(form.quantity) > 15) {
+                formErrors.quantity = 'Quantity must be between 1 and 15';
             }
 
             if (Object.keys(formErrors).length > 0) {
@@ -1955,19 +1956,35 @@ export default function Page() {
                                     </Box>
                                     {/* Dynamic luggage description fields based on quantity */}
                                     {form.luggageDescriptions && form.luggageDescriptions.map((description, descIndex) => (
-                                        <TextField
-                                            key={descIndex}
-                                            label={`Luggage Description ${descIndex + 1}`}
-                                            fullWidth
-                                            size="small"
-                                            value={description}
-                                            onChange={(e) => handleLuggageDescriptionChange(index, descIndex, e.target.value.slice(0, 200))}
-                                            required
-                                            error={!!(validationErrors.luggage && validationErrors.luggage[index] && validationErrors.luggage[index].luggageDescriptions && validationErrors.luggage[index].luggageDescriptions[descIndex])}
-                                            helperText={validationErrors.luggage && validationErrors.luggage[index] && validationErrors.luggage[index].luggageDescriptions && validationErrors.luggage[index].luggageDescriptions[descIndex]}
-                                            inputProps={{ maxLength: 200 }}
-                                            sx={{ mb: 1 }}
-                                        />
+                                        <Box key={descIndex}>
+                                            {descIndex === 3 && (
+                                                <Typography 
+                                                    variant="subtitle2" 
+                                                    sx={{ 
+                                                        color: 'primary.main', 
+                                                        fontWeight: 700, 
+                                                        mb: 1, 
+                                                        mt: 1,
+                                                        borderTop: `2px solid ${theme.palette.primary.main}`,
+                                                        pt: 1
+                                                    }}
+                                                >
+                                                    Additional Luggage
+                                                </Typography>
+                                            )}
+                                            <TextField
+                                                label={`Luggage Description ${descIndex + 1}`}
+                                                fullWidth
+                                                size="small"
+                                                value={description}
+                                                onChange={(e) => handleLuggageDescriptionChange(index, descIndex, e.target.value.slice(0, 200))}
+                                                required
+                                                error={!!(validationErrors.luggage && validationErrors.luggage[index] && validationErrors.luggage[index].luggageDescriptions && validationErrors.luggage[index].luggageDescriptions[descIndex])}
+                                                helperText={validationErrors.luggage && validationErrors.luggage[index] && validationErrors.luggage[index].luggageDescriptions && validationErrors.luggage[index].luggageDescriptions[descIndex]}
+                                                inputProps={{ maxLength: 200 }}
+                                                sx={{ mb: 1 }}
+                                            />
+                                        </Box>
                                     ))}
                                     <Box sx={{ display: 'flex', gap: 2, width: '100%' }}>
                                         <TextField
@@ -2033,7 +2050,7 @@ export default function Page() {
                                             value={form.quantity}
                                             onChange={(e) => {
                                                 const value = e.target.value;
-                                                if (value === '' || (Number(value) >= 1 && Number(value) <= 9)) {
+                                                if (value === '' || (Number(value) >= 1 && Number(value) <= 15)) {
                                                     handleLuggageFormChange(index, "quantity", value);
                                                 }
                                             }}
@@ -2043,7 +2060,7 @@ export default function Page() {
                                             sx={{ width: '30%' }}
                                             inputProps={{
                                                 min: 1,
-                                                max: 9,
+                                                max: 15,
                                                 step: 1
                                             }}
                                         />
