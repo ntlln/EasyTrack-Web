@@ -259,7 +259,7 @@ export default function Page() {
               <Typography color="secondary.main" variant="body2">or</Typography>
             </Box>
             <Typography
-              color="white"
+              color="secondary.main"
               onClick={() => router.push("/egc-admin/verify")}
               sx={{ 
                 width: '40%', 
@@ -268,7 +268,6 @@ export default function Page() {
                 textAlign: 'center', 
                 cursor: 'pointer', 
                 '&:hover': { 
-                  textDecoration: 'underline', 
                   color: 'primary.main' 
                 } 
               }}
