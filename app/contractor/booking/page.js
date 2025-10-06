@@ -117,7 +117,12 @@ export default function Page() {
         contact: ""
     });
     const [luggageForms, setLuggageForms] = useState([{ firstName: "", middleInitial: "", lastName: "", suffix: "", flightNo: "", luggageDescriptions: [""], quantity: "1", contact: "" }]);
-    const [pickupAddress, setPickupAddress] = useState({ location: "" });
+    const [pickupAddress, setPickupAddress] = useState({ 
+        terminal: "", 
+        bay: "", 
+        location: "",
+        coordinates: { lat: null, lng: null }
+    });
     const [dropoffAddress, setDropoffAddress] = useState({ location: null, lat: null, lng: null });
     const [placeOptions, setPlaceOptions] = useState([]);
     const [placeLoading, setPlaceLoading] = useState(false);
@@ -153,6 +158,14 @@ export default function Page() {
     const [flightPrefix, setFlightPrefix] = useState('');
     const [mapCity, setMapCity] = useState('');
     const [mapCityPrice, setMapCityPrice] = useState(0);
+
+    // Terminal coordinates data
+    const terminalCoordinates = {
+        'Terminal 1': { lat: 14.508963226090515, lng: 121.00417400814496 },
+        'Terminal 2': { lat: 14.511166725278645, lng: 121.01288969053523 },
+        'Terminal 3': { lat: 14.5201168528943, lng: 121.01377520505147 },
+        'Terminal 4': { lat: 14.525440177319647, lng: 121.00111980000001 }
+    };
 
     // Mount component
     useEffect(() => { setMounted(true); setIsFormMounted(true); }, []);
@@ -634,7 +647,25 @@ export default function Page() {
 
     // Contract form handlers
     const handlePickupAddressChange = (field, value) => {
-        setPickupAddress(prev => ({ ...prev, [field]: value }));
+        setPickupAddress(prev => {
+            const newState = { ...prev, [field]: value };
+            
+            // Update location string and coordinates when terminal or bay changes
+            if (field === 'terminal' || field === 'bay') {
+                if (newState.terminal && newState.bay) {
+                    newState.location = `${newState.terminal}, Bay ${newState.bay}`;
+                    if (terminalCoordinates[newState.terminal]) {
+                        newState.coordinates = terminalCoordinates[newState.terminal];
+                    }
+                } else {
+                    newState.location = '';
+                    newState.coordinates = { lat: null, lng: null };
+                }
+            }
+            
+            return newState;
+        });
+        
         // Clear validation error for this field
         if (validationErrors.pickupLocation) {
             setValidationErrors(prev => ({ ...prev, pickupLocation: null }));
@@ -901,12 +932,42 @@ export default function Page() {
         setLuggageForms(prev => prev.filter((_, i) => i !== index));
     };
 
+    const handleClearLuggageForm = (index) => {
+        setLuggageForms(prev => {
+            const newForms = [...prev];
+            newForms[index] = { 
+                firstName: "", 
+                middleInitial: "", 
+                lastName: "", 
+                suffix: "", 
+                flightNo: "", 
+                luggageDescriptions: [""], 
+                quantity: "1", 
+                contact: "" 
+            };
+            return newForms;
+        });
+
+        // Clear validation errors for this form
+        if (validationErrors.luggage?.[index]) {
+            setValidationErrors(prev => ({
+                ...prev,
+                luggage: prev.luggage.map((formErrors, i) =>
+                    i === index ? {} : formErrors
+                )
+            }));
+        }
+    };
+
 
     const validateForm = () => {
         const errors = {};
 
-        if (!pickupAddress.location?.trim()) {
-            errors.pickupLocation = 'Pickup location is required';
+        if (!pickupAddress.terminal?.trim()) {
+            errors.pickupLocation = 'Terminal selection is required';
+        }
+        if (!pickupAddress.bay) {
+            errors.pickupLocation = 'Bay selection is required';
         }
 
         if (!dropoffAddress.location?.trim()) {
@@ -1048,6 +1109,8 @@ export default function Page() {
                     id: contractTrackingIDs[i],
                     airline_id: user.id,
                     pickup_location: pickupAddress.location,
+                    pickup_location_geo: pickupAddress.coordinates.lat && pickupAddress.coordinates.lng ? 
+                        { type: 'Point', coordinates: [pickupAddress.coordinates.lng, pickupAddress.coordinates.lat] } : null,
                     drop_off_location: dropoffAddress.location,
                     drop_off_location_geo: { type: 'Point', coordinates: [dropoffAddress.lng, dropoffAddress.lat] },
                     owner_first_name: form.firstName || null,
@@ -1093,7 +1156,7 @@ export default function Page() {
             setFilteredCities([]);
             setFilteredBarangays([]);
             setLuggageForms([{ firstName: "", middleInitial: "", lastName: "", suffix: "", flightNo: "", luggageDescriptions: [""], quantity: "1", contact: "" }]);
-            setPickupAddress({ location: "" });
+            setPickupAddress({ terminal: "", bay: "", location: "", coordinates: { lat: null, lng: null } });
             setDropoffAddress({ location: null, lat: null, lng: null });
             setValidationErrors({});
             setActiveTab(0);
@@ -1644,26 +1707,49 @@ export default function Page() {
                     <Paper elevation={3} sx={{ maxWidth: 700, mx: "auto", mt: 4, p: 4, pt: 2, borderRadius: 3, backgroundColor: theme.palette.background.paper, position: "relative" }}>
                         <Typography variant="h6" fontWeight="bold" align="center" mb={3}>Pickup Location</Typography>
                         <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mb: 2 }}>
-                            <FormControl fullWidth size="small" required error={!!validationErrors.pickupLocation}>
-                                <InputLabel>Pickup Location</InputLabel>
-                                <Select
-                                    value={pickupAddress.location || ""}
-                                    label="Pickup Location"
-                                    onChange={(e) => handlePickupAddressChange("location", e.target.value)}
-                                    required
-                                >
-                                    {[...Array(12)].map((_, i) => (
-                                        <MenuItem key={`terminal-${i + 1}`} value={`Terminal 3, Bay ${i + 1}`}>
-                                            {`Terminal 3, Bay ${i + 1}`}
-                                        </MenuItem>
-                                    ))}
-                                </Select>
-                                {validationErrors.pickupLocation && (
-                                    <Typography variant="caption" color="error" sx={{ mt: 0.5, ml: 1.5 }}>
-                                        {validationErrors.pickupLocation}
-                                    </Typography>
-                                )}
-                            </FormControl>
+                            <Box sx={{ display: 'flex', gap: 2, width: '100%' }}>
+                                <FormControl fullWidth size="small" required error={!!validationErrors.pickupLocation}>
+                                    <InputLabel>Terminal</InputLabel>
+                                    <Select
+                                        value={pickupAddress.terminal || ""}
+                                        label="Terminal"
+                                        onChange={(e) => handlePickupAddressChange("terminal", e.target.value)}
+                                        required
+                                    >
+                                        {Object.keys(terminalCoordinates).map((terminal) => (
+                                            <MenuItem key={terminal} value={terminal}>
+                                                {terminal}
+                                            </MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
+                                <FormControl fullWidth size="small" required error={!!validationErrors.pickupLocation}>
+                                    <InputLabel>Bay</InputLabel>
+                                    <Select
+                                        value={pickupAddress.bay || ""}
+                                        label="Bay"
+                                        onChange={(e) => handlePickupAddressChange("bay", e.target.value)}
+                                        required
+                                        disabled={!pickupAddress.terminal}
+                                    >
+                                        {[...Array(20)].map((_, i) => (
+                                            <MenuItem key={`bay-${i + 1}`} value={i + 1}>
+                                                Bay {i + 1}
+                                            </MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
+                            </Box>
+                            {validationErrors.pickupLocation && (
+                                <Typography variant="caption" color="error" sx={{ mt: 0.5, ml: 1.5 }}>
+                                    {validationErrors.pickupLocation}
+                                </Typography>
+                            )}
+                            {pickupAddress.location && (
+                                <Typography variant="body2" sx={{ mt: 1, p: 1, bgcolor: 'background.default', borderRadius: 1, border: `1px solid ${theme.palette.divider}` }}>
+                                    <strong>Selected Location:</strong> {pickupAddress.location}
+                                </Typography>
+                            )}
                         </Box>
                     </Paper>
                     <Paper elevation={3} sx={{ maxWidth: 700, mx: "auto", mt: 3, p: 4, pt: 2, borderRadius: 3, backgroundColor: theme.palette.background.paper, position: "relative" }}>
@@ -1857,32 +1943,53 @@ export default function Page() {
                             />
                         </Box>
                     </Paper>
-                    <Paper elevation={3} sx={{ maxWidth: 700, mx: "auto", mt: 3, p: 4, pt: 2, borderRadius: 3, backgroundColor: theme.palette.background.paper, position: "relative" }}>
-                        <Typography variant="h6" fontWeight="bold" align="center" mb={3}>Passenger Information</Typography>
+                    <Box sx={{ maxWidth: 700, mx: "auto", mt: 3 }}>
+                        <Typography variant="h6" fontWeight="bold" align="center" mb={3} sx={{ color: 'primary.main' }}>
+                            Passenger Information
+                        </Typography>
                         {luggageForms.map((form, index) => (
-                            <Box key={index} sx={{ mb: 4, position: 'relative' }}>
-                                {index > 0 && (
-                                    <IconButton
-                                        size="small"
-                                        onClick={() => handleRemoveLuggageForm(index)}
-                                        sx={{
-                                            position: 'absolute',
-                                            right: 0,
-                                            top: 0,
-                                            color: 'error.main',
-                                            '&:hover': {
-                                                backgroundColor: 'error.light',
-                                                color: 'error.contrastText'
-                                            }
-                                        }}
-                                        title="Remove this passenger"
-                                    >
-                                        <CloseIcon />
-                                    </IconButton>
-                                )}
-                                <Typography variant="subtitle1" sx={{ mb: 2, color: 'primary.main' }}>
-                                    Passenger {index + 1}
-                                </Typography>
+                            <Paper 
+                                key={index} 
+                                elevation={2} 
+                                sx={{ 
+                                    mb: 4, 
+                                    p: 3, 
+                                    position: 'relative',
+                                    border: `1px solid ${theme.palette.divider}`,
+                                    borderRadius: 2,
+                                    backgroundColor: theme.palette.background.paper
+                                }}
+                            >
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                                    <Typography variant="subtitle1" sx={{ color: 'primary.main', fontWeight: 600 }}>
+                                        Passenger {index + 1}
+                                    </Typography>
+                                    <Box sx={{ display: 'flex', gap: 1 }}>
+                                        <Button
+                                            size="small"
+                                            variant="outlined"
+                                            color="warning"
+                                            onClick={() => handleClearLuggageForm(index)}
+                                            sx={{ minWidth: 'auto', px: 1.5 }}
+                                        >
+                                            Clear Fields
+                                        </Button>
+                                        <IconButton
+                                            size="small"
+                                            onClick={() => handleRemoveLuggageForm(index)}
+                                            sx={{
+                                                color: 'error.main',
+                                                '&:hover': {
+                                                    backgroundColor: 'error.light',
+                                                    color: 'error.contrastText'
+                                                }
+                                            }}
+                                            title="Remove this passenger"
+                                        >
+                                            <CloseIcon />
+                                        </IconButton>
+                                    </Box>
+                                </Box>
                                 <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
                                     <Box sx={{ display: 'flex', gap: 2, width: '100%' }}>
                                         <TextField
@@ -2066,20 +2173,23 @@ export default function Page() {
                                         />
                                     </Box>
                                 </Box>
-                            </Box>
+                            </Paper>
                         ))}
-
-                        <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
+                    </Box>
+                    
+                    <Box sx={{ maxWidth: 700, mx: "auto", mt: 2, mb: 4 }}>
+                        <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center' }}>
                             <Button
                                 variant="outlined"
                                 onClick={handleAddLuggageForm}
                                 startIcon={<AddIcon />}
                                 disabled={luggageForms.length >= 15}
+                                size="large"
                             >
                                 Add Another Passenger
                             </Button>
                         </Box>
-                    </Paper>
+                    </Box>
                     <Box sx={{ 
                         position: 'fixed', 
                         top: '50%', 
