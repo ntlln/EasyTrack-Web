@@ -54,6 +54,14 @@ export default function Page() {
     setIsLoading(true);
     setSnackbar({ open: false, message: "", severity: "error" });
     let flowComplete = false; // set true when we navigate or intentionally pause at a modal
+    
+    // Add a timeout to prevent infinite loading
+    const loadingTimeout = setTimeout(() => {
+      if (!flowComplete) {
+        console.warn('[AdminLogin] Login timeout - resetting loading state');
+        setIsLoading(false);
+      }
+    }, 10000); // 10 second timeout
 
     const status = getLoginStatus(email);
     if (!status.canAttempt) {
@@ -71,7 +79,7 @@ export default function Page() {
           setSnackbar({ open: true, message: "Please verify your email first.", severity: "info" });
           setEmail(""); setPassword(""); setIsLoading(false);
           // Redirect to verify page
-          router.push("/egc-admin/verify");
+          router.replace("/egc-admin/verify");
           flowComplete = true;
           return;
         }
@@ -128,16 +136,21 @@ export default function Page() {
       if (activeStatusIdOnLogin) updateOnLogin.user_status_id = activeStatusIdOnLogin;
       const { error: updErr } = await supabase.from("profiles").update(updateOnLogin).eq("id", userId);
       if (updErr) console.warn('[AdminLogin] Failed to update last_sign_in/status:', updErr);
-      router.push("/egc-admin/");
+      console.log('[AdminLogin] About to navigate to /egc-admin/');
+      setIsLoading(false); // Stop loading before navigation
+      router.replace("/egc-admin/");
       flowComplete = true;
+      console.log('[AdminLogin] Navigation initiated, flowComplete set to true');
     } catch (error) {
       console.error('[AdminLogin] Login flow error:', error);
       setSnackbar({ open: true, message: error.message || "Login failed", severity: "error" });
       setEmail(""); setPassword("");
       try { await supabase.auth.signOut(); } catch (_) {}
     } finally { 
-      setIsLoading(false);
+      console.log('[AdminLogin] Finally block - flowComplete:', flowComplete);
+      clearTimeout(loadingTimeout);
       if (!flowComplete) {
+        setIsLoading(false);
         try {
           const { data: { session } } = await supabase.auth.getSession();
           if (session) { await supabase.auth.signOut(); console.log('[AdminLogin] Cleaned up lingering session after failed login.'); }
@@ -200,11 +213,10 @@ export default function Page() {
     justifyContent: "center"
   };
   const progressStyles = { 
-    color: "primary.main", 
-    position: "absolute",
-    top: "50%",
-    left: "50%",
-    transform: "translate(-50%, -50%)"
+    color: "inherit"
+  };
+  const loginProgressStyles = { 
+    color: "inherit"
   };
   const linkContainerStyles = { display: "flex", gap: 5 };
   const linkStyles = { fontSize: ".75rem", cursor: "pointer", "&:hover": { textDecoration: "underline", color: "primary.main" } };
@@ -253,7 +265,7 @@ export default function Page() {
 
           <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0 }}>
             <Button type="submit" variant="contained" color="primary" disabled={isLoading || !loginStatus.canAttempt} sx={buttonStyles}>
-              {!isLoading ? "Login" : <CircularProgress size={24} sx={progressStyles} />}
+              {!isLoading ? "Login" : <CircularProgress size={24} sx={loginProgressStyles} />}
             </Button>
             <Box sx={{ width: '40%', display: 'flex', justifyContent: 'center', my: 0.3 }}>
               <Typography color="secondary.main" variant="body2">or</Typography>

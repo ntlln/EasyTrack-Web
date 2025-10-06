@@ -44,7 +44,18 @@ function AdminLayoutContent({ children }) {
 
                 const { data: { session }, error: sessionError } = await supabase.auth.getSession();
                 console.log('[AdminLayout] getSession result:', { hasSession: !!session, sessionError });
-                if (sessionError || !session) { if (mounted) { console.log('[AdminLayout] No session, redirect to login'); setIsLoading(false); router.replace("/egc-admin/login"); } return; }
+                if (sessionError || !session) { 
+                    // Add a small delay to handle race condition with login
+                    console.log('[AdminLayout] No session, waiting briefly for potential login...');
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                    const { data: { session: retrySession } } = await supabase.auth.getSession();
+                    if (!retrySession && mounted) { 
+                        console.log('[AdminLayout] Still no session after retry, redirect to login'); 
+                        setIsLoading(false); 
+                        router.replace("/egc-admin/login"); 
+                    } 
+                    return; 
+                }
                 lastUserIdRef.current = session.user.id;
 
                 const { data: profile, error: profileError } = await supabase.from('profiles').select('role_id').eq('id', session.user.id).single();
