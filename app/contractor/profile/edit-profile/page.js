@@ -23,6 +23,7 @@ export default function Page() {
   const [snackbarSeverity, setSnackbarSeverity] = useState("success");
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
   const [incompleteDialogOpen, setIncompleteDialogOpen] = useState(false);
+  const [isAlreadyVerified, setIsAlreadyVerified] = useState(false);
   const [form, setForm] = useState({ first_name: "", middle_initial: "", last_name: "", suffix: "", contact_number: "", birth_date: "", emergency_contact_name: "", emergency_contact_number: "", gov_id_number: "", gov_id_proof: "", gov_id_proof_back: "" });
 
   // Suffix options
@@ -99,12 +100,17 @@ export default function Page() {
           setSelectedGovIdType(Number(data.gov_id_type));
         }
         
+        // Check if user is already verified
+        const isVerified = data.verify_status_id !== null && data.verify_status_id !== undefined;
+        setIsAlreadyVerified(isVerified);
+        
         // Log profile completion status for debugging
         console.log('[ProfileEdit] Loaded profile data:', {
           hasAllFields: Object.values(cleanData).every(value => value && value.trim() !== ''),
           hasGovIdType: data.gov_id_type !== null && data.gov_id_type !== undefined,
           hasGovIdImages: !!(data.gov_id_proof && data.gov_id_proof_back),
           verifyStatusId: data.verify_status_id,
+          isAlreadyVerified: isVerified,
           updatedAt: data.updated_at
         });
       }
@@ -379,7 +385,7 @@ export default function Page() {
         </Grid>
 
         <Typography variant="h6" fontWeight="bold" mb={2} color="primary">Identification & Verification</Typography>
-        {checkProfileCompleteness() && (
+        {checkProfileCompleteness() && !isAlreadyVerified && (
           <Alert severity="success" sx={{ mb: 2 }}>
             <Typography variant="body2">
               <strong>Profile Complete!</strong> Your profile will be automatically verified when you save these changes.
@@ -392,7 +398,7 @@ export default function Page() {
               {govIdTypes.map((type) => <MenuItem key={type.id} value={Number(type.id)}>{type.id_type_name}</MenuItem>)}
             </TextField>
           </Grid>
-          <Grid item xs={12} sm={6}><TextField fullWidth sx={formStyles} label="Government ID Number" name="gov_id_number" value={form.gov_id_number} onChange={handleChange} onKeyPress={handleKeyPress} inputProps={{ minLength: 5, maxLength: 20 }} /></Grid>
+          <Grid item xs={12} sm={6}><TextField fullWidth sx={formStyles} label="Government ID Number" name="gov_id_number" value={form.gov_id_number} onChange={handleChange} onKeyPress={handleKeyPress} required inputProps={{ minLength: 5, maxLength: 20 }} /></Grid>
           <Grid item xs={12} sm={6}>
             <input type="file" ref={fileInputRef} onChange={(e) => handleFileUpload(e, 'front')} style={fileInputStyles} accept="image/*" />
             <TextField fullWidth sx={formStyles} label="Upload Government ID (Front)" value={form.gov_id_proof ? 'Image uploaded' : ''} InputProps={{ endAdornment: <InputAdornment position="end"><IconButton onClick={() => triggerFileInput('front')} disabled={uploading}><UploadIcon /></IconButton></InputAdornment>, readOnly: true }} onKeyPress={handleKeyPress} />
