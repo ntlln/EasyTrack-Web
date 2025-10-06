@@ -1,11 +1,10 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Box, Typography, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, TablePagination, IconButton, Menu, MenuItem, CircularProgress, Checkbox, Dialog, DialogTitle, DialogContent, DialogActions, Button, Divider, Collapse, TextField, Snackbar, Alert, Tabs, Tab, FormControl, InputLabel, Select } from '@mui/material';
+import { Box, Typography, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, TablePagination, IconButton, Menu, MenuItem, CircularProgress, Checkbox, Dialog, DialogTitle, DialogContent, DialogActions, Button, Divider, Collapse, TextField, Snackbar, Alert, Tabs, Tab, FormControl, InputLabel, Select, Autocomplete } from '@mui/material';
 import { useRouter } from 'next/navigation';
 
 import MoreVertIcon from '@mui/icons-material/MoreVert';
-/* Removed unused ChevronLeftIcon */
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import { PDFDownloadLink, PDFViewer, pdf } from '@react-pdf/renderer';
@@ -15,46 +14,45 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { format as formatDateFns } from 'date-fns';
-/* Removed unused VisibilityIcon */
 
 // Register fonts from local public/fonts directory
 // Use a simple approach to avoid browser compatibility issues
 try {
-Font.register({
-    family: 'Roboto',
-    fonts: [
-        {
-            src: '/fonts/Roboto-VariableFont_wdth,wght.ttf',
-            fontWeight: 'normal',
-            fontStyle: 'normal',
-        },
-        {
-            src: '/fonts/Roboto-VariableFont_wdth,wght.ttf',
-            fontWeight: 'bold',
-            fontStyle: 'normal',
-        },
-        {
-            src: '/fonts/Roboto-Italic-VariableFont_wdth,wght.ttf',
-            fontWeight: 'normal',
-            fontStyle: 'italic',
-        },
-        {
-            src: '/fonts/Roboto-Italic-VariableFont_wdth,wght.ttf',
-            fontWeight: 'bold',
-            fontStyle: 'italic',
-        },
-    ],
-});
+    Font.register({
+        family: 'Roboto',
+        fonts: [
+            {
+                src: '/fonts/Roboto-VariableFont_wdth,wght.ttf',
+                fontWeight: 'normal',
+                fontStyle: 'normal',
+            },
+            {
+                src: '/fonts/Roboto-VariableFont_wdth,wght.ttf',
+                fontWeight: 'bold',
+                fontStyle: 'normal',
+            },
+            {
+                src: '/fonts/Roboto-Italic-VariableFont_wdth,wght.ttf',
+                fontWeight: 'normal',
+                fontStyle: 'italic',
+            },
+            {
+                src: '/fonts/Roboto-Italic-VariableFont_wdth,wght.ttf',
+                fontWeight: 'bold',
+                fontStyle: 'italic',
+            },
+        ],
+    });
 } catch (error) {
     // Font already registered, ignore error
     console.log('Roboto font already registered or error occurred:', error.message);
 }
 
 try {
-Font.register({
-    family: 'NotoSans',
-    src: 'https://fonts.gstatic.com/s/notosans/v27/o-0IIpQlx3QUlC5A4PNb4g.woff2',
-});
+    Font.register({
+        family: 'NotoSans',
+        src: 'https://fonts.gstatic.com/s/notosans/v27/o-0IIpQlx3QUlC5A4PNb4g.woff2',
+    });
 } catch (error) {
     // Font already registered, ignore error
     console.log('NotoSans font already registered or error occurred:', error.message);
@@ -304,291 +302,291 @@ const InvoicePDF = ({ contracts = [], invoiceNumber = null }) => {
 const CombinedSOAInvoicePDF = ({ contracts = [], dateRange, invoiceNumber = null, proofOfDeliveryData = {} }) => {
     // Add error boundary and validation
     try {
-    const today = new Date();
-    const todayFormatted = formatDateFns(today, 'MMMM d, yyyy');
-    const invoiceNo = invoiceNumber || formatDateFns(today, 'yyyyMMdd');
-    const monthStart = startOfMonth(today);
-    const monthEnd = endOfMonth(today);
-    const dueDate = formatDateFns(monthEnd, 'MMMM d, yyyy');
-    const desc = `PIR Luggage Delivery – ${formatDateFns(monthStart, 'MMMM d, yyyy')} to ${formatDateFns(monthEnd, 'MMMM d, yyyy')}`;
-        
+        const today = new Date();
+        const todayFormatted = formatDateFns(today, 'MMMM d, yyyy');
+        const invoiceNo = invoiceNumber || formatDateFns(today, 'yyyyMMdd');
+        const monthStart = startOfMonth(today);
+        const monthEnd = endOfMonth(today);
+        const dueDate = formatDateFns(monthEnd, 'MMMM d, yyyy');
+        const desc = `PIR Luggage Delivery – ${formatDateFns(monthStart, 'MMMM d, yyyy')} to ${formatDateFns(monthEnd, 'MMMM d, yyyy')}`;
+
         // Ensure contracts is an array
         const safeContracts = Array.isArray(contracts) ? contracts : [];
         const soaNumber = (safeContracts[0] && (safeContracts[0].summary_id || safeContracts[0].summaryId)) || invoiceNo;
-    
-    // Calculate totals safely
+
+        // Calculate totals safely
         // Totals for SOA (VAT is included in totals; do not add on top)
         const subtotal = safeContracts.reduce((sum, c) => sum + (Number(c.delivery_charge) || 0), 0);
         const surchargeTotal = safeContracts.reduce((sum, c) => sum + (Number(c.delivery_surcharge || c.surcharge) || 0), 0);
         const discountTotal = safeContracts.reduce((sum, c) => sum + (Number(c.delivery_discount || c.discount) || 0), 0);
-    const getRowAmount = (c) => {
-        const delivery_charge = Number(c.delivery_charge) || 0;
-        const delivery_surcharge = Number(c.delivery_surcharge || c.surcharge) || 0;
-        const delivery_discount = Number(c.delivery_discount || c.discount) || 0;
-        return Math.max(0, (delivery_charge + delivery_surcharge) - delivery_discount);
-    };
+        const getRowAmount = (c) => {
+            const delivery_charge = Number(c.delivery_charge) || 0;
+            const delivery_surcharge = Number(c.delivery_surcharge || c.surcharge) || 0;
+            const delivery_discount = Number(c.delivery_discount || c.discount) || 0;
+            return Math.max(0, (delivery_charge + delivery_surcharge) - delivery_discount);
+        };
         const totalAmount = safeContracts.reduce((sum, c) => sum + getRowAmount(c), 0);
-    const vat = totalAmount * 0.12;
+        const vat = totalAmount * 0.12;
         const finalTotal = totalAmount; // Amount due equals total; VAT not added on top
 
-    const formatDate = (dateString) => {
-        if (!dateString) return 'N/A';
-        try {
-            const date = new Date(dateString);
-            return date.toLocaleString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
-        } catch { return 'N/A'; }
-    };
+        const formatDate = (dateString) => {
+            if (!dateString) return 'N/A';
+            try {
+                const date = new Date(dateString);
+                return date.toLocaleString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+            } catch { return 'N/A'; }
+        };
 
-    return (
-        <Document>
-            {/* First Page - Invoice */}
-            <PDFPage size="A4" style={{ padding: 24, fontSize: 10, fontFamily: 'Roboto' }}>
-                {/* Header */}
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                    <View style={{ flex: 1 }}>
-                        <Text style={{ fontWeight: 'bold', fontSize: 12 }}>GREEN HANGAR EMISSION TESTING CENTER</Text>
-                        <Text style={{ fontWeight: 'bold', fontSize: 10 }}>PROPRIETOR: JONALIZ L. CABALUNA</Text>
-                        <Text style={{ fontSize: 9 }}>ATAYDE ST. BRGY.191 PASAY CITY</Text>
-                        <Text style={{ fontSize: 9 }}>VAT REG. TIN: 234-449-892-00000</Text>
+        return (
+            <Document>
+                {/* First Page - Invoice */}
+                <PDFPage size="A4" style={{ padding: 24, fontSize: 10, fontFamily: 'Roboto' }}>
+                    {/* Header */}
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                        <View style={{ flex: 1 }}>
+                            <Text style={{ fontWeight: 'bold', fontSize: 12 }}>GREEN HANGAR EMISSION TESTING CENTER</Text>
+                            <Text style={{ fontWeight: 'bold', fontSize: 10 }}>PROPRIETOR: JONALIZ L. CABALUNA</Text>
+                            <Text style={{ fontSize: 9 }}>ATAYDE ST. BRGY.191 PASAY CITY</Text>
+                            <Text style={{ fontSize: 9 }}>VAT REG. TIN: 234-449-892-00000</Text>
+                        </View>
+                        <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                            <Text style={{ fontWeight: 'bold', fontSize: 10 }}>BILL TO</Text>
+                            <Text style={{ fontSize: 9 }}>PHILIPPINES AIR ASIA INC.</Text>
+                            <Text style={{ fontSize: 9 }}>2ND LEVEL MEZZANINE</Text>
+                            <Text style={{ fontSize: 9 }}>AREA NAIA T3, PASAY CITY</Text>
+                            <Text style={{ fontSize: 9 }}>TIN# 005-838-00016</Text>
+                        </View>
                     </View>
-                    <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                        <Text style={{ fontWeight: 'bold', fontSize: 10 }}>BILL TO</Text>
-                        <Text style={{ fontSize: 9 }}>PHILIPPINES AIR ASIA INC.</Text>
-                        <Text style={{ fontSize: 9 }}>2ND LEVEL MEZZANINE</Text>
-                        <Text style={{ fontSize: 9 }}>AREA NAIA T3, PASAY CITY</Text>
-                        <Text style={{ fontSize: 9 }}>TIN# 005-838-00016</Text>
+                    <View style={{ borderTopWidth: 1, borderColor: '#000', marginVertical: 10 }} />
+                    {/* Date and SOA row */}
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                            <Text style={{ fontSize: 9, fontWeight: 'bold' }}>DATE:&nbsp;</Text>
+                            <Text style={{ fontSize: 9 }}>{todayFormatted}</Text>
+                        </View>
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                            <Text style={{ fontSize: 9, fontWeight: 'bold' }}>SOA #:&nbsp;</Text>
+                            <Text style={{ fontSize: 9 }}>{soaNumber}</Text>
+                        </View>
                     </View>
-                </View>
-                <View style={{ borderTopWidth: 1, borderColor: '#000', marginVertical: 10 }} />
-                {/* Date and SOA row */}
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                        <Text style={{ fontSize: 9, fontWeight: 'bold' }}>DATE:&nbsp;</Text>
-                        <Text style={{ fontSize: 9 }}>{todayFormatted}</Text>
-                    </View>
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                        <Text style={{ fontSize: 9, fontWeight: 'bold' }}>SOA #:&nbsp;</Text>
-                        <Text style={{ fontSize: 9 }}>{soaNumber}</Text>
-                    </View>
-                </View>
-                <Text style={{ fontWeight: 'bold', fontSize: 12, textAlign: 'center', marginBottom: 8 }}>SALES INVOICE NO. {invoiceNo}</Text>
-                {/* Terms Table */}
-                <View style={{ flexDirection: 'row', fontWeight: 'bold', fontSize: 9, borderWidth: 1, borderColor: '#000' }}>
-                    <Text style={{ flex: 1, padding: 4, borderRightWidth: 1, borderColor: '#000' }}>TERMS</Text>
-                    <Text style={{ flex: 1, padding: 4, borderRightWidth: 1, borderColor: '#000' }}>PAYMENT METHOD</Text>
-                    <Text style={{ flex: 1, padding: 4 }}>DUE DATE</Text>
-                </View>
-                <View style={{ flexDirection: 'row', fontSize: 9, borderLeftWidth: 1, borderRightWidth: 1, borderBottomWidth: 1, borderColor: '#000' }}>
-                    <Text style={{ flex: 1, padding: 4, borderRightWidth: 1, borderColor: '#000' }}>30 DAYS</Text>
-                    <Text style={{ flex: 1, padding: 4, borderRightWidth: 1, borderColor: '#000' }}>DOMESTIC FUND TRANSFER</Text>
-                    <Text style={{ flex: 1, padding: 4 }}>{dueDate}</Text>
-                </View>
-                {/* Invoice Table */}
-                <View style={{ marginTop: 12 }}>
+                    <Text style={{ fontWeight: 'bold', fontSize: 12, textAlign: 'center', marginBottom: 8 }}>SALES INVOICE NO. {invoiceNo}</Text>
+                    {/* Terms Table */}
                     <View style={{ flexDirection: 'row', fontWeight: 'bold', fontSize: 9, borderWidth: 1, borderColor: '#000' }}>
-                        <Text style={{ flex: 0.5, padding: 4, borderRightWidth: 1, borderColor: '#000' }}>QTY</Text>
-                        <Text style={{ flex: 1, padding: 4, borderRightWidth: 1, borderColor: '#000' }}>UNIT</Text>
-                        <Text style={{ flex: 4, padding: 4, borderRightWidth: 1, borderColor: '#000' }}>DESCRIPTION</Text>
-                        <Text style={{ flex: 1, padding: 4 }}>TOTAL AMOUNT DUE</Text>
+                        <Text style={{ flex: 1, padding: 4, borderRightWidth: 1, borderColor: '#000' }}>TERMS</Text>
+                        <Text style={{ flex: 1, padding: 4, borderRightWidth: 1, borderColor: '#000' }}>PAYMENT METHOD</Text>
+                        <Text style={{ flex: 1, padding: 4 }}>DUE DATE</Text>
                     </View>
-                    <View style={{ flexDirection: 'row', fontSize: 9, borderLeftWidth: 1, borderRightWidth: 1, borderBottomWidth: 1, borderColor: '#000', minHeight: 20, alignItems: 'center' }}>
-                        <Text style={{ flex: 0.5, padding: 4, borderRightWidth: 1, borderColor: '#000' }}>{safeContracts.length}</Text>
-                        <Text style={{ flex: 1, padding: 4, borderRightWidth: 1, borderColor: '#000' }}>PCS</Text>
-                        <Text style={{ flex: 4, padding: 4, borderRightWidth: 1, borderColor: '#000' }}>{`PIRs Luggage Delivery - (${formatDateFns(monthStart, 'dd/MM/yyyy')} to ${formatDateFns(monthEnd, 'dd/MM/yyyy')})`}</Text>
-                        <Text style={{ flex: 1, padding: 4 }}>PHP</Text>
+                    <View style={{ flexDirection: 'row', fontSize: 9, borderLeftWidth: 1, borderRightWidth: 1, borderBottomWidth: 1, borderColor: '#000' }}>
+                        <Text style={{ flex: 1, padding: 4, borderRightWidth: 1, borderColor: '#000' }}>30 DAYS</Text>
+                        <Text style={{ flex: 1, padding: 4, borderRightWidth: 1, borderColor: '#000' }}>DOMESTIC FUND TRANSFER</Text>
+                        <Text style={{ flex: 1, padding: 4 }}>{dueDate}</Text>
                     </View>
-                    {[...Array(7)].map((_, i) => (
-                        <View key={i} style={{ flexDirection: 'row', fontSize: 9, borderLeftWidth: 1, borderRightWidth: 1, borderBottomWidth: 1, borderColor: '#000', minHeight: 20, alignItems: 'center' }}>
+                    {/* Invoice Table */}
+                    <View style={{ marginTop: 12 }}>
+                        <View style={{ flexDirection: 'row', fontWeight: 'bold', fontSize: 9, borderWidth: 1, borderColor: '#000' }}>
+                            <Text style={{ flex: 0.5, padding: 4, borderRightWidth: 1, borderColor: '#000' }}>QTY</Text>
+                            <Text style={{ flex: 1, padding: 4, borderRightWidth: 1, borderColor: '#000' }}>UNIT</Text>
+                            <Text style={{ flex: 4, padding: 4, borderRightWidth: 1, borderColor: '#000' }}>DESCRIPTION</Text>
+                            <Text style={{ flex: 1, padding: 4 }}>TOTAL AMOUNT DUE</Text>
+                        </View>
+                        <View style={{ flexDirection: 'row', fontSize: 9, borderLeftWidth: 1, borderRightWidth: 1, borderBottomWidth: 1, borderColor: '#000', minHeight: 20, alignItems: 'center' }}>
+                            <Text style={{ flex: 0.5, padding: 4, borderRightWidth: 1, borderColor: '#000' }}>{safeContracts.length}</Text>
+                            <Text style={{ flex: 1, padding: 4, borderRightWidth: 1, borderColor: '#000' }}>PCS</Text>
+                            <Text style={{ flex: 4, padding: 4, borderRightWidth: 1, borderColor: '#000' }}>{`PIRs Luggage Delivery - (${formatDateFns(monthStart, 'dd/MM/yyyy')} to ${formatDateFns(monthEnd, 'dd/MM/yyyy')})`}</Text>
+                            <Text style={{ flex: 1, padding: 4 }}>PHP</Text>
+                        </View>
+                        {[...Array(7)].map((_, i) => (
+                            <View key={i} style={{ flexDirection: 'row', fontSize: 9, borderLeftWidth: 1, borderRightWidth: 1, borderBottomWidth: 1, borderColor: '#000', minHeight: 20, alignItems: 'center' }}>
+                                <Text style={{ flex: 0.5, padding: 4, borderRightWidth: 1, borderColor: '#000' }}></Text>
+                                <Text style={{ flex: 1, padding: 4, borderRightWidth: 1, borderColor: '#000' }}></Text>
+                                <Text style={{ flex: 4, padding: 4, borderRightWidth: 1, borderColor: '#000' }}></Text>
+                                <Text style={{ flex: 1, padding: 4 }}></Text>
+                            </View>
+                        ))}
+                        {/* Note row - keep all column lines continuous; text in Description column */}
+                        <View style={{ flexDirection: 'row', fontSize: 9, borderLeftWidth: 1, borderRightWidth: 1, borderBottomWidth: 1, borderColor: '#000', minHeight: 20, alignItems: 'center' }}>
                             <Text style={{ flex: 0.5, padding: 4, borderRightWidth: 1, borderColor: '#000' }}></Text>
                             <Text style={{ flex: 1, padding: 4, borderRightWidth: 1, borderColor: '#000' }}></Text>
-                            <Text style={{ flex: 4, padding: 4, borderRightWidth: 1, borderColor: '#000' }}></Text>
+                            <Text style={{ flex: 4, padding: 4, borderRightWidth: 1, borderColor: '#000', fontWeight: 'bold' }}>Note: All Original Documents are Included in this statement</Text>
                             <Text style={{ flex: 1, padding: 4 }}></Text>
                         </View>
-                    ))}
-                    {/* Note row - keep all column lines continuous; text in Description column */}
-                    <View style={{ flexDirection: 'row', fontSize: 9, borderLeftWidth: 1, borderRightWidth: 1, borderBottomWidth: 1, borderColor: '#000', minHeight: 20, alignItems: 'center' }}>
-                        <Text style={{ flex: 0.5, padding: 4, borderRightWidth: 1, borderColor: '#000' }}></Text>
-                        <Text style={{ flex: 1, padding: 4, borderRightWidth: 1, borderColor: '#000' }}></Text>
-                        <Text style={{ flex: 4, padding: 4, borderRightWidth: 1, borderColor: '#000', fontWeight: 'bold' }}>Note: All Original Documents are Included in this statement</Text>
-                        <Text style={{ flex: 1, padding: 4 }}></Text>
-                    </View>
-                    {/* Total row - align with columns and remove extra horizontal divider below */}
-                    <View style={{ flexDirection: 'row', fontSize: 9, borderLeftWidth: 1, borderRightWidth: 1, borderBottomWidth: 1, borderColor: '#000', minHeight: 20, alignItems: 'center' }}>
-                        <Text style={{ flex: 0.5, padding: 4, borderRightWidth: 1, borderColor: '#000' }}></Text>
-                        <Text style={{ flex: 1, padding: 4, borderRightWidth: 1, borderColor: '#000' }}></Text>
-                        <Text style={{ flex: 4, padding: 4, borderRightWidth: 1, borderColor: '#000', fontWeight: 'bold', textAlign: 'right' }}>Total Amount Due:</Text>
-                        <Text style={{ flex: 1, padding: 4, fontWeight: 'bold' }}>{`₱${totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</Text>
-                    </View>
-                </View>
-                <Text style={{ fontSize: 9, marginTop: 8, fontWeight: 'bold' }}>Note: Please make check payable to JONALIZ L. CABALUNA</Text>
-                {/* Summary Box */}
-                <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 8 }}>
-                    <View style={{ width: 180, borderWidth: 1, borderColor: '#000', padding: 8 }}>
-                        <Text style={{ fontSize: 9 }}>RCBC ACCT NUMBER: 7591033191</Text>
-                        <Text style={{ fontSize: 9 }}>VATABLE: {`₱${(totalAmount - vat).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</Text>
-                        <Text style={{ fontSize: 9 }}>VAT EXEMPT:</Text>
-                        <Text style={{ fontSize: 9 }}>ZERO RATED:</Text>
-                        <Text style={{ fontSize: 9 }}>TOTAL SALES:</Text>
-                        <Text style={{ fontSize: 9 }}>TOTAL VAT: {`₱${vat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</Text>
-                        <Text style={{ fontSize: 9 }}>AMOUNT DUE: {`₱${totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</Text>
-                    </View>
-                </View>
-                {/* Signature lines */}
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 16 }}>
-                    <View style={{ width: '45%' }}>
-                        <Text style={{ fontSize: 8, fontWeight: 'bold' }}>PREPARED BY:</Text>
-                        <View style={{ borderBottomWidth: 1, borderColor: '#000', marginTop: 16 }} />
-                    </View>
-                    <View style={{ width: '45%' }}>
-                        <Text style={{ fontSize: 8, fontWeight: 'bold' }}>CHECKED BY:</Text>
-                        <View style={{ borderBottomWidth: 1, borderColor: '#000', marginTop: 16 }} />
-                    </View>
-                </View>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 12 }}>
-                    <View style={{ width: '45%' }}>
-                        <Text style={{ fontSize: 8, fontWeight: 'bold' }}>RECEIVED BY:</Text>
-                        <View style={{ borderBottomWidth: 1, borderColor: '#000', marginTop: 16 }} />
-                    </View>
-                    <View style={{ width: '45%' }}>
-                        <Text style={{ fontSize: 8, fontWeight: 'bold' }}>DATE:</Text>
-                        <View style={{ borderBottomWidth: 1, borderColor: '#000', marginTop: 16 }} />
-                    </View>
-                </View>
-            </PDFPage>
-
-            {/* Second Page - SOA */}
-            <PDFPage size="A4" style={{ padding: 12, fontSize: 8, fontFamily: 'Roboto' }}>
-                <View style={{ alignItems: 'center', marginBottom: 4 }}>
-                    <Text style={{ fontSize: 14, fontWeight: 'bold' }}>GHE TRANSMITTAL - AIRPORT CLIENTS PROPERTY IRREGULARITY SUMMARY REPORT</Text>
-                    <Text style={{ fontSize: 12, marginTop: 2 }}>{dateRange || 'No date range specified'}</Text>
-                </View>
-                <View style={{ borderWidth: 1, borderColor: '#000', marginBottom: 4 }}>
-                    <View style={{ flexDirection: 'row', backgroundColor: '#eee', borderBottomWidth: 1, borderColor: '#000' }}>
-                        <Text style={{ flex: 0.5, fontWeight: 'bold', padding: 2, fontSize: 8 }}>No.</Text>
-                        <Text style={{ flex: 1, fontWeight: 'bold', padding: 2, fontSize: 8 }}>Tracking ID</Text>
-                        <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 2, fontSize: 8 }}>Invoice No.</Text>
-                        <Text style={{ flex: 2, fontWeight: 'bold', padding: 2, fontSize: 8 }}>Luggage Owner</Text>
-                        <Text style={{ flex: 1, fontWeight: 'bold', padding: 2, fontSize: 8 }}>Flight No.</Text>
-                        <Text style={{ flex: 2.5, fontWeight: 'bold', padding: 2, fontSize: 8 }}>Address</Text>
-                        <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 2, fontSize: 8 }}>Date Received</Text>
-                        <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 2, fontSize: 8 }}>Status</Text>
-                        <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 2, fontSize: 8 }}>Amount</Text>
-                        <Text style={{ flex: 1, fontWeight: 'bold', padding: 2, fontSize: 8 }}>Remarks</Text>
-                    </View>
-                    {safeContracts.map((c, idx) => (
-                        <View key={c.id || idx} style={{ flexDirection: 'row', borderBottomWidth: 1, borderColor: '#000' }}>
-                            <Text style={{ flex: 0.5, padding: 2, fontSize: 8 }}>{idx + 1}</Text>
-                            <Text style={{ flex: 1, padding: 2, fontSize: 8 }}>{c.id}</Text>
-                            <Text style={{ flex: 1.5, padding: 2, fontSize: 8 }}>{c.summary_id || 'N/A'}</Text>
-                            <Text style={{ flex: 2, padding: 2, fontSize: 8 }}>{c.owner_first_name || c.owner_middle_initial || c.owner_last_name ? `${c.owner_first_name || ''} ${c.owner_middle_initial || ''} ${c.owner_last_name || ''}`.replace(/  +/g, ' ').trim() : 'N/A'}</Text>
-                            <Text style={{ flex: 1, padding: 2, fontSize: 8 }}>{c.flight_number || 'N/A'}</Text>
-                            <Text style={{ flex: 2.5, padding: 2, fontSize: 8 }}>{c.drop_off_location || 'N/A'}</Text>
-                            <Text style={{ flex: 1.5, padding: 2, fontSize: 8 }}>{formatDate(c.delivered_at || c.created_at)}</Text>
-                            <Text style={{ flex: 1.5, padding: 2, fontSize: 8 }}>{c.contract_status?.status_name || 'N/A'}</Text>
-                            <Text style={{ flex: 1.5, padding: 2, fontFamily: 'Roboto', fontSize: 8 }}>{'\u20B1\u00A0'}{getRowAmount(c).toFixed(2)}</Text>
-                            <Text style={{ flex: 1, padding: 2, fontSize: 8 }}>{c.contract_status?.status_name === 'Delivery Failed' ? 'Delivery Failed' : ''}</Text>
+                        {/* Total row - align with columns and remove extra horizontal divider below */}
+                        <View style={{ flexDirection: 'row', fontSize: 9, borderLeftWidth: 1, borderRightWidth: 1, borderBottomWidth: 1, borderColor: '#000', minHeight: 20, alignItems: 'center' }}>
+                            <Text style={{ flex: 0.5, padding: 4, borderRightWidth: 1, borderColor: '#000' }}></Text>
+                            <Text style={{ flex: 1, padding: 4, borderRightWidth: 1, borderColor: '#000' }}></Text>
+                            <Text style={{ flex: 4, padding: 4, borderRightWidth: 1, borderColor: '#000', fontWeight: 'bold', textAlign: 'right' }}>Total Amount Due:</Text>
+                            <Text style={{ flex: 1, padding: 4, fontWeight: 'bold' }}>{`₱${totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</Text>
                         </View>
-                    ))}
-                    <View style={{ flexDirection: 'row', borderTopWidth: 1, borderColor: '#000', backgroundColor: '#f7f7f7' }}>
-                        <Text style={{ flex: 9, fontWeight: 'bold', padding: 2, textAlign: 'right', fontSize: 8 }}>Subtotal:</Text>
-                        <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 2, fontFamily: 'Roboto', fontSize: 8 }}>{'\u20B1\u00A0'}{subtotal.toFixed(2)}</Text>
-                        <Text style={{ flex: 1 }}></Text>
                     </View>
-                    <View style={{ flexDirection: 'row', borderTopWidth: 1, borderColor: '#000', backgroundColor: '#f7f7f7' }}>
-                        <Text style={{ flex: 9, fontWeight: 'bold', padding: 2, textAlign: 'right', fontSize: 8 }}>Surcharge Total:</Text>
-                        <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 2, fontFamily: 'Roboto', fontSize: 8 }}>{'\u20B1\u00A0'}{surchargeTotal.toFixed(2)}</Text>
-                        <Text style={{ flex: 1 }}></Text>
+                    <Text style={{ fontSize: 9, marginTop: 8, fontWeight: 'bold' }}>Note: Please make check payable to JONALIZ L. CABALUNA</Text>
+                    {/* Summary Box */}
+                    <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 8 }}>
+                        <View style={{ width: 180, borderWidth: 1, borderColor: '#000', padding: 8 }}>
+                            <Text style={{ fontSize: 9 }}>RCBC ACCT NUMBER: 7591033191</Text>
+                            <Text style={{ fontSize: 9 }}>VATABLE: {`₱${(totalAmount - vat).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</Text>
+                            <Text style={{ fontSize: 9 }}>VAT EXEMPT:</Text>
+                            <Text style={{ fontSize: 9 }}>ZERO RATED:</Text>
+                            <Text style={{ fontSize: 9 }}>TOTAL SALES:</Text>
+                            <Text style={{ fontSize: 9 }}>TOTAL VAT: {`₱${vat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</Text>
+                            <Text style={{ fontSize: 9 }}>AMOUNT DUE: {`₱${totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</Text>
+                        </View>
                     </View>
-                    <View style={{ flexDirection: 'row', borderTopWidth: 1, borderColor: '#000', backgroundColor: '#f7f7f7' }}>
-                        <Text style={{ flex: 9, fontWeight: 'bold', padding: 2, textAlign: 'right', fontSize: 8 }}>Discount Total:</Text>
-                        <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 2, fontFamily: 'Roboto', fontSize: 8 }}>{'\u20B1\u00A0'}{discountTotal.toFixed(2)}</Text>
-                        <Text style={{ flex: 1 }}></Text>
+                    {/* Signature lines */}
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 16 }}>
+                        <View style={{ width: '45%' }}>
+                            <Text style={{ fontSize: 8, fontWeight: 'bold' }}>PREPARED BY:</Text>
+                            <View style={{ borderBottomWidth: 1, borderColor: '#000', marginTop: 16 }} />
+                        </View>
+                        <View style={{ width: '45%' }}>
+                            <Text style={{ fontSize: 8, fontWeight: 'bold' }}>CHECKED BY:</Text>
+                            <View style={{ borderBottomWidth: 1, borderColor: '#000', marginTop: 16 }} />
+                        </View>
                     </View>
-                    <View style={{ flexDirection: 'row', borderTopWidth: 2, borderColor: '#000', backgroundColor: '#eee' }}>
-                        <Text style={{ flex: 10.5, fontWeight: 'bold', padding: 2, textAlign: 'right', fontSize: 8 }}>TOTAL</Text>
-                        <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 2, fontFamily: 'Roboto', fontSize: 8 }}>{'\u20B1\u00A0'}{totalAmount.toFixed(2)}</Text>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 12 }}>
+                        <View style={{ width: '45%' }}>
+                            <Text style={{ fontSize: 8, fontWeight: 'bold' }}>RECEIVED BY:</Text>
+                            <View style={{ borderBottomWidth: 1, borderColor: '#000', marginTop: 16 }} />
+                        </View>
+                        <View style={{ width: '45%' }}>
+                            <Text style={{ fontSize: 8, fontWeight: 'bold' }}>DATE:</Text>
+                            <View style={{ borderBottomWidth: 1, borderColor: '#000', marginTop: 16 }} />
+                        </View>
                     </View>
-                </View>
-                <View style={{ flexDirection: 'row', marginTop: 12, justifyContent: 'space-between' }}>
-                    <View>
-                        <Text style={{ fontSize: 8 }}>Received by: _______________, Date: _______________</Text>
-                        <Text style={{ fontWeight: 'bold', marginTop: 4, fontSize: 8 }}>AIRLINE'S REPRESENTATIVE</Text>
-                    </View>
-                    <View style={{ alignItems: 'flex-end' }}>
-                        <Text style={{ fontSize: 8 }}>GENERATED ON: {formatDate(new Date().toISOString())}</Text>
-                        <Text style={{ fontSize: 8 }}>*************SUBMITTED ALL ORIGINAL SIGNED PIR*****</Text>
-                        <Text style={{ fontSize: 8 }}>Total PIR submitted: {safeContracts.length}</Text>
-                    </View>
-                </View>
-            </PDFPage>
+                </PDFPage>
 
-            {/* Proof of Delivery Pages - One per contract */}
-            {safeContracts.map((contract, index) => {
-                const podData = proofOfDeliveryData[contract.id];
-                const ownerName = contract.owner_first_name || contract.owner_middle_initial || contract.owner_last_name 
-                    ? `${contract.owner_first_name || ''} ${contract.owner_middle_initial || ''} ${contract.owner_last_name || ''}`.replace(/  +/g, ' ').trim()
-                    : 'N/A';
-                
-                return (
-                    <PDFPage key={`pod-${contract.id}`} size="A4" style={{ padding: 24, fontSize: 10, fontFamily: 'Roboto' }}>
-                        <View style={{ alignItems: 'center', marginBottom: 16 }}>
-                            <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#2d3991' }}>PROOF OF DELIVERY</Text>
-                            <Text style={{ fontSize: 12, marginTop: 4 }}>Contract ID: {contract.id}</Text>
+                {/* Second Page - SOA */}
+                <PDFPage size="A4" style={{ padding: 12, fontSize: 8, fontFamily: 'Roboto' }}>
+                    <View style={{ alignItems: 'center', marginBottom: 4 }}>
+                        <Text style={{ fontSize: 14, fontWeight: 'bold' }}>GHE TRANSMITTAL - AIRPORT CLIENTS PROPERTY IRREGULARITY SUMMARY REPORT</Text>
+                        <Text style={{ fontSize: 12, marginTop: 2 }}>{dateRange || 'No date range specified'}</Text>
                     </View>
-                        
-                        <View style={{ marginBottom: 16 }}>
-                            <Text style={{ fontSize: 12, fontWeight: 'bold', marginBottom: 8 }}>Contract Details:</Text>
-                            <View style={{ padding: 8, backgroundColor: '#f5f5f5', borderRadius: 4 }}>
-                                <Text style={{ fontSize: 10, marginBottom: 2 }}>Contract ID: {contract.id}</Text>
-                                <Text style={{ fontSize: 10, marginBottom: 2 }}>Luggage Owner: {ownerName}</Text>
-                                <Text style={{ fontSize: 10, marginBottom: 2 }}>Flight Number: {contract.flight_number || 'N/A'}</Text>
-                                <Text style={{ fontSize: 10, marginBottom: 2 }}>Pickup Location: {contract.pickup_location || 'N/A'}</Text>
-                                <Text style={{ fontSize: 10, marginBottom: 2 }}>Drop-off Location: {contract.drop_off_location || 'N/A'}</Text>
-                                <Text style={{ fontSize: 10, marginBottom: 2 }}>Delivery Date: {formatDate(contract.delivered_at || contract.created_at)}</Text>
-                                <Text style={{ fontSize: 10, marginBottom: 2 }}>Status: {contract.contract_status?.status_name || 'N/A'}</Text>
+                    <View style={{ borderWidth: 1, borderColor: '#000', marginBottom: 4 }}>
+                        <View style={{ flexDirection: 'row', backgroundColor: '#eee', borderBottomWidth: 1, borderColor: '#000' }}>
+                            <Text style={{ flex: 0.5, fontWeight: 'bold', padding: 2, fontSize: 8 }}>No.</Text>
+                            <Text style={{ flex: 1, fontWeight: 'bold', padding: 2, fontSize: 8 }}>Tracking ID</Text>
+                            <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 2, fontSize: 8 }}>Invoice No.</Text>
+                            <Text style={{ flex: 2, fontWeight: 'bold', padding: 2, fontSize: 8 }}>Luggage Owner</Text>
+                            <Text style={{ flex: 1, fontWeight: 'bold', padding: 2, fontSize: 8 }}>Flight No.</Text>
+                            <Text style={{ flex: 2.5, fontWeight: 'bold', padding: 2, fontSize: 8 }}>Address</Text>
+                            <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 2, fontSize: 8 }}>Date Received</Text>
+                            <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 2, fontSize: 8 }}>Status</Text>
+                            <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 2, fontSize: 8 }}>Amount</Text>
+                            <Text style={{ flex: 1, fontWeight: 'bold', padding: 2, fontSize: 8 }}>Remarks</Text>
+                        </View>
+                        {safeContracts.map((c, idx) => (
+                            <View key={c.id || idx} style={{ flexDirection: 'row', borderBottomWidth: 1, borderColor: '#000' }}>
+                                <Text style={{ flex: 0.5, padding: 2, fontSize: 8 }}>{idx + 1}</Text>
+                                <Text style={{ flex: 1, padding: 2, fontSize: 8 }}>{c.id}</Text>
+                                <Text style={{ flex: 1.5, padding: 2, fontSize: 8 }}>{c.summary_id || 'N/A'}</Text>
+                                <Text style={{ flex: 2, padding: 2, fontSize: 8 }}>{c.owner_first_name || c.owner_middle_initial || c.owner_last_name ? `${c.owner_first_name || ''} ${c.owner_middle_initial || ''} ${c.owner_last_name || ''}`.replace(/  +/g, ' ').trim() : 'N/A'}</Text>
+                                <Text style={{ flex: 1, padding: 2, fontSize: 8 }}>{c.flight_number || 'N/A'}</Text>
+                                <Text style={{ flex: 2.5, padding: 2, fontSize: 8 }}>{c.drop_off_location || 'N/A'}</Text>
+                                <Text style={{ flex: 1.5, padding: 2, fontSize: 8 }}>{formatDate(c.delivered_at || c.created_at)}</Text>
+                                <Text style={{ flex: 1.5, padding: 2, fontSize: 8 }}>{c.contract_status?.status_name || 'N/A'}</Text>
+                                <Text style={{ flex: 1.5, padding: 2, fontFamily: 'Roboto', fontSize: 8 }}>{'\u20B1\u00A0'}{getRowAmount(c).toFixed(2)}</Text>
+                                <Text style={{ flex: 1, padding: 2, fontSize: 8 }}>{c.contract_status?.status_name === 'Delivery Failed' ? 'Delivery Failed' : ''}</Text>
+                            </View>
+                        ))}
+                        <View style={{ flexDirection: 'row', borderTopWidth: 1, borderColor: '#000', backgroundColor: '#f7f7f7' }}>
+                            <Text style={{ flex: 9, fontWeight: 'bold', padding: 2, textAlign: 'right', fontSize: 8 }}>Subtotal:</Text>
+                            <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 2, fontFamily: 'Roboto', fontSize: 8 }}>{'\u20B1\u00A0'}{subtotal.toFixed(2)}</Text>
+                            <Text style={{ flex: 1 }}></Text>
+                        </View>
+                        <View style={{ flexDirection: 'row', borderTopWidth: 1, borderColor: '#000', backgroundColor: '#f7f7f7' }}>
+                            <Text style={{ flex: 9, fontWeight: 'bold', padding: 2, textAlign: 'right', fontSize: 8 }}>Surcharge Total:</Text>
+                            <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 2, fontFamily: 'Roboto', fontSize: 8 }}>{'\u20B1\u00A0'}{surchargeTotal.toFixed(2)}</Text>
+                            <Text style={{ flex: 1 }}></Text>
+                        </View>
+                        <View style={{ flexDirection: 'row', borderTopWidth: 1, borderColor: '#000', backgroundColor: '#f7f7f7' }}>
+                            <Text style={{ flex: 9, fontWeight: 'bold', padding: 2, textAlign: 'right', fontSize: 8 }}>Discount Total:</Text>
+                            <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 2, fontFamily: 'Roboto', fontSize: 8 }}>{'\u20B1\u00A0'}{discountTotal.toFixed(2)}</Text>
+                            <Text style={{ flex: 1 }}></Text>
+                        </View>
+                        <View style={{ flexDirection: 'row', borderTopWidth: 2, borderColor: '#000', backgroundColor: '#eee' }}>
+                            <Text style={{ flex: 10.5, fontWeight: 'bold', padding: 2, textAlign: 'right', fontSize: 8 }}>TOTAL</Text>
+                            <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 2, fontFamily: 'Roboto', fontSize: 8 }}>{'\u20B1\u00A0'}{totalAmount.toFixed(2)}</Text>
+                        </View>
                     </View>
-                </View>
+                    <View style={{ flexDirection: 'row', marginTop: 12, justifyContent: 'space-between' }}>
+                        <View>
+                            <Text style={{ fontSize: 8 }}>Received by: _______________, Date: _______________</Text>
+                            <Text style={{ fontWeight: 'bold', marginTop: 4, fontSize: 8 }}>AIRLINE'S REPRESENTATIVE</Text>
+                        </View>
+                        <View style={{ alignItems: 'flex-end' }}>
+                            <Text style={{ fontSize: 8 }}>GENERATED ON: {formatDate(new Date().toISOString())}</Text>
+                            <Text style={{ fontSize: 8 }}>*************SUBMITTED ALL ORIGINAL SIGNED PIR*****</Text>
+                            <Text style={{ fontSize: 8 }}>Total PIR submitted: {safeContracts.length}</Text>
+                        </View>
+                    </View>
+                </PDFPage>
 
-                        {podData && podData.proof_of_delivery ? (
+                {/* Proof of Delivery Pages - One per contract */}
+                {safeContracts.map((contract, index) => {
+                    const podData = proofOfDeliveryData[contract.id];
+                    const ownerName = contract.owner_first_name || contract.owner_middle_initial || contract.owner_last_name
+                        ? `${contract.owner_first_name || ''} ${contract.owner_middle_initial || ''} ${contract.owner_last_name || ''}`.replace(/  +/g, ' ').trim()
+                        : 'N/A';
+
+                    return (
+                        <PDFPage key={`pod-${contract.id}`} size="A4" style={{ padding: 24, fontSize: 10, fontFamily: 'Roboto' }}>
                             <View style={{ alignItems: 'center', marginBottom: 16 }}>
-                                <Text style={{ fontSize: 12, fontWeight: 'bold', marginBottom: 8 }}>Proof of Delivery Image:</Text>
-                <View style={{
-                                    width: '100%', 
-                                    height: 400,
-                                    border: '1px solid #ddd',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    backgroundColor: '#f9f9f9'
-                                }}>
-                                    <Image 
-                                        src={podData.proof_of_delivery} 
-                                        style={{ 
-                                            maxWidth: '100%', 
-                                            maxHeight: '100%',
-                                            objectFit: 'contain'
-                                        }} 
-                                        cache={false}
-                                    />
-                    </View>
-                                {podData.delivery_timestamp && (
-                                    <Text style={{ fontSize: 10, marginTop: 8, color: '#666' }}>
-                                        Delivered at: {formatDate(podData.delivery_timestamp)}
-                                    </Text>
-                                )}
-                    </View>
-                        ) : (
-                            <View style={{ alignItems: 'center', marginBottom: 16, padding: 20, backgroundColor: '#f9f9f9', borderRadius: 4 }}>
-                                <Text style={{ fontSize: 12, color: '#666' }}>No proof of delivery available for this contract</Text>
-                    </View>
-                        )}
+                                <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#2d3991' }}>PROOF OF DELIVERY</Text>
+                                <Text style={{ fontSize: 12, marginTop: 4 }}>Contract ID: {contract.id}</Text>
+                            </View>
 
-                        {/* Removed signature/date/time section as requested */}
-                    </PDFPage>
-                );
-            })}
-        </Document>
-    );
+                            <View style={{ marginBottom: 16 }}>
+                                <Text style={{ fontSize: 12, fontWeight: 'bold', marginBottom: 8 }}>Contract Details:</Text>
+                                <View style={{ padding: 8, backgroundColor: '#f5f5f5', borderRadius: 4 }}>
+                                    <Text style={{ fontSize: 10, marginBottom: 2 }}>Contract ID: {contract.id}</Text>
+                                    <Text style={{ fontSize: 10, marginBottom: 2 }}>Luggage Owner: {ownerName}</Text>
+                                    <Text style={{ fontSize: 10, marginBottom: 2 }}>Flight Number: {contract.flight_number || 'N/A'}</Text>
+                                    <Text style={{ fontSize: 10, marginBottom: 2 }}>Pickup Location: {contract.pickup_location || 'N/A'}</Text>
+                                    <Text style={{ fontSize: 10, marginBottom: 2 }}>Drop-off Location: {contract.drop_off_location || 'N/A'}</Text>
+                                    <Text style={{ fontSize: 10, marginBottom: 2 }}>Delivery Date: {formatDate(contract.delivered_at || contract.created_at)}</Text>
+                                    <Text style={{ fontSize: 10, marginBottom: 2 }}>Status: {contract.contract_status?.status_name || 'N/A'}</Text>
+                                </View>
+                            </View>
+
+                            {podData && podData.proof_of_delivery ? (
+                                <View style={{ alignItems: 'center', marginBottom: 16 }}>
+                                    <Text style={{ fontSize: 12, fontWeight: 'bold', marginBottom: 8 }}>Proof of Delivery Image:</Text>
+                                    <View style={{
+                                        width: '100%',
+                                        height: 400,
+                                        border: '1px solid #ddd',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        backgroundColor: '#f9f9f9'
+                                    }}>
+                                        <Image
+                                            src={podData.proof_of_delivery}
+                                            style={{
+                                                maxWidth: '100%',
+                                                maxHeight: '100%',
+                                                objectFit: 'contain'
+                                            }}
+                                            cache={false}
+                                        />
+                                    </View>
+                                    {podData.delivery_timestamp && (
+                                        <Text style={{ fontSize: 10, marginTop: 8, color: '#666' }}>
+                                            Delivered at: {formatDate(podData.delivery_timestamp)}
+                                        </Text>
+                                    )}
+                                </View>
+                            ) : (
+                                <View style={{ alignItems: 'center', marginBottom: 16, padding: 20, backgroundColor: '#f9f9f9', borderRadius: 4 }}>
+                                    <Text style={{ fontSize: 12, color: '#666' }}>No proof of delivery available for this contract</Text>
+                                </View>
+                            )}
+
+                            {/* Removed signature/date/time section as requested */}
+                        </PDFPage>
+                    );
+                })}
+            </Document>
+        );
     } catch (error) {
         console.error('Error in CombinedSOAInvoicePDF:', error);
         return (
@@ -597,10 +595,10 @@ const CombinedSOAInvoicePDF = ({ contracts = [], dateRange, invoiceNumber = null
                     <View style={{ alignItems: 'center', marginBottom: 8 }}>
                         <Text style={{ fontSize: 16, fontWeight: 'bold', color: 'red' }}>Error generating PDF</Text>
                         <Text style={{ fontSize: 12, marginTop: 4 }}>Please try again or contact support</Text>
-                </View>
-            </PDFPage>
-        </Document>
-    );
+                    </View>
+                </PDFPage>
+            </Document>
+        );
     }
 };
 
@@ -662,10 +660,10 @@ const TransactionManagement = () => {
     // Add new state for confirmation dialog
     const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
     const [pendingPriceUpdate, setPendingPriceUpdate] = useState(null);
-    
-    
+
+
     // Removed complete confirmation dialog state
-    
+
     // Add new state for summarize confirmation dialog
     const [summarizeConfirmDialogOpen, setSummarizeConfirmDialogOpen] = useState(false);
     const [pendingSummarizeData, setPendingSummarizeData] = useState(null);
@@ -697,15 +695,18 @@ const TransactionManagement = () => {
     // Corporations map for airline_id -> corporation name
     const [corporationsById, setCorporationsById] = useState(new Map());
     const [corporationFilter, setCorporationFilter] = useState('');
-    
+    // Corporation emails for share PDF functionality
+    const [corporationEmails, setCorporationEmails] = useState([]);
+    const [loadingCorporationEmails, setLoadingCorporationEmails] = useState(false);
+
     // Sorting state for Summary table
     const [summarySortField, setSummarySortField] = useState('due_date');
     const [summarySortDirection, setSummarySortDirection] = useState('desc');
-    
+
     // Sorting state for Pending table
     const [pendingSortField, setPendingSortField] = useState('created_at');
     const [pendingSortDirection, setPendingSortDirection] = useState('desc');
-    
+
     // Sorting state for Pricing Update table
     const [pricingSortField, setPricingSortField] = useState('region');
     const [pricingSortDirection, setPricingSortDirection] = useState('asc');
@@ -731,7 +732,7 @@ const TransactionManagement = () => {
                         const map = new Map((corpJson.corporations || []).map(c => [c.id, c.corporation_name]));
                         setCorporationsById(map);
                     }
-                } catch {}
+                } catch { }
             } catch (err) {
                 setError('Failed to fetch data');
             } finally {
@@ -740,6 +741,30 @@ const TransactionManagement = () => {
         };
 
         fetchData();
+    }, []);
+
+    // Fetch corporation emails for share PDF functionality
+    useEffect(() => {
+        const fetchCorporationEmails = async () => {
+            setLoadingCorporationEmails(true);
+            try {
+                const response = await fetch('/api/admin', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'getCorporationEmails' })
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    setCorporationEmails(data.corporationEmails || []);
+                }
+            } catch (error) {
+                console.error('Error fetching corporation emails:', error);
+            } finally {
+                setLoadingCorporationEmails(false);
+            }
+        };
+
+        fetchCorporationEmails();
     }, []);
 
     // Silent background refresh every 5 seconds for Pending (Pay) tab only
@@ -783,7 +808,7 @@ const TransactionManagement = () => {
                 const json = await res.json();
                 if (cancelled) return;
                 setData(prev => mergeUpdatedContracts(prev, json.data || []));
-            } catch {}
+            } catch { }
         };
 
         const interval = setInterval(() => {
@@ -963,8 +988,8 @@ const TransactionManagement = () => {
         if (action === 'view' && selectedRow) { setDetailsContract(selectedRow); setDetailsOpen(true); }
         else if (action === 'surcharge' && selectedRow) { setSurchargeContract(selectedRow); setSurchargeValue(selectedRow.delivery_surcharge || ''); setSurchargeError(''); setSurchargeOpen(true); }
         else if (action === 'discount' && selectedRow) { setDiscountContract(selectedRow); setDiscountValue(selectedRow.delivery_discount || ''); setDiscountError(''); setDiscountOpen(true); }
-        else if (action === 'pod' && selectedRow) { 
-            setPodContract(selectedRow); 
+        else if (action === 'pod' && selectedRow) {
+            setPodContract(selectedRow);
             setPodOpen(true);
             fetchProofOfDelivery(selectedRow.id);
         }
@@ -978,16 +1003,16 @@ const TransactionManagement = () => {
         if (!isSurchargeValid(surchargeValue)) { setSurchargeError('Surcharge must be 0 or a positive number.'); return; }
         setSurchargeLoading(true); setSurchargeError('');
         try {
-            const res = await fetch('/api/admin', { 
-                method: 'POST', 
-                headers: { 'Content-Type': 'application/json' }, 
-                body: JSON.stringify({ 
+            const res = await fetch('/api/admin', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
                     action: 'updatedelivery_Surcharge',
-                    params: { 
-                        contractId: surchargeContract.id, 
-                        delivery_surcharge: Number(surchargeValue) 
+                    params: {
+                        contractId: surchargeContract.id,
+                        delivery_surcharge: Number(surchargeValue)
                     }
-                }) 
+                })
             });
             const json = await res.json();
             if (!res.ok) throw new Error(json.error || 'Failed to update surcharge');
@@ -1009,16 +1034,16 @@ const TransactionManagement = () => {
         if (!isDiscountValid(discountValue)) { setDiscountError('Discount must be 0 or a positive number.'); return; }
         setDiscountLoading(true); setDiscountError('');
         try {
-            const res = await fetch('/api/admin', { 
-                method: 'POST', 
-                headers: { 'Content-Type': 'application/json' }, 
-                body: JSON.stringify({ 
+            const res = await fetch('/api/admin', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
                     action: 'updatedelivery_discount',
-                    params: { 
-                        contractId: discountContract.id, 
-                        delivery_discount: Number(discountValue) 
+                    params: {
+                        contractId: discountContract.id,
+                        delivery_discount: Number(discountValue)
                     }
-                }) 
+                })
             });
             const json = await res.json();
             if (!res.ok) throw new Error(json.error || 'Failed to update discount');
@@ -1038,7 +1063,7 @@ const TransactionManagement = () => {
         const row = filteredData.find(r => r.id === id);
         if (row && isRowLocked(row)) return; // block selecting locked rows
         setSelectedRows((prev) => {
-            const newSelection = prev.includes(id) 
+            const newSelection = prev.includes(id)
                 ? prev.filter((rowId) => rowId !== id)
                 : [...prev, id];
             return newSelection;
@@ -1118,58 +1143,58 @@ const TransactionManagement = () => {
         return regionMatch && cityMatch;
     });
 
-     // Sorting functions for Pricing Update table
-     const handlePricingSort = (field) => {
-         const isAsc = pricingSortField === field && pricingSortDirection === 'asc';
-         setPricingSortDirection(isAsc ? 'desc' : 'asc');
-         setPricingSortField(field);
-     };
+    // Sorting functions for Pricing Update table
+    const handlePricingSort = (field) => {
+        const isAsc = pricingSortField === field && pricingSortDirection === 'asc';
+        setPricingSortDirection(isAsc ? 'desc' : 'asc');
+        setPricingSortField(field);
+    };
 
-     const getSortedPricingData = () => {
-         return [...filteredPricingTable].sort((a, b) => {
-             let aValue, bValue;
-             
-             switch (pricingSortField) {
-                 case 'region':
-                     aValue = a.region || '';
-                     bValue = b.region || '';
-                     break;
-                 case 'city':
-                     aValue = a.city || '';
-                     bValue = b.city || '';
-                     break;
-                 case 'price':
-                     aValue = Number(a.price) || 0;
-                     bValue = Number(b.price) || 0;
-                     break;
-                 case 'updated_at':
-                     aValue = new Date(a.updated_at || 0);
-                     bValue = new Date(b.updated_at || 0);
-                     break;
-                 default:
-                     aValue = a[pricingSortField] || '';
-                     bValue = b[pricingSortField] || '';
-             }
-             
-             if (aValue < bValue) {
-                 return pricingSortDirection === 'asc' ? -1 : 1;
-             }
-             if (aValue > bValue) {
-                 return pricingSortDirection === 'asc' ? 1 : -1;
-             }
-             return 0;
-         });
-     };
+    const getSortedPricingData = () => {
+        return [...filteredPricingTable].sort((a, b) => {
+            let aValue, bValue;
 
-     const getPricingSortIcon = (field) => {
-         if (pricingSortField !== field) {
-             return null;
-         }
-         return pricingSortDirection === 'asc' ? <ArrowUpwardIcon /> : <ArrowDownwardIcon />;
-     };
+            switch (pricingSortField) {
+                case 'region':
+                    aValue = a.region || '';
+                    bValue = b.region || '';
+                    break;
+                case 'city':
+                    aValue = a.city || '';
+                    bValue = b.city || '';
+                    break;
+                case 'price':
+                    aValue = Number(a.price) || 0;
+                    bValue = Number(b.price) || 0;
+                    break;
+                case 'updated_at':
+                    aValue = new Date(a.updated_at || 0);
+                    bValue = new Date(b.updated_at || 0);
+                    break;
+                default:
+                    aValue = a[pricingSortField] || '';
+                    bValue = b[pricingSortField] || '';
+            }
+
+            if (aValue < bValue) {
+                return pricingSortDirection === 'asc' ? -1 : 1;
+            }
+            if (aValue > bValue) {
+                return pricingSortDirection === 'asc' ? 1 : -1;
+            }
+            return 0;
+        });
+    };
+
+    const getPricingSortIcon = (field) => {
+        if (pricingSortField !== field) {
+            return null;
+        }
+        return pricingSortDirection === 'asc' ? <ArrowUpwardIcon /> : <ArrowDownwardIcon />;
+    };
 
     // Pagination logic
-     const paginatedPricingTable = getSortedPricingData().slice(pricingPage * pricingRowsPerPage, pricingPage * pricingRowsPerPage + pricingRowsPerPage);
+    const paginatedPricingTable = getSortedPricingData().slice(pricingPage * pricingRowsPerPage, pricingPage * pricingRowsPerPage + pricingRowsPerPage);
 
     // Modify the edit price handlers
     const handleEditPriceClick = (row) => {
@@ -1188,7 +1213,7 @@ const TransactionManagement = () => {
 
     const handleEditPriceSubmit = () => {
         if (!selectedPricingRow) return;
-        
+
         const newPrice = Number(editPriceValue);
         if (isNaN(newPrice) || newPrice < 0) {
             setEditPriceError('Please enter a valid price (0 or greater)');
@@ -1233,12 +1258,12 @@ const TransactionManagement = () => {
             const { data } = await response.json();
 
             // Update the local state with the new price and updated_at timestamp
-            setPricingTable(prev => prev.map(row => 
-                row.id === pendingPriceUpdate.city_id 
-                    ? { 
-                        ...row, 
+            setPricingTable(prev => prev.map(row =>
+                row.id === pendingPriceUpdate.city_id
+                    ? {
+                        ...row,
                         price: pendingPriceUpdate.price,
-                        updated_at: data.updated_at 
+                        updated_at: data.updated_at
                     }
                     : row
             ));
@@ -1284,7 +1309,7 @@ const TransactionManagement = () => {
                 if (json.error) throw new Error(json.error);
                 const summaries = json.summaries || [];
                 setSummaries(summaries);
-                
+
                 // Fetch date spans for each summary
                 setLoadingDateSpans(true);
                 const dateSpanPromises = summaries.map(async (summary) => {
@@ -1297,11 +1322,11 @@ const TransactionManagement = () => {
                                 params: { summaryId: summary.id }
                             })
                         });
-                        
+
                         if (response.ok) {
                             const data = await response.json();
                             const contracts = data.contracts || [];
-                            
+
                             if (contracts.length > 0) {
                                 const contractDates = contracts.map(c => new Date(c.created_at)).filter(date => !isNaN(date));
                                 const minDate = new Date(Math.min(...contractDates));
@@ -1316,7 +1341,7 @@ const TransactionManagement = () => {
                         return { summaryId: summary.id, dateSpan: 'N/A' };
                     }
                 });
-                
+
                 const dateSpanResults = await Promise.all(dateSpanPromises);
                 const dateSpanMap = {};
                 dateSpanResults.forEach(result => {
@@ -1343,7 +1368,7 @@ const TransactionManagement = () => {
     const getSortedPendingData = () => {
         return [...filteredData].sort((a, b) => {
             let aValue, bValue;
-            
+
             switch (pendingSortField) {
                 case 'id':
                     aValue = a.id;
@@ -1378,7 +1403,7 @@ const TransactionManagement = () => {
                     const aDeliverySurcharge = Number(a.delivery_surcharge || a.surcharge) || 0;
                     const aDeliveryDiscount = Number(a.delivery_discount || a.discount) || 0;
                     aValue = Math.max(0, (aDeliveryCharge + aDeliverySurcharge) - aDeliveryDiscount);
-                    
+
                     const bDeliveryCharge = Number(b.delivery_charge) || 0;
                     const bDeliverySurcharge = Number(b.delivery_surcharge || b.surcharge) || 0;
                     const bDeliveryDiscount = Number(b.delivery_discount || b.discount) || 0;
@@ -1388,7 +1413,7 @@ const TransactionManagement = () => {
                     aValue = a[pendingSortField] || '';
                     bValue = b[pendingSortField] || '';
             }
-            
+
             if (aValue < bValue) {
                 return pendingSortDirection === 'asc' ? -1 : 1;
             }
@@ -1453,7 +1478,7 @@ const TransactionManagement = () => {
         const contractDates = contracts.map(c => new Date(c.created_at)).filter(date => !isNaN(date));
         const minDate = contractDates.length > 0 ? new Date(Math.min(...contractDates)) : new Date();
         const maxDate = contractDates.length > 0 ? new Date(Math.max(...contractDates)) : new Date();
-        
+
         const dateSpan = `${formatDateFns(minDate, 'MMM d')} to ${formatDateFns(maxDate, 'MMM d, yyyy')}`;
 
         // Calculate summary statistics
@@ -1464,7 +1489,7 @@ const TransactionManagement = () => {
             const delivery_discount = Number(c.delivery_discount || c.discount) || 0;
             return sum + Math.max(0, (delivery_charge + delivery_surcharge) - delivery_discount);
         }, 0);
-        
+
         const deliveredContracts = contracts.filter(c => c.contract_status?.status_name === 'Delivered').length;
         const failedContracts = contracts.filter(c => c.contract_status?.status_name === 'Delivery Failed').length;
 
@@ -1494,7 +1519,7 @@ const TransactionManagement = () => {
 
         try {
             const { summaryId, invoiceId, totalContracts, totalAmount, deliveredContracts, failedContracts, contracts } = pendingSummarizeData;
-            
+
             // Create summary record and update contracts
             const contractIds = contracts.map(c => c.id);
             const createSummaryPayload = {
@@ -1508,20 +1533,20 @@ const TransactionManagement = () => {
                     contractIds
                 }
             };
-            
+
             const createSummaryRes = await fetch('/api/admin', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(createSummaryPayload)
             });
-            
+
             if (!createSummaryRes.ok) {
                 const errorData = await createSummaryRes.json();
                 throw new Error(errorData.error || 'Failed to create summary');
             }
 
             const result = await createSummaryRes.json();
-            
+
             // Update the summary record with the generated invoice number
             const invoiceResponse = await fetch('/api/admin', {
                 method: 'POST',
@@ -1534,13 +1559,13 @@ const TransactionManagement = () => {
                     }
                 })
             });
-            
+
             if (!invoiceResponse.ok) {
                 const errorData = await invoiceResponse.json();
                 throw new Error(errorData.error || 'Failed to update invoice number');
             }
 
-            
+
             const summary = {
                 summaryId,
                 totalContracts,
@@ -1550,7 +1575,7 @@ const TransactionManagement = () => {
                 contracts: contracts,
                 summaryRecord: result.summary
             };
-            
+
             setSummaryData(summary);
             setSummaryOpen(true);
 
@@ -1581,20 +1606,20 @@ const TransactionManagement = () => {
         setPendingSummarizeData(null);
     };
 
-     const handleViewSummaryDetails = (summary) => {
-         // For now, just show the summary data in the existing summary dialog
-         // You can expand this to fetch more detailed information if needed
-         setSummaryData({
-             summaryId: summary.id,
-             totalContracts: 0, // This would need to be fetched from the database
-             totalAmount: summary.total_charge || 0,
-             deliveredContracts: 0, // This would need to be fetched from the database
-             failedContracts: 0, // This would need to be fetched from the database
-             contracts: [], // This would need to be fetched from the database
-             summaryRecord: summary
-         });
-         setSummaryOpen(true);
-     };
+    const handleViewSummaryDetails = (summary) => {
+        // For now, just show the summary data in the existing summary dialog
+        // You can expand this to fetch more detailed information if needed
+        setSummaryData({
+            summaryId: summary.id,
+            totalContracts: 0, // This would need to be fetched from the database
+            totalAmount: summary.total_charge || 0,
+            deliveredContracts: 0, // This would need to be fetched from the database
+            failedContracts: 0, // This would need to be fetched from the database
+            contracts: [], // This would need to be fetched from the database
+            summaryRecord: summary
+        });
+        setSummaryOpen(true);
+    };
 
 
     // Removed complete summary handlers
@@ -1709,7 +1734,7 @@ const TransactionManagement = () => {
                     if (updateRes.ok) {
                         setSummaries(prev => prev.map(s => s.id === previewSummary.id ? { ...s, status_id: 2, status_name: 'Issued a receipt' } : s));
                     }
-                } catch {}
+                } catch { }
             }
 
             // Close share input after sending
@@ -1758,7 +1783,7 @@ const TransactionManagement = () => {
                             proofOfDeliveryData[contract.id] = podData;
                         }
                     }
-                } catch {}
+                } catch { }
             }));
 
             const minDate = contracts.reduce((min, c) => c.created_at && c.created_at < min ? c.created_at : min, contracts[0].created_at);
@@ -1772,7 +1797,7 @@ const TransactionManagement = () => {
                 proofOfDeliveryData
             });
             setPreviewDoc(
-                <CombinedPDFTemplate 
+                <CombinedPDFTemplate
                     contracts={contracts}
                     dateRange={dateRange}
                     invoiceNumber={summary.invoice_id || null}
@@ -1820,14 +1845,14 @@ const TransactionManagement = () => {
                     params: { summaryId: summary.id }
                 })
             });
-            
+
             if (!response.ok) {
                 throw new Error('Failed to fetch contracts for summary');
             }
-            
+
             const data = await response.json();
             const contracts = data.contracts || [];
-            
+
             if (contracts.length === 0) {
                 setSnackbar({
                     open: true,
@@ -1836,7 +1861,7 @@ const TransactionManagement = () => {
                 });
                 return;
             }
-            
+
             // Fetch proof of delivery for all contracts
             const proofOfDeliveryData = {};
             const podPromises = contracts.map(async (contract) => {
@@ -1849,7 +1874,7 @@ const TransactionManagement = () => {
                             params: { contract_id: contract.id }
                         })
                     });
-                    
+
                     if (podResponse.ok) {
                         const podData = await podResponse.json();
                         if (podData.proof_of_delivery) {
@@ -1860,14 +1885,14 @@ const TransactionManagement = () => {
                     console.error(`Error fetching proof of delivery for contract ${contract.id}:`, error);
                 }
             });
-            
+
             await Promise.all(podPromises);
-            
+
             // Generate date range for the contracts
             const minDate = contracts.reduce((min, c) => c.created_at && c.created_at < min ? c.created_at : min, contracts[0].created_at);
             const maxDate = contracts.reduce((max, c) => c.created_at && c.created_at > max ? c.created_at : max, contracts[0].created_at);
             const dateRange = `${formatDate(minDate)} TO ${formatDate(maxDate)}`;
-            
+
             // Set the combined PDF data
             setCombinedPDFData({
                 contracts,
@@ -1875,10 +1900,10 @@ const TransactionManagement = () => {
                 invoiceNumber: summary.invoice_id || null,
                 proofOfDeliveryData
             });
-            
+
             // Trigger PDF generation
             setShouldRenderCombinedPDF(true);
-            
+
             // Auto-trigger download after a short delay to ensure PDF is ready
             setTimeout(() => {
                 if (pdfDownloadRef.current) {
@@ -1890,7 +1915,7 @@ const TransactionManagement = () => {
                     setCombinedPDFData(null);
                 }, 2000);
             }, 1500);
-            
+
             setSnackbar({
                 open: true,
                 message: `Combined SOA and Invoice PDF with Proof of Delivery generated and downloaded for summary ${summary.id}`,
@@ -1909,59 +1934,59 @@ const TransactionManagement = () => {
         }
     };
 
-     // Sorting functions for Summary table
-     const handleSummarySort = (field) => {
-         const isAsc = summarySortField === field && summarySortDirection === 'asc';
-         setSummarySortDirection(isAsc ? 'desc' : 'asc');
-         setSummarySortField(field);
-     };
+    // Sorting functions for Summary table
+    const handleSummarySort = (field) => {
+        const isAsc = summarySortField === field && summarySortDirection === 'asc';
+        setSummarySortDirection(isAsc ? 'desc' : 'asc');
+        setSummarySortField(field);
+    };
 
-     const getSortedSummaries = () => {
-         return [...summaries].sort((a, b) => {
-             let aValue, bValue;
-             
-             switch (summarySortField) {
-                 case 'id':
-                     aValue = a.id;
-                     bValue = b.id;
-                     break;
-                 case 'invoice_id':
-                     aValue = a.invoice_id || '';
-                     bValue = b.invoice_id || '';
-                     break;
-                 case 'status_name':
-                     aValue = a.status_name || '';
-                     bValue = b.status_name || '';
-                     break;
-                 case 'created_at':
-                     aValue = new Date(a.created_at || 0);
-                     bValue = new Date(b.created_at || 0);
-                     break;
-                 case 'due_date':
-                     aValue = new Date(a.due_date || 0);
-                     bValue = new Date(b.due_date || 0);
-                     break;
-                 default:
-                     aValue = a[summarySortField] || '';
-                     bValue = b[summarySortField] || '';
-             }
-             
-             if (aValue < bValue) {
-                 return summarySortDirection === 'asc' ? -1 : 1;
-             }
-             if (aValue > bValue) {
-                 return summarySortDirection === 'asc' ? 1 : -1;
-             }
-             return 0;
-         });
-     };
+    const getSortedSummaries = () => {
+        return [...summaries].sort((a, b) => {
+            let aValue, bValue;
 
-     const getSortIcon = (field) => {
-         if (summarySortField !== field) {
-             return null;
-         }
-         return summarySortDirection === 'asc' ? <ArrowUpwardIcon /> : <ArrowDownwardIcon />;
-     };
+            switch (summarySortField) {
+                case 'id':
+                    aValue = a.id;
+                    bValue = b.id;
+                    break;
+                case 'invoice_id':
+                    aValue = a.invoice_id || '';
+                    bValue = b.invoice_id || '';
+                    break;
+                case 'status_name':
+                    aValue = a.status_name || '';
+                    bValue = b.status_name || '';
+                    break;
+                case 'created_at':
+                    aValue = new Date(a.created_at || 0);
+                    bValue = new Date(b.created_at || 0);
+                    break;
+                case 'due_date':
+                    aValue = new Date(a.due_date || 0);
+                    bValue = new Date(b.due_date || 0);
+                    break;
+                default:
+                    aValue = a[summarySortField] || '';
+                    bValue = b[summarySortField] || '';
+            }
+
+            if (aValue < bValue) {
+                return summarySortDirection === 'asc' ? -1 : 1;
+            }
+            if (aValue > bValue) {
+                return summarySortDirection === 'asc' ? 1 : -1;
+            }
+            return 0;
+        });
+    };
+
+    const getSortIcon = (field) => {
+        if (summarySortField !== field) {
+            return null;
+        }
+        return summarySortDirection === 'asc' ? <ArrowUpwardIcon /> : <ArrowDownwardIcon />;
+    };
 
 
 
@@ -1977,12 +2002,12 @@ const TransactionManagement = () => {
                     params: { contract_id: contractId }
                 })
             });
-            
+
             if (!response.ok) {
                 const errorData = await response.json();
                 throw new Error(errorData.error || 'Failed to fetch proof of delivery');
             }
-            
+
             const data = await response.json();
             if (data.proof_of_delivery) {
                 setPodImage(data.proof_of_delivery);
@@ -2002,9 +2027,9 @@ const TransactionManagement = () => {
     return (
         <Box>
             <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
-                <Tabs 
-                    value={tabValue} 
-                    onChange={handleTabChange} 
+                <Tabs
+                    value={tabValue}
+                    onChange={handleTabChange}
                     aria-label="transaction management tabs"
                     centered
                 >
@@ -2041,12 +2066,12 @@ const TransactionManagement = () => {
                                     onChange={(e) => setCorporationFilter(e.target.value)}
                                 >
                                     <MenuItem value="">All Corporations</MenuItem>
-                                    {Array.from(new Set(Array.from(corporationsById.values()))).sort((a,b)=>a.localeCompare(b)).map(name => (
+                                    {Array.from(new Set(Array.from(corporationsById.values()))).sort((a, b) => a.localeCompare(b)).map(name => (
                                         <MenuItem key={name} value={name}>{name}</MenuItem>
                                     ))}
                                 </Select>
                             </FormControl>
-                            <Button 
+                            <Button
                                 variant="contained"
                                 size="small"
                                 color="primary"
@@ -2062,33 +2087,33 @@ const TransactionManagement = () => {
                             <TableHead>
                                 <TableRow sx={{ backgroundColor: 'primary.main' }}>
                                     <TableCell padding="checkbox" sx={{ color: 'white' }}>
-                                        <Checkbox 
-                                            indeterminate={somePageRowsSelected && !allPageRowsSelected} 
-                                            checked={allPageRowsSelected} 
-                                            onChange={handleSelectAll} 
+                                        <Checkbox
+                                            indeterminate={somePageRowsSelected && !allPageRowsSelected}
+                                            checked={allPageRowsSelected}
+                                            onChange={handleSelectAll}
                                             inputProps={{ 'aria-label': 'select all contracts' }}
                                             sx={{ color: 'white', '&.Mui-checked': { color: 'white' } }}
                                         />
-                                     </TableCell>
-                                     <TableCell 
-                                         sx={{ color: 'white', cursor: 'pointer', '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' } }}
-                                         onClick={() => handlePendingSort('id')}
-                                     >
-                                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                             Tracking ID
-                                             {getPendingSortIcon('id')}
-                                         </Box>
-                                     </TableCell>
-                                     <TableCell 
-                                         sx={{ color: 'white', cursor: 'pointer', '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' } }}
-                                         onClick={() => handlePendingSort('owner_name')}
-                                     >
-                                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                             Luggage Owner
-                                             {getPendingSortIcon('owner_name')}
-                                         </Box>
-                                     </TableCell>
-                                    <TableCell 
+                                    </TableCell>
+                                    <TableCell
+                                        sx={{ color: 'white', cursor: 'pointer', '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' } }}
+                                        onClick={() => handlePendingSort('id')}
+                                    >
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                            Tracking ID
+                                            {getPendingSortIcon('id')}
+                                        </Box>
+                                    </TableCell>
+                                    <TableCell
+                                        sx={{ color: 'white', cursor: 'pointer', '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' } }}
+                                        onClick={() => handlePendingSort('owner_name')}
+                                    >
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                            Luggage Owner
+                                            {getPendingSortIcon('owner_name')}
+                                        </Box>
+                                    </TableCell>
+                                    <TableCell
                                         sx={{ color: 'white', cursor: 'pointer', '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' } }}
                                         onClick={() => handlePendingSort('corporation')}
                                     >
@@ -2097,51 +2122,51 @@ const TransactionManagement = () => {
                                             {getPendingSortIcon('corporation')}
                                         </Box>
                                     </TableCell>
-                                     <TableCell 
-                                         sx={{ color: 'white', cursor: 'pointer', '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' } }}
-                                         onClick={() => handlePendingSort('flight_number')}
-                                     >
-                                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                             Flight No.
-                                             {getPendingSortIcon('flight_number')}
-                                         </Box>
-                                     </TableCell>
-                                     <TableCell 
-                                         sx={{ color: 'white', cursor: 'pointer', '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' } }}
-                                         onClick={() => handlePendingSort('drop_off_location')}
-                                     >
-                                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                             Address
-                                             {getPendingSortIcon('drop_off_location')}
-                                         </Box>
-                                     </TableCell>
-                                     <TableCell 
-                                         sx={{ color: 'white', cursor: 'pointer', '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' } }}
-                                         onClick={() => handlePendingSort('delivered_at')}
-                                     >
-                                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                             Date Received
-                                             {getPendingSortIcon('delivered_at')}
-                                         </Box>
-                                     </TableCell>
-                                     <TableCell 
-                                         sx={{ color: 'white', cursor: 'pointer', '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' } }}
-                                         onClick={() => handlePendingSort('contract_status')}
-                                     >
-                                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                             Status
-                                             {getPendingSortIcon('contract_status')}
-                                         </Box>
-                                     </TableCell>
-                                     <TableCell 
-                                         sx={{ color: 'white', cursor: 'pointer', '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' } }}
-                                         onClick={() => handlePendingSort('amount')}
-                                     >
-                                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                             Amount
-                                             {getPendingSortIcon('amount')}
-                                         </Box>
-                                     </TableCell>
+                                    <TableCell
+                                        sx={{ color: 'white', cursor: 'pointer', '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' } }}
+                                        onClick={() => handlePendingSort('flight_number')}
+                                    >
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                            Flight No.
+                                            {getPendingSortIcon('flight_number')}
+                                        </Box>
+                                    </TableCell>
+                                    <TableCell
+                                        sx={{ color: 'white', cursor: 'pointer', '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' } }}
+                                        onClick={() => handlePendingSort('drop_off_location')}
+                                    >
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                            Address
+                                            {getPendingSortIcon('drop_off_location')}
+                                        </Box>
+                                    </TableCell>
+                                    <TableCell
+                                        sx={{ color: 'white', cursor: 'pointer', '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' } }}
+                                        onClick={() => handlePendingSort('delivered_at')}
+                                    >
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                            Date Received
+                                            {getPendingSortIcon('delivered_at')}
+                                        </Box>
+                                    </TableCell>
+                                    <TableCell
+                                        sx={{ color: 'white', cursor: 'pointer', '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' } }}
+                                        onClick={() => handlePendingSort('contract_status')}
+                                    >
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                            Status
+                                            {getPendingSortIcon('contract_status')}
+                                        </Box>
+                                    </TableCell>
+                                    <TableCell
+                                        sx={{ color: 'white', cursor: 'pointer', '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' } }}
+                                        onClick={() => handlePendingSort('amount')}
+                                    >
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                            Amount
+                                            {getPendingSortIcon('amount')}
+                                        </Box>
+                                    </TableCell>
                                     <TableCell sx={{ color: 'white' }}>Remarks</TableCell>
                                     <TableCell sx={{ color: 'white' }}>Actions</TableCell>
                                 </TableRow>
@@ -2154,19 +2179,19 @@ const TransactionManagement = () => {
                                     const delivery_discount = Number(row.delivery_discount || row.discount) || 0;
                                     const total = Math.max(0, (delivery_charge + delivery_surcharge) - delivery_discount);
                                     const remarks = row.remarks || '';
-                                    
+
                                     // Format luggage owner name from contracts table fields
-                                    const luggageOwner = row.owner_first_name || row.owner_middle_initial || row.owner_last_name 
+                                    const luggageOwner = row.owner_first_name || row.owner_middle_initial || row.owner_last_name
                                         ? `${row.owner_first_name || ''} ${row.owner_middle_initial || ''} ${row.owner_last_name || ''}`.replace(/  +/g, ' ').trim()
                                         : 'N/A';
-                                    
+
                                     return (
                                         <TableRow key={row.id} selected={isRowSelected(row.id)}>
                                             <TableCell padding="checkbox">
-                                                <Checkbox 
-                                                    checked={isRowSelected(row.id)} 
-                                                    onChange={() => handleSelectRow(row.id)} 
-                                                    inputProps={{ 'aria-label': `select contract ${row.id}` }} 
+                                                <Checkbox
+                                                    checked={isRowSelected(row.id)}
+                                                    onChange={() => handleSelectRow(row.id)}
+                                                    inputProps={{ 'aria-label': `select contract ${row.id}` }}
                                                     disabled={isRowLocked(row)}
                                                 />
                                             </TableCell>
@@ -2221,10 +2246,10 @@ const TransactionManagement = () => {
                                 })}
                             </TableBody>
                         </Table>
-                        <TablePagination 
+                        <TablePagination
                             rowsPerPageOptions={[10, 25, 50, 100]}
-                            component="div" 
-                             count={getSortedPendingData().length} 
+                            component="div"
+                            count={getSortedPendingData().length}
                             rowsPerPage={tmRowsPerPage}
                             page={tmPage}
                             onPageChange={handleTmPageChange}
@@ -2245,239 +2270,206 @@ const TransactionManagement = () => {
                         <Alert severity="error">{summariesError}</Alert>
                     ) : (
                         <Box>
-                        <TableContainer component={Paper}>
-                            <Table>
-                                <TableHead>
-                                    <TableRow sx={{ backgroundColor: 'primary.main' }}>
-                                         <TableCell 
-                                             sx={{ color: 'white', cursor: 'pointer', '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' } }}
-                                             onClick={() => handleSummarySort('id')}
-                                         >
-                                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                                 Summary ID
-                                                 {getSortIcon('id')}
-                                             </Box>
-                                        </TableCell>
-                                         <TableCell 
-                                             sx={{ color: 'white', cursor: 'pointer', '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' } }}
-                                             onClick={() => handleSummarySort('invoice_id')}
-                                         >
-                                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                                 Invoice No.
-                                                 {getSortIcon('invoice_id')}
-                                             </Box>
-                                         </TableCell>
-                                         <TableCell 
-                                             sx={{ color: 'white', cursor: 'pointer', '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' } }}
-                                             onClick={() => handleSummarySort('status_name')}
-                                         >
-                                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                                 Status
-                                                 {getSortIcon('status_name')}
-                                             </Box>
-                                         </TableCell>
-                                         <TableCell sx={{ color: 'white' }}>Date Span</TableCell>
-                                         <TableCell 
-                                             sx={{ color: 'white', cursor: 'pointer', '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' } }}
-                                             onClick={() => handleSummarySort('due_date')}
-                                         >
-                                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                                 Due Date
-                                                 {getSortIcon('due_date')}
-                                             </Box>
-                                         </TableCell>
-                                         <TableCell 
-                                             sx={{ color: 'white', cursor: 'pointer', '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' } }}
-                                             onClick={() => handleSummarySort('created_at')}
-                                         >
-                                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                                 Created At
-                                                 {getSortIcon('created_at')}
-                                             </Box>
-                                         </TableCell>
-                                        <TableCell sx={{ color: 'white' }}>Actions</TableCell>
-                                    </TableRow>
-                                </TableHead>
-                                <TableBody>
-                                     {summaries.length === 0 ? (
-                                        <TableRow>
-                                             <TableCell colSpan={7} align="center">No summaries found</TableCell>
-                                        </TableRow>
-                                     ) : getSortedSummaries().map((summary) => (
-                                         <TableRow key={summary.id}>
-                                             <TableCell>{summary.id}</TableCell>
-                                             <TableCell>{summary.invoice_id || 'N/A'}</TableCell>
-                                             <TableCell>
-                                                 <Box sx={{ 
-                                                     display: 'inline-flex', 
-                                                     alignItems: 'center', 
-                                                     px: 1.5, 
-                                                     py: 0.5, 
-                                                     borderRadius: 1,
-                                                     backgroundColor: summary.status_id === 1 ? '#fff3cd' : summary.status_id === 3 ? '#d4edda' : '#d1edff',
-                                                     color: summary.status_id === 1 ? '#856404' : summary.status_id === 3 ? '#155724' : '#0c5460',
-                                                     border: `1px solid ${summary.status_id === 1 ? '#ffeaa7' : summary.status_id === 3 ? '#c3e6cb' : '#bee5eb'}`,
-                                                     fontSize: '0.75rem',
-                                                     fontWeight: 500
-                                                 }}>
-                                                     {summary.status_name || 'N/A'}
-                                                 </Box>
+                            <TableContainer component={Paper}>
+                                <Table>
+                                    <TableHead>
+                                        <TableRow sx={{ backgroundColor: 'primary.main' }}>
+                                            <TableCell
+                                                sx={{ color: 'white', cursor: 'pointer', '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' } }}
+                                                onClick={() => handleSummarySort('id')}
+                                            >
+                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                                    Summary ID
+                                                    {getSortIcon('id')}
+                                                </Box>
                                             </TableCell>
-                                            <TableCell>
-                                                 {loadingDateSpans ? (
-                                                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                                         <CircularProgress size={16} />
-                                                         <Typography variant="body2" sx={{ 
-                                                             fontSize: '0.875rem',
-                                                             color: 'text.primary'
-                                                         }}>
-                                                             Loading...
-                                                         </Typography>
-                                                     </Box>
-                                                 ) : (
-                                                     <Typography variant="body2" sx={{ 
-                                                         fontSize: '0.875rem',
-                                                         color: 'text.primary'
-                                                     }}>
-                                                         {summaryDateSpans[summary.id] || 'N/A'}
-                                                     </Typography>
-                                                 )}
-                                             </TableCell>
-                                             <TableCell>
-                                                 {summary.due_date ? new Date(summary.due_date).toLocaleDateString(undefined, { 
-                                                     year: 'numeric', 
-                                                     month: 'long', 
-                                                     day: 'numeric'
-                                                 }) : ''}
-                                             </TableCell>
-                                             <TableCell>
-                                                 {summary.created_at ? new Date(summary.created_at).toLocaleDateString(undefined, { 
-                                                     year: 'numeric', 
-                                                     month: 'long', 
-                                                     day: 'numeric',
-                                                     hour: '2-digit',
-                                                     minute: '2-digit'
-                                                 }) : ''}
-                                             </TableCell>
-                                             <TableCell>
-                                                  <Box sx={{ display: 'flex', gap: 1 }}>
-                                                     <Button
-                                                          variant="contained"
-                                                          size="small"
-                                                          color="primary"
-                                                          onClick={() => openPreviewForSummary(summary)}
-                                                          disabled={summary.status_id === 3}
-                                                          sx={{
-                                                              backgroundColor: summary.status_id === 3 ? '#ccc' : undefined,
-                                                              color: summary.status_id === 3 ? '#666' : undefined,
-                                                              '&:hover': {
-                                                                  backgroundColor: summary.status_id === 3 ? '#ccc' : undefined
-                                                              }
-                                                          }}
-                                                      >
-                                                          View Preview
-                                                      </Button>
-                                                     
-                                                  </Box>
+                                            <TableCell
+                                                sx={{ color: 'white', cursor: 'pointer', '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' } }}
+                                                onClick={() => handleSummarySort('invoice_id')}
+                                            >
+                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                                    Invoice No.
+                                                    {getSortIcon('invoice_id')}
+                                                </Box>
                                             </TableCell>
+                                            <TableCell
+                                                sx={{ color: 'white', cursor: 'pointer', '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' } }}
+                                                onClick={() => handleSummarySort('status_name')}
+                                            >
+                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                                    Status
+                                                    {getSortIcon('status_name')}
+                                                </Box>
+                                            </TableCell>
+                                            <TableCell sx={{ color: 'white' }}>Date Span</TableCell>
+                                            <TableCell
+                                                sx={{ color: 'white', cursor: 'pointer', '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' } }}
+                                                onClick={() => handleSummarySort('due_date')}
+                                            >
+                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                                    Due Date
+                                                    {getSortIcon('due_date')}
+                                                </Box>
+                                            </TableCell>
+                                            <TableCell
+                                                sx={{ color: 'white', cursor: 'pointer', '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' } }}
+                                                onClick={() => handleSummarySort('created_at')}
+                                            >
+                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                                    Created At
+                                                    {getSortIcon('created_at')}
+                                                </Box>
+                                            </TableCell>
+                                            <TableCell sx={{ color: 'white' }}>Actions</TableCell>
                                         </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        </TableContainer>
-                        
-                        {/* Combined PDF Download Link - Hidden for auto-download */}
-                        {shouldRenderCombinedPDF && combinedPDFData && (
-                            <Box sx={{ display: 'none' }}>
-                                <PDFDownloadLink 
-                                    ref={pdfDownloadRef}
-                                    document={<CombinedPDFTemplate 
-                                        contracts={combinedPDFData.contracts} 
-                                        dateRange={combinedPDFData.dateRange}
-                                        invoiceNumber={combinedPDFData.invoiceNumber}
-                                        proofOfDeliveryData={combinedPDFData.proofOfDeliveryData || {}}
-                                    />}
-                                    fileName={`${combinedPDFData.invoiceNumber || 'invoice'}.pdf`}
-                                >
-                                    {({ loading, error }) => (
-                                        <Button 
-                                            variant="contained" 
-                                            color="success"
-                                            size="large"
-                                            disabled={loading || error}
-                                        >
-                                            {loading ? 'Generating PDF...' : error ? 'Error generating PDF' : 'Download Combined SOA & Invoice PDF'}
-                                        </Button>
+                                    </TableHead>
+                                    <TableBody>
+                                        {summaries.length === 0 ? (
+                                            <TableRow>
+                                                <TableCell colSpan={7} align="center">No summaries found</TableCell>
+                                            </TableRow>
+                                        ) : getSortedSummaries().map((summary) => (
+                                            <TableRow key={summary.id}>
+                                                <TableCell>{summary.id}</TableCell>
+                                                <TableCell>{summary.invoice_id || 'N/A'}</TableCell>
+                                                <TableCell>
+                                                    <Box sx={{
+                                                        display: 'inline-flex',
+                                                        alignItems: 'center',
+                                                        px: 1.5,
+                                                        py: 0.5,
+                                                        borderRadius: 1,
+                                                        backgroundColor: summary.status_id === 1 ? '#fff3cd' : summary.status_id === 3 ? '#d4edda' : '#d1edff',
+                                                        color: summary.status_id === 1 ? '#856404' : summary.status_id === 3 ? '#155724' : '#0c5460',
+                                                        border: `1px solid ${summary.status_id === 1 ? '#ffeaa7' : summary.status_id === 3 ? '#c3e6cb' : '#bee5eb'}`,
+                                                        fontSize: '0.75rem',
+                                                        fontWeight: 500
+                                                    }}>
+                                                        {summary.status_name || 'N/A'}
+                                                    </Box>
+                                                </TableCell>
+                                                <TableCell>
+                                                    {loadingDateSpans ? (
+                                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                            <CircularProgress size={16} />
+                                                            <Typography variant="body2" sx={{
+                                                                fontSize: '0.875rem',
+                                                                color: 'text.primary'
+                                                            }}>
+                                                                Loading...
+                                                            </Typography>
+                                                        </Box>
+                                                    ) : (
+                                                        <Typography variant="body2" sx={{
+                                                            fontSize: '0.875rem',
+                                                            color: 'text.primary'
+                                                        }}>
+                                                            {summaryDateSpans[summary.id] || 'N/A'}
+                                                        </Typography>
+                                                    )}
+                                                </TableCell>
+                                                <TableCell>
+                                                    {summary.due_date ? new Date(summary.due_date).toLocaleDateString(undefined, {
+                                                        year: 'numeric',
+                                                        month: 'long',
+                                                        day: 'numeric'
+                                                    }) : ''}
+                                                </TableCell>
+                                                <TableCell>
+                                                    {summary.created_at ? new Date(summary.created_at).toLocaleDateString(undefined, {
+                                                        year: 'numeric',
+                                                        month: 'long',
+                                                        day: 'numeric',
+                                                        hour: '2-digit',
+                                                        minute: '2-digit'
+                                                    }) : ''}
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Box sx={{ display: 'flex', gap: 1 }}>
+                                                        <Button
+                                                            variant="contained"
+                                                            size="small"
+                                                            color="primary"
+                                                            onClick={() => openPreviewForSummary(summary)}
+                                                            disabled={summary.status_id === 3}
+                                                            sx={{
+                                                                backgroundColor: summary.status_id === 3 ? '#ccc' : undefined,
+                                                                color: summary.status_id === 3 ? '#666' : undefined,
+                                                                '&:hover': {
+                                                                    backgroundColor: summary.status_id === 3 ? '#ccc' : undefined
+                                                                }
+                                                            }}
+                                                        >
+                                                            View Preview
+                                                        </Button>
+
+                                                    </Box>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </TableContainer>
+
+                            {/* Combined PDF Download Link - Hidden for auto-download */}
+                            {shouldRenderCombinedPDF && combinedPDFData && (
+                                <Box sx={{ display: 'none' }}>
+                                    <PDFDownloadLink
+                                        ref={pdfDownloadRef}
+                                        document={<CombinedPDFTemplate
+                                            contracts={combinedPDFData.contracts}
+                                            dateRange={combinedPDFData.dateRange}
+                                            invoiceNumber={combinedPDFData.invoiceNumber}
+                                            proofOfDeliveryData={combinedPDFData.proofOfDeliveryData || {}}
+                                        />}
+                                        fileName={`${combinedPDFData.invoiceNumber || 'invoice'}.pdf`}
+                                    >
+                                        {({ loading, error }) => (
+                                            <Button
+                                                variant="contained"
+                                                color="success"
+                                                size="large"
+                                                disabled={loading || error}
+                                            >
+                                                {loading ? 'Generating PDF...' : error ? 'Error generating PDF' : 'Download Combined SOA & Invoice PDF'}
+                                            </Button>
+                                        )}
+                                    </PDFDownloadLink>
+                                </Box>
+                            )}
+                            {/* Preview Dialog */}
+                            <Dialog open={previewOpen} onClose={handlePreviewClose} maxWidth="lg" fullWidth>
+                                <DialogTitle>PDF Preview</DialogTitle>
+                                <DialogContent dividers>
+                                    {previewLoading ? (
+                                        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 300 }}>
+                                            <CircularProgress />
+                                        </Box>
+                                    ) : previewError ? (
+                                        <Typography color="error">{previewError}</Typography>
+                                    ) : previewDoc ? (
+                                        <Box sx={{ height: 600, border: '1px solid', borderColor: 'divider' }}>
+                                            <PDFViewer key={previewKey} width="100%" height="100%" showToolbar>
+                                                {previewDoc}
+                                            </PDFViewer>
+                                        </Box>
+                                    ) : (
+                                        <Typography color="text.secondary">No preview available.</Typography>
                                     )}
-                                </PDFDownloadLink>
-                            </Box>
-                        )}
-                        {/* Preview Dialog */}
-                        <Dialog open={previewOpen} onClose={handlePreviewClose} maxWidth="lg" fullWidth>
-                            <DialogTitle>PDF Preview</DialogTitle>
-                            <DialogContent dividers>
-                                {previewLoading ? (
-                                    <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 300 }}>
-                                        <CircularProgress />
-                                    </Box>
-                                ) : previewError ? (
-                                    <Typography color="error">{previewError}</Typography>
-                                ) : previewDoc ? (
-                                    <Box sx={{ height: 600, border: '1px solid', borderColor: 'divider' }}>
-                                        <PDFViewer key={previewKey} width="100%" height="100%" showToolbar>
-                                            {previewDoc}
-                                        </PDFViewer>
-                                    </Box>
-                                ) : (
-                                    <Typography color="text.secondary">No preview available.</Typography>
-                                )}
-                                {/* E-Signature section */}
-                                <Divider sx={{ my: 2 }}>Upload e‑signature</Divider>
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                    <input
-                                        type="file"
-                                        accept="image/*"
-                                        onChange={async (e) => {
-                                            const file = e.target.files?.[0];
-                                            if (!file) return;
-                                            const reader = new FileReader();
-                                            reader.onload = () => {
-                                                const dataUrl = reader.result;
-                                                setESignatureDataUrl(dataUrl);
-                                                // Always rebuild from latest combinedPDFData; if absent, rebuild via previewSummary
-                                                if (combinedPDFData) {
-                                                    setPreviewDoc(
-                                                        <CombinedPDFTemplate
-                                                            contracts={combinedPDFData.contracts}
-                                                            dateRange={combinedPDFData.dateRange}
-                                                            invoiceNumber={combinedPDFData.invoiceNumber}
-                                                            proofOfDeliveryData={combinedPDFData.proofOfDeliveryData || {}}
-                                                            eSignatureUrl={dataUrl}
-                                                        />
-                                                    );
-                                                    setPreviewKey(prev => prev + 1);
-                                                } else if (previewSummary) {
-                                                    // In case user uploads before data is set, refetch lightweight rebuild using existing doc
-                                                    setPreviewDoc(prev => (
-                                                        <CombinedPDFTemplate
-                                                            {...prev?.props}
-                                                            eSignatureUrl={dataUrl}
-                                                        />
-                                                    ));
-                                                    setPreviewKey(prev => prev + 1);
-                                                }
-                                            };
-                                            reader.readAsDataURL(file);
-                                        }}
-                                    />
-                                    {eSignatureDataUrl && (
-                                        <>
-                                            <Typography variant="body2" color="text.secondary">Signature attached</Typography>
-                                            <Button 
-                                                variant="contained" 
-                                                size="small"
-                                                onClick={() => {
-                                                    setESignatureDataUrl(null);
+                                    {/* E-Signature section */}
+                                    <Divider sx={{ my: 2 }}>Upload e‑signature</Divider>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                        <input
+                                            type="file"
+                                            accept="image/*"
+                                            onChange={async (e) => {
+                                                const file = e.target.files?.[0];
+                                                if (!file) return;
+                                                const reader = new FileReader();
+                                                reader.onload = () => {
+                                                    const dataUrl = reader.result;
+                                                    setESignatureDataUrl(dataUrl);
+                                                    // Always rebuild from latest combinedPDFData; if absent, rebuild via previewSummary
                                                     if (combinedPDFData) {
                                                         setPreviewDoc(
                                                             <CombinedPDFTemplate
@@ -2485,62 +2477,126 @@ const TransactionManagement = () => {
                                                                 dateRange={combinedPDFData.dateRange}
                                                                 invoiceNumber={combinedPDFData.invoiceNumber}
                                                                 proofOfDeliveryData={combinedPDFData.proofOfDeliveryData || {}}
-                                                                eSignatureUrl={null}
+                                                                eSignatureUrl={dataUrl}
                                                             />
                                                         );
                                                         setPreviewKey(prev => prev + 1);
-                                                    } else {
-                                                        // Also clear from existing preview doc to handle subsequent uploads
+                                                    } else if (previewSummary) {
+                                                        // In case user uploads before data is set, refetch lightweight rebuild using existing doc
                                                         setPreviewDoc(prev => (
                                                             <CombinedPDFTemplate
                                                                 {...prev?.props}
-                                                                eSignatureUrl={null}
+                                                                eSignatureUrl={dataUrl}
                                                             />
                                                         ));
                                                         setPreviewKey(prev => prev + 1);
                                                     }
-                                                }}
-                                            >
-                                                Remove e‑signature
-                                            </Button>
-                                        </>
-                                    )}
-                                </Box>
-                            </DialogContent>
-                            <DialogActions>
-                                <Box sx={{ flex: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center', px: 1 }}>
-                                    <Typography variant="body2" color="text.secondary">
-                                        {previewSummary ? `Summary ID: ${previewSummary.id}` : ''}
-                                    </Typography>
-                                    <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-                                        {showShareEmailField && (
+                                                };
+                                                reader.readAsDataURL(file);
+                                            }}
+                                        />
+                                        {eSignatureDataUrl && (
                                             <>
-                                                <TextField
+                                                <Typography variant="body2" color="text.secondary">Signature attached</Typography>
+                                                <Button
+                                                    variant="contained"
                                                     size="small"
-                                                    label="Recipient Email"
-                                                    value={shareEmail}
-                                                    onChange={(e) => setShareEmail(e.target.value)}
-                                                    error={!!shareEmailError}
-                                                    helperText={shareEmailError}
-                                                    sx={{ minWidth: 260 }}
-                                                />
-                                                <Button onClick={handleSendEmailPdf} variant="contained" color="primary" disabled={!previewDoc || previewLoading}>
-                                                    Send
+                                                    onClick={() => {
+                                                        setESignatureDataUrl(null);
+                                                        if (combinedPDFData) {
+                                                            setPreviewDoc(
+                                                                <CombinedPDFTemplate
+                                                                    contracts={combinedPDFData.contracts}
+                                                                    dateRange={combinedPDFData.dateRange}
+                                                                    invoiceNumber={combinedPDFData.invoiceNumber}
+                                                                    proofOfDeliveryData={combinedPDFData.proofOfDeliveryData || {}}
+                                                                    eSignatureUrl={null}
+                                                                />
+                                                            );
+                                                            setPreviewKey(prev => prev + 1);
+                                                        } else {
+                                                            // Also clear from existing preview doc to handle subsequent uploads
+                                                            setPreviewDoc(prev => (
+                                                                <CombinedPDFTemplate
+                                                                    {...prev?.props}
+                                                                    eSignatureUrl={null}
+                                                                />
+                                                            ));
+                                                            setPreviewKey(prev => prev + 1);
+                                                        }
+                                                    }}
+                                                >
+                                                    Remove e‑signature
                                                 </Button>
                                             </>
                                         )}
-                                        {!showShareEmailField && (
-                                            <Button onClick={handlePreviewSave} variant="contained" disabled={!previewDoc || previewLoading}>Save PDF</Button>
-                                        )}
-                                        <Button onClick={handlePreviewShare} variant="contained" disabled={!previewDoc || previewLoading}>
-                                            {showShareEmailField ? 'Close Share' : 'Share PDF'}
-                                        </Button>
-                                        <Button onClick={handlePreviewClose} variant="contained">Close</Button>
                                     </Box>
-                                </Box>
-                            </DialogActions>
-                        </Dialog>
-                            </Box>
+                                </DialogContent>
+                                <DialogActions>
+                                    <Box sx={{ flex: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center', px: 1 }}>
+                                        <Typography variant="body2" color="text.secondary">
+                                            {previewSummary ? `Summary ID: ${previewSummary.id}` : ''}
+                                        </Typography>
+                                        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                                            {showShareEmailField && (
+                                                <>
+                                                    <Autocomplete
+                                                        size="small"
+                                                        freeSolo
+                                                        options={corporationEmails.map((corp) => ({
+                                                            label: `${corp.corporation_name} - ${corp.corporation_email}`,
+                                                            value: corp.corporation_email
+                                                        }))}
+                                                        value={shareEmail}
+                                                        onChange={(event, newValue) => {
+                                                            if (typeof newValue === 'string') {
+                                                                setShareEmail(newValue);
+                                                            } else if (newValue && newValue.value) {
+                                                                setShareEmail(newValue.value);
+                                                            } else {
+                                                                setShareEmail('');
+                                                            }
+                                                            setShareEmailError('');
+                                                        }}
+                                                        onInputChange={(event, newInputValue) => {
+                                                            setShareEmail(newInputValue);
+                                                            setShareEmailError('');
+                                                        }}
+                                                        renderInput={(params) => (
+                                                            <TextField
+                                                                {...params}
+                                                                label="Recipient Email"
+                                                                error={!!shareEmailError}
+                                                                helperText={shareEmailError}
+                                                                sx={{ minWidth: 400 }}
+                                                            />
+                                                        )}
+                                                        renderOption={(props, option) => {
+                                                            const { key, ...otherProps } = props;
+                                                            return (
+                                                                <Box component="li" key={key} {...otherProps}>
+                                                                    {option.label}
+                                                                </Box>
+                                                            );
+                                                        }}
+                                                    />
+                                                    <Button onClick={handleSendEmailPdf} variant="contained" color="primary" disabled={!previewDoc || previewLoading}>
+                                                        Send
+                                                    </Button>
+                                                </>
+                                            )}
+                                            {!showShareEmailField && (
+                                                <Button onClick={handlePreviewSave} variant="contained" disabled={!previewDoc || previewLoading}>Save PDF</Button>
+                                            )}
+                                            <Button onClick={handlePreviewShare} variant="contained" disabled={!previewDoc || previewLoading}>
+                                                {showShareEmailField ? 'Close Share' : 'Share PDF'}
+                                            </Button>
+                                            <Button onClick={handlePreviewClose} variant="contained">Close</Button>
+                                        </Box>
+                                    </Box>
+                                </DialogActions>
+                            </Dialog>
+                        </Box>
                     )}
                 </Box>
             )}
@@ -2585,43 +2641,43 @@ const TransactionManagement = () => {
                                                 sx={{ color: 'white', '&.Mui-checked': { color: 'white' } }}
                                             />
                                         </TableCell>
-                                         <TableCell 
-                                             sx={{ color: 'white', cursor: 'pointer', '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' } }}
-                                             onClick={() => handlePricingSort('region')}
-                                         >
-                                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                                 <b>Region</b>
-                                                 {getPricingSortIcon('region')}
-                                             </Box>
-                                         </TableCell>
-                                         <TableCell 
-                                             sx={{ color: 'white', cursor: 'pointer', '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' } }}
-                                             onClick={() => handlePricingSort('city')}
-                                         >
-                                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                                 <b>City</b>
-                                                 {getPricingSortIcon('city')}
-                                             </Box>
-                                         </TableCell>
-                                         <TableCell 
-                                             align="right"
-                                             sx={{ color: 'white', cursor: 'pointer', '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' } }}
-                                             onClick={() => handlePricingSort('price')}
-                                         >
-                                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, justifyContent: 'flex-end' }}>
-                                                 <b>Price (₱)</b>
-                                                 {getPricingSortIcon('price')}
-                                             </Box>
-                                         </TableCell>
-                                         <TableCell 
-                                             sx={{ color: 'white', cursor: 'pointer', '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' } }}
-                                             onClick={() => handlePricingSort('updated_at')}
-                                         >
-                                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                                 <b>Last Updated</b>
-                                                 {getPricingSortIcon('updated_at')}
-                                             </Box>
-                                         </TableCell>
+                                        <TableCell
+                                            sx={{ color: 'white', cursor: 'pointer', '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' } }}
+                                            onClick={() => handlePricingSort('region')}
+                                        >
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                                <b>Region</b>
+                                                {getPricingSortIcon('region')}
+                                            </Box>
+                                        </TableCell>
+                                        <TableCell
+                                            sx={{ color: 'white', cursor: 'pointer', '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' } }}
+                                            onClick={() => handlePricingSort('city')}
+                                        >
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                                <b>City</b>
+                                                {getPricingSortIcon('city')}
+                                            </Box>
+                                        </TableCell>
+                                        <TableCell
+                                            align="right"
+                                            sx={{ color: 'white', cursor: 'pointer', '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' } }}
+                                            onClick={() => handlePricingSort('price')}
+                                        >
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, justifyContent: 'flex-end' }}>
+                                                <b>Price (₱)</b>
+                                                {getPricingSortIcon('price')}
+                                            </Box>
+                                        </TableCell>
+                                        <TableCell
+                                            sx={{ color: 'white', cursor: 'pointer', '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' } }}
+                                            onClick={() => handlePricingSort('updated_at')}
+                                        >
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                                <b>Last Updated</b>
+                                                {getPricingSortIcon('updated_at')}
+                                            </Box>
+                                        </TableCell>
                                         <TableCell sx={{ color: 'white' }} align="center"><b>Action</b></TableCell>
                                     </TableRow>
                                 </TableHead>
@@ -2661,8 +2717,8 @@ const TransactionManagement = () => {
                                                 </TableCell>
                                                 <TableCell align="center" sx={{ p: 0 }}>
                                                     <Box sx={{ display: 'flex', justifyContent: 'center' }}>
-                                                        <Button 
-                                                            variant="outlined" 
+                                                        <Button
+                                                            variant="outlined"
                                                             size="small"
                                                             onClick={() => handleEditPriceClick(row)}
                                                         >
@@ -2678,7 +2734,7 @@ const TransactionManagement = () => {
                             <TablePagination
                                 rowsPerPageOptions={[10, 25, 50, 100]}
                                 component="div"
-                                 count={getSortedPricingData().length}
+                                count={getSortedPricingData().length}
                                 rowsPerPage={pricingRowsPerPage}
                                 page={pricingPage}
                                 onPageChange={handlePricingPageChange}
@@ -2891,13 +2947,13 @@ const TransactionManagement = () => {
                     <Button onClick={handleDiscountSubmit} color="primary" disabled={discountLoading || discountValue === ''}>{discountLoading ? 'Saving...' : 'Save'}</Button>
                 </DialogActions>
             </Dialog>
-            <Snackbar 
-                open={snackbar.open} 
-                autoHideDuration={6000} 
+            <Snackbar
+                open={snackbar.open}
+                autoHideDuration={6000}
                 onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}
                 anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
             >
-                <Alert 
+                <Alert
                     severity={snackbar.severity}
                     sx={{ width: '100%' }}
                 >
@@ -2905,8 +2961,8 @@ const TransactionManagement = () => {
                 </Alert>
             </Snackbar>
             {/* Add the Edit Price Dialog */}
-            <Dialog 
-                open={editPriceDialogOpen} 
+            <Dialog
+                open={editPriceDialogOpen}
                 onClose={handleEditPriceClose}
                 maxWidth="xs"
                 fullWidth
@@ -2932,14 +2988,14 @@ const TransactionManagement = () => {
                     </Box>
                 </DialogContent>
                 <DialogActions>
-                    <Button 
-                        onClick={handleEditPriceClose} 
+                    <Button
+                        onClick={handleEditPriceClose}
                         disabled={editPriceLoading}
                     >
                         Cancel
                     </Button>
-                    <Button 
-                        onClick={handleEditPriceSubmit} 
+                    <Button
+                        onClick={handleEditPriceSubmit}
                         color="primary"
                         disabled={editPriceLoading || !editPriceValue}
                     >
@@ -2974,13 +3030,13 @@ const TransactionManagement = () => {
                     </Box>
                 </DialogContent>
                 <DialogActions>
-                    <Button 
+                    <Button
                         onClick={handleCancelUpdate}
                         disabled={editPriceLoading}
                     >
                         Cancel
                     </Button>
-                    <Button 
+                    <Button
                         onClick={handleConfirmUpdate}
                         color="primary"
                         disabled={editPriceLoading}
@@ -3012,14 +3068,14 @@ const TransactionManagement = () => {
                                     </Box>
                                 ) : podImage ? (
                                     <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-                                        <img 
-                                            src={podImage} 
-                                            alt="Proof of Delivery" 
-                                            style={{ 
-                                                maxWidth: '100%', 
-                                                maxHeight: '500px', 
-                                                objectFit: 'contain' 
-                                            }} 
+                                        <img
+                                            src={podImage}
+                                            alt="Proof of Delivery"
+                                            style={{
+                                                maxWidth: '100%',
+                                                maxHeight: '500px',
+                                                objectFit: 'contain'
+                                            }}
                                         />
                                         <Typography variant="body2" color="text.secondary">
                                             Delivered at: {new Date(podContract?.delivery_timestamp).toLocaleString()}
@@ -3087,10 +3143,10 @@ const TransactionManagement = () => {
                                                 const delivery_surcharge = Number(contract.delivery_surcharge || contract.surcharge) || 0;
                                                 const delivery_discount = Number(contract.delivery_discount || contract.discount) || 0;
                                                 const total = Math.max(0, (delivery_charge + delivery_surcharge) - delivery_discount);
-                                                const ownerName = contract.owner_first_name || contract.owner_middle_initial || contract.owner_last_name 
+                                                const ownerName = contract.owner_first_name || contract.owner_middle_initial || contract.owner_last_name
                                                     ? `${contract.owner_first_name || ''} ${contract.owner_middle_initial || ''} ${contract.owner_last_name || ''}`.replace(/  +/g, ' ').trim()
                                                     : 'N/A';
-                                                
+
                                                 return (
                                                     <TableRow key={contract.id}>
                                                         <TableCell>{contract.id}</TableCell>
@@ -3112,8 +3168,8 @@ const TransactionManagement = () => {
                     <Button onClick={handleSummaryClose} color="primary">Close</Button>
                 </DialogActions>
             </Dialog>
-            
-            
+
+
             {/* Removed Complete Confirmation Dialog */}
 
             {/* Summarize Confirmation Dialog */}
@@ -3123,7 +3179,7 @@ const TransactionManagement = () => {
                     {pendingSummarizeData && (
                         <Box sx={{ minWidth: 400 }}>
                             <Typography variant="h6" sx={{ color: 'primary.main', fontWeight: 700, mb: 2 }}>Summary Details</Typography>
-                            
+
                             <Box sx={{ p: 2, bgcolor: 'primary.main', color: 'white', borderRadius: 1, mb: 3 }}>
                                 <Typography variant="body2" sx={{ mb: 1 }}>Summary ID</Typography>
                                 <Typography variant="h5" sx={{ fontWeight: 700, fontFamily: 'monospace' }}>{pendingSummarizeData.summaryId}</Typography>

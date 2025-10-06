@@ -1234,6 +1234,21 @@ export async function POST(req) {
       return NextResponse.json({ corporations: data || [] });
     }
 
+    // Handle fetching corporation emails
+    if (action === 'getCorporationEmails') {
+      const { data, error } = await supabase
+        .from('profiles_corporation')
+        .select('id, corporation_name, corporation_email')
+        .not('corporation_email', 'is', null)
+        .order('corporation_name', { ascending: true });
+
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+
+      return NextResponse.json({ corporationEmails: data || [] });
+    }
+
     // Handle fetching summaries
     if (action === 'getSummaries') {
       try {
