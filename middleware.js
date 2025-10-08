@@ -5,12 +5,27 @@ import { getContractorSessionMiddleware } from './utils/contractorSession';
 export async function middleware(req) {
   const res = NextResponse.next();
   console.log('MIDDLEWARE: path:', req.nextUrl.pathname);
-  const host = req.headers.get('host') || req.nextUrl.host || '';
+  const hostHeader = (req.headers.get('host') || req.nextUrl.host || '').toLowerCase();
+  const hostname = ((hostHeader.split(':')[0] || '') || req.nextUrl.hostname || '').replace(/\.$/, '');
   const path = req.nextUrl.pathname;
 
   const MAIN_HOST = 'www.ghe-easytrack.org';
   const ADMIN_HOST = 'www.admin.ghe-easytrack.org';
   const CONTRACTOR_HOST = 'www.airline.ghe-easytrack.org';
+
+  // Localhost subdomains support for development
+  const isLocalTld = hostname.endsWith('.localhost');
+  const firstLabel = hostname.split('.').shift();
+  const stripWww = (h) => h?.startsWith('www.') ? h.slice(4) : h;
+  const prodHost = stripWww(hostname);
+  const isProdMainHost = prodHost === 'ghe-easytrack.org';
+  const isProdAdminHost = prodHost === 'admin.ghe-easytrack.org';
+  const isProdContractorHost = prodHost === 'airline.ghe-easytrack.org';
+  const isMainHost = isProdMainHost || hostname === 'localhost' || hostname === '127.0.0.1';
+  const isAdminHost = isProdAdminHost || hostname === 'admin.localhost' || (isLocalTld && firstLabel === 'admin');
+  const isContractorHost = isProdContractorHost || hostname === 'airline.localhost' || (isLocalTld && firstLabel === 'airline');
+
+  console.log('MIDDLEWARE: hostname:', hostname, 'isAdminHost:', isAdminHost, 'isContractorHost:', isContractorHost);
 
   // Skip Next.js internals, API routes, and static assets
   const isNextInternal = path.startsWith('/_next');
@@ -21,7 +36,7 @@ export async function middleware(req) {
   }
 
   // Block protected spaces on the main domain
-  if (host === MAIN_HOST) {
+  if (isMainHost) {
     if (path.startsWith('/egc-admin') || path.startsWith('/contractor')) {
       return new NextResponse('Not Found', { status: 404 });
     }
@@ -29,7 +44,7 @@ export async function middleware(req) {
   }
 
   // Admin subdomain: hide /egc-admin in URL while rewriting internally
-  if (host === ADMIN_HOST) {
+  if (isAdminHost) {
     // If user tries to access with prefix, redirect to clean URL
     if (path.startsWith('/egc-admin')) {
       const cleanPath = path.replace(/^\/egc-admin/, '') || '/';
@@ -41,7 +56,7 @@ export async function middleware(req) {
     const internalUrl = new URL(internalPath, req.url);
 
     // Auth exceptions (user-facing clean URLs)
-    const isAuthPage = ['/login', '/forgot-password', '/reset-password', '/verify']
+    const isAuthPage = ['/login', '/forgot-password', '/reset-password', '/verify', '/otp']
       .some(p => path === p);
     if (!isAuthPage) {
       const session = await getAdminSessionMiddleware(req, res);
@@ -57,7 +72,7 @@ export async function middleware(req) {
   }
 
   // Contractor subdomain: hide /contractor in URL while rewriting internally
-  if (host === CONTRACTOR_HOST) {
+  if (isContractorHost) {
     // If user tries to access with prefix, redirect to clean URL
     if (path.startsWith('/contractor')) {
       const cleanPath = path.replace(/^\/contractor/, '') || '/';
