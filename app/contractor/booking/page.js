@@ -117,9 +117,9 @@ export default function Page() {
         contact: ""
     });
     const [luggageForms, setLuggageForms] = useState([{ firstName: "", middleInitial: "", lastName: "", suffix: "", flightNo: "", luggageDescriptions: [""], quantity: "1", contact: "" }]);
-    const [pickupAddress, setPickupAddress] = useState({ 
-        terminal: "", 
-        bay: "", 
+    const [pickupAddress, setPickupAddress] = useState({
+        terminal: "",
+        bay: "",
         location: "",
         coordinates: { lat: null, lng: null }
     });
@@ -188,7 +188,7 @@ export default function Page() {
 
                 const verified = profile?.verify_status?.status_name === 'Verified';
                 setIsVerified(verified);
-                
+
                 if (!verified) {
                     console.log('[BookingPage] User not verified');
                 }
@@ -211,7 +211,7 @@ export default function Page() {
                 const regionResponse = await fetch('/ph-address/region.json');
                 const allRegions = await regionResponse.json();
                 const allowedRegionCodes = ['01', '02', '03', '04', '05', '13', '14', '17'];
-                const filteredRegions = allRegions.filter(region => 
+                const filteredRegions = allRegions.filter(region =>
                     allowedRegionCodes.includes(region.region_code)
                 );
                 setRegions(filteredRegions);
@@ -219,7 +219,7 @@ export default function Page() {
                 // Load provinces and filter by allowed regions
                 const provinceResponse = await fetch('/ph-address/province.json');
                 const allProvinces = await provinceResponse.json();
-                const filteredProvinces = allProvinces.filter(province => 
+                const filteredProvinces = allProvinces.filter(province =>
                     allowedRegionCodes.includes(province.region_code)
                 );
                 setProvinces(filteredProvinces);
@@ -534,8 +534,8 @@ export default function Page() {
         setSelectedRegion(value);
         setSelectedProvince('');
         setSelectedCity('');
-        setContract(prev => ({ ...prev, province: '', city: '', barangay: '' }));
-        
+        setContract(prev => ({ ...prev, province: '', city: '', barangay: '', postalCode: '' }));
+
         // Filter provinces by selected region
         const filtered = provinces.filter(province => province.region_code === value);
         setFilteredProvinces(filtered);
@@ -547,7 +547,7 @@ export default function Page() {
         setSelectedProvince(value);
         setSelectedCity('');
         setContract(prev => ({ ...prev, city: '', barangay: '', postalCode: '' }));
-        
+
         // Find the province code for the selected province name
         const selectedProvinceData = provinces.find(province => province.province_name === value);
         if (selectedProvinceData) {
@@ -563,7 +563,7 @@ export default function Page() {
     const handleCityChange = (value) => {
         setSelectedCity(value);
         setContract(prev => ({ ...prev, barangay: '', postalCode: '' }));
-        
+
         // Find the city code for the selected city name
         const selectedCityData = cities.find(city => city.city_name === value);
         if (selectedCityData) {
@@ -572,6 +572,17 @@ export default function Page() {
             setFilteredBarangays(filtered);
         } else {
             setFilteredBarangays([]);
+        }
+    };
+
+    const handleBarangayChange = (value) => {
+        setContract(prev => ({ ...prev, barangay: value, postalCode: '' }));
+
+        // Find the selected city data to get the postal code
+        const selectedCityData = cities.find(city => city.city_name === contract.city);
+        if (selectedCityData && selectedCityData.postal_code) {
+            // Auto-populate postal code from the selected city after barangay is selected
+            setContract(prev => ({ ...prev, postalCode: selectedCityData.postal_code }));
         }
     };
 
@@ -587,7 +598,7 @@ export default function Page() {
     const handlePickupAddressChange = (field, value) => {
         setPickupAddress(prev => {
             const newState = { ...prev, [field]: value };
-            
+
             // Update location string and coordinates when terminal or bay changes
             if (field === 'terminal' || field === 'bay') {
                 if (newState.terminal && newState.bay) {
@@ -600,10 +611,10 @@ export default function Page() {
                     newState.coordinates = { lat: null, lng: null };
                 }
             }
-            
+
             return newState;
         });
-        
+
         // Clear validation error for this field
         if (validationErrors.pickupLocation) {
             setValidationErrors(prev => ({ ...prev, pickupLocation: null }));
@@ -888,9 +899,9 @@ export default function Page() {
 
     const handleAddLuggageForm = () => {
         if (luggageForms.length < 15) {
-            setLuggageForms(prev => [...prev, { 
-                firstName: "", middleInitial: "", lastName: "", suffix: "", 
-                flightNo: "", luggageDescriptions: [""], quantity: "1", contact: "" 
+            setLuggageForms(prev => [...prev, {
+                firstName: "", middleInitial: "", lastName: "", suffix: "",
+                flightNo: "", luggageDescriptions: [""], quantity: "1", contact: ""
             }]);
         }
     };
@@ -904,15 +915,15 @@ export default function Page() {
     const handleClearLuggageForm = (index) => {
         setLuggageForms(prev => {
             const newForms = [...prev];
-            newForms[index] = { 
-                firstName: "", 
-                middleInitial: "", 
-                lastName: "", 
-                suffix: "", 
-                flightNo: "", 
-                luggageDescriptions: [""], 
-                quantity: "1", 
-                contact: "" 
+            newForms[index] = {
+                firstName: "",
+                middleInitial: "",
+                lastName: "",
+                suffix: "",
+                flightNo: "",
+                luggageDescriptions: [""],
+                quantity: "1",
+                contact: ""
             };
             return newForms;
         });
@@ -1081,7 +1092,7 @@ export default function Page() {
                     id: contractTrackingIDs[i],
                     airline_id: user.id,
                     pickup_location: pickupAddress.location,
-                    pickup_location_geo: pickupAddress.coordinates.lat && pickupAddress.coordinates.lng ? 
+                    pickup_location_geo: pickupAddress.coordinates.lat && pickupAddress.coordinates.lng ?
                         { type: 'Point', coordinates: [pickupAddress.coordinates.lng, pickupAddress.coordinates.lat] } : null,
                     drop_off_location: dropoffAddress.location,
                     drop_off_location_geo: { type: 'Point', coordinates: [dropoffAddress.lng, dropoffAddress.lat] },
@@ -1116,7 +1127,7 @@ export default function Page() {
 
             setSnackbarMessage('Booking created successfully!');
             setSnackbarOpen(true);
-            
+
             // Reset form
             setContract({
                 province: "", city: "", addressLine1: "", addressLine2: "",
@@ -1409,12 +1420,12 @@ export default function Page() {
     // Show loading while checking verification
     if (verificationLoading) {
         return (
-            <Box sx={{ 
-                minHeight: "100vh", 
-                bgcolor: theme.palette.background.default, 
-                display: 'flex', 
-                alignItems: 'center', 
-                justifyContent: 'center' 
+            <Box sx={{
+                minHeight: "100vh",
+                bgcolor: theme.palette.background.default,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
             }}>
                 <Box sx={{ textAlign: 'center' }}>
                     <CircularProgress size={60} />
@@ -1429,29 +1440,29 @@ export default function Page() {
     // Show verification message if not verified
     if (!isVerified) {
         return (
-            <Box sx={{ 
-                minHeight: "100vh", 
-                bgcolor: theme.palette.background.default, 
-                display: 'flex', 
-                alignItems: 'center', 
+            <Box sx={{
+                minHeight: "100vh",
+                bgcolor: theme.palette.background.default,
+                display: 'flex',
+                alignItems: 'center',
                 justifyContent: 'center',
                 p: 4
             }}>
-                <Box sx={{ 
-                    textAlign: 'center', 
+                <Box sx={{
+                    textAlign: 'center',
                     maxWidth: 500,
                     p: 4,
                     borderRadius: 2,
                     bgcolor: 'background.paper',
                     boxShadow: 2
                 }}>
-                    <Box sx={{ 
-                        width: 80, 
-                        height: 80, 
-                        borderRadius: '50%', 
-                        bgcolor: 'warning.main', 
-                        display: 'flex', 
-                        alignItems: 'center', 
+                    <Box sx={{
+                        width: 80,
+                        height: 80,
+                        borderRadius: '50%',
+                        bgcolor: 'warning.main',
+                        display: 'flex',
+                        alignItems: 'center',
                         justifyContent: 'center',
                         mx: 'auto',
                         mb: 3
@@ -1462,12 +1473,12 @@ export default function Page() {
                         Account Not Verified
                     </Typography>
                     <Typography variant="body1" sx={{ mb: 3, color: theme.palette.mode === 'dark' ? 'white' : 'black' }}>
-                        You need to complete your profile verification before accessing the booking system. 
+                        You need to complete your profile verification before accessing the booking system.
                         Please complete your profile information and upload your government ID documents.
                     </Typography>
-                    <Button 
-                        variant="contained" 
-                        color="primary" 
+                    <Button
+                        variant="contained"
+                        color="primary"
                         size="large"
                         onClick={() => router.push('/contractor/profile')}
                         sx={{ px: 4, py: 1.5 }}
@@ -1645,7 +1656,7 @@ export default function Page() {
                                                                     size="small"
                                                                     color="error"
                                                                     onClick={() => handleCancelClick(contract.id)}
-                                                                    disabled={(() => { const s = (contract.contract_status?.status_name || '').toLowerCase(); return ['delivered', 'failed', 'cancelled'].some(k => s.includes(k)); })()}
+                                                                    disabled={contract.contract_status_id !== 1}
                                                                     fullWidth
                                                                 >
                                                                     Cancel
@@ -1850,7 +1861,7 @@ export default function Page() {
                                     <Select
                                         value={contract.barangay}
                                         label="Barangay"
-                                        onChange={(e) => handleInputChange("barangay", e.target.value)}
+                                        onChange={(e) => handleBarangayChange(e.target.value)}
                                     >
                                         {filteredBarangays.map((barangay) => (
                                             <MenuItem key={barangay.brgy_code} value={barangay.brgy_name}>
@@ -1918,12 +1929,12 @@ export default function Page() {
                             Passenger Information
                         </Typography>
                         {luggageForms.map((form, index) => (
-                            <Paper 
-                                key={index} 
-                                elevation={2} 
-                                sx={{ 
-                                    mb: 4, 
-                                    p: 3, 
+                            <Paper
+                                key={index}
+                                elevation={2}
+                                sx={{
+                                    mb: 4,
+                                    p: 3,
                                     position: 'relative',
                                     border: `1px solid ${theme.palette.divider}`,
                                     borderRadius: 2,
@@ -1958,8 +1969,8 @@ export default function Page() {
                                         >
                                             <CloseIcon />
                                         </IconButton>
-                                        </Box>
                                     </Box>
+                                </Box>
                                 <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
                                     <Box sx={{ display: 'flex', gap: 2, width: '100%' }}>
                                         <TextField
@@ -2035,12 +2046,12 @@ export default function Page() {
                                     {form.luggageDescriptions && form.luggageDescriptions.map((description, descIndex) => (
                                         <Box key={descIndex}>
                                             {descIndex === 3 && (
-                                                <Typography 
-                                                    variant="subtitle2" 
-                                                    sx={{ 
-                                                        color: 'primary.main', 
-                                                        fontWeight: 700, 
-                                                        mb: 1, 
+                                                <Typography
+                                                    variant="subtitle2"
+                                                    sx={{
+                                                        color: 'primary.main',
+                                                        fontWeight: 700,
+                                                        mb: 1,
                                                         mt: 1,
                                                         borderTop: `2px solid ${theme.palette.primary.main}`,
                                                         pt: 1
@@ -2146,7 +2157,7 @@ export default function Page() {
                             </Paper>
                         ))}
                     </Box>
-                    
+
                     <Box sx={{ maxWidth: 700, mx: "auto", mt: 2, mb: 4 }}>
                         <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center' }}>
                             <Button
@@ -2160,13 +2171,13 @@ export default function Page() {
                             </Button>
                         </Box>
                     </Box>
-                    <Box sx={{ 
-                        position: 'fixed', 
-                        top: '50%', 
-                        right: 20, 
+                    <Box sx={{
+                        position: 'fixed',
+                        top: '50%',
+                        right: 20,
                         transform: 'translateY(-50%)',
-                        display: 'flex', 
-                        justifyContent: 'flex-end', 
+                        display: 'flex',
+                        justifyContent: 'flex-end',
                         zIndex: 1000,
                         backgroundColor: theme.palette.background.paper,
                         padding: 2,

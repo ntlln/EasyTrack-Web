@@ -205,18 +205,8 @@ function LuggageTrackingContent() {
           return merged;
         });
 
-        // Update current location marker if it exists
-        if (updatedRow?.current_location_geo?.coordinates && currentLocationMarkerRef.current && map) {
-          const newPosition = {
-            lat: updatedRow.current_location_geo.coordinates[1],
-            lng: updatedRow.current_location_geo.coordinates[0]
-          };
-          
-          if (currentLocationMarkerRef.current && currentLocationMarkerRef.current.map) {
-            currentLocationMarkerRef.current.position = newPosition;
-            map.setCenter(newPosition);
-          }
-        }
+        // Note: Map marker updates are now handled manually via the Get Directions button
+        // Real-time updates only update the contract data, not the map visualization
       } catch (err) {
         console.error('Realtime update handling error:', err);
       }
@@ -297,14 +287,7 @@ function LuggageTrackingContent() {
     }
   }, [isScriptLoaded, contract, map]);
 
-  // Auto-run directions once when map and contract are ready (after clicking Track)
-  useEffect(() => {
-    if (map && contract && !autoDirectionsRequestedRef.current) {
-      autoDirectionsRequestedRef.current = true;
-      // Fire and forget; internal guards handle missing coordinates/cooldown
-      handleGetDirections();
-    }
-  }, [map, contract]);
+  // Removed auto-run directions - directions should only be triggered by button click
 
   // Map initialization
   const initMap = () => {
