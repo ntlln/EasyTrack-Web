@@ -1,6 +1,8 @@
 'use server';
 
 import { createClient } from '@supabase/supabase-js';
+import { createServerActionClient } from '@supabase/auth-helpers-nextjs';
+import { cookies } from 'next/headers';
 
 // Validation functions
 function validateEmail(email) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email); }
@@ -17,7 +19,7 @@ function generateSecurePassword(length = 8) {
 }
 
 export async function createUser(formData) {
-    const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+    const adminClient = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 
     try {
         if (!validateEmail(formData.email)) throw new Error('Invalid email format');
@@ -27,7 +29,7 @@ export async function createUser(formData) {
         const encryptedValue = generateSecurePassword();
 
         // Create user account and send invitation email
-        const { data, error: inviteError } = await supabase.auth.admin.inviteUserByEmail(sanitizedEmail, {
+        const { data, error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(sanitizedEmail, {
             email: sanitizedEmail,
             data: { password: encryptedValue, role: formData.role_id },
             options: { emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/accept-invitation` },
@@ -36,7 +38,7 @@ export async function createUser(formData) {
         if (inviteError) throw new Error(inviteError.message);
 
         // Immediately mark email as verified and set initial password
-        const { error: updateError } = await supabase.auth.admin.updateUserById(data.user.id, {
+        const { error: updateError } = await adminClient.auth.admin.updateUserById(data.user.id, {
             email: sanitizedEmail,
             password: encryptedValue,
             email_confirm: true,
@@ -46,7 +48,8 @@ export async function createUser(formData) {
         if (updateError) throw new Error(updateError.message);
 
         // Create user profile
-        const { error: profileError } = await supabase.from('profiles').insert({
+        const userScoped = createServerActionClient({ cookies });
+        const { error: profileError } = await userScoped.from('profiles').insert({
             id: data.user.id,
             email: sanitizedEmail,
             role_id: formData.role_id,
@@ -54,7 +57,7 @@ export async function createUser(formData) {
         });
 
         if (profileError) {
-            await supabase.auth.admin.deleteUser(data.user.id);
+            await adminClient.auth.admin.deleteUser(data.user.id);
             throw new Error('Profile creation failed: ' + profileError.message);
         }
 

@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
-import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
+import { createServerComponentClient, createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from '@google/generative-ai';
 
@@ -23,16 +23,8 @@ export async function GET(request) {
     const action = searchParams.get('action');
     const contractId = searchParams.get('contractId');
 
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL,
-      process.env.SUPABASE_SERVICE_ROLE_KEY,
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false
-        }
-      }
-    );
+    // Use a user-scoped client backed by the anon key and request cookies
+    const supabase = createRouteHandlerClient({ cookies });
 
     // Handle user session fetch for chat support
     if (action === 'userSession') {
@@ -664,16 +656,8 @@ export async function POST(req) {
       const bytes = await file.arrayBuffer();
       const buffer = Buffer.from(bytes);
 
-      const supabase = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL,
-        process.env.SUPABASE_SERVICE_ROLE_KEY,
-        {
-          auth: {
-            autoRefreshToken: false,
-            persistSession: false
-          }
-        }
-      );
+      // Use a user-scoped client for storage operations as well
+      const supabase = createRouteHandlerClient({ cookies });
 
       // Upload file to Supabase storage with upsert
       const { data, error } = await supabase
@@ -708,16 +692,8 @@ export async function POST(req) {
     const body = await req.json();
     const { action, params } = body;
 
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL,
-      process.env.SUPABASE_SERVICE_ROLE_KEY,
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false
-        }
-      }
-    );
+    // Use a user-scoped client backed by the anon key and request cookies
+    const supabase = createRouteHandlerClient({ cookies });
 
     // Handle sending a new message
     if (action === 'sendMessage') {
