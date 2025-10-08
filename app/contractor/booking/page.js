@@ -788,20 +788,51 @@ export default function Page() {
         return null;
     };
 
-    // Calculate total luggages and pricing
+    // Calculate pricing
+    const basePrice = mapCityPrice || 0;
+    const passengerCount = (luggageForms || []).length;
+
+    // Per-passenger multiplier based on that passenger's luggage quantity
+    const getMultiplierForQty = (quantity) => {
+        const qty = Number(quantity || 0);
+        let m = 1;
+        if (qty >= 4) m++;
+        if (qty >= 7) m++;
+        if (qty >= 10) m++;
+        if (qty >= 13) m++;
+        return m;
+    };
+
+    // Build per-passenger breakdown using individual multipliers
+    const passengerCostBreakdown = (luggageForms || []).map((form, idx) => {
+        const qty = Number(form?.quantity || 0);
+        const tiers = getMultiplierForQty(qty);
+        const surchargeCount = Math.max(0, tiers - 1);
+        const surchargeAmount = surchargeCount * basePrice;
+        const amount = basePrice + surchargeAmount; // additive increments per tier
+        const surchargeText = surchargeCount === 0
+            ? 'No surcharge'
+            : `+${surchargeCount} tier(s) after 3 luggages: ₱${Number(surchargeAmount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (base ₱${Number(basePrice).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} × ${surchargeCount})`;
+        const fullName = `${(form.firstName || '').trim()} ${(form.middleInitial || '').trim()} ${(form.lastName || '').trim()}${form.suffix ? ` ${form.suffix}` : ''}`
+            .replace(/  +/g, ' ')
+            .trim();
+        return {
+            index: idx,
+            name: fullName || `Passenger ${idx + 1}`,
+            quantity: qty,
+            amount,
+            surchargeCount,
+            surchargeAmount,
+            surchargeText
+        };
+    });
+
+    // Estimated total is now the sum of per-passenger amounts
+    const estimatedTotalPrice = (passengerCostBreakdown || []).reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
     const totalLuggages = (luggageForms || []).reduce((sum, form) => {
         const qty = Number(form?.quantity || 0);
         return sum + (isNaN(qty) ? 0 : qty);
     }, 0);
-    const basePrice = mapCityPrice || 0;
-    
-    // Pricing tiers: 1-3 luggages = 1x, 4-6 = 2x, 7-9 = 3x, 10-12 = 4x, 13-15 = 5x
-    let surchargeMultiplier = 1;
-    if (totalLuggages >= 4) surchargeMultiplier++;
-    if (totalLuggages >= 7) surchargeMultiplier++;
-    if (totalLuggages >= 10) surchargeMultiplier++;
-    if (totalLuggages >= 13) surchargeMultiplier++;
-    const estimatedTotalPrice = basePrice * surchargeMultiplier;
 
     // Update city and price when drop-off coordinates change
     useEffect(() => {
@@ -1105,6 +1136,9 @@ export default function Page() {
 
             for (let i = 0; i < luggageForms.length; i++) {
                 const form = luggageForms[i];
+                const perPassenger = passengerCostBreakdown?.[i];
+                const deliveryCharge = basePrice; // base city price only
+                const deliverySurcharge = Number(perPassenger?.surchargeAmount || 0);
                 const contractData = {
                     id: contractTrackingIDs[i],
                     airline_id: user.id,
@@ -1128,7 +1162,8 @@ export default function Page() {
                     ].filter(Boolean).join(', '),
                     address_line_1: contract.addressLine1 || null,
                     address_line_2: contract.addressLine2 || null,
-                    delivery_charge: deliveryCharge
+                    delivery_charge: deliveryCharge,
+                    delivery_surcharge: deliverySurcharge
                 };
 
                 const { error: contractError } = await supabase
@@ -1988,8 +2023,8 @@ export default function Page() {
                                         >
                                             <CloseIcon />
                                         </IconButton>
+                                        </Box>
                                     </Box>
-                                </Box>
                                 <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
                                     <Box sx={{ display: 'flex', gap: 2, width: '100%' }}>
                                         <TextField
@@ -2130,7 +2165,7 @@ export default function Page() {
                                             onChange={(e) => {
                                                 const value = e.target.value;
                                                 // Only allow alphanumeric characters and limit to 8 characters
-                                                const alphanumericValue = value.replace(/[^a-zA-Z0-9]/g, '').slice(0, 8);
+                                                const alphanumericValue = value.replace(/[^a-zA-Z0-9]/g, '').slice(0, 6);
                                                 handleLuggageFormChange(index, "flightNo", alphanumericValue);
                                             }}
                                             required
@@ -2138,8 +2173,8 @@ export default function Page() {
                                             helperText={validationErrors.luggage && validationErrors.luggage[index] && validationErrors.luggage[index].flightNo}
                                             sx={{ width: '30%' }}
                                             inputProps={{
-                                                maxLength: 8,
-                                                pattern: '^[a-zA-Z0-9]{1,8}$'
+                                                maxLength: 6,
+                                                pattern: '^[a-zA-Z0-9]{1,6}$'
                                             }}
                                             InputProps={{
                                                 startAdornment: !!flightPrefix ? (
@@ -2204,9 +2239,44 @@ export default function Page() {
                         boxShadow: 3,
                         border: `1px solid ${theme.palette.divider}`
                     }}>
-                        <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
-                            Estimated Total: ₱{Number(estimatedTotalPrice).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </Typography>
+                        <Box>
+                            <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
+                                Estimated Price
+                            </Typography>
+                            <Box sx={{ mt: 0.5 }}>
+                                {(passengerCostBreakdown || []).map((p) => (
+                                    <Box key={`price-break-${p.index}`} sx={{ mb: 0.75 }}>
+                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2 }}>
+                                            <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                                                Passenger {p.index + 1}=
+                                            </Typography>
+                                            <Typography variant="caption" sx={{ fontWeight: 600 }}>
+                                                ₱{Number(p.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                            </Typography>
+                                        </Box>
+                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2, ml: 2 }}>
+                                            <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                                                Base Price =
+                                            </Typography>
+                                            <Typography variant="caption">
+                                                ₱{Number(basePrice || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                            </Typography>
+                                        </Box>
+                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2, ml: 2 }}>
+                                            <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                                                Surcharge (x{p.quantity}) =
+                                            </Typography>
+                                            <Typography variant="caption">
+                                                ₱{Number(p.surchargeAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                            </Typography>
+                                        </Box>
+                                    </Box>
+                                ))}
+                            </Box>
+                            <Typography variant="subtitle1" sx={{ fontWeight: 700, mt: 1.5 }}>
+                                Estimated Total: ₱{Number(estimatedTotalPrice).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </Typography>
+                        </Box>
                     </Box>
                     <Box sx={{ display: "flex", justifyContent: "center", mt: 4, gap: 2 }}>
                         <Button
@@ -2285,7 +2355,25 @@ export default function Page() {
                             <Box sx={{ ml: 1 }}>
                                 <Typography variant="body2"><b>Base price per tier:</b> <span>₱{Number(basePrice || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></Typography>
                                 <Typography variant="body2"><b>Total luggages:</b> <span>{totalLuggages}</span></Typography>
-                                <Typography variant="body2"><b>Pricing tiers:</b> <span>{surchargeMultiplier} tier(s) × ₱{Number(basePrice || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></Typography>
+                                <Typography variant="body2"><b>Pricing rule:</b> <span>Base price increases after every 3 luggages per passenger.</span></Typography>
+                                <Box sx={{ mt: 1.5 }}>
+                                    <Typography variant="body2" sx={{ fontWeight: 700, mb: 0.5 }}>Per-passenger breakdown</Typography>
+                                    {(passengerCostBreakdown || []).map((p) => (
+                                        <Box key={`confirm-price-break-${p.index}`} sx={{ mb: 0.75 }}>
+                                            <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2 }}>
+                                                <Typography variant="body2">
+                                                    {p.name} (x{p.quantity})
+                                                </Typography>
+                                                <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                                                    ₱{Number(p.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                </Typography>
+                                            </Box>
+                                            <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                                                Base: ₱{Number(basePrice).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} — {p.surchargeText}
+                                            </Typography>
+                                        </Box>
+                                    ))}
+                                </Box>
                                 <Typography variant="h6" sx={{ mt: 1, fontWeight: 700 }}>Total: ₱{Number(estimatedTotalPrice || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Typography>
                             </Box>
                         </Box>
