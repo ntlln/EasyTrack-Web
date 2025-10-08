@@ -248,17 +248,7 @@ export default function Page() {
         loadAddressData();
     }, []);
 
-    // Load PH postal codes dataset once
-    useEffect(() => {
-        const loadPostalCodes = async () => {
-            try {
-                const resp = await fetch('/ph-address/postal-codes.json');
-                const data = await resp.json();
-                if (Array.isArray(data)) setPostalCodes(data);
-            } catch (_) { /* ignore */ }
-        };
-        loadPostalCodes();
-    }, []);
+    // (Postal code auto-fill removed; keep manual entry only)
 
     // Philippine address data state
     const [regions, setRegions] = useState([]);
@@ -274,7 +264,7 @@ export default function Page() {
         cities: [],
         barangays: []
     });
-    const [postalCodes, setPostalCodes] = useState([]);
+    // (Postal code dataset state removed)
 
     // Filtered data based on selections
     const [filteredProvinces, setFilteredProvinces] = useState([]);
@@ -585,63 +575,11 @@ export default function Page() {
         }
     };
 
-    // Extract postal code helper
-    const extractPostalCode = (results) => {
-        if (!Array.isArray(results)) return null;
-        for (const res of results) {
-            const comp = (res.address_components || []).find((c) => c.types && c.types.includes('postal_code'));
-            if (comp && comp.long_name) return comp.long_name;
-        }
-        return null;
-    };
+    // (Postal code extraction helpers removed)
 
-    // Extract postal code from a formatted address string as fallback
-    const extractPostalFromString = (formattedAddress) => {
-        if (!formattedAddress || typeof formattedAddress !== 'string') return null;
-        // Common PH zips are 4 digits; sometimes 5-6 appear in Google data
-        const match = formattedAddress.match(/\b(\d{4,6})\b/);
-        return match ? match[1] : null;
-    };
+    // (Postal code municipality lookup removed)
 
-    // Municipality dataset lookup
-    const getPostalCodeForMunicipality = (municipalityName, provinceName) => {
-        if (!municipalityName) return null;
-        const target = normalizeCityString(municipalityName);
-        const provinceNorm = normalizeCityString(provinceName || '');
-        if (!Array.isArray(postalCodes) || postalCodes.length === 0) return null;
-
-        // Normalize Tondo variants
-        const isTondoI = target === 'tondo i' || target === 'tondo 1' || target === 'tondoi';
-        const isTondoII = target === 'tondo ii' || target === 'tondo 2' || target === 'tondoii';
-
-        const exactMatches = postalCodes.filter((row) => normalizeCityString(row.municipality) === target);
-        if (exactMatches.length === 1) return String(exactMatches[0].post_code || '');
-        if (exactMatches.length > 1) {
-            const provinceFiltered = exactMatches.filter((row) => {
-                const loc = normalizeCityString(row.location || '');
-                return loc === provinceNorm || loc.includes(provinceNorm) || provinceNorm.includes(loc);
-            });
-            if (provinceFiltered.length > 0) return String(provinceFiltered[0].post_code || '');
-            return String(exactMatches[0].post_code || '');
-        }
-
-        const partial = postalCodes.find((row) => {
-            const m = normalizeCityString(row.municipality);
-            return m.includes(target) || target.includes(m);
-        });
-        return partial ? String(partial.post_code || '') : null;
-    };
-
-    // Auto-fill postal code ONLY after a barangay is selected, using dataset via city
-    useEffect(() => {
-        const ready = Boolean(contract.barangay && contract.city && contract.province);
-        if (!ready) return;
-        const zip = getPostalCodeForMunicipality(contract.city, contract.province);
-        if (zip) {
-            setContract((prev) => (prev.postalCode === zip ? prev : { ...prev, postalCode: zip }));
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [contract.barangay, contract.city, contract.province, postalCodes]);
+    // (Postal code auto-fill effect removed)
 
     // Remove Google-based and drop-off parsing logic (no longer used)
 

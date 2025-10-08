@@ -19,7 +19,6 @@ export async function middleware(req) {
     console.log('Session in middleware:', session);
     if (!session) {
       const url = new URL('/contractor/login', req.url);
-      url.searchParams.set('redirect', req.nextUrl.pathname);
       return NextResponse.redirect(url);
     }
   }
@@ -30,7 +29,6 @@ export async function middleware(req) {
     const session = await getAdminSession();
     if (!session) {
       const url = new URL('/admin/login', req.url);
-      url.searchParams.set('redirect', req.nextUrl.pathname);
       return NextResponse.redirect(url);
     }
   }
