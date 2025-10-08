@@ -10,9 +10,9 @@ import IconButton from '@mui/material/IconButton';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
-const regionList = [
-  'Batangas', 'Bulacan', 'Cavite', 'Laguna', 'NCR', 'North Luzon', 'Pampanga', 'Rizal', 'South Luzon'
-];
+// Regions fetched from backend `pricing_region`
+// Shape: [{ id, region }]
+// We avoid hardcoding regions and rely on the server source of truth
 
 
 // Price-to-region lookup using actual pricing data
@@ -168,6 +168,8 @@ export default function Page() {
   const [regionData, setRegionData] = useState({});
   const [geocodingLoading, setGeocodingLoading] = useState(false);
   const [pricingLoaded, setPricingLoaded] = useState(false);
+  const [regions, setRegions] = useState([]); // [{ id, region }]
+  const [regionsLoading, setRegionsLoading] = useState(false);
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
   const router = useRouter();
@@ -195,6 +197,31 @@ export default function Page() {
       setPricingLoaded(!!data);
     }
     loadPricingData();
+  }, []);
+
+  // Fetch pricing regions from backend source of truth
+  useEffect(() => {
+    async function loadRegions() {
+      setRegionsLoading(true);
+      try {
+        const response = await fetch('/api/admin', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'getPricingRegion' })
+        });
+        const data = await response.json();
+        if (response.ok && Array.isArray(data.regions)) {
+          setRegions(data.regions);
+        } else {
+          setRegions([]);
+        }
+      } catch (_) {
+        setRegions([]);
+      } finally {
+        setRegionsLoading(false);
+      }
+    }
+    loadRegions();
   }, []);
 
   // Process contracts to detect regions based on price
@@ -240,14 +267,14 @@ export default function Page() {
     .filter(mins => mins > 0);
   const avgDeliveryTime = deliveryTimes.length ? Math.round(deliveryTimes.reduce((a, b) => a + b, 0) / deliveryTimes.length) : 0;
 
-  // Deliveries by region using pricing data
-  const deliveriesByRegion = regionList.map(region => {
-    const count = filteredContracts.filter(c => {
-      const detectedRegion = regionData[c.id];
-      return detectedRegion === region;
-    }).length;
-    return { region, count };
-  });
+  // Deliveries by region using fetched pricing regions and detected region names
+  const deliveriesByRegion = React.useMemo(() => {
+    return (regions || []).map(r => {
+      const regionName = r.region;
+      const count = filteredContracts.filter(c => regionData[c.id] === regionName).length;
+      return { region: regionName, count };
+    });
+  }, [regions, filteredContracts, regionData]);
 
   // Compute status counts for filtered contracts (covered by the filters)
   const statusCounts = React.useMemo(() => {
@@ -301,7 +328,7 @@ export default function Page() {
   }
 
   // Styles
-  const containerStyles = { p: 3, bgcolor: theme.palette.background.default, minHeight: '100vh' };
+  const containerStyles = { p: 3, bgcolor: theme.palette.background.default, minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center' };
   const titleStyles = { mb: 3, color: theme.palette.primary.main, fontWeight: 'bold' };
   const statBoxStyles = {
     p: 2,
@@ -329,7 +356,7 @@ export default function Page() {
 
   return (
     <Box sx={containerStyles}>
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3, width: '100%', maxWidth: 1200 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           <IconButton onClick={() => router.back()} sx={{ color: theme.palette.primary.main }}>
             <ChevronLeftIcon />
@@ -360,7 +387,7 @@ export default function Page() {
           </Select>
         </Box>
       </Box>
-      <Box sx={{ mb: 3 }}>
+      <Box sx={{ mb: 3, width: '100%', maxWidth: 1200 }}>
         <Grid container spacing={2} justifyContent="center">
           {statusList.map((status) => {
             const statusFilterMap = {
@@ -388,7 +415,7 @@ export default function Page() {
         </Grid>
       </Box>
       {/* Success Rate Progress Bar with Details */}
-      <Box sx={{ mb: 3 }}>
+      <Box sx={{ mb: 3, width: '100%', maxWidth: 1200 }}>
         <Card sx={cardStyles}>
           <CardContent>
             <Typography variant="subtitle1" sx={{ mb: 1, color: theme.palette.primary.main, fontWeight: 'bold' }}>Success Rate</Typography>
@@ -405,20 +432,34 @@ export default function Page() {
               </Box>
               <Box>
                 <Typography variant="subtitle1" sx={{ mb: 1, color: theme.palette.primary.main, fontWeight: 'bold' }}>Deliveries by Region</Typography>
-                <List sx={regionListStyles}>
-                  {deliveriesByRegion.map(r => (
-                    <ListItem key={r.region} disablePadding>
-                      <ListItemText primary={`${r.region}: ${r.count} deliveries`} />
-                    </ListItem>
-                  ))}
-                </List>
+                {regionsLoading ? (
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                    <CircularProgress size={20} />
+                    <Typography>Loading regions…</Typography>
+                  </Box>
+                ) : (
+                  <Grid container spacing={2} justifyContent="center" alignItems="stretch">
+                    {deliveriesByRegion.map(r => (
+                      <Grid item xs={12} sm={6} md={4} lg={3} key={r.region}>
+                        <Card sx={{ p: 2, borderRadius: 2, bgcolor: theme.palette.background.paper, boxShadow: isDark ? 2 : 1, border: isDark ? `1px solid ${theme.palette.divider}` : undefined, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                          <Typography variant="subtitle1" color="primary.main" fontWeight="bold" sx={{ mb: 1, textAlign: 'center' }}>
+                            {r.region}
+                          </Typography>
+                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', py: 2 }}>
+                            <Typography variant="h4" sx={{ textAlign: 'center' }}>{r.count}</Typography>
+                          </Box>
+                        </Card>
+                      </Grid>
+                    ))}
+                  </Grid>
+                )}
               </Box>
             </Box>
           </CardContent>
         </Card>
       </Box>
       {/* AI Powered Insights Section */}
-      <Box sx={{ mb: 3 }}>
+      <Box sx={{ mb: 3, width: '100%', maxWidth: 1200 }}>
         <Card sx={cardStyles}>
           <CardContent>
             <Typography variant="h5" sx={{ mb: 1, color: theme.palette.primary.main, fontWeight: 'bold' }}>

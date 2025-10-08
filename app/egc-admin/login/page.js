@@ -32,17 +32,33 @@ export default function Page() {
 
   // Session and role validation
   useEffect(() => {
+    let mounted = true;
     const checkSession = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
-        if (session) {
-          const { data: profile } = await supabase.from('profiles').select('role_id').eq('id', session.user.id).single();
-          if (profile && Number(profile.role_id) === 1) router.push("/egc-admin/"); // 1 = Administrator
+        if (!mounted || !session?.user?.id) return;
+        const { data: profile } = await supabase.from('profiles').select('role_id').eq('id', session.user.id).single();
+        if (profile && Number(profile.role_id) === 1) {
+          router.replace("/egc-admin/");
+          setTimeout(() => router.refresh(), 50);
         }
       } catch (error) { }
     };
     checkSession();
-  }, [router, supabase.auth]);
+
+    const { data: sub } = supabase.auth.onAuthStateChange(async (event, sess) => {
+      if (event === 'SIGNED_IN' && sess?.user?.id) {
+        try {
+          const { data: profile } = await supabase.from('profiles').select('role_id').eq('id', sess.user.id).single();
+          if (profile && Number(profile.role_id) === 1) {
+            router.replace("/egc-admin/");
+            setTimeout(() => router.refresh(), 50);
+          }
+        } catch (_) { }
+      }
+    });
+    return () => { mounted = false; sub?.subscription?.unsubscribe?.(); };
+  }, [router, supabase]);
 
   useEffect(() => { setLoginStatus(getLoginStatus(email)); }, [email]);
 
@@ -139,6 +155,7 @@ export default function Page() {
       console.log('[AdminLogin] About to navigate to /egc-admin/');
       setIsLoading(false); // Stop loading before navigation
       router.replace("/egc-admin/");
+      setTimeout(() => router.refresh(), 50);
       flowComplete = true;
       console.log('[AdminLogin] Navigation initiated, flowComplete set to true');
     } catch (error) {

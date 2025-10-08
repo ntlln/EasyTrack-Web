@@ -644,6 +644,15 @@ const TransactionManagement = () => {
         message: '',
         severity: 'success'
     });
+    const lastToastRef = useRef({ message: '', time: 0 });
+    const showToast = (message, severity = 'success', dedupeMs = 8000) => {
+        const now = Date.now();
+        if (message === lastToastRef.current.message && now - lastToastRef.current.time < dedupeMs) {
+            return; // dedupe repeated messages
+        }
+        lastToastRef.current = { message, time: now };
+        setSnackbar({ open: true, message, severity });
+    };
     const [pricingTable, setPricingTable] = useState([]);
     const [loadingPricingTable, setLoadingPricingTable] = useState(true);
     const [pricingPage, setPricingPage] = useState(0);
@@ -847,11 +856,7 @@ const TransactionManagement = () => {
                 setPricingRegions(data.regions || []);
             } catch (error) {
                 console.error('Error fetching pricing regions:', error);
-                setSnackbar({
-                    open: true,
-                    message: 'Failed to load pricing regions',
-                    severity: 'error'
-                });
+                showToast('Failed to load pricing regions', 'error');
             } finally {
                 setLoadingRegions(false);
             }
@@ -884,11 +889,7 @@ const TransactionManagement = () => {
                 setCities(data.cities || []);
             } catch (error) {
                 setCities([]);
-                setSnackbar({
-                    open: true,
-                    message: 'Failed to load cities',
-                    severity: 'error'
-                });
+                showToast('Failed to load cities', 'error');
             } finally {
                 setLoadingCities(false);
             }
@@ -918,11 +919,7 @@ const TransactionManagement = () => {
                 setPriceValue(data.price ?? '');
             } catch (error) {
                 setPriceValue('');
-                setSnackbar({
-                    open: true,
-                    message: 'Failed to load price',
-                    severity: 'error'
-                });
+                showToast('Failed to load price', 'error');
             } finally {
                 setLoadingPrice(false);
             }
@@ -946,11 +943,7 @@ const TransactionManagement = () => {
                 setPricingTable(data.pricing || []);
             } catch (error) {
                 setPricingTable([]);
-                setSnackbar({
-                    open: true,
-                    message: 'Failed to load pricing table',
-                    severity: 'error'
-                });
+                showToast('Failed to load pricing table', 'error');
             } finally {
                 setLoadingPricingTable(false);
             }
@@ -1268,18 +1261,10 @@ const TransactionManagement = () => {
                     : row
             ));
 
-            setSnackbar({
-                open: true,
-                message: 'Price updated successfully',
-                severity: 'success'
-            });
+            showToast('Price updated successfully', 'success');
         } catch (error) {
             setEditPriceError(error.message || 'Failed to update price');
-            setSnackbar({
-                open: true,
-                message: error.message || 'Failed to update price',
-                severity: 'error'
-            });
+            showToast(error.message || 'Failed to update price', 'error');
         } finally {
             setEditPriceLoading(false);
             setConfirmDialogOpen(false);
@@ -1648,7 +1633,7 @@ const TransactionManagement = () => {
             a.remove();
             URL.revokeObjectURL(url);
         } catch (err) {
-            setSnackbar({ open: true, message: err.message || 'Failed to save PDF', severity: 'error' });
+            showToast(err.message || 'Failed to save PDF', 'error');
         }
     };
 
@@ -1663,7 +1648,7 @@ const TransactionManagement = () => {
                 setShowShareEmailField(true);
             }
         } catch (err) {
-            setSnackbar({ open: true, message: err.message || 'Failed to share PDF', severity: 'error' });
+            showToast(err.message || 'Failed to share PDF', 'error');
         }
     };
 
@@ -1717,7 +1702,7 @@ const TransactionManagement = () => {
             const json = await res.json();
             if (!res.ok) throw new Error(json.error || 'Failed to send email');
 
-            setSnackbar({ open: true, message: 'Email sent successfully', severity: 'success' });
+            showToast('Email sent successfully', 'success');
 
             // After successful email, mark summary as "Issued a receipt" (status_id = 2)
             if (previewSummary?.id) {
@@ -1742,7 +1727,7 @@ const TransactionManagement = () => {
             setShareEmail('');
             setShareEmailError('');
         } catch (err) {
-            setSnackbar({ open: true, message: err.message || 'Failed to send email', severity: 'error' });
+            showToast(err.message || 'Failed to send email', 'error');
         }
     };
 
@@ -1809,7 +1794,7 @@ const TransactionManagement = () => {
             setPreviewOpen(true);
         } catch (error) {
             setPreviewError(error.message || 'Failed to load preview');
-            setSnackbar({ open: true, message: error.message || 'Failed to load preview', severity: 'error' });
+            showToast(error.message || 'Failed to load preview', 'error');
         } finally {
             setPreviewLoading(false);
         }
@@ -1824,11 +1809,7 @@ const TransactionManagement = () => {
         try {
             // Prevent multiple simultaneous PDF generations
             if (shouldRenderCombinedPDF) {
-                setSnackbar({
-                    open: true,
-                    message: 'PDF generation in progress. Please wait...',
-                    severity: 'warning'
-                });
+                showToast('PDF generation in progress. Please wait...', 'warning');
                 return;
             }
 
@@ -1854,11 +1835,7 @@ const TransactionManagement = () => {
             const contracts = data.contracts || [];
 
             if (contracts.length === 0) {
-                setSnackbar({
-                    open: true,
-                    message: 'No contracts found for this summary',
-                    severity: 'warning'
-                });
+                showToast('No contracts found for this summary', 'warning');
                 return;
             }
 
@@ -1916,18 +1893,10 @@ const TransactionManagement = () => {
                 }, 2000);
             }, 1500);
 
-            setSnackbar({
-                open: true,
-                message: `Combined SOA and Invoice PDF with Proof of Delivery generated and downloaded for summary ${summary.id}`,
-                severity: 'success'
-            });
+            showToast(`Combined SOA and Invoice PDF with Proof of Delivery generated and downloaded for summary ${summary.id}`, 'success');
         } catch (error) {
             console.error('Error generating combined PDF:', error);
-            setSnackbar({
-                open: true,
-                message: error.message || 'Failed to generate combined PDF',
-                severity: 'error'
-            });
+            showToast(error.message || 'Failed to generate combined PDF', 'error');
             // Reset state on error
             setShouldRenderCombinedPDF(false);
             setCombinedPDFData(null);
@@ -2632,15 +2601,6 @@ const TransactionManagement = () => {
                             <Table>
                                 <TableHead>
                                     <TableRow sx={{ backgroundColor: 'primary.main' }}>
-                                        <TableCell padding="checkbox" sx={{ color: 'white' }}>
-                                            <Checkbox
-                                                indeterminate={somePagePricingRowsSelected && !allPagePricingRowsSelected}
-                                                checked={allPagePricingRowsSelected}
-                                                onChange={handleSelectAllPricingRows}
-                                                inputProps={{ 'aria-label': 'select all pricing rows' }}
-                                                sx={{ color: 'white', '&.Mui-checked': { color: 'white' } }}
-                                            />
-                                        </TableCell>
                                         <TableCell
                                             sx={{ color: 'white', cursor: 'pointer', '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' } }}
                                             onClick={() => handlePricingSort('region')}
@@ -2694,14 +2654,7 @@ const TransactionManagement = () => {
                                         </TableRow>
                                     ) : (
                                         paginatedPricingTable.map((row) => (
-                                            <TableRow key={row.id} selected={isPricingRowSelected(row.id)}>
-                                                <TableCell padding="checkbox">
-                                                    <Checkbox
-                                                        checked={isPricingRowSelected(row.id)}
-                                                        onChange={() => handleSelectPricingRow(row.id)}
-                                                        inputProps={{ 'aria-label': `select pricing row ${row.id}` }}
-                                                    />
-                                                </TableCell>
+                                            <TableRow key={row.id}>
                                                 <TableCell>{row.region}</TableCell>
                                                 <TableCell>{row.city}</TableCell>
                                                 <TableCell align="right">₱{row.price}</TableCell>

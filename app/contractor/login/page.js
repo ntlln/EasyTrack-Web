@@ -33,6 +33,45 @@ export default function Page() {
 
     useEffect(() => { setLoginStatus(getLoginStatus(email)); }, [email]);
 
+    // Redirect if already signed in and authorized; also listen to auth state changes
+    useEffect(() => {
+        let mounted = true;
+        const run = async () => {
+            try {
+                const { data: { session } } = await supabase.auth.getSession();
+                if (!mounted || !session?.user?.id) return;
+                const { data: profile } = await supabase
+                    .from('profiles')
+                    .select('role_id')
+                    .eq('id', session.user.id)
+                    .single();
+                if (profile && [3, 1].includes(Number(profile.role_id))) {
+                    router.replace('/contractor/');
+                    setTimeout(() => router.refresh(), 50);
+                }
+            } catch (_) { }
+        };
+        run();
+
+        const { data: sub } = supabase.auth.onAuthStateChange(async (event, sess) => {
+            if (!sess?.user?.id) return;
+            if (event === 'SIGNED_IN') {
+                try {
+                    const { data: profile } = await supabase
+                        .from('profiles')
+                        .select('role_id')
+                        .eq('id', sess.user.id)
+                        .single();
+                    if (profile && [3, 1].includes(Number(profile.role_id))) {
+                        router.replace('/contractor/');
+                        setTimeout(() => router.refresh(), 50);
+                    }
+                } catch (_) { }
+            }
+        });
+        return () => { mounted = false; sub?.subscription?.unsubscribe?.(); };
+    }, [router, supabase]);
+
     // Event handlers
     const handleCloseSnackbar = () => setSnackbar(prev => ({ ...prev, open: false }));
 
@@ -143,6 +182,7 @@ export default function Page() {
             await supabase.auth.refreshSession();
             console.log('Redirecting to /contractor/dashboard...');
             router.replace("/contractor/");
+            setTimeout(() => router.refresh(), 50);
             flowComplete = true;
         } catch (error) {
             console.log('Login error:', error);
