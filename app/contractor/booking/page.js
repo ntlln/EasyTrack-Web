@@ -1808,7 +1808,6 @@ export default function Page() {
                                             handleProvinceChange(e.target.value);
                                             handleInputChange("province", e.target.value);
                                         }}
-                                        disabled={!selectedRegion}
                                     >
                                         {filteredProvinces.map((province) => (
                                             <MenuItem key={province.province_code} value={province.province_name}>
@@ -1833,7 +1832,6 @@ export default function Page() {
                                             handleCityChange(e.target.value);
                                             handleInputChange("city", e.target.value);
                                         }}
-                                        disabled={!selectedProvince}
                                     >
                                         {filteredCities.map((city) => (
                                             <MenuItem key={`${city.city_code}-${city.city_name}`} value={city.city_name}>
@@ -1853,7 +1851,6 @@ export default function Page() {
                                         value={contract.barangay}
                                         label="Barangay"
                                         onChange={(e) => handleInputChange("barangay", e.target.value)}
-                                        disabled={!selectedCity}
                                     >
                                         {filteredBarangays.map((barangay) => (
                                             <MenuItem key={barangay.brgy_code} value={barangay.brgy_name}>
