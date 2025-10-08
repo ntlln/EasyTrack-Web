@@ -1,39 +1,90 @@
 import { NextResponse } from 'next/server';
-import { getAdminSession } from './utils/adminSession';
+import { getAdminSessionMiddleware } from './utils/adminSession';
 import { getContractorSessionMiddleware } from './utils/contractorSession';
 
 export async function middleware(req) {
   const res = NextResponse.next();
   console.log('MIDDLEWARE: path:', req.nextUrl.pathname);
+  const host = req.headers.get('host') || req.nextUrl.host || '';
+  const path = req.nextUrl.pathname;
 
-  // Contractor section access control
-  if (req.nextUrl.pathname.startsWith('/contractor')) {
-    if (
-      req.nextUrl.pathname === '/contractor/login' ||
-      req.nextUrl.pathname === '/contractor/forgot-password' ||
-      req.nextUrl.pathname === '/contractor/reset-password' ||
-      req.nextUrl.pathname === '/contractor/verify' ||
-      req.nextUrl.pathname === '/contractor/otp'
-    ) return res;
-    const session = await getContractorSessionMiddleware(req, res);
-    console.log('Session in middleware:', session);
-    if (!session) {
-      const url = new URL('/contractor/login', req.url);
-      return NextResponse.redirect(url);
-    }
+  const MAIN_HOST = 'www.ghe-easytrack.org';
+  const ADMIN_HOST = 'www.admin.ghe-easytrack.org';
+  const CONTRACTOR_HOST = 'www.airline.ghe-easytrack.org';
+
+  // Skip Next.js internals, API routes, and static assets
+  const isNextInternal = path.startsWith('/_next');
+  const isApiRoute = path.startsWith('/api');
+  const isAsset = path.includes('.') || path === '/favicon.ico' || path === '/robots.txt' || path === '/sitemap.xml';
+  if (isNextInternal || isApiRoute || isAsset) {
+    return res;
   }
 
-  // Admin section access control
-  if (req.nextUrl.pathname.startsWith('/admin')) {
-    if (req.nextUrl.pathname === '/admin/login') return res;
-    const session = await getAdminSession();
-    if (!session) {
-      const url = new URL('/admin/login', req.url);
-      return NextResponse.redirect(url);
+  // Block protected spaces on the main domain
+  if (host === MAIN_HOST) {
+    if (path.startsWith('/egc-admin') || path.startsWith('/contractor')) {
+      return new NextResponse('Not Found', { status: 404 });
     }
+    return res;
+  }
+
+  // Admin subdomain: hide /egc-admin in URL while rewriting internally
+  if (host === ADMIN_HOST) {
+    // If user tries to access with prefix, redirect to clean URL
+    if (path.startsWith('/egc-admin')) {
+      const cleanPath = path.replace(/^\/egc-admin/, '') || '/';
+      const cleanUrl = new URL(cleanPath, req.url);
+      return NextResponse.redirect(cleanUrl);
+    }
+
+    const internalPath = `/egc-admin${path === '/' ? '' : path}`;
+    const internalUrl = new URL(internalPath, req.url);
+
+    // Auth exceptions (user-facing clean URLs)
+    const isAuthPage = ['/login', '/forgot-password', '/reset-password', '/verify']
+      .some(p => path === p);
+    if (!isAuthPage) {
+      const session = await getAdminSessionMiddleware(req, res);
+      if (!session) {
+        // Redirect user to clean login URL
+        const loginUrl = new URL('/login', req.url);
+        return NextResponse.redirect(loginUrl);
+      }
+    }
+
+    // Rewrite to internal admin route structure
+    return NextResponse.rewrite(internalUrl);
+  }
+
+  // Contractor subdomain: hide /contractor in URL while rewriting internally
+  if (host === CONTRACTOR_HOST) {
+    // If user tries to access with prefix, redirect to clean URL
+    if (path.startsWith('/contractor')) {
+      const cleanPath = path.replace(/^\/contractor/, '') || '/';
+      const cleanUrl = new URL(cleanPath, req.url);
+      return NextResponse.redirect(cleanUrl);
+    }
+
+    const internalPath = `/contractor${path === '/' ? '' : path}`;
+    const internalUrl = new URL(internalPath, req.url);
+
+    // Auth exceptions (user-facing clean URLs)
+    const isAuthPage = ['/login', '/forgot-password', '/reset-password', '/verify', '/otp']
+      .some(p => path === p);
+    if (!isAuthPage) {
+      const session = await getContractorSessionMiddleware(req, res);
+      if (!session) {
+        // Redirect user to clean login URL
+        const loginUrl = new URL('/login', req.url);
+        return NextResponse.redirect(loginUrl);
+      }
+    }
+
+    // Rewrite to internal contractor route structure
+    return NextResponse.rewrite(internalUrl);
   }
 
   return res;
 }
 
-export const config = { matcher: ['/contractor/:path*', '/admin/:path*'] }; 
+export const config = { matcher: ['/:path*'] };
