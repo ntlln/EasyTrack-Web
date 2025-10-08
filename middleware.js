@@ -48,12 +48,15 @@ export async function middleware(req) {
     // If user tries to access with prefix, redirect to clean URL
     if (path.startsWith('/egc-admin')) {
       const cleanPath = path.replace(/^\/egc-admin/, '') || '/';
-      const cleanUrl = new URL(cleanPath, req.url);
+      const cleanUrl = req.nextUrl.clone();
+      cleanUrl.pathname = cleanPath;
+      // Preserve search params
       return NextResponse.redirect(cleanUrl);
     }
 
     const internalPath = `/egc-admin${path === '/' ? '' : path}`;
-    const internalUrl = new URL(internalPath, req.url);
+    const internalUrl = req.nextUrl.clone();
+    internalUrl.pathname = internalPath;
 
     // Auth exceptions (user-facing clean URLs)
     const isAuthPage = ['/login', '/forgot-password', '/reset-password', '/verify', '/otp']
@@ -67,7 +70,7 @@ export async function middleware(req) {
       }
     }
 
-    // Rewrite to internal admin route structure
+    // Rewrite to internal admin route structure (preserves existing query params)
     return NextResponse.rewrite(internalUrl);
   }
 
@@ -76,12 +79,15 @@ export async function middleware(req) {
     // If user tries to access with prefix, redirect to clean URL
     if (path.startsWith('/contractor')) {
       const cleanPath = path.replace(/^\/contractor/, '') || '/';
-      const cleanUrl = new URL(cleanPath, req.url);
+      const cleanUrl = req.nextUrl.clone();
+      cleanUrl.pathname = cleanPath;
+      // Preserve search params
       return NextResponse.redirect(cleanUrl);
     }
 
     const internalPath = `/contractor${path === '/' ? '' : path}`;
-    const internalUrl = new URL(internalPath, req.url);
+    const internalUrl = req.nextUrl.clone();
+    internalUrl.pathname = internalPath;
 
     // Auth exceptions (user-facing clean URLs)
     const isAuthPage = ['/login', '/forgot-password', '/reset-password', '/verify', '/otp']
@@ -95,7 +101,7 @@ export async function middleware(req) {
       }
     }
 
-    // Rewrite to internal contractor route structure
+    // Rewrite to internal contractor route structure (preserves existing query params)
     return NextResponse.rewrite(internalUrl);
   }
 

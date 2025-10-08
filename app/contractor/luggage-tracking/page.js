@@ -35,6 +35,8 @@ function LuggageTrackingContent() {
   const [map, setMap] = useState(null);
   const [isScriptLoaded, setIsScriptLoaded] = useState(false);
   const [mapError, setMapError] = useState(null);
+  const autoDirectionsRequestedRef = useRef(false);
+  const didInitialRefreshRef = useRef(false);
   // Directions API related state
   const [routeData, setRouteData] = useState({ eta: null, distanceRemaining: null, progress: 0, polyline: null, totalDistance: null });
   const [isLoadingDirections, setIsLoadingDirections] = useState(false);
@@ -63,13 +65,55 @@ function LuggageTrackingContent() {
     return () => { if (cooldownInterval) clearInterval(cooldownInterval); };
   }, [cooldownRemaining]);
 
-  // Handle contract ID from URL
+  // Mount-only fallback to capture contractId immediately on first client render
   useEffect(() => {
-    const idFromUrl = searchParams.get('contractId');
-    if (idFromUrl) {
-      setContractId(idFromUrl);
-      handleSearch(idFromUrl);
-    }
+    try {
+      if (typeof window === 'undefined') return;
+      const idFromUrl = new URLSearchParams(window.location.search).get('contractId');
+      if (idFromUrl) {
+        if (!didInitialRefreshRef.current) {
+          didInitialRefreshRef.current = true;
+          router.refresh();
+          setTimeout(() => {
+            setContractId((prev) => prev || idFromUrl);
+            if (!contract) {
+              handleSearch(idFromUrl);
+            }
+          }, 50);
+        } else {
+          setContractId((prev) => prev || idFromUrl);
+          if (!contract) {
+            handleSearch(idFromUrl);
+          }
+        }
+      }
+    } catch {}
+  }, []);
+
+  // Handle contract ID from URL (robust for localhost/navigation)
+  useEffect(() => {
+    try {
+      let idFromUrl = null;
+      if (typeof window !== 'undefined') {
+        idFromUrl = new URLSearchParams(window.location.search).get('contractId');
+      }
+      if (!idFromUrl) {
+        idFromUrl = searchParams.get('contractId');
+      }
+      if (idFromUrl && idFromUrl !== contractId) {
+        if (!didInitialRefreshRef.current) {
+          didInitialRefreshRef.current = true;
+          router.refresh();
+          setTimeout(() => {
+            setContractId(idFromUrl);
+            handleSearch(idFromUrl);
+          }, 50);
+        } else {
+          setContractId(idFromUrl);
+          handleSearch(idFromUrl);
+        }
+      }
+    } catch {}
   }, [searchParams]);
 
   // Fetch contract and luggage info via API (mirror admin)
@@ -84,7 +128,7 @@ function LuggageTrackingContent() {
     
     setLoading(true);
     try {
-      const response = await fetch(`/api/admin?contractId=${id}`);
+      const response = await fetch(`/api/admin?contractId=${id}&includeSummarized=1`);
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Failed to fetch contract data');
@@ -268,9 +312,16 @@ function LuggageTrackingContent() {
     }
   };
 
-  // Google Maps script loader (mirror admin)
+  // Google Maps script loader (robust)
   useEffect(() => {
-    if (contract && !isScriptLoaded && !window.google) {
+    if (!contract) return;
+
+    if (typeof window !== 'undefined' && window.google) {
+      if (!isScriptLoaded) setIsScriptLoaded(true);
+      return;
+    }
+
+    if (!isScriptLoaded) {
       const script = document.createElement('script');
       script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places,marker`;
       script.async = true;
@@ -292,6 +343,14 @@ function LuggageTrackingContent() {
       initMap();
     }
   }, [isScriptLoaded, contract, map]);
+
+  // Auto-run directions once when map and contract are ready (after clicking Track)
+  useEffect(() => {
+    if (map && contract && !autoDirectionsRequestedRef.current) {
+      autoDirectionsRequestedRef.current = true;
+      handleGetDirections();
+    }
+  }, [map, contract]);
 
   // Map initialization
   const initMap = () => {

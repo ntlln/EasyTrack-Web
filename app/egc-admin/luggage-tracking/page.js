@@ -35,6 +35,7 @@ function LuggageTrackingContent() {
   const [map, setMap] = useState(null);
   const [isScriptLoaded, setIsScriptLoaded] = useState(false);
   const [mapError, setMapError] = useState(null);
+  const autoDirectionsRequestedRef = useRef(false);
   
   // Directions API related state
   const [routeData, setRouteData] = useState({
@@ -59,13 +60,58 @@ function LuggageTrackingContent() {
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState("");
   const [snackbarSeverity, setSnackbarSeverity] = useState("info");
+  const didInitialRefreshRef = useRef(false);
 
-  // Handle contract ID from URL
+  // Mount-only fallback to capture contractId immediately on first client render
   useEffect(() => {
-    const idFromUrl = searchParams.get('contractId');
-    if (idFromUrl) {
-      setContractId(idFromUrl);
-      handleSearch(idFromUrl);
+    try {
+      if (typeof window === 'undefined') return;
+      const idFromUrl = new URLSearchParams(window.location.search).get('contractId');
+      if (idFromUrl) {
+        if (!didInitialRefreshRef.current) {
+          didInitialRefreshRef.current = true;
+          router.refresh();
+          setTimeout(() => {
+            setContractId((prev) => prev || idFromUrl);
+            if (!contract) {
+              handleSearch(idFromUrl);
+            }
+          }, 50);
+        } else {
+          setContractId((prev) => prev || idFromUrl);
+          if (!contract) {
+            handleSearch(idFromUrl);
+          }
+        }
+      }
+    } catch {}
+  }, []);
+
+  // Handle contract ID from URL (robust for localhost/navigation)
+  useEffect(() => {
+    try {
+      let idFromUrl = null;
+      if (typeof window !== 'undefined') {
+        idFromUrl = new URLSearchParams(window.location.search).get('contractId');
+      }
+      if (!idFromUrl) {
+        idFromUrl = searchParams.get('contractId');
+      }
+      if (idFromUrl && idFromUrl !== contractId) {
+        if (!didInitialRefreshRef.current) {
+          didInitialRefreshRef.current = true;
+          router.refresh();
+          setTimeout(() => {
+            setContractId(idFromUrl);
+            handleSearch(idFromUrl);
+          }, 50);
+        } else {
+          setContractId(idFromUrl);
+          handleSearch(idFromUrl);
+        }
+      }
+    } catch (e) {
+      // no-op
     }
   }, [searchParams]);
 
@@ -81,7 +127,7 @@ function LuggageTrackingContent() {
     
     try {
       console.log('Fetching contract data for ID:', id);
-      const response = await fetch(`/api/admin?contractId=${id}`);
+      const response = await fetch(`/api/admin?contractId=${id}&includeSummarized=1`);
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Failed to fetch contract data');
@@ -212,7 +258,15 @@ function LuggageTrackingContent() {
 
   // Google Maps script loader
   useEffect(() => {
-    if (contract && !isScriptLoaded && !window.google) {
+    if (!contract) return;
+
+    // If Google Maps is already available (loaded elsewhere), mark as loaded
+    if (typeof window !== 'undefined' && window.google) {
+      if (!isScriptLoaded) setIsScriptLoaded(true);
+      return;
+    }
+
+    if (!isScriptLoaded) {
       console.log('Loading Google Maps script...');
       const script = document.createElement('script');
       script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places,marker`;
@@ -242,6 +296,15 @@ function LuggageTrackingContent() {
       initMap();
     }
   }, [isScriptLoaded, contract, map]);
+
+  // Auto-run directions once when map and contract are ready (after clicking Track)
+  useEffect(() => {
+    if (map && contract && !autoDirectionsRequestedRef.current) {
+      autoDirectionsRequestedRef.current = true;
+      // Fire and forget; internal guards handle missing coordinates/cooldown
+      handleGetDirections();
+    }
+  }, [map, contract]);
 
   // Map initialization
   const initMap = () => {

@@ -291,6 +291,7 @@ export async function GET(request) {
     // Handle getContract action for polling
     if (action === 'getContract') {
       const contractId = searchParams.get('contractId');
+      const includeSummarized = searchParams.get('includeSummarized') === '1';
       if (!contractId) {
         return NextResponse.json(
           { error: 'Contract ID is required' },
@@ -298,7 +299,7 @@ export async function GET(request) {
         );
       }
 
-      const { data: contract, error: contractError } = await supabase
+      let query = supabase
         .from('contracts')
         .select(`
           id, created_at, accepted_at, pickup_at, delivered_at, cancelled_at,
@@ -310,9 +311,14 @@ export async function GET(request) {
           airline:airline_id (*),
           delivery:delivery_id (*)
         `)
-        .eq('id', contractId)
-        .is('summary_id', null)
-        .single();
+        .eq('id', contractId);
+
+      // Only exclude summarized when not explicitly included
+      if (!includeSummarized) {
+        query = query.is('summary_id', null);
+      }
+
+      const { data: contract, error: contractError } = await query.single();
 
       if (contractError) {
         console.error('Error fetching contract for polling:', contractError);
