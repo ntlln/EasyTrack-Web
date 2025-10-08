@@ -20,7 +20,9 @@ function ContractorLayoutContent({ children }) {
   const router = useRouter();
   const supabase = createClientComponentClient();
   const [checkingSession, setCheckingSession] = useState(true);
-  const isAuthPage = pathname === "/contractor/login" || pathname === "/contractor/forgot-password" || pathname === "/contractor/reset-password" || pathname === "/contractor/verify" || pathname === "/contractor/otp";
+  // Auth page check (support clean URLs on subdomain and internal prefixed paths)
+  const normalizedPath = pathname?.startsWith('/contractor') ? pathname.replace(/^\/contractor/, '') || '/' : pathname;
+  const isAuthPage = normalizedPath === "/login" || normalizedPath === "/forgot-password" || normalizedPath === "/reset-password" || normalizedPath === "/verify" || normalizedPath === "/otp";
   const contractorRoleId = 3; // Contractor
 
   // Session and role validation
@@ -29,7 +31,7 @@ function ContractorLayoutContent({ children }) {
     const checkSession = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
-        if (!session || !session.user) { router.replace("/contractor/login"); return; }
+        if (!session || !session.user) { router.replace("/login"); return; }
 
         const { data: profile } = await supabase.from('profiles').select('role_id').eq('id', session.user.id).single();
         // const { data: contractorRole } = await supabase.from('profiles_roles').select('id').eq('role_name', 'AirAsia').single();
@@ -51,14 +53,14 @@ function ContractorLayoutContent({ children }) {
             }
           } catch (_) { }
           await supabase.auth.signOut();
-          router.replace("/contractor/login");
+          router.replace("/login");
           return;
         }
 
         setCheckingSession(false);
       } catch (error) {
         console.error('Session check error:', error);
-        router.replace("/contractor/login");
+        router.replace("/login");
       }
     };
     checkSession();

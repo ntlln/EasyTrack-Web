@@ -29,8 +29,9 @@ function AdminLayoutContent({ children }) {
     const [activeToast, setActiveToast] = useState(null);
     const [notifications, setNotifications] = useState([]);
 
-    // Auth page check
-    const isAuthPage = pathname === "/egc-admin/login" || pathname === "/egc-admin/forgot-password" || pathname === "/egc-admin/reset-password" || pathname === "/egc-admin/verify" || pathname === "/egc-admin/otp";
+    // Auth page check (support clean URLs on subdomain and internal prefixed paths)
+    const normalizedPath = pathname?.startsWith('/egc-admin') ? pathname.replace(/^\/egc-admin/, '') || '/' : pathname;
+    const isAuthPage = normalizedPath === "/login" || normalizedPath === "/forgot-password" || normalizedPath === "/reset-password" || normalizedPath === "/verify" || normalizedPath === "/otp";
 
     // Auth and session management
     useEffect(() => {
@@ -52,7 +53,7 @@ function AdminLayoutContent({ children }) {
                     if (!retrySession && mounted) { 
                         console.log('[AdminLayout] Still no session after retry, redirect to login'); 
                         setIsLoading(false); 
-                        router.replace("/egc-admin/login"); 
+                        router.replace("/login"); 
                     } 
                     return; 
                 }
@@ -65,13 +66,13 @@ function AdminLayoutContent({ children }) {
                 if (!profile || !adminRoleId || Number(profile.role_id) !== Number(adminRoleId)) {
                     console.warn('[AdminLayout] Role check failed. Signing out.');
                     await supabase.auth.signOut();
-                    if (mounted) { console.log('[AdminLayout] Signed out due to role, redirecting'); setIsLoading(false); router.replace("/egc-admin/login"); }
+                    if (mounted) { console.log('[AdminLayout] Signed out due to role, redirecting'); setIsLoading(false); router.replace("/login"); }
                     return;
                 }
 
                 const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event) => {
                     console.log('[AdminLayout] onAuthStateChange event:', event);
-                    if (event === 'SIGNED_OUT' && mounted) { console.log('[AdminLayout] SIGNED_OUT -> stop loading and redirect'); setIsLoading(false); router.replace("/egc-admin/login"); }
+                    if (event === 'SIGNED_OUT' && mounted) { console.log('[AdminLayout] SIGNED_OUT -> stop loading and redirect'); setIsLoading(false); router.replace("/login"); }
                     if (event === 'SIGNED_OUT') {
                         try {
                             let userId = lastUserIdRef.current;
@@ -100,7 +101,7 @@ function AdminLayoutContent({ children }) {
                 if (mounted) { console.log('[AdminLayout] Session valid. Rendering app.'); setIsLoading(false); }
             } catch (error) {
                 console.error('[AdminLayout] checkSession error:', error);
-                if (mounted) { console.log('[AdminLayout] Error path -> redirect to login'); setIsLoading(false); router.replace("/egc-admin/login"); }
+                if (mounted) { console.log('[AdminLayout] Error path -> redirect to login'); setIsLoading(false); router.replace("/login"); }
             }
         };
         checkSession();
