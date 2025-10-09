@@ -16,16 +16,53 @@ export default function Page() {
   const [isValidSession, setIsValidSession] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Session validation
+  // Handle password reset callback: exchange code for a session then proceed
   useEffect(() => {
-    const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
+    const handlePasswordReset = async () => {
+      try {
+        const url = new URL(window.location.href);
+        const code = url.searchParams.get('code');
+        
+        // If already signed in, proceed
+        const existingSession = await supabase.auth.getSession();
+        if (existingSession?.data?.session) {
+          setIsValidSession(true);
+          return;
+        }
+
+        // If no code, show invalid link
+        if (!code) {
+          setSnackbar({ open: true, message: 'Invalid or expired reset link. Please request a new password reset.', severity: 'error' });
+          setTimeout(() => router.push('/contractor/login'), 3000);
+          return;
+        }
+
+        // Exchange code for session
+        const { error } = await supabase.auth.exchangeCodeForSession(window.location.href);
+        if (error) {
+          console.error('Password reset exchange error:', error);
+          setSnackbar({ open: true, message: 'Invalid or expired reset link. Please request a new password reset.', severity: 'error' });
+          setTimeout(() => router.push('/contractor/login'), 3000);
+          return;
+        }
+
+        // Verify session is established
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          setSnackbar({ open: true, message: 'Invalid or expired reset link. Please request a new password reset.', severity: 'error' });
+          setTimeout(() => router.push('/contractor/login'), 3000);
+          return;
+        }
+
+        setIsValidSession(true);
+      } catch (err) {
+        console.error('Password reset error:', err);
         setSnackbar({ open: true, message: 'Invalid or expired reset link. Please request a new password reset.', severity: 'error' });
         setTimeout(() => router.push('/contractor/login'), 3000);
-      } else { setIsValidSession(true); }
+      }
     };
-    checkSession();
+
+    handlePasswordReset();
   }, [router, supabase.auth]);
 
   // Event handlers
