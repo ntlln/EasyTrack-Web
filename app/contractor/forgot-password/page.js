@@ -46,8 +46,14 @@ export default function Page() {
             }
 
             // Only proceed with password reset if user is verified
+            // Determine the correct redirect URL based on environment
+            const isProduction = process.env.NODE_ENV === 'production';
+            const redirectUrl = isProduction 
+                ? 'https://www.airline.ghe-easytrack.org/reset-password'
+                : `${window.location.origin}/contractor/reset-password`;
+
             const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, { 
-                redirectTo: `${window.location.origin}/contractor/reset-password` 
+                redirectTo: redirectUrl 
             });
             
             if (resetError) { 

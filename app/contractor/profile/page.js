@@ -149,7 +149,13 @@ export default function Page() {
         setResetLoading(true); setResetStatus({ message: '', severity: '' });
         if (resetEmail !== userEmail) { setResetStatus({ message: 'Please enter your registered email address', severity: 'error' }); setResetLoading(false); return; }
         try {
-            const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, { redirectTo: `${window.location.origin}/contractor/profile/reset-password` });
+            // Determine the correct redirect URL based on environment
+            const isProduction = process.env.NODE_ENV === 'production';
+            const redirectUrl = isProduction 
+                ? 'https://www.airline.ghe-easytrack.org/profile/reset-password'
+                : `${window.location.origin}/contractor/profile/reset-password`;
+
+            const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, { redirectTo: redirectUrl });
             if (error) throw error;
             setResetStatus({ message: 'Password reset link sent to your email', severity: 'success' });
             setTimeout(() => { setResetOpen(false); setResetStatus({ message: '', severity: '' }); setResetEmail(''); }, 2000);

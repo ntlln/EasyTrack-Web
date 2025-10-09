@@ -23,9 +23,15 @@ export default function Page() {
         setSnackbar({ open: false, message: "", severity: "error" });
 
         try {
+            // Determine the correct redirect URL based on environment
+            const isProduction = process.env.NODE_ENV === 'production';
+            const redirectUrl = isProduction 
+                ? 'https://www.airline.ghe-easytrack.org/verify'
+                : `${window.location.origin}/contractor/verify`;
+
             const { error } = await supabase.auth.signInWithOtp({
                 email: email,
-                options: { emailRedirectTo: `${window.location.origin}/contractor/verify` }
+                options: { emailRedirectTo: redirectUrl }
             });
             
             if (error) throw error;
