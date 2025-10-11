@@ -1,10 +1,13 @@
 import { NextResponse } from 'next/server';
 import { getAdminSessionMiddleware } from './utils/adminSession';
 import { getContractorSessionMiddleware } from './utils/contractorSession';
+import { applySecurityHeaders } from './lib/security-headers';
 
 export async function middleware(req) {
-  const res = NextResponse.next();
-  console.log('MIDDLEWARE: path:', req.nextUrl.pathname);
+  let res = NextResponse.next();
+  
+  // Apply security headers
+  res = applySecurityHeaders(res);
   const hostHeader = (req.headers.get('host') || req.nextUrl.host || '').toLowerCase();
   const hostname = ((hostHeader.split(':')[0] || '') || req.nextUrl.hostname || '').replace(/\.$/, '');
   const path = req.nextUrl.pathname;
@@ -25,8 +28,6 @@ export async function middleware(req) {
   const isAdminHost = isProdAdminHost || hostname === 'admin.localhost' || (isLocalTld && firstLabel === 'admin');
   const isContractorHost = isProdContractorHost || hostname === 'airline.localhost' || (isLocalTld && firstLabel === 'airline');
 
-  console.log('MIDDLEWARE: hostname:', hostname, 'isAdminHost:', isAdminHost, 'isContractorHost:', isContractorHost);
-
   // Skip Next.js internals, API routes, and static assets
   const isNextInternal = path.startsWith('/_next');
   const isApiRoute = path.startsWith('/api');
@@ -38,7 +39,8 @@ export async function middleware(req) {
   // Block protected spaces on the main domain
   if (isMainHost) {
     if (path.startsWith('/egc-admin') || path.startsWith('/contractor')) {
-      return new NextResponse('Not Found', { status: 404 });
+      const notFoundResponse = new NextResponse('Not Found', { status: 404 });
+      return applySecurityHeaders(notFoundResponse);
     }
     return res;
   }
@@ -51,7 +53,8 @@ export async function middleware(req) {
       const cleanUrl = req.nextUrl.clone();
       cleanUrl.pathname = cleanPath;
       // Preserve search params
-      return NextResponse.redirect(cleanUrl);
+      const redirectResponse = NextResponse.redirect(cleanUrl);
+      return applySecurityHeaders(redirectResponse);
     }
 
     const internalPath = `/egc-admin${path === '/' ? '' : path}`;
@@ -66,7 +69,8 @@ export async function middleware(req) {
       if (!session) {
         // Redirect user to clean login URL
         const loginUrl = new URL('/login', req.url);
-        return NextResponse.redirect(loginUrl);
+        const redirectResponse = NextResponse.redirect(loginUrl);
+        return applySecurityHeaders(redirectResponse);
       }
     }
 
@@ -82,7 +86,8 @@ export async function middleware(req) {
       const cleanUrl = req.nextUrl.clone();
       cleanUrl.pathname = cleanPath;
       // Preserve search params
-      return NextResponse.redirect(cleanUrl);
+      const redirectResponse = NextResponse.redirect(cleanUrl);
+      return isDevelopment ? applyDevelopmentSecurityHeaders(redirectResponse) : applySecurityHeaders(redirectResponse);
     }
 
     const internalPath = `/contractor${path === '/' ? '' : path}`;
@@ -97,7 +102,8 @@ export async function middleware(req) {
       if (!session) {
         // Redirect user to clean login URL
         const loginUrl = new URL('/login', req.url);
-        return NextResponse.redirect(loginUrl);
+        const redirectResponse = NextResponse.redirect(loginUrl);
+        return applySecurityHeaders(redirectResponse);
       }
     }
 
