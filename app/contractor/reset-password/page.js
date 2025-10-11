@@ -1,10 +1,12 @@
 "use client"
 
-import { Box, Typography, Button, TextField, Snackbar, Alert, CircularProgress } from "@mui/material";
+import { Box, Typography, Button, TextField, Snackbar, Alert, CircularProgress, IconButton, InputAdornment } from "@mui/material";
 import { Global } from '@emotion/react';
 import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import Visibility from '@mui/icons-material/Visibility';
+import VisibilityOff from '@mui/icons-material/VisibilityOff';
 
 export default function Page() {
   // Client and state setup
@@ -12,6 +14,8 @@ export default function Page() {
   const supabase = createClientComponentClient();
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'error' });
   const [isValidSession, setIsValidSession] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -67,6 +71,8 @@ export default function Page() {
 
   // Event handlers
   const handleCloseSnackbar = () => setSnackbar(prev => ({ ...prev, open: false }));
+  const handleTogglePasswordVisibility = () => setShowPassword(!showPassword);
+  const handleToggleConfirmPasswordVisibility = () => setShowConfirmPassword(!showConfirmPassword);
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSnackbar({ open: false, message: '', severity: 'error' });
@@ -120,8 +126,52 @@ export default function Page() {
           <Typography variant="h3" sx={{ color: "primary.main", fontWeight: "bold" }}>EasyTrack</Typography>
           <Typography color="secondary.main">Reset Password</Typography>
           <form onSubmit={handleSubmit} style={formStyles}>
-            <TextField label="New Password" type="password" placeholder="Enter new password" required sx={{ width: "70%" }} value={password} onChange={(e) => setPassword(e.target.value)} disabled={isLoading} />
-            <TextField label="Confirm Password" type="password" placeholder="Confirm new password" required sx={{ width: "70%" }} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} disabled={isLoading} />
+            <TextField 
+              label="New Password" 
+              type={showPassword ? "text" : "password"} 
+              placeholder="Enter new password" 
+              required 
+              sx={{ width: "70%" }} 
+              value={password} 
+              onChange={(e) => setPassword(e.target.value)} 
+              disabled={isLoading}
+              InputProps={{
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <IconButton
+                      aria-label="toggle password visibility"
+                      onClick={handleTogglePasswordVisibility}
+                      edge="end"
+                    >
+                      {showPassword ? <VisibilityOff /> : <Visibility />}
+                    </IconButton>
+                  </InputAdornment>
+                ),
+              }}
+            />
+            <TextField 
+              label="Confirm Password" 
+              type={showConfirmPassword ? "text" : "password"} 
+              placeholder="Confirm new password" 
+              required 
+              sx={{ width: "70%" }} 
+              value={confirmPassword} 
+              onChange={(e) => setConfirmPassword(e.target.value)} 
+              disabled={isLoading}
+              InputProps={{
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <IconButton
+                      aria-label="toggle confirm password visibility"
+                      onClick={handleToggleConfirmPasswordVisibility}
+                      edge="end"
+                    >
+                      {showConfirmPassword ? <VisibilityOff /> : <Visibility />}
+                    </IconButton>
+                  </InputAdornment>
+                ),
+              }}
+            />
             <Button type="submit" variant="contained" color="primary" sx={buttonStyles} disabled={isLoading}>
               {!isLoading ? "Reset Password" : <CircularProgress size={24} sx={{ color: "primary.main" }} />}
             </Button>

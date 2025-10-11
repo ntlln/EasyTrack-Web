@@ -1,11 +1,13 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Box, Grid, CardContent, Typography, Button, Avatar, Paper, IconButton, Alert, CircularProgress, Snackbar, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Tabs, Tab } from '@mui/material';
+import { Box, Grid, CardContent, Typography, Button, Avatar, Paper, IconButton, Alert, CircularProgress, Snackbar, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Tabs, Tab, InputAdornment, Tooltip } from '@mui/material';
 import { useRouter } from 'next/navigation';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useTheme } from '@mui/material/styles';
 import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import dynamic from 'next/dynamic';
 
@@ -46,6 +48,9 @@ export default function Page() {
     const [newPassword, setNewPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
     const [changePwLoading, setChangePwLoading] = useState(false);
+    const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+    const [showNewPassword, setShowNewPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [tabIndex, setTabIndex] = useState(0);
 
     // Image cropping states
@@ -218,6 +223,7 @@ export default function Page() {
         finally { setChangePwLoading(false); }
     };
 
+
     if (!profile) return <Box p={4}><Typography>No profile found.</Typography></Box>;
 
     const user = {
@@ -367,17 +373,84 @@ export default function Page() {
                 </DialogActions>
             </Dialog>
 
-            <Dialog open={changePwOpen} onClose={() => { setChangePwOpen(false); setCurrentPassword(""); setNewPassword(""); setConfirmPassword(""); }} fullWidth maxWidth="xs" PaperProps={{ sx: dialogStyles }}>
-                <DialogContent sx={dialogContentStyles}>
-                    <Typography variant="h5" sx={dialogTitleStyles}>Change Password</Typography>
-                    <TextField label="Current Password" type="password" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} placeholder="Enter current password" required fullWidth InputLabelProps={{ sx: inputLabelStyles }} />
-                    <TextField label="New Password" type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="Enter new password" required fullWidth InputLabelProps={{ sx: inputLabelStyles }} />
-                    <TextField label="Confirm Password" type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} placeholder="Confirm new password" required fullWidth InputLabelProps={{ sx: inputLabelStyles }} />
-                    <Box sx={dialogActionsStyles}>
-                        <Button sx={actionButtonStyles} variant="contained" color="primary" onClick={handleChangePassword} disabled={changePwLoading || !newPassword || !confirmPassword}>{changePwLoading ? "Changing..." : "Change Password"}</Button>
-                        <Button sx={actionButtonStyles} onClick={() => { setChangePwOpen(false); setCurrentPassword(""); setNewPassword(""); setConfirmPassword(""); }} color="secondary" disabled={changePwLoading}>Cancel</Button>
-                    </Box>
+            <Dialog open={changePwOpen} onClose={() => { setChangePwOpen(false); setCurrentPassword(""); setNewPassword(""); setConfirmPassword(""); }} fullWidth maxWidth="xs" PaperProps={{ sx: { backgroundColor: isDark ? theme.palette.grey[900] : theme.palette.background.paper, color: theme.palette.text.primary } }}>
+                <DialogTitle sx={dialogTitleStyles}>
+                    Change Password
+                </DialogTitle>
+                <DialogContent sx={{ ...dialogContentStyles, gap: 2.5 }}>
+                    <TextField
+                        label="Current Password"
+                        type={showCurrentPassword ? 'text' : 'password'}
+                        value={currentPassword}
+                        onChange={e => setCurrentPassword(e.target.value)}
+                        placeholder="Enter current password"
+                        required
+                        fullWidth
+                        InputLabelProps={{ sx: inputLabelStyles }}
+                        InputProps={{
+                            endAdornment: (
+                                <InputAdornment position="end">
+                                    <Tooltip title={showCurrentPassword ? 'Hide' : 'Show'}>
+                                        <IconButton onClick={() => setShowCurrentPassword(v => !v)} edge="end">
+                                            {showCurrentPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                                        </IconButton>
+                                    </Tooltip>
+                                </InputAdornment>
+                            )
+                        }}
+                    />
+
+                    <TextField
+                        label="New Password"
+                        type={showNewPassword ? 'text' : 'password'}
+                        value={newPassword}
+                        onChange={e => setNewPassword(e.target.value)}
+                        placeholder="Enter new password"
+                        required
+                        fullWidth
+                        InputLabelProps={{ sx: inputLabelStyles }}
+                        InputProps={{
+                            endAdornment: (
+                                <InputAdornment position="end">
+                                    <Tooltip title={showNewPassword ? 'Hide' : 'Show'}>
+                                        <IconButton onClick={() => setShowNewPassword(v => !v)} edge="end">
+                                            {showNewPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                                        </IconButton>
+                                    </Tooltip>
+                                </InputAdornment>
+                            )
+                        }}
+                    />
+
+
+                    <TextField
+                        label="Confirm Password"
+                        type={showConfirmPassword ? 'text' : 'password'}
+                        value={confirmPassword}
+                        onChange={e => setConfirmPassword(e.target.value)}
+                        placeholder="Confirm new password"
+                        required
+                        fullWidth
+                        error={!!confirmPassword && confirmPassword !== newPassword}
+                        helperText={confirmPassword && confirmPassword !== newPassword ? 'Passwords do not match' : ' '}
+                        InputLabelProps={{ sx: inputLabelStyles }}
+                        InputProps={{
+                            endAdornment: (
+                                <InputAdornment position="end">
+                                    <Tooltip title={showConfirmPassword ? 'Hide' : 'Show'}>
+                                        <IconButton onClick={() => setShowConfirmPassword(v => !v)} edge="end">
+                                            {showConfirmPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                                        </IconButton>
+                                    </Tooltip>
+                                </InputAdornment>
+                            )
+                        }}
+                    />
                 </DialogContent>
+                <DialogActions sx={{ px: 3, pb: 3, display: 'flex', flexDirection: 'column', gap: 0.625 }}>
+                    <Button variant="contained" color="primary" onClick={handleChangePassword} disabled={changePwLoading || !newPassword || !confirmPassword || confirmPassword !== newPassword} sx={{ width: '100%' }}>{changePwLoading ? "Changing..." : "Change Password"}</Button>
+                    <Button onClick={() => { setChangePwOpen(false); setCurrentPassword(""); setNewPassword(""); setConfirmPassword(""); }} color="secondary" disabled={changePwLoading} sx={{ width: '100%', color: 'error.main' }}>Cancel</Button>
+                </DialogActions>
             </Dialog>
 
             <Dialog open={cropDialogOpen} onClose={() => { setCropDialogOpen(false); setImgSrc(''); setSelectedFile(null); setImgRef(null); setIsImageLoaded(false); setCrop({ unit: 'px', width: 0, height: 0, x: 0, y: 0 }); }} maxWidth="md" fullWidth PaperProps={{ sx: dialogStyles }}>
