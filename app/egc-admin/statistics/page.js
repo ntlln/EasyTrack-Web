@@ -490,7 +490,7 @@ export default function Page() {
                 disabled={insightLoading}
               >
                 {insightLoading && (
-                  <CircularProgress size={18} sx={{ color: '#fff' }} />
+                  <CircularProgress size={18} sx={{ color: 'primary.main' }} />
                 )}
                 Generate Insight
               </button>

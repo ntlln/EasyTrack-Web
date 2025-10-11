@@ -16,11 +16,11 @@ import DarkModeIcon from '@mui/icons-material/DarkMode';
 import LightModeIcon from '@mui/icons-material/LightMode';
 import MenuIcon from '@mui/icons-material/Menu';
 import WarningIcon from '@mui/icons-material/Warning';
-import { ColorModeContext } from "../../layout";
+import { ColorModeContext } from "../layout";
 import { useTheme } from "@mui/material/styles";
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
-export default function Page() {
+export default function ContractorSidebar() {
     return (
         <Suspense fallback={<div>Loading...</div>}>
             <ContractorSidebarContent />
@@ -350,7 +350,14 @@ function ContractorSidebarContent() {
                     {!isMinimized && <Typography noWrap>{mode === 'light' ? 'Dark Mode' : 'Light Mode'}</Typography>}
                 </Button>
 
-                <Button variant="contained" color="error" startIcon={<LogoutIcon />} onClick={handleLogout} fullWidth sx={buttonStyles}>
+                <Button variant="contained" startIcon={<LogoutIcon />} onClick={handleLogout} fullWidth sx={{
+                    ...buttonStyles,
+                    bgcolor: '#D13137',
+                    color: 'white',
+                    '&:hover': {
+                        bgcolor: '#B82A2F'
+                    }
+                }}>
                     {!isMinimized && "Logout"}
                 </Button>
             </Box>

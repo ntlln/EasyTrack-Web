@@ -7,6 +7,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import dynamic from 'next/dynamic';
 import Layout from '../components/Layout';
+import Navbar from '../components/Navbar';
 
 // Map component
 const MapComponent = dynamic(() => Promise.resolve(({ mapRef, mapError }) => (
@@ -63,6 +64,7 @@ export default function Test() {
 
     return () => clearInterval(interval);
   }, [images.length]);
+
 
   // Fetch contract and luggage info from Supabase
   const fetchData = async (id = contractId) => {
@@ -328,7 +330,7 @@ export default function Test() {
       const newPolyline = new window.google.maps.Polyline({
         path: routePath,
         geodesic: true,
-        strokeColor: '#4CAF50',
+        strokeColor: 'success.main',
         strokeOpacity: 0.8,
         strokeWeight: 5,
         map: map
@@ -346,7 +348,7 @@ export default function Test() {
       const newPolyline = new window.google.maps.Polyline({
         path: fallbackPath,
         geodesic: true,
-        strokeColor: '#4CAF50',
+        strokeColor: 'success.main',
         strokeOpacity: 0.8,
         strokeWeight: 6,
         map: map
@@ -500,10 +502,10 @@ export default function Test() {
           </style>
           <div class="location-marker">
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="12" cy="12" r="10" fill="#4CAF50" fill-opacity="0.6"/>
-              <circle cx="12" cy="12" r="8" fill="#4CAF50" fill-opacity="0.8"/>
-              <circle cx="12" cy="12" r="6" fill="#4CAF50" fill-opacity="0.9"/>
-              <circle cx="12" cy="12" r="4" fill="#4CAF50"/>
+              <circle cx="12" cy="12" r="10" fill="success.main" fill-opacity="0.6"/>
+              <circle cx="12" cy="12" r="8" fill="success.main" fill-opacity="0.8"/>
+              <circle cx="12" cy="12" r="6" fill="success.main" fill-opacity="0.9"/>
+              <circle cx="12" cy="12" r="4" fill="success.main"/>
               <circle cx="12" cy="12" r="2" fill="white"/>
             </svg>
           </div>
@@ -524,9 +526,9 @@ export default function Test() {
         console.log('Adding pickup location marker:', contract.pickup_location_geo.coordinates);
         const pickupMarker = new window.google.maps.marker.PinElement({
           scale: 1,
-          background: '#2196F3',
-          borderColor: '#1976D2',
-          glyphColor: '#FFFFFF'
+          background: 'info.main',
+          borderColor: 'info.dark',
+          glyphColor: 'info.contrastText'
         });
 
         const pickupPosition = {
@@ -549,9 +551,9 @@ export default function Test() {
         console.log('Adding drop-off location marker:', contract.drop_off_location_geo.coordinates);
         const dropoffMarker = new window.google.maps.marker.PinElement({
           scale: 1,
-          background: '#FF9800',
-          borderColor: '#F57C00',
-          glyphColor: '#FFFFFF'
+          background: 'warning.main',
+          borderColor: 'warning.dark',
+          glyphColor: 'warning.contrastText'
         });
 
         const dropoffPosition = {
@@ -656,10 +658,10 @@ export default function Test() {
             </style>
             <div class="location-marker">
               <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <circle cx="12" cy="12" r="10" fill="#4CAF50" fill-opacity="0.6"/>
-                <circle cx="12" cy="12" r="8" fill="#4CAF50" fill-opacity="0.8"/>
-                <circle cx="12" cy="12" r="6" fill="#4CAF50" fill-opacity="0.9"/>
-                <circle cx="12" cy="12" r="4" fill="#4CAF50"/>
+                <circle cx="12" cy="12" r="10" fill="success.main" fill-opacity="0.6"/>
+                <circle cx="12" cy="12" r="8" fill="success.main" fill-opacity="0.8"/>
+                <circle cx="12" cy="12" r="6" fill="success.main" fill-opacity="0.9"/>
+                <circle cx="12" cy="12" r="4" fill="success.main"/>
                 <circle cx="12" cy="12" r="2" fill="white"/>
               </svg>
             </div>
@@ -972,182 +974,11 @@ export default function Test() {
     }
   ];
 
-  const services = [
-    {
-      icon: '🚚',
-      title: 'Express Delivery',
-      description: 'Same-day delivery for urgent shipments across the city',
-      features: ['Real-time tracking', 'Priority handling', 'Guaranteed delivery']
-    },
-    {
-      icon: '📦',
-      title: 'Package Handling',
-      description: 'Professional handling of fragile and valuable items',
-      features: ['Insurance included', 'Careful packaging', 'Signature required']
-    },
-    {
-      icon: '🌍',
-      title: 'International Shipping',
-      description: 'Worldwide delivery with customs handling',
-      features: ['Documentation support', 'Customs clearance', 'Global tracking']
-    },
-    {
-      icon: '🏢',
-      title: 'Business Solutions',
-      description: 'Tailored logistics solutions for businesses',
-      features: ['Bulk discounts', 'Dedicated account manager', 'API integration']
-    },
-    {
-      icon: '🛡️',
-      title: 'Secure Transport',
-      description: 'High-security transport for valuable items',
-      features: ['Armed escort', 'GPS monitoring', '24/7 surveillance']
-    },
-    {
-      icon: '🌱',
-      title: 'Eco-Friendly Delivery',
-      description: 'Green delivery options for environmentally conscious customers',
-      features: ['Electric vehicles', 'Carbon offset', 'Sustainable packaging']
-    }
-  ];
-
-  const features = [
-    {
-      icon: '💰',
-      title: 'Affordable rates',
-      description: 'Transparent pricing with no hidden costs'
-    },
-    {
-      icon: '⚡',
-      title: 'Fast order matching',
-      description: 'Match orders and deliver your goods immediately'
-    },
-    {
-      icon: '🚚',
-      title: 'Wide-ranging delivery vehicles',
-      description: 'Motorcycle, sedan, MPV, pick-up & truck delivery services'
-    },
-    {
-      icon: '🗺️',
-      title: '48 serviceable areas',
-      description: 'Island-wide coverage across Luzon and in Cebu'
-    },
-    {
-      icon: '🛡️',
-      title: 'Safe delivery',
-      description: 'Professional partner drivers to deliver packages safely'
-    },
-    {
-      icon: '📍',
-      title: 'Real-time Tracking',
-      description: 'Track orders real-time from pick-up to drop-off'
-    }
-  ];
 
      return (
      <Layout>
-      {/* Header */}
-      <Box
-        sx={{
-          background: '#214d22',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-          py: 2,
-          position: 'sticky',
-          top: 0,
-          zIndex: 1000,
-        }}
-      >
-        <Container maxWidth="lg">
-          <Box display="flex" justifyContent="space-between" alignItems="center">
-            <Box display="flex" alignItems="center">
-              <img src="/images/white-logo.png" alt="Logo" width={40} height={40} style={{ marginRight: 12 }} />
-              <Typography variant="h5" fontWeight={700} color="white">
-                EasyTrack
-              </Typography>
-            </Box>
-            
-            <Box display="flex" alignItems="center" gap={2}>
-              <Button 
-                variant="contained" 
-                href="/"
-                sx={{ 
-                  bgcolor: 'white', 
-                  color: '#214d22',
-                  '&:hover': { bgcolor: '#f0f0f0' }
-                }}
-              >
-                Home
-              </Button>
-              <Button color="inherit" href="/services" sx={{ color: 'white', '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.1)' } }}>
-                Our Services
-              </Button>
-              <Button color="inherit" href="/about" sx={{ color: 'white', '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.1)' } }}>
-                About Us
-              </Button>
-              
-              <Button color="inherit" href="/contact" sx={{ color: 'white', '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.1)' } }}>
-                Contact Us
-              </Button>
-              <Box
-                sx={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: '50%',
-                  bgcolor: 'white',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#214d22',
-                  fontWeight: 600,
-                  fontSize: '0.9rem'
-                }}
-              >
-                DP
-              </Box>
-            </Box>
-          </Box>
-        </Container>
-      </Box>
+      <Navbar currentPage="home" />
 
-       {/* Welcome Section with Wave Background */}
-        <Box
-          sx={{
-            backgroundImage: ` url(/images/wavebg.svg)`,
-            backgroundRepeat: 'no-repeat',
-            backgroundSize: 'cover',
-            backgroundPosition: 'top',
-            color: 'white',
-            py: 3, // reduced padding so container almost hugs text
-            mt: 0,
-            position: 'relative',
-            overflow: 'hidden',
-          }}
-        >
-          <Container maxWidth="lg" sx={{ py: 0 }}> {/* remove extra padding from Container */}
-            <Typography
-              variant="h5"
-              sx={{
-                fontWeight: 700,
-                mb: 0.4, // smaller gap between texts
-                textShadow: '0 2px 4px rgba(0,0,0,0.3)',
-                fontSize: { xs: '1.5rem', sm: '2rem' },
-              }}
-            >
-              Welcome Back!
-            </Typography>
-            <Typography
-              variant="subtitle1"
-              sx={{
-                fontWeight: 400,
-                color: 'rgba(255, 255, 255, 0.9)',
-                textShadow: '0 1px 2px rgba(0,0,0,0.3)',
-                mb: 0, // no extra space below
-              }}
-            >
-              Hi, Delivery Partner
-            </Typography>
-          </Container>
-        </Box>
 
 
       {/* Carousel Section with Wave Background */}
@@ -1163,9 +994,25 @@ export default function Test() {
         }}
       >
         <Container maxWidth="lg">
-          <Box display="flex" flexDirection={{ xs: 'column', md: 'row' }} alignItems="center" gap={6}>
+          <Box 
+            display="flex" 
+            flexDirection={{ xs: 'column', md: 'row' }} 
+            alignItems={{ xs: 'center', md: 'flex-start' }}
+            justifyContent="space-between"
+            gap={{ xs: 4, md: 6 }}
+            minHeight={{ xs: 'auto', md: '500px' }}
+          >
             {/* Text Content */}
-            <Box flex={1} sx={{ textAlign: { xs: 'center', md: 'left' } }}>
+            <Box 
+              flex={{ xs: '1 1 auto', md: '1 1 50%' }}
+              sx={{ 
+                textAlign: { xs: 'center', md: 'left' },
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center',
+                width: { xs: '100%', md: 'auto' }
+              }}
+            >
               <Typography
                 variant="h2"
                 sx={{
@@ -1173,7 +1020,7 @@ export default function Test() {
                   fontSize: { xs: '2.5rem', md: '3.5rem' },
                   mb: 2,
                   lineHeight: 1.2,
-                  color: 'white',
+                  color: 'primary.contrastText',
                   textShadow: '0 2px 4px rgba(0,0,0,0.5)'
                 }}
               >
@@ -1201,14 +1048,15 @@ export default function Test() {
                   textAlign: 'left', 
                   p: 3,
                   borderRadius: 2,
-                  bgcolor: 'rgba(255, 255, 255, 0.95)',
-                  backdropFilter: 'blur(10px)',
-                  boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
-                  border: '1px solid rgba(255, 255, 255, 0.3)',
+                  bgcolor: 'background.paper',
+                  boxShadow: '0 8px 32px rgba(0,0,0,0.15)',
+                  border: '2px solid',
+                  borderColor: 'primary.main',
                   transition: 'all 0.3s ease',
                   '&:hover': {
                     transform: 'translateY(-2px)',
-                    boxShadow: '0 12px 40px rgba(0,0,0,0.4)'
+                    boxShadow: '0 12px 40px rgba(0,0,0,0.2)',
+                    borderColor: 'primary.dark'
                   }
                 }}
               >
@@ -1217,7 +1065,7 @@ export default function Test() {
                   sx={{ 
                     fontSize: { xs: '1.2rem', md: '1.4rem' },
                     fontWeight: 700, 
-                    color: '#214d22', 
+                    color: 'primary.main', 
                     mb: 2
                   }}
                 >
@@ -1227,7 +1075,7 @@ export default function Test() {
                 <Box 
                   display="flex" 
                   flexDirection={{ xs: 'column', sm: 'row' }} 
-                  gap={3} 
+                  gap={{ xs: 2, sm: 3 }} 
                   alignItems="stretch"
                   sx={{ mb: 2 }}
                 >
@@ -1242,7 +1090,15 @@ export default function Test() {
                     InputProps={{
                       endAdornment: (
                         <>
-                          {loading && <CircularProgress size={20} />}
+                          {loading && (
+                            <Box sx={{ display: 'flex', alignItems: 'center', mr: 1 }}>
+                              <CircularProgress 
+                                size={20} 
+                                thickness={4}
+                                sx={{ color: 'primary.main' }}
+                              />
+                            </Box>
+                          )}
                           {contractId && !loading && (
                             <IconButton
                               size="small"
@@ -1263,20 +1119,20 @@ export default function Test() {
                     sx={{ 
                       flex: 2,
                       '& .MuiOutlinedInput-root': {
-                        backgroundColor: 'white',
+                        backgroundColor: 'background.paper',
                         borderRadius: 2,
                         height: 48,
                         '& fieldset': {
-                          borderColor: 'rgba(0, 0, 0, 0.2)',
+                          borderColor: 'divider',
                           borderWidth: 1,
                           borderRadius: 2,
                         },
                         '&:hover fieldset': {
-                          borderColor: 'rgba(0, 0, 0, 0.4)',
+                          borderColor: 'text.secondary',
                           borderWidth: 1,
                         },
                         '&.Mui-focused fieldset': {
-                          borderColor: '#214d22',
+                          borderColor: 'primary.main',
                           borderWidth: 1,
                         },
                         transition: 'all 0.2s ease',
@@ -1285,10 +1141,10 @@ export default function Test() {
                         fontSize: '1rem',
                         fontWeight: 400,
                         padding: '12px 16px',
-                        color: '#214d22',
+                        color: 'primary.main',
                         backgroundColor: 'transparent',
                         '&::placeholder': {
-                          color: '#999999',
+                          color: 'text.secondary',
                           opacity: 1,
                           fontWeight: 400,
                         }
@@ -1300,10 +1156,11 @@ export default function Test() {
                     onClick={() => handleSearch()}
                     disabled={loading}
                     sx={{ 
-                      flex: 1,
+                      flex: { xs: '0 0 auto', sm: 1 },
+                      width: { xs: '100%', sm: 'auto' },
                       minWidth: { xs: '100%', sm: 120 },
-                      bgcolor: '#214d22',
-                      color: 'white',
+                      bgcolor: 'primary.main',
+                      color: 'primary.contrastText',
                       borderRadius: 2,
                       height: 48,
                       px: 3,
@@ -1312,13 +1169,20 @@ export default function Test() {
                       textTransform: 'none',
                       boxShadow: '0 2px 8px rgba(33, 77, 34, 0.3)',
                       '&:hover': {
-                        bgcolor: '#1a3d1b',
+                        bgcolor: 'primary.dark',
                         boxShadow: '0 4px 12px rgba(33, 77, 34, 0.4)',
                       },
                       transition: 'all 0.2s ease'
                     }}
                   >
-                    {loading ? 'Tracking...' : 'Track Now'}
+                    {loading ? (
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <CircularProgress size={16} thickness={4} sx={{ color: 'inherit' }} />
+                        Tracking...
+                      </Box>
+                    ) : (
+                      'Track Now'
+                    )}
                   </Button>
                 </Box>
                 
@@ -1332,7 +1196,15 @@ export default function Test() {
             </Box>
 
             {/* Image Carousel */}
-            <Box flex={1} sx={{ display: { xs: 'none', md: 'block' } }}>
+            <Box 
+              flex={{ xs: '0 0 auto', md: '1 1 50%' }}
+              sx={{ 
+                display: { xs: 'none', md: 'flex' },
+                justifyContent: 'center',
+                alignItems: 'center',
+                width: { xs: '100%', md: 'auto' }
+              }}
+            >
               <Box
                 sx={{
                   position: 'relative',
@@ -1341,7 +1213,8 @@ export default function Test() {
                   borderRadius: 3,
                   overflow: 'hidden',
                   boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
-                  border: '2px solid rgba(255, 255, 255, 0.2)'
+                  border: '2px solid',
+                  borderColor: 'rgba(255, 255, 255, 0.2)'
                 }}
               >
                 {images.map((image, index) => (
@@ -1409,7 +1282,7 @@ export default function Test() {
                     alignItems: 'center',
                     justifyContent: 'center',
                     cursor: 'pointer',
-                    color: 'white',
+                    color: 'primary.contrastText',
                     fontSize: 20,
                     fontWeight: 'bold',
                     transition: 'all 0.3s ease',
@@ -1440,7 +1313,7 @@ export default function Test() {
                     alignItems: 'center',
                     justifyContent: 'center',
                     cursor: 'pointer',
-                    color: 'white',
+                    color: 'primary.contrastText',
                     fontSize: 20,
                     fontWeight: 'bold',
                     transition: 'all 0.3s ease',
@@ -1464,7 +1337,7 @@ export default function Test() {
 
       {/* Expanding Luggage Tracking Section */}
       {contract && (
-        <Box sx={{ py: 6, bgcolor: '#f8f8f0' }}>
+        <Box sx={{ py: 6, bgcolor: 'background.default' }}>
           <Container maxWidth="lg">
             <Paper elevation={3} sx={{ p: 3, borderRadius: 3, position: 'relative', overflow: 'hidden', border: '1px solid', borderColor: 'divider' }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', position: 'relative' }}>
@@ -1648,16 +1521,16 @@ export default function Test() {
               <Typography variant="h6" sx={{ mb: 2 }}>Live Tracking</Typography>
               <Box sx={{ display: 'flex', gap: 2, mb: 2, flexWrap: 'wrap' }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <Box sx={{ width: 16, height: 16, borderRadius: '50%', bgcolor: '#FF9800', border: '2px solid #F57C00' }} />
+                  <Box sx={{ width: 16, height: 16, borderRadius: '50%', bgcolor: 'warning.main', border: '2px solid', borderColor: 'warning.dark' }} />
                   <Typography variant="body2">Drop-off Location</Typography>
                 </Box>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <Box sx={{ width: 16, height: 16, borderRadius: '50%', bgcolor: '#2196F3', border: '2px solid #1976D2' }} />
+                  <Box sx={{ width: 16, height: 16, borderRadius: '50%', bgcolor: 'info.main', border: '2px solid', borderColor: 'info.dark' }} />
                   <Typography variant="body2">Pickup Location</Typography>
                 </Box>
                 {contract?.current_location_geo?.coordinates && (
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Box sx={{ width: 16, height: 16, borderRadius: '50%', bgcolor: '#4CAF50', border: '2px solid #388E3C' }} />
+                    <Box sx={{ width: 16, height: 16, borderRadius: '50%', bgcolor: 'success.main', border: '2px solid', borderColor: 'success.dark' }} />
                     <Typography variant="body2">Current Location</Typography>
                   </Box>
                 )}
@@ -1757,314 +1630,103 @@ export default function Test() {
         </Box>
       )}
 
-      {/* Services Section */}
-       <Box sx={{ py: 8, bgcolor: '#f8f8f0' }}>
-         <Container maxWidth="lg">
-           <Box textAlign="center" mb={6}>
-             <Typography variant="h3" sx={{ fontWeight: 700, mb: 2, color: '#214d22' }}>
-               Your 24/7 delivery app partner
-             </Typography>
-             <Typography variant="h5" sx={{ fontWeight: 300, color: '#666666' }}>
-               Fast. Simple. Affordable.
-             </Typography>
-           </Box>
+      {/* Contact Section */}
+      <Box id="contact" sx={{ py: 8, bgcolor: 'background.default' }}>
+        <Container maxWidth="lg">
+          <Box 
+            display="flex"
+            flexDirection="column"
+            alignItems="center"
+            textAlign="center" 
+            mb={6}
+          >
+            <Typography variant="h3" sx={{ fontWeight: 700, mb: 2, color: 'primary.main' }}>
+              Get in Touch with Us
+            </Typography>
+            <Typography variant="h5" sx={{ fontWeight: 300, color: 'text.secondary' }}>
+              Ready to start your delivery journey? Contact us today!
+            </Typography>
+          </Box>
 
-          <Grid container spacing={4}>
-            {features.map((feature, index) => (
-              <Grid item xs={12} sm={6} md={4} key={index}>
-                <Card
-                  sx={{
-                    height: '100%',
-                    textAlign: 'center',
-                    p: 3,
-                    borderRadius: 3,
-                    boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
-                    transition: 'transform 0.3s ease',
-                    '&:hover': {
-                      transform: 'translateY(-5px)'
-                    }
-                  }}
-                >
-                                     <Avatar
-                     sx={{
-                       width: 60,
-                       height: 60,
-                       mx: 'auto',
-                       mb: 2,
-                       bgcolor: '#214d22',
-                       fontSize: '1.5rem'
-                     }}
-                   >
-                     {feature.icon}
-                   </Avatar>
-                   <Typography variant="h6" sx={{ fontWeight: 600, mb: 1, color: '#214d22' }}>
-                     {feature.title}
-                   </Typography>
-                   <Typography variant="body2" sx={{ color: '#666666' }}>
-                     {feature.description}
-                   </Typography>
-                </Card>
-              </Grid>
-            ))}
-          </Grid>
+          <Box 
+            display="flex"
+            justifyContent="center"
+            width="100%"
+          >
+            <Box 
+              sx={{ 
+                width: { xs: '100%', sm: '90%', md: '80%', lg: '70%' },
+                maxWidth: 600
+              }}
+            >
+              <Card
+                sx={{
+                  p: 4,
+                  borderRadius: 3,
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+                  border: '2px solid',
+                  borderColor: 'primary.main'
+                }}
+              >
+                <Typography variant="h5" sx={{ fontWeight: 600, mb: 3, color: 'primary.main' }}>
+                  Send us a Message
+                </Typography>
+                <Typography variant="body1" sx={{ color: 'text.secondary', mb: 4 }}>
+                  Fill out the form below and we'll get back to you as soon as possible.
+                </Typography>
+                <Box sx={{ mb: 3 }}>
+                  <TextField
+                    fullWidth
+                    label="Your Name"
+                    variant="outlined"
+                    sx={{ mb: 2 }}
+                  />
+                  <TextField
+                    fullWidth
+                    label="Email Address"
+                    variant="outlined"
+                    sx={{ mb: 2 }}
+                  />
+                  <TextField
+                    fullWidth
+                    label="Phone Number"
+                    variant="outlined"
+                    sx={{ mb: 2 }}
+                  />
+                  <TextField
+                    fullWidth
+                    label="Message"
+                    variant="outlined"
+                    multiline
+                    rows={4}
+                    sx={{ mb: 3 }}
+                  />
+                  <Button
+                    variant="contained"
+                    fullWidth
+                    size="large"
+                    sx={{
+                      bgcolor: 'primary.main',
+                      color: 'primary.contrastText',
+                      py: 1.5,
+                      fontSize: '1.1rem',
+                      fontWeight: 600,
+                      borderRadius: 3,
+                      textTransform: 'none',
+                      '&:hover': {
+                        bgcolor: 'primary.dark'
+                      }
+                    }}
+                  >
+                    Send Message
+                  </Button>
+                </Box>
+              </Card>
+            </Box>
+          </Box>
         </Container>
       </Box>
 
-             {/* Our Services Section */}
-       <Box sx={{ py: 8, bgcolor: '#f8f8f0' }}>
-         <Container maxWidth="lg">
-           <Box textAlign="center" mb={6}>
-             <Typography variant="h3" sx={{ fontWeight: 700, mb: 2, color: '#214d22' }}>
-               What We Offer
-             </Typography>
-             <Typography variant="h5" sx={{ fontWeight: 300, color: '#666666' }}>
-               From local deliveries to international shipping, we've got you covered
-             </Typography>
-           </Box>
-
-           <Grid container spacing={4}>
-             {services.map((service, index) => (
-               <Grid item xs={12} sm={6} md={4} key={index}>
-                 <Card
-                   sx={{
-                     height: '100%',
-                     textAlign: 'center',
-                     p: 3,
-                     borderRadius: 3,
-                     boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
-                     transition: 'transform 0.3s ease',
-                     '&:hover': {
-                       transform: 'translateY(-5px)',
-                       boxShadow: '0 8px 30px rgba(0,0,0,0.15)'
-                     }
-                   }}
-                 >
-                   <Avatar
-                     sx={{
-                       width: 80,
-                       height: 80,
-                       mx: 'auto',
-                       mb: 2,
-                       bgcolor: '#214d22',
-                       fontSize: '2rem'
-                     }}
-                   >
-                     {service.icon}
-                   </Avatar>
-                   <Typography variant="h5" sx={{ fontWeight: 600, mb: 1, color: '#214d22' }}>
-                     {service.title}
-                   </Typography>
-                   <Typography variant="body2" sx={{ color: '#666666', mb: 2 }}>
-                     {service.description}
-                   </Typography>
-                   
-                   <Box sx={{ mb: 2 }}>
-                     {service.features.map((feature, featureIndex) => (
-                       <Chip
-                         key={featureIndex}
-                         label={feature}
-                         size="small"
-                         sx={{
-                           m: 0.5,
-                           bgcolor: '#214d22',
-                           color: 'white',
-                           fontSize: '0.75rem'
-                         }}
-                       />
-                     ))}
-                   </Box>
-                 </Card>
-               </Grid>
-             ))}
-           </Grid>
-         </Container>
-       </Box>
-
-       {/* Get in Touch Section */}
-       <Box sx={{ py: 8, bgcolor: 'white' }}>
-         <Container maxWidth="lg">
-           <Box textAlign="center" mb={6}>
-             <Typography variant="h3" sx={{ fontWeight: 700, mb: 2, color: '#214d22' }}>
-               Get in Touch with Us
-             </Typography>
-             <Typography variant="h5" sx={{ fontWeight: 300, color: '#666666' }}>
-               Ready to start your delivery journey? Contact us today!
-             </Typography>
-           </Box>
-
-           <Grid container spacing={4}>
-             <Grid item xs={12} md={6}>
-               <Card
-                 sx={{
-                   p: 4,
-                   borderRadius: 3,
-                   boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
-                   border: '2px solid #214d22'
-                 }}
-               >
-                 <Typography variant="h5" sx={{ fontWeight: 600, mb: 3, color: '#214d22' }}>
-                   Contact Information
-                 </Typography>
-                 <Box sx={{ mb: 3 }}>
-                   <Typography variant="h6" sx={{ fontWeight: 600, mb: 1, color: '#214d22' }}>
-                     📞 Phone
-                   </Typography>
-                   <Typography variant="body1" sx={{ color: '#666666' }}>
-                     +63 912 345 6789
-                   </Typography>
-                 </Box>
-                 <Box sx={{ mb: 3 }}>
-                   <Typography variant="h6" sx={{ fontWeight: 600, mb: 1, color: '#214d22' }}>
-                     📧 Email
-                   </Typography>
-                   <Typography variant="body1" sx={{ color: '#666666' }}>
-                     info@easytrack.com
-                   </Typography>
-                 </Box>
-                 <Box sx={{ mb: 3 }}>
-                   <Typography variant="h6" sx={{ fontWeight: 600, mb: 1, color: '#214d22' }}>
-                     📍 Address
-                   </Typography>
-                   <Typography variant="body1" sx={{ color: '#666666' }}>
-                     123 Logistics Street, Metro Manila, Philippines
-                   </Typography>
-                 </Box>
-                 <Box>
-                   <Typography variant="h6" sx={{ fontWeight: 600, mb: 1, color: '#214d22' }}>
-                     🕒 Business Hours
-                   </Typography>
-                   <Typography variant="body1" sx={{ color: '#666666' }}>
-                     Monday - Friday: 8:00 AM - 6:00 PM<br />
-                     Saturday: 9:00 AM - 4:00 PM<br />
-                     Sunday: Closed
-                   </Typography>
-                 </Box>
-               </Card>
-             </Grid>
-             <Grid item xs={12} md={6}>
-               <Card
-                 sx={{
-                   p: 4,
-                   borderRadius: 3,
-                   boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
-                   border: '2px solid #214d22'
-                 }}
-               >
-                 <Typography variant="h5" sx={{ fontWeight: 600, mb: 3, color: '#214d22' }}>
-                   Quick Contact Form
-                 </Typography>
-                 <Box sx={{ mb: 3 }}>
-                   <TextField
-                     fullWidth
-                     label="Your Name"
-                     variant="outlined"
-                     sx={{ mb: 2 }}
-                   />
-                   <TextField
-                     fullWidth
-                     label="Email Address"
-                     variant="outlined"
-                     sx={{ mb: 2 }}
-                   />
-                   <TextField
-                     fullWidth
-                     label="Phone Number"
-                     variant="outlined"
-                     sx={{ mb: 2 }}
-                   />
-                   <TextField
-                     fullWidth
-                     label="Message"
-                     variant="outlined"
-                     multiline
-                     rows={4}
-                     sx={{ mb: 3 }}
-                   />
-                   <Button
-                     variant="contained"
-                     fullWidth
-                     size="large"
-                     sx={{
-                       bgcolor: '#214d22',
-                       color: 'white',
-                       py: 1.5,
-                       fontSize: '1.1rem',
-                       fontWeight: 600,
-                       borderRadius: 3,
-                       textTransform: 'none',
-                       '&:hover': {
-                         bgcolor: '#1a3d1b'
-                       }
-                     }}
-                   >
-                     Send Message
-                   </Button>
-                 </Box>
-               </Card>
-             </Grid>
-           </Grid>
-         </Container>
-       </Box>
-
-             {/* CTA Section */}
-       <Box
-         sx={{
-           background: '#214d22',
-           color: 'white',
-           py: 8,
-           textAlign: 'center'
-         }}
-       >
-         <Container maxWidth="md">
-           <Typography variant="h3" sx={{ fontWeight: 700, mb: 3 }}>
-             Ready to roll?
-           </Typography>
-           <Typography variant="h6" sx={{ fontWeight: 300, mb: 4, opacity: 0.9 }}>
-           Partner with EasyTrack and start delivering what matters today.
-           </Typography>
-           <Box display="flex" gap={2} justifyContent="center" flexWrap="wrap">
-             <Button
-               variant="contained"
-               size="large"
-               sx={{
-                 bgcolor: '#ffffff',
-                 color: '#214d22',
-                 px: 4,
-                 py: 1.5,
-                 fontSize: '1.1rem',
-                 fontWeight: 600,
-                 borderRadius: 3,
-                 textTransform: 'none',
-                 '&:hover': {
-                   bgcolor: '#f0f0f0'
-                 }
-               }}
-             >
-               Download App
-             </Button>
-             <Button
-               variant="outlined"
-               size="large"
-               sx={{
-                 borderColor: 'white',
-                 color: 'white',
-                 px: 4,
-                 py: 1.5,
-                 fontSize: '1.1rem',
-                 fontWeight: 600,
-                 borderRadius: 3,
-                 textTransform: 'none',
-                 '&:hover': {
-                   borderColor: 'white',
-                   bgcolor: 'rgba(255,255,255,0.1)'
-                 }
-               }}
-             >
-               Learn More
-             </Button>
-           </Box>
-         </Container>
-       </Box>
       
       {/* Snackbar for notifications */}
       <Snackbar open={snackbarOpen} autoHideDuration={6000} onClose={handleSnackbarClose} anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}>

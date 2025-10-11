@@ -1424,16 +1424,11 @@ const LuggageAssignments = ({ onAssignmentComplete }) => {
 // Main Page Component
 const Page = () => {
   const [selectedTab, setSelectedTab] = useState(0);
-  const [mounted, setMounted] = useState(false);
   const [redirectContractId, setRedirectContractId] = useState(null);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const router = useRouter();
   const theme = useTheme();
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   const handleTabChange = (event, newValue) => {
     setSelectedTab(newValue);
@@ -1469,9 +1464,6 @@ const Page = () => {
     setSnackbarOpen(true);
   };
 
-  if (!mounted) {
-    return null; // Prevent hydration errors: only render on client
-  }
 
   return (
     <Box sx={{ p: 2, display: "flex", flexDirection: "column", gap: 4 }}>

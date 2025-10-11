@@ -14,6 +14,7 @@ import BarChartIcon from '@mui/icons-material/BarChart';
 import SupportAgentIcon from '@mui/icons-material/SupportAgent';
 import PaymentIcon from '@mui/icons-material/Payment';
 import WarningIcon from '@mui/icons-material/Warning';
+import LoadingSpinner from '../../components/LoadingSpinner';
 
 export default function Page() {
   // Theme and client setup
@@ -75,6 +76,11 @@ export default function Page() {
   const cardStyles = { height: "100%", width: "35vh" };
   const linkStyles = { textDecoration: "none" };
   const iconStyles = { fontSize: 40, color: "primary.main", mb: 2 };
+
+  // Show loading spinner while checking verification
+  if (verificationLoading) {
+    return <LoadingSpinner />;
+  }
 
   return (
     <Box>

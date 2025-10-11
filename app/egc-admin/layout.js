@@ -6,11 +6,13 @@ import { Box, CircularProgress, Snackbar, Alert } from "@mui/material";
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { ColorModeContext } from "../layout";
 import { useTheme } from "@mui/material/styles";
-import AdminSidebar from "../components/admin-sidebar/page";
+import AdminSidebar from "../components/AdminSidebar";
+import LoadingSpinner from '../components/LoadingSpinner';
+import { useTimeoutManager } from '../../utils/timeoutManager';
 
 export default function Layout({ children }) {
     return (
-        <Suspense fallback={<div>Loading...</div>}>
+        <Suspense fallback={<LoadingSpinner />}>
             <AdminLayoutContent>{children}</AdminLayoutContent>
         </Suspense>
     );
@@ -29,87 +31,100 @@ function AdminLayoutContent({ children }) {
     const [activeToast, setActiveToast] = useState(null);
     const [notifications, setNotifications] = useState([]);
 
+    // Timeout manager for automatic logout after 30 minutes of inactivity
+    useTimeoutManager();
+
     // Auth page check (support clean URLs on subdomain and internal prefixed paths)
     const normalizedPath = pathname?.startsWith('/egc-admin') ? pathname.replace(/^\/egc-admin/, '') || '/' : pathname;
     const isAuthPage = normalizedPath === "/login" || normalizedPath === "/forgot-password" || normalizedPath === "/reset-password" || normalizedPath === "/verify" || normalizedPath === "/otp";
+    const isLuggageManagementPage = normalizedPath === "/luggage-management";
 
-    // Auth and session management
+    // Enhanced session management
     useEffect(() => {
         let mounted = true;
         let unsubscribe = null;
 
-        const checkSession = async () => {
+        const validateSession = async () => {
             try {
-                console.log('[AdminLayout] checkSession start. isAuthPage=', isAuthPage);
-                if (isAuthPage) { if (mounted) { console.log('[AdminLayout] Auth page detected, stop loading'); setIsLoading(false); } return; }
+                if (isAuthPage) {
+                    if (mounted) setIsLoading(false);
+                    return;
+                }
 
                 const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-                console.log('[AdminLayout] getSession result:', { hasSession: !!session, sessionError });
-                if (sessionError || !session) { 
-                    // Add a small delay to handle race condition with login
-                    console.log('[AdminLayout] No session, waiting briefly for potential login...');
-                    await new Promise(resolve => setTimeout(resolve, 500));
-                    const { data: { session: retrySession } } = await supabase.auth.getSession();
-                    if (!retrySession && mounted) { 
-                        console.log('[AdminLayout] Still no session after retry, redirect to login'); 
-                        setIsLoading(false); 
-                        router.replace("/login"); 
-                    } 
-                    return; 
+                
+                if (sessionError || !session?.user) {
+                    if (mounted) {
+                        setIsLoading(false);
+                        router.replace("/login");
+                    }
+                    return;
                 }
+
                 lastUserIdRef.current = session.user.id;
 
-                const { data: profile, error: profileError } = await supabase.from('profiles').select('role_id').eq('id', session.user.id).single();
-                console.log('[AdminLayout] profile fetch:', { profile, profileError });
-                const adminRoleId = 1; // Administrator
+                const { data: profile, error: profileError } = await supabase
+                    .from('profiles')
+                    .select('role_id')
+                    .eq('id', session.user.id)
+                    .single();
 
-                if (!profile || !adminRoleId || Number(profile.role_id) !== Number(adminRoleId)) {
-                    console.warn('[AdminLayout] Role check failed. Signing out.');
+                const adminRoleId = 1;
+                if (profileError || !profile || Number(profile.role_id) !== adminRoleId) {
                     await supabase.auth.signOut();
-                    if (mounted) { console.log('[AdminLayout] Signed out due to role, redirecting'); setIsLoading(false); router.replace("/login"); }
+                    if (mounted) {
+                        setIsLoading(false);
+                        router.replace("/login");
+                    }
                     return;
                 }
 
                 const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event) => {
-                    console.log('[AdminLayout] onAuthStateChange event:', event);
-                    if (event === 'SIGNED_OUT' && mounted) { console.log('[AdminLayout] SIGNED_OUT -> stop loading and redirect'); setIsLoading(false); router.replace("/login"); }
+                    if (event === 'SIGNED_OUT' && mounted) {
+                        setIsLoading(false);
+                        router.replace("/login");
+                    }
+                    
                     if (event === 'SIGNED_OUT') {
                         try {
-                            let userId = lastUserIdRef.current;
-                            if (!userId) {
-                                const { data: s } = await supabase.auth.getSession();
-                                userId = s?.session?.user?.id || null;
+                            const userId = lastUserIdRef.current;
+                            if (userId) {
+                                const { data: statusRow } = await supabase
+                                    .from('profiles_status')
+                                    .select('id')
+                                    .eq('status_name', 'Signed Out')
+                                    .single();
+                                
+                                if (statusRow?.id) {
+                                    await supabase
+                                        .from('profiles')
+                                        .update({ user_status_id: statusRow.id })
+                                        .eq('id', userId);
+                                }
                             }
-                            const { data: statusRow } = await supabase
-                                .from('profiles_status')
-                                .select('id')
-                                .eq('status_name', 'Signed Out')
-                                .single();
-                            const signedOutId = statusRow?.id || null;
-                            if (userId && signedOutId) {
-                                console.log('[AdminLayout] Updating Signed Out status for user', userId);
-                                await supabase
-                                    .from('profiles')
-                                    .update({ user_status_id: signedOutId })
-                                    .eq('id', userId);
-                            }
-                        } catch (_) { }
+                        } catch (error) {
+                            console.error('Error updating user status:', error);
+                        }
                     }
                 });
+
                 unsubscribe = subscription?.unsubscribe;
 
-                if (mounted) { console.log('[AdminLayout] Session valid. Rendering app.'); setIsLoading(false); }
+                if (mounted) setIsLoading(false);
             } catch (error) {
-                console.error('[AdminLayout] checkSession error:', error);
-                if (mounted) { console.log('[AdminLayout] Error path -> redirect to login'); setIsLoading(false); router.replace("/login"); }
+                console.error('Session validation error:', error);
+                if (mounted) {
+                    setIsLoading(false);
+                    router.replace("/login");
+                }
             }
         };
-        checkSession();
+
+        validateSession();
 
         return () => {
             mounted = false;
             if (typeof unsubscribe === 'function') unsubscribe();
-            console.log('[AdminLayout] cleanup complete');
         };
     }, [isAuthPage, router]);
 
@@ -269,11 +284,11 @@ function AdminLayoutContent({ children }) {
 
     // Styles
     const containerStyles = { display: "flex", minHeight: "100vh", bgcolor: "background.default", position: "relative" };
-    const contentStyles = { flexGrow: 1, p: 4, display: "flex", flexDirection: "column", minHeight: "calc(100vh - 64px)", width: "calc(100% - 64px)", ml: "64px", transition: "margin-left 0.2s ease-in-out, width 0.2s ease-in-out", "&.expanded": { width: "calc(100% - 280px)", ml: "280px" } };
-    const authContentStyles = { flexGrow: 1, display: "flex", flexDirection: "column", minHeight: "100vh", width: "100%" };
+    const contentStyles = { flexGrow: 1, p: 4, display: "flex", flexDirection: "column", minHeight: "calc(100vh - 64px)", width: "calc(100% - 64px)", ml: "64px", transition: "margin-left 0.2s ease-in-out, width 0.2s ease-in-out", bgcolor: "background.default", "&.expanded": { width: "calc(100% - 280px)", ml: "280px" } };
+    const authContentStyles = { flexGrow: 1, display: "flex", flexDirection: "column", minHeight: "100vh", width: "100%", bgcolor: "background.default" };
     const loadingStyles = { display: "flex", justifyContent: "center", alignItems: "center", minHeight: "100vh", bgcolor: "background.default" };
 
-    if (isLoading && !isAuthPage) return <Box sx={loadingStyles}><CircularProgress /></Box>;
+    if (isLoading && !isAuthPage && !isLuggageManagementPage) return <LoadingSpinner />;
     if (isAuthPage) return <Box sx={containerStyles}><Box sx={authContentStyles}>{children}</Box></Box>;
     return (
         <Box sx={containerStyles}>

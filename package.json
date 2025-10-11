@@ -24,6 +24,7 @@
     "@supabase/ssr": "^0.6.1",
     "@supabase/supabase-js": "^2.49.4",
     "@types/google.maps": "^3.58.1",
+    "cookies-next": "^6.1.0",
     "critters": "^0.0.23",
     "date-fns": "^4.1.0",
     "jose": "^6.0.11",

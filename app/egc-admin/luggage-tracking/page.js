@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, Suspense } from "react";
 import { Box, Typography, TextField, Paper, Divider, IconButton, Collapse, CircularProgress, Snackbar, Alert, Button } from "@mui/material";
+import LoadingSpinner from '../../components/LoadingSpinner';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import CloseIcon from '@mui/icons-material/Close';
@@ -376,9 +377,9 @@ function LuggageTrackingContent() {
         console.log('Adding pickup location marker:', contract.pickup_location_geo.coordinates);
         const pickupMarker = new window.google.maps.marker.PinElement({
           scale: 1,
-          background: '#2196F3',
-          borderColor: '#1976D2',
-          glyphColor: '#FFFFFF'
+          background: 'info.main',
+          borderColor: 'info.dark',
+          glyphColor: 'info.contrastText'
         });
 
         const pickupPosition = {
@@ -402,9 +403,9 @@ function LuggageTrackingContent() {
         console.log('Adding drop-off location marker:', contract.drop_off_location_geo.coordinates);
         const dropoffMarker = new window.google.maps.marker.PinElement({
           scale: 1,
-          background: '#FF9800',
-          borderColor: '#F57C00',
-          glyphColor: '#FFFFFF'
+          background: 'warning.main',
+          borderColor: 'warning.dark',
+          glyphColor: 'warning.contrastText'
         });
 
         const dropoffPosition = {
@@ -581,7 +582,7 @@ function LuggageTrackingContent() {
       polylineRef.current = new window.google.maps.Polyline({
         path: routePath,
         geodesic: true,
-        strokeColor: '#4CAF50',
+        strokeColor: 'success.main',
         strokeOpacity: 0.8,
         strokeWeight: 5,
         map: map
@@ -954,15 +955,15 @@ function LuggageTrackingContent() {
             
             <Box sx={{ display: 'flex', gap: 2, mb: 2, flexWrap: 'wrap' }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Box sx={{ width: 16, height: 16, borderRadius: '50%', bgcolor: '#FF9800', border: '2px solid #F57C00' }} />
+                <Box sx={{ width: 16, height: 16, borderRadius: '50%', bgcolor: 'warning.main', border: '2px solid', borderColor: 'warning.dark' }} />
                 <Typography variant="body2">Drop-off Location</Typography>
               </Box>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Box sx={{ width: 16, height: 16, borderRadius: '50%', bgcolor: '#2196F3', border: '2px solid #1976D2' }} />
+                <Box sx={{ width: 16, height: 16, borderRadius: '50%', bgcolor: 'info.main', border: '2px solid', borderColor: 'info.dark' }} />
                 <Typography variant="body2">Pickup Location</Typography>
               </Box>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Box sx={{ width: 16, height: 16, borderRadius: '50%', bgcolor: '#4CAF50', border: '2px solid #388E3C' }} />
+                <Box sx={{ width: 16, height: 16, borderRadius: '50%', bgcolor: 'success.main', border: '2px solid', borderColor: 'success.dark' }} />
                 <Typography variant="body2">Current Location</Typography>
               </Box>
             </Box>

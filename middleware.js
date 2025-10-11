@@ -87,7 +87,7 @@ export async function middleware(req) {
       cleanUrl.pathname = cleanPath;
       // Preserve search params
       const redirectResponse = NextResponse.redirect(cleanUrl);
-      return isDevelopment ? applyDevelopmentSecurityHeaders(redirectResponse) : applySecurityHeaders(redirectResponse);
+      return applySecurityHeaders(redirectResponse);
     }
 
     const internalPath = `/contractor${path === '/' ? '' : path}`;

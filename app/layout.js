@@ -5,6 +5,8 @@ import { CssBaseline, Box, CircularProgress } from "@mui/material";
 import { getTheme } from "./theme";
 import { useState, useEffect, createContext, useContext, Suspense } from "react";
 import { usePathname, useSearchParams } from 'next/navigation';
+import { setCookie, getCookie } from 'cookies-next';
+import LoadingSpinner from './components/LoadingSpinner';
 
 export const ColorModeContext = createContext({ toggleMode: () => {}, mode: "light" });
 
@@ -23,31 +25,38 @@ function LayoutContent({ children }) {
     const pathname = usePathname();
     const searchParams = useSearchParams();
 
-    // Theme initialization
+    // Theme initialization - check cookies for saved theme, default to light
     useEffect(() => {
-        const storedMode = localStorage.getItem("themeMode");
-        if (storedMode) setMode(storedMode);
-        else setMode(window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        const savedMode = getCookie('theme-mode') || 'light';
+        setMode(savedMode);
     }, []);
 
-    // Loading state management
+    // Loading state management - show spinner immediately on navigation
     useEffect(() => {
+        // Skip loading for contractor and admin routes as they have their own loading
+        if (pathname?.startsWith('/contractor') || pathname?.startsWith('/egc-admin')) {
+            setIsLoading(false);
+            return;
+        }
+        
         setIsLoading(true);
-        const timer = setTimeout(() => setIsLoading(false), 500);
+        
+        // Show loading for minimum time to ensure smooth transition
+        const timer = setTimeout(() => {
+            setIsLoading(false);
+        }, 100);
         return () => clearTimeout(timer);
     }, [pathname, searchParams]);
 
     // Theme toggle handler
     const toggleMode = () => {
-        setMode((prevMode) => {
-            const newMode = prevMode === "light" ? "dark" : "light";
-            localStorage.setItem("themeMode", newMode);
-            return newMode;
+        const newMode = mode === 'light' ? 'dark' : 'light';
+        setMode(newMode);
+        setCookie('theme-mode', newMode, { 
+            maxAge: 60 * 60 * 24 * 365, // 1 year
+            sameSite: 'lax'
         });
     };
-
-    // Styles
-    const loadingStyles = { position: 'fixed', top: 0, left: '64px', width: 'calc(100% - 64px)', height: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', backgroundColor: mode === "dark" ? "#28282B" : "#FAF9F6", zIndex: 9999 };
 
     return (
         <html lang="en">
@@ -67,8 +76,8 @@ function LayoutContent({ children }) {
                     <ThemeProvider theme={getTheme(mode)}>
                         <CssBaseline />
                         <Box sx={{ margin: 0, padding: 0, overflowX: 'hidden', height: '100vh' }}>
-                            {isLoading && <Box sx={loadingStyles}><CircularProgress size={60} thickness={4} /></Box>}
-                            {children}
+                            {isLoading && <LoadingSpinner />}
+                            {!isLoading && children}
                         </Box>
                     </ThemeProvider>
                 </ColorModeContext.Provider>

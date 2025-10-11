@@ -10,6 +10,7 @@ import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import CloseIcon from '@mui/icons-material/Close';
 import TermsAndConditions from '../../components/TermsAndConditions';
 import PrivacyPolicy from '../../components/PrivacyPolicy';
+import LoadingSpinner from '../../components/LoadingSpinner';
 
 export default function Page() {
   // Client and state setup
@@ -282,7 +283,7 @@ export default function Page() {
 
           <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0 }}>
             <Button type="submit" variant="contained" color="primary" disabled={isLoading || !loginStatus.canAttempt} sx={buttonStyles}>
-              {!isLoading ? "Login" : <CircularProgress size={24} sx={loginProgressStyles} />}
+              {!isLoading ? "Login" : <CircularProgress size={24} sx={{ ...loginProgressStyles, color: 'inherit' }} />}
             </Button>
             <Box sx={{ width: '40%', display: 'flex', justifyContent: 'center', my: 0.3 }}>
               <Typography color="secondary.main" variant="body2">or</Typography>

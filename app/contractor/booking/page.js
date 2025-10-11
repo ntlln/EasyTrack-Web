@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Box, Typography, TextField, Button, Paper, useTheme, IconButton, Grid, Select, MenuItem, FormControl, InputLabel, Tabs, Tab, Autocomplete, CircularProgress, Snackbar, Divider, Collapse, Dialog, DialogTitle, DialogContent, DialogActions, TablePagination, Table, TableHead, TableBody, TableRow, TableCell, TableContainer } from "@mui/material";
+import LoadingSpinner from '../../components/LoadingSpinner';
 import SearchIcon from '@mui/icons-material/Search';
 import ClearIcon from '@mui/icons-material/Clear';
 import CloseIcon from "@mui/icons-material/Close";
@@ -371,7 +372,7 @@ export default function Page() {
                 scale: 1,
                 background: theme.palette.primary.main,
                 borderColor: theme.palette.primary.dark,
-                glyphColor: '#FFFFFF'
+                glyphColor: 'primary.contrastText'
             });
 
             markerRef.current = new window.google.maps.marker.AdvancedMarkerElement({
@@ -1419,22 +1420,7 @@ export default function Page() {
 
     // Show loading while checking verification
     if (verificationLoading) {
-        return (
-            <Box sx={{
-                minHeight: "100vh",
-                bgcolor: theme.palette.background.default,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-            }}>
-                <Box sx={{ textAlign: 'center' }}>
-                    <CircularProgress size={60} />
-                    <Typography variant="h6" sx={{ mt: 2 }}>
-                        Checking verification status...
-                    </Typography>
-                </Box>
-            </Box>
-        );
+        return <LoadingSpinner />;
     }
 
     // Show verification message if not verified
@@ -1500,9 +1486,8 @@ export default function Page() {
                 </Box>
                 {activeTab === 0 && (
                     <Box>
-                        {contractListLoading && (<Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}><CircularProgress /></Box>)}
+                        {contractListLoading && (<Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}><CircularProgress sx={{ color: 'primary.main' }} /></Box>)}
                         {contractListError && (<Typography color="error" align="center">{contractListError}</Typography>)}
-                        {!contractListLoading && !contractListError && contractList.length === 0 && (<Typography align="center" sx={{ mb: 4 }}>No contracts found</Typography>)}
 
                         {mounted && (
                             <>
@@ -1767,7 +1752,7 @@ export default function Page() {
                                                     ...params.InputProps,
                                                     endAdornment: (
                                                         <>
-                                                            {placeLoading ? <CircularProgress color="inherit" size={20} /> : null}
+                                                            {placeLoading ? <CircularProgress color="inherit" size={20} sx={{ color: 'primary.main' }} /> : null}
                                                             {params.InputProps.endAdornment}
                                                         </>
                                                     ),
@@ -2229,7 +2214,7 @@ export default function Page() {
                             variant="contained"
                             onClick={openConfirm}
                             disabled={isSubmitting}
-                            startIcon={isSubmitting ? <CircularProgress size={20} color="inherit" /> : null}
+                            startIcon={isSubmitting ? <CircularProgress size={20} color="inherit" sx={{ color: 'inherit' }} /> : null}
                         >
                             {isSubmitting ? 'Creating Booking...' : 'Create Booking'}
                         </Button>
@@ -2508,7 +2493,7 @@ export default function Page() {
                     <DialogContent dividers>
                         {pickupLoading && (
                             <Box sx={{ display: 'flex', justifyContent: 'center', my: 3 }}>
-                                <CircularProgress />
+                                <CircularProgress sx={{ color: 'primary.main' }} />
                             </Box>
                         )}
                         {!pickupLoading && pickupError && (
@@ -2530,7 +2515,7 @@ export default function Page() {
                     <DialogContent dividers>
                         {deliveryLoading && (
                             <Box sx={{ display: 'flex', justifyContent: 'center', my: 3 }}>
-                                <CircularProgress />
+                                <CircularProgress sx={{ color: 'primary.main' }} />
                             </Box>
                         )}
                         {!deliveryLoading && deliveryError && (

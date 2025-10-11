@@ -20,11 +20,11 @@ import LightModeIcon from '@mui/icons-material/LightMode';
 import MenuIcon from '@mui/icons-material/Menu';
 import WarningIcon from '@mui/icons-material/Warning';
 import HistoryIcon from '@mui/icons-material/History';
-import { ColorModeContext } from "../../layout";
+import { ColorModeContext } from "../layout";
 import { useTheme } from "@mui/material/styles";
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
-export default function Page(props) {
+export default function AdminSidebar(props) {
     return (
         <Suspense fallback={<div>Loading...</div>}>
             <AdminSidebarContent {...props} />
@@ -34,7 +34,7 @@ export default function Page(props) {
 
 function AdminSidebarContent() {
     // State and context setup
-    const [openPages, setOpenPages] = useState(() => typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('adminSidebarTransactionsOpen') || 'true') : true);
+    const [openPages, setOpenPages] = useState(true);
     const [isMinimized, setIsMinimized] = useState(true);
     const { mode, toggleMode } = useContext(ColorModeContext);
     const theme = useTheme();
@@ -65,6 +65,16 @@ function AdminSidebarContent() {
         };
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    // Load state from localStorage after hydration
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            const savedState = localStorage.getItem('adminSidebarTransactionsOpen');
+            if (savedState !== null) {
+                setOpenPages(JSON.parse(savedState));
+            }
+        }
     }, []);
 
     // Save state to localStorage
@@ -488,7 +498,14 @@ function AdminSidebarContent() {
                     {!isMinimized && <Typography noWrap>{mode === 'light' ? 'Dark Mode' : 'Light Mode'}</Typography>}
                 </Button>
 
-                <Button variant="contained" color="error" startIcon={<LogoutIcon />} onClick={handleLogout} fullWidth sx={buttonStyles}>
+                <Button variant="contained" startIcon={<LogoutIcon />} onClick={handleLogout} fullWidth sx={{
+                    ...buttonStyles,
+                    bgcolor: '#D13137',
+                    color: 'white',
+                    '&:hover': {
+                        bgcolor: '#B82A2F'
+                    }
+                }}>
                     {!isMinimized && "Logout"}
                 </Button>
             </Box>

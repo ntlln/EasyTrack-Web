@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Box, Typography, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, TablePagination, IconButton, Menu, MenuItem, CircularProgress, Checkbox, Dialog, DialogTitle, DialogContent, DialogActions, Button, Divider, Collapse, TextField, Snackbar, Alert, Tabs, Tab, FormControl, InputLabel, Select, Autocomplete } from '@mui/material';
 import { useRouter } from 'next/navigation';
+import LoadingSpinner from '../../components/LoadingSpinner';
 
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
@@ -2320,7 +2321,7 @@ const TransactionManagement = () => {
                                                 <TableCell>
                                                     {loadingDateSpans ? (
                                                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                                            <CircularProgress size={16} />
+                                                            <CircularProgress size={16} sx={{ color: 'primary.main' }} />
                                                             <Typography variant="body2" sx={{
                                                                 fontSize: '0.875rem',
                                                                 color: 'text.primary'
