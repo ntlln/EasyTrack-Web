@@ -8,7 +8,7 @@ import LoadingSpinner from '../../components/LoadingSpinner';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
-import { PDFDownloadLink, PDFViewer, pdf } from '@react-pdf/renderer';
+import { PDFDownloadLink, PDFViewer, pdf, Document, Page as PDFPage, Text, View, Font, Image } from '@react-pdf/renderer';
 import { CombinedSOAInvoicePDF as CombinedPDFTemplate } from '../../../utils/pdf-templates';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
@@ -16,48 +16,7 @@ import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { format as formatDateFns } from 'date-fns';
 
-// Register fonts from local public/fonts directory
-// Use a simple approach to avoid browser compatibility issues
-try {
-    Font.register({
-        family: 'Roboto',
-        fonts: [
-            {
-                src: '/fonts/Roboto-VariableFont_wdth,wght.ttf',
-                fontWeight: 'normal',
-                fontStyle: 'normal',
-            },
-            {
-                src: '/fonts/Roboto-VariableFont_wdth,wght.ttf',
-                fontWeight: 'bold',
-                fontStyle: 'normal',
-            },
-            {
-                src: '/fonts/Roboto-Italic-VariableFont_wdth,wght.ttf',
-                fontWeight: 'normal',
-                fontStyle: 'italic',
-            },
-            {
-                src: '/fonts/Roboto-Italic-VariableFont_wdth,wght.ttf',
-                fontWeight: 'bold',
-                fontStyle: 'italic',
-            },
-        ],
-    });
-} catch (error) {
-    // Font already registered, ignore error
-    console.log('Roboto font already registered or error occurred:', error.message);
-}
-
-try {
-    Font.register({
-        family: 'NotoSans',
-        src: 'https://fonts.gstatic.com/s/notosans/v27/o-0IIpQlx3QUlC5A4PNb4g.woff2',
-    });
-} catch (error) {
-    // Font already registered, ignore error
-    console.log('NotoSans font already registered or error occurred:', error.message);
-}
+// Font registration is handled in pdf-templates.js
 
 // Utility: format date for table
 const formatDate = (date) => date ? new Date(date).toISOString().split('T')[0] : '';
