@@ -49,6 +49,9 @@ export default function Page() {
     const [isImageLoaded, setIsImageLoaded] = useState(false);
     const [tabIndex, setTabIndex] = useState(0);
     const [idTypeName, setIdTypeName] = useState('');
+    // Local state for gov-id signed URLs with auto-refresh on error
+    const [govIdFrontUrl, setGovIdFrontUrl] = useState('');
+    const [govIdBackUrl, setGovIdBackUrl] = useState('');
 
     // Data fetching
     useEffect(() => { fetchProfile(); }, []);
@@ -65,6 +68,8 @@ export default function Page() {
                 setProfileImage(data.pfp_id || null);
                 await fetchRoleName(data.role_id);
                 await fetchIdTypeName(data.gov_id_type);
+                setGovIdFrontUrl(data.gov_id_proof || '');
+                setGovIdBackUrl(data.gov_id_proof_back || '');
             }
         } catch (error) { console.error('Error fetching profile:', error); }
     };
@@ -123,11 +128,11 @@ export default function Page() {
         if (!profile?.pfp_id) return;
         try {
             const url = new URL(profile.pfp_id);
-            const pathMatch = url.pathname.match(/contractor\/([^.]+)\.(\w+)/);
+            const pathMatch = url.pathname.match(/airlines\/([^.]+)\.(\w+)/);
             if (!pathMatch) return;
             const fileName = pathMatch[1];
             const fileExt = pathMatch[2];
-            const filePath = `contractor/${fileName}.${fileExt}`;
+            const filePath = `airlines/${fileName}.${fileExt}`;
             await supabase.storage.from('profile-images').remove([filePath]);
             await supabase.from('profiles').update({ pfp_id: null }).eq('id', profile.id);
         } catch (error) { }
@@ -136,7 +141,7 @@ export default function Page() {
         try {
             const fileExt = file.name.split('.').pop();
             const fileName = `${profile.id}.${fileExt}`;
-            const filePath = `contractor/${fileName}`;
+            const filePath = `airlines/${fileName}`;
             await deleteOldProfileImage();
             const { error: uploadError } = await supabase.storage.from('profile-images').upload(filePath, file, { upsert: true, cacheControl: '3600' });
             if (uploadError) throw new Error(`Failed to upload image: ${uploadError.message}`);
@@ -147,6 +152,29 @@ export default function Page() {
             setProfileImage(signedData.signedUrl);
             setProfile(prevProfile => ({ ...prevProfile, pfp_id: signedData.signedUrl }));
         } catch (error) { setUploadError(error.message || 'Failed to upload image'); setSnackbarOpen(true); throw error; }
+    };
+
+    // Helper: extract object path from a signed URL for a given bucket
+    const extractObjectPath = (signedUrl, bucket) => {
+        try {
+            const u = new URL(signedUrl);
+            const marker = `/object/sign/${bucket}/`;
+            const idx = u.pathname.indexOf(marker);
+            if (idx === -1) return null;
+            return u.pathname.substring(idx + marker.length);
+        } catch (_) { return null; }
+    };
+
+    // Refresh front/back gov-id signed URLs on error
+    const refreshGovIdUrl = async (which) => {
+        if (!profile) return;
+        const currentUrl = which === 'front' ? govIdFrontUrl : govIdBackUrl;
+        const objectPath = extractObjectPath(currentUrl, 'gov-id');
+        if (!objectPath) return;
+        const { data } = await supabase.storage.from('gov-id').createSignedUrl(objectPath, 60 * 60 * 24 * 365);
+        const newUrl = data?.signedUrl || '';
+        if (which === 'front') setGovIdFrontUrl(newUrl);
+        else setGovIdBackUrl(newUrl);
     };
 
     // Password management
@@ -227,7 +255,7 @@ export default function Page() {
                     <Box sx={profileHeaderStyles}>
                         <Box display="flex" alignItems="center" gap={3}>
                             <Box sx={avatarContainerStyles}>
-                                <Avatar alt={user.fullName} src={profileImage || "/avatar.png"} sx={avatarStyles} />
+                                <Avatar alt={user.fullName} src={profileImage || "/avatar.png"} sx={avatarStyles} imgProps={{ crossOrigin: 'anonymous', referrerPolicy: 'no-referrer' }} />
                                 <input accept="image/*" style={{ display: 'none' }} id="profile-image-upload" type="file" onChange={handleImageUpload} disabled={uploading} />
                                 <label htmlFor="profile-image-upload">
                                     <IconButton component="span" sx={uploadButtonStyles} disabled={uploading}>
@@ -282,11 +310,31 @@ export default function Page() {
                         <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, alignItems: { md: 'flex-start', xs: 'center' }, justifyContent: 'center' }}>
                             <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, flex: 1 }}>
                                 <Typography variant="subtitle1" fontWeight="bold" color="primary.main" mb={1}>{idTypeName ? `${idTypeName} (Front)` : 'ID Type (Front)'}</Typography>
-                                {profile?.gov_id_proof ? (<img src={profile.gov_id_proof} alt="ID Front" style={{ maxWidth: 450, maxHeight: 320, borderRadius: 10, border: '2px solid #ccc' }} />) : (<Typography color="text.secondary">No image uploaded</Typography>)}
+                                {govIdFrontUrl ? (
+                                    <img
+                                        src={govIdFrontUrl}
+                                        alt="ID Front"
+                                        style={{ maxWidth: 450, maxHeight: 320, borderRadius: 10, border: '2px solid #ccc' }}
+                                        crossOrigin="anonymous"
+                                        onError={() => refreshGovIdUrl('front')}
+                                    />
+                                ) : (
+                                    <Typography color="text.secondary">No image uploaded</Typography>
+                                )}
                             </Box>
                             <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, flex: 1 }}>
                                 <Typography variant="subtitle1" fontWeight="bold" color="primary.main" mb={1}>{idTypeName ? `${idTypeName} (Back)` : 'ID Type (Back)'}</Typography>
-                                {profile?.gov_id_proof_back ? (<img src={profile.gov_id_proof_back} alt="ID Back" style={{ maxWidth: 450, maxHeight: 320, borderRadius: 10, border: '2px solid #ccc' }} />) : (<Typography color="text.secondary">No image uploaded</Typography>)}
+                                {govIdBackUrl ? (
+                                    <img
+                                        src={govIdBackUrl}
+                                        alt="ID Back"
+                                        style={{ maxWidth: 450, maxHeight: 320, borderRadius: 10, border: '2px solid #ccc' }}
+                                        crossOrigin="anonymous"
+                                        onError={() => refreshGovIdUrl('back')}
+                                    />
+                                ) : (
+                                    <Typography color="text.secondary">No image uploaded</Typography>
+                                )}
                             </Box>
                         </Box>
                     )}

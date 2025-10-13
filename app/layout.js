@@ -61,6 +61,8 @@ function LayoutContent({ children }) {
     return (
         <html lang="en">
             <head>
+                <title>EasyTrack</title>
+                <link rel="icon" href="/brand-1.png" type="image/png" />
                 <link
                     href="https://fonts.googleapis.com/css2?family=Onest:wght@100;200;300;400;500;600;700;800;900&display=swap"
                     rel="stylesheet"

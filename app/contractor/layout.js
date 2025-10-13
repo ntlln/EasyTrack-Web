@@ -30,6 +30,58 @@ function ContractorLayoutContent({ children }) {
   // Timeout manager for automatic logout after 30 minutes of inactivity
   useTimeoutManager();
 
+  // Update document title when pathname changes
+  useEffect(() => {
+    if (typeof document !== 'undefined') {
+      document.title = getPageTitle();
+    }
+  }, [pathname]);
+
+  // Generate page title based on current path
+  const getPageTitle = () => {
+    if (!pathname) return 'EasyTrack | Dashboard';
+    
+    const pageName = getPageNameFromPath(pathname, '/contractor');
+    return `EasyTrack | ${pageName}`;
+  };
+
+  // Helper function to get page name from path
+  const getPageNameFromPath = (path, basePath) => {
+    const segments = path.replace(basePath, '').split('/').filter(Boolean);
+    
+    if (segments.length === 0) {
+      return 'Dashboard';
+    }
+    
+    // Handle specific page names
+    const pageMap = {
+      'dashboard': 'Dashboard',
+      'profile': 'Profile',
+      'booking': 'Booking',
+      'luggage-tracking': 'Luggage Tracking',
+      'history-and-reports': 'History & Reports',
+      'statistics': 'Statistics',
+      'chat-support': 'Chat Support',
+      'verify': 'Verification',
+      'login': 'Login',
+      'forgot-password': 'Forgot Password',
+      'reset-password': 'Reset Password',
+      'edit-profile': 'Edit Profile'
+    };
+    
+    const firstSegment = segments[0];
+    const pageName = pageMap[firstSegment] || firstSegment.charAt(0).toUpperCase() + firstSegment.slice(1).replace(/-/g, ' ');
+    
+    // Handle nested routes
+    if (segments.length > 1) {
+      const secondSegment = segments[1];
+      const nestedPageName = pageMap[secondSegment] || secondSegment.charAt(0).toUpperCase() + secondSegment.slice(1).replace(/-/g, ' ');
+      return `${pageName} | ${nestedPageName}`;
+    }
+    
+    return pageName;
+  };
+
   // Enhanced session validation
   useEffect(() => {
     if (isAuthPage) {

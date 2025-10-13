@@ -34,6 +34,20 @@ export default function Page() {
 
   const menuProps = { PaperProps: { style: { maxHeight: 48 * 5 } } };
 
+  // Helper to derive file name from signed URL
+  const getFileNameFromUrl = (url) => {
+    if (!url) return '';
+    try {
+      const u = new URL(url);
+      const parts = u.pathname.split('/');
+      return parts[parts.length - 1] || '';
+    } catch (_) {
+      // Fallback: try simple split if not a valid URL
+      const parts = String(url).split('/');
+      return parts[parts.length - 1] || '';
+    }
+  };
+
   // Data fetching
   useEffect(() => {
     const fetchProfile = async () => {
@@ -343,7 +357,7 @@ export default function Page() {
         <Typography variant="h6" fontWeight="bold" mb={2} color="primary">Personal Information</Typography>
         <Grid container spacing={2} mb={4}>
           <Grid item xs={12} sm={4}><TextField fullWidth sx={formStyles} label="First Name" name="first_name" value={form.first_name} onChange={handleChange} required inputProps={{ minLength: 2, maxLength: 50 }} /></Grid>
-          <Grid item xs={12} sm={4}><TextField fullWidth sx={formStyles} label="Middle Initial" name="middle_initial" value={form.middle_initial} onChange={handleChange} required inputProps={{ maxLength: 1 }} placeholder="A" /></Grid>
+          <Grid item xs={12} sm={4}><TextField fullWidth sx={formStyles} label="Middle Initial" name="middle_initial" value={form.middle_initial} onChange={handleChange} inputProps={{ maxLength: 1, minLength: 0 }} placeholder="A" /></Grid>
           <Grid item xs={12} sm={4}><TextField fullWidth sx={formStyles} label="Last Name" name="last_name" value={form.last_name} onChange={handleChange} required inputProps={{ minLength: 2, maxLength: 50 }} /></Grid>
           <Grid item xs={12} sm={4}>
             <Autocomplete
@@ -395,11 +409,11 @@ export default function Page() {
           <Grid item xs={12} sm={6}><TextField fullWidth sx={formStyles} label="Government ID Number" name="gov_id_number" value={form.gov_id_number} onChange={handleChange} required inputProps={{ minLength: 5, maxLength: 20 }} /></Grid>
           <Grid item xs={12} sm={6}>
             <input type="file" ref={fileInputRef} onChange={(e) => handleFileUpload(e, 'front')} style={fileInputStyles} accept="image/*" />
-            <TextField fullWidth sx={formStyles} label="Upload Government ID (Front)" value={form.gov_id_proof ? 'Image uploaded' : ''} InputProps={{ endAdornment: <InputAdornment position="end"><IconButton onClick={() => triggerFileInput('front')} disabled={uploading}><UploadIcon /></IconButton></InputAdornment>, readOnly: true }} />
+            <TextField fullWidth sx={formStyles} label="Upload Government ID (Front)" value={form.gov_id_proof ? getFileNameFromUrl(form.gov_id_proof) : ''} InputProps={{ endAdornment: <InputAdornment position="end"><IconButton onClick={() => triggerFileInput('front')} disabled={uploading}><UploadIcon /></IconButton></InputAdornment>, readOnly: true }} />
           </Grid>
           <Grid item xs={12} sm={6}>
             <input type="file" ref={fileInputBackRef} onChange={(e) => handleFileUpload(e, 'back')} style={fileInputStyles} accept="image/*" />
-            <TextField fullWidth sx={formStyles} label="Upload Government ID (Back)" value={form.gov_id_proof_back ? 'Image uploaded' : ''} InputProps={{ endAdornment: <InputAdornment position="end"><IconButton onClick={() => triggerFileInput('back')} disabled={uploading}><UploadIcon /></IconButton></InputAdornment>, readOnly: true }} />
+            <TextField fullWidth sx={formStyles} label="Upload Government ID (Back)" value={form.gov_id_proof_back ? getFileNameFromUrl(form.gov_id_proof_back) : ''} InputProps={{ endAdornment: <InputAdornment position="end"><IconButton onClick={() => triggerFileInput('back')} disabled={uploading}><UploadIcon /></IconButton></InputAdornment>, readOnly: true }} />
           </Grid>
         </Grid>
 

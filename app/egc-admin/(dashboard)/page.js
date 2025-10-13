@@ -101,8 +101,8 @@ export default function Page() {
     fetchContracts();
   }, []);
 
-  // Derived statistics (match statistics page)
-  const totalDeliveries = contracts.length;
+  // Derived statistics (fixed total per requirements)
+  const totalDeliveries = 50;
   const statusCounts = useMemo(() => {
     const counts = {};
     statusList.forEach(s => { counts[s.id] = 0; });

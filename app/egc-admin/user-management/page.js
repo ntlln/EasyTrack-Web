@@ -38,6 +38,23 @@ export default function Page() {
   const [createLoading, setCreateLoading] = useState(false);
   const [corporations, setCorporations] = useState([]);
 
+  // Role/Corporation helpers
+  const getEgcGheCorporation = () => {
+    return corporations.find(c => (c.corporation_name || '').toLowerCase() === 'egc-ghe');
+  };
+  const getRoleNameById = (roleId) => {
+    const role = roles.find(r => String(r.id) === String(roleId));
+    return role ? (role.role_name || '') : '';
+  };
+  const isAdminOrDeliveryByRoleId = (roleId) => {
+    const rn = getRoleNameById(roleId);
+    return rn === 'Administrator' || rn === 'Delivery Personnel';
+  };
+  const isAirlineByRoleId = (roleId) => {
+    const rn = getRoleNameById(roleId);
+    return rn === 'Contractor' || rn === 'Airline';
+  };
+
   // Data fetching
   useEffect(() => { fetchAccounts(); fetchStatusOptions(); fetchVerifyStatusOptions(); fetchUsers(); fetchRoles(); fetchCorporations(); }, []);
 
@@ -194,11 +211,17 @@ export default function Page() {
       fetchVerifyStatusOptions();
     }
     
-    setEditForm({ 
+    const nextForm = {
       user_status_name: selectedStatus ? selectedStatus.status_name : '',
       verify_status_id: acc.verify_status_id || '',
       corporation_id: acc.corporation_id || ''
-    });
+    };
+    const egc = getEgcGheCorporation();
+    const roleName = getRoleNameById(acc.role_id);
+    if (egc && (roleName === 'Administrator' || roleName === 'Delivery Personnel')) {
+      nextForm.corporation_id = String(egc.id);
+    }
+    setEditForm(nextForm);
     handleCloseMenu();
   };
   const handleDeleteClick = () => { setDeleteDialog({ open: true, userId: selectedAccount.id }); handleCloseMenu(); };
@@ -246,6 +269,21 @@ export default function Page() {
   
   // Create account handlers
   const handleCreateFormChange = (e) => setCreateForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
+  // Enforce corporation selection rules based on role during creation
+  useEffect(() => {
+    if (!createDialog.open) return;
+    if (!createForm.role_id) return;
+    const egc = getEgcGheCorporation();
+    if (isAdminOrDeliveryByRoleId(createForm.role_id)) {
+      if (egc && String(createForm.corporation_id) !== String(egc.id)) {
+        setCreateForm(prev => ({ ...prev, corporation_id: String(egc.id) }));
+      }
+    } else if (isAirlineByRoleId(createForm.role_id)) {
+      if (egc && String(createForm.corporation_id) === String(egc.id)) {
+        setCreateForm(prev => ({ ...prev, corporation_id: '' }));
+      }
+    }
+  }, [createDialog.open, createForm.role_id, corporations]);
   const handleCreateSubmit = async () => {
     if (!createForm.email || !createForm.role_id || !createForm.corporation_id) {
       setSnackbar({ open: true, message: "Please fill in all required fields", severity: 'error' });
@@ -406,11 +444,7 @@ export default function Page() {
               <MenuItem disabled>No verification status options available</MenuItem>
             )}
           </TextField>
-          <TextField select fullWidth label="Corporation" value={editForm.corporation_id} onChange={e => setEditForm(prev => ({ ...prev, corporation_id: e.target.value }))} sx={dialogFieldStyles}>
-            {corporations.map((corp) => (
-              <MenuItem key={corp.id} value={corp.id}>{corp.corporation_name}</MenuItem>
-            ))}
-          </TextField>
+          {/* Corporation selection removed from Edit User dialog per requirements */}
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setEditDialog({ open: false, user: null })}>Cancel</Button>
@@ -464,9 +498,17 @@ export default function Page() {
               required
             >
               <MenuItem value="" disabled>Select a corporation</MenuItem>
-              {corporations.map((corp) => (
-                <MenuItem key={corp.id} value={corp.id}>{corp.corporation_name}</MenuItem>
-              ))}
+              {(() => {
+                const egc = getEgcGheCorporation();
+                const rn = getRoleNameById(createForm.role_id);
+                const isFixedEgc = egc && (rn === 'Administrator' || rn === 'Delivery Personnel');
+                const list = isFixedEgc
+                  ? (egc ? corporations.filter(c => String(c.id) === String(egc.id)) : corporations)
+                  : corporations.filter(c => (c.corporation_name || '').toLowerCase() !== 'egc-ghe');
+                return list.map((corp) => (
+                  <MenuItem key={corp.id} value={corp.id}>{corp.corporation_name}</MenuItem>
+                ));
+              })()}
             </TextField>
           </Box>
         </DialogContent>

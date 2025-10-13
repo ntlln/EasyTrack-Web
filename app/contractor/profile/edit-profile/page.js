@@ -149,6 +149,19 @@ export default function Page() {
   };
   const triggerFileInput = (type) => type === 'front' ? fileInputRef.current?.click() : fileInputBackRef.current?.click();
 
+  // Helper to derive file name from signed URL
+  const getFileNameFromUrl = (url) => {
+    if (!url) return '';
+    try {
+      const u = new URL(url);
+      const parts = u.pathname.split('/');
+      return parts[parts.length - 1] || '';
+    } catch (_) {
+      const parts = String(url).split('/');
+      return parts[parts.length - 1] || '';
+    }
+  };
+
   // Check if form has unsaved changes
   const hasUnsavedChanges = () => {
     if (!original) return false;
@@ -296,18 +309,18 @@ export default function Page() {
       if (oldUrl) {
         try {
           const url = new URL(oldUrl);
-          const pathMatch = url.pathname.match(/contractor\/([^.]+_[^./]+)\.(\w+)/);
+          const pathMatch = url.pathname.match(/airlines\/([^.]+_[^./]+)\.(\w+)/);
           if (pathMatch) {
             const fileName = pathMatch[1];
             const fileExt = pathMatch[2];
-            const filePath = `contractor/${fileName}.${fileExt}`;
+            const filePath = `airlines/${fileName}.${fileExt}`;
             await supabase.storage.from('gov-id').remove([filePath]);
           }
         } catch (e) {}
       }
       const fileExt = file.name.split('.').pop();
       const fileName = `${profileData.id}_${type}.${fileExt}`;
-      const filePath = `contractor/${fileName}`;
+      const filePath = `airlines/${fileName}`;
       const { error: uploadError } = await supabase.storage.from('gov-id').upload(filePath, file, { upsert: true });
       if (uploadError) throw uploadError;
       const { data: { signedUrl } } = await supabase.storage.from('gov-id').createSignedUrl(filePath, 31536000);
@@ -348,7 +361,7 @@ export default function Page() {
         <Typography variant="h6" fontWeight="bold" mb={2} color="primary">Personal Information</Typography>
         <Grid container spacing={2} mb={4}>
           <Grid item xs={12} sm={4}><TextField fullWidth sx={formStyles} label="First Name" name="first_name" value={form.first_name} onChange={handleChange} required onKeyPress={handleKeyPress} inputProps={{ minLength: 2, maxLength: 50 }} /></Grid>
-          <Grid item xs={12} sm={4}><TextField fullWidth sx={formStyles} label="Middle Initial" name="middle_initial" value={form.middle_initial} onChange={handleChange} required onKeyPress={handleKeyPress} inputProps={{ maxLength: 1 }} placeholder="A" /></Grid>
+          <Grid item xs={12} sm={4}><TextField fullWidth sx={formStyles} label="Middle Initial" name="middle_initial" value={form.middle_initial} onChange={handleChange} onKeyPress={handleKeyPress} inputProps={{ maxLength: 1, minLength: 0 }} placeholder="A" /></Grid>
           <Grid item xs={12} sm={4}><TextField fullWidth sx={formStyles} label="Last Name" name="last_name" value={form.last_name} onChange={handleChange} required onKeyPress={handleKeyPress} inputProps={{ minLength: 2, maxLength: 50 }} /></Grid>
           <Grid item xs={12} sm={4}>
             <Autocomplete
@@ -401,11 +414,11 @@ export default function Page() {
           <Grid item xs={12} sm={6}><TextField fullWidth sx={formStyles} label="Government ID Number" name="gov_id_number" value={form.gov_id_number} onChange={handleChange} onKeyPress={handleKeyPress} required inputProps={{ minLength: 5, maxLength: 20 }} /></Grid>
           <Grid item xs={12} sm={6}>
             <input type="file" ref={fileInputRef} onChange={(e) => handleFileUpload(e, 'front')} style={fileInputStyles} accept="image/*" />
-            <TextField fullWidth sx={formStyles} label="Upload Government ID (Front)" value={form.gov_id_proof ? 'Image uploaded' : ''} InputProps={{ endAdornment: <InputAdornment position="end"><IconButton onClick={() => triggerFileInput('front')} disabled={uploading}><UploadIcon /></IconButton></InputAdornment>, readOnly: true }} onKeyPress={handleKeyPress} />
+            <TextField fullWidth sx={formStyles} label="Upload Government ID (Front)" value={form.gov_id_proof ? getFileNameFromUrl(form.gov_id_proof) : ''} InputProps={{ endAdornment: <InputAdornment position="end"><IconButton onClick={() => triggerFileInput('front')} disabled={uploading}><UploadIcon /></IconButton></InputAdornment>, readOnly: true }} onKeyPress={handleKeyPress} />
           </Grid>
           <Grid item xs={12} sm={6}>
             <input type="file" ref={fileInputBackRef} onChange={(e) => handleFileUpload(e, 'back')} style={fileInputStyles} accept="image/*" />
-            <TextField fullWidth sx={formStyles} label="Upload Government ID (Back)" value={form.gov_id_proof_back ? 'Image uploaded' : ''} InputProps={{ endAdornment: <InputAdornment position="end"><IconButton onClick={() => triggerFileInput('back')} disabled={uploading}><UploadIcon /></IconButton></InputAdornment>, readOnly: true }} onKeyPress={handleKeyPress} />
+            <TextField fullWidth sx={formStyles} label="Upload Government ID (Back)" value={form.gov_id_proof_back ? getFileNameFromUrl(form.gov_id_proof_back) : ''} InputProps={{ endAdornment: <InputAdornment position="end"><IconButton onClick={() => triggerFileInput('back')} disabled={uploading}><UploadIcon /></IconButton></InputAdornment>, readOnly: true }} onKeyPress={handleKeyPress} />
           </Grid>
         </Grid>
 

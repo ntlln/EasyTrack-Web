@@ -80,7 +80,7 @@ export default function Navbar({ currentPage = 'home' }) {
       <Container maxWidth="lg">
         <Box display="flex" justifyContent="space-between" alignItems="center">
           <Box display="flex" alignItems="center">
-            <img src="/images/white-logo.png" alt="Logo" width={40} height={40} style={{ marginRight: 12 }} />
+            <img src="/brand-1.png" alt="Logo" width={40} height={40} style={{ marginRight: 12 }} />
             <Typography variant="h5" fontWeight={700} color="primary.contrastText">
               EasyTrack
             </Typography>
