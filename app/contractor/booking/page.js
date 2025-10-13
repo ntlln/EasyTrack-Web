@@ -366,6 +366,7 @@ export default function Page() {
             };
 
             const newMap = new window.google.maps.Map(mapRef.current, mapOptions);
+            console.log('[Maps] Map initialized', { center: mapOptions.center, mapId: mapOptions.mapId });
             setMap(newMap);
 
             const markerView = new window.google.maps.marker.PinElement({
@@ -414,6 +415,7 @@ export default function Page() {
             newMap.addListener('click', (event) => {
                 const lat = event.latLng.lat();
                 const lng = event.latLng.lng();
+                console.log('[Maps] Map click', { lat, lng });
                 updateMarkerAndAddress({ lat, lng });
             });
 
@@ -425,8 +427,8 @@ export default function Page() {
             setMapError(error.message);
         }
     };
-    const updateAddressFromPosition = (position) => { const lat = position.lat(); const lng = position.lng(); const geocoder = new window.google.maps.Geocoder(); geocoder.geocode({ location: { lat, lng } }, (results, status) => { if (status === 'OK' && results[0]) { setDropoffAddress(prev => ({ ...prev, location: results[0].formatted_address, lat: lat, lng: lng })); } }); };
-    const updateMarkerAndAddress = (position) => { if (!window.google || !map) return; const markerView = new window.google.maps.marker.PinElement({ scale: 1, background: theme.palette.primary.main, borderColor: theme.palette.primary.dark, glyphColor: '#FFFFFF' }); if (markerRef.current) { markerRef.current.position = position; } else { markerRef.current = new window.google.maps.marker.AdvancedMarkerElement({ map: map, position: position, content: markerView.element, gmpDraggable: true, collisionBehavior: window.google.maps.CollisionBehavior.OPTIONAL_AND_HIDES_LOWER_PRIORITY }); } map.panTo(position); const geocoder = new window.google.maps.Geocoder(); geocoder.geocode({ location: position }, (results, status) => { if (status === 'OK' && results[0]) { const formattedAddress = results[0].formatted_address; setDropoffAddress(prev => ({ ...prev, location: formattedAddress, lat: position.lat, lng: position.lng })); } }); };
+    const updateAddressFromPosition = (position) => { const lat = position.lat(); const lng = position.lng(); const geocoder = new window.google.maps.Geocoder(); geocoder.geocode({ location: { lat, lng } }, (results, status) => { if (status === 'OK' && results[0]) { const top = results[0]; console.log('[Maps] Reverse geocode from marker/map center', { lat, lng, formatted_address: top.formatted_address, components: top.address_components }); setDropoffAddress(prev => ({ ...prev, location: top.formatted_address, lat: lat, lng: lng })); const parsed = parsePhAdministrativeComponents(top.address_components); console.log('[Maps] Parsed PH admin components', parsed); backfillAddressSelections(parsed); const cityRegion = parsed?.cityName && parsed?.regionName ? `${canonicalizeCityName(parsed.cityName)}, ${canonicalizeRegionName(parsed.regionName)}` : null; fetchAndSetDeliveryFee(cityRegion || top.formatted_address); } else { console.warn('[Maps] Reverse geocode failed', status); } }); };
+    const updateMarkerAndAddress = (position) => { if (!window.google || !map) return; const markerView = new window.google.maps.marker.PinElement({ scale: 1, background: theme.palette.primary.main, borderColor: theme.palette.primary.dark, glyphColor: '#FFFFFF' }); if (markerRef.current) { markerRef.current.position = position; } else { markerRef.current = new window.google.maps.marker.AdvancedMarkerElement({ map: map, position: position, content: markerView.element, gmpDraggable: true, collisionBehavior: window.google.maps.CollisionBehavior.OPTIONAL_AND_HIDES_LOWER_PRIORITY }); } map.panTo(position); const geocoder = new window.google.maps.Geocoder(); geocoder.geocode({ location: position }, (results, status) => { if (status === 'OK' && results[0]) { const top = results[0]; const formattedAddress = top.formatted_address; console.log('[Maps] Reverse geocode from click', { position, formattedAddress, components: top.address_components }); setDropoffAddress(prev => ({ ...prev, location: formattedAddress, lat: position.lat, lng: position.lng })); const parsed = parsePhAdministrativeComponents(top.address_components); console.log('[Maps] Parsed PH admin components', parsed); backfillAddressSelections(parsed); const cityRegion = parsed?.cityName && parsed?.regionName ? `${canonicalizeCityName(parsed.cityName)}, ${canonicalizeRegionName(parsed.regionName)}` : null; fetchAndSetDeliveryFee(cityRegion || formattedAddress); } else { console.warn('[Maps] Reverse geocode (click) failed', status); } }); };
     const updateMapLocation = useCallback((position, address) => {
         if (!window.google || !map) return;
         const markerView = new window.google.maps.marker.PinElement({
@@ -462,12 +464,16 @@ export default function Page() {
             const geocoder = new window.google.maps.Geocoder();
             geocoder.geocode({ location: { lat, lng }, componentRestrictions: { country: 'ph' } }, (results, status) => {
                 if (status === 'OK' && results[0]) {
+                    const top = results[0];
                     setDropoffAddress(prev => ({
                         ...prev,
-                        location: results[0].formatted_address,
+                        location: top.formatted_address,
                         lat: lat,
                         lng: lng
                     }));
+                    const parsed = parsePhAdministrativeComponents(top.address_components);
+                    backfillAddressSelections(parsed);
+                    fetchAndSetDeliveryFee(top.formatted_address);
                 }
             });
         });
@@ -497,8 +503,10 @@ export default function Page() {
         }, (predictions, status) => {
             if (status === window.google.maps.places.PlacesServiceStatus.OK && predictions) {
                 setPlaceOptions(predictions);
+                console.log('[Maps] Place predictions', { input, count: predictions.length, examples: predictions.slice(0, 3) });
             } else {
                 setPlaceOptions([]);
+                console.warn('[Maps] Place predictions failed/empty', { input, status });
             }
             setPlaceLoading(false);
         });
@@ -511,6 +519,7 @@ export default function Page() {
             if (status === window.google.maps.places.PlacesServiceStatus.OK && data && data.geometry) {
                 const loc = data.geometry.location;
                 const newPosition = { lat: loc.lat(), lng: loc.lng() };
+                console.log('[Maps] Place details', { description: value.description, place_id: value.place_id, position: newPosition, components: data.address_components, formatted_address: data.formatted_address });
 
                 // Check if the location is within Luzon bounds
                 if (!isWithinLuzonBounds(newPosition.lat, newPosition.lng)) {
@@ -519,13 +528,23 @@ export default function Page() {
                     return;
                 }
 
-                updateMapLocation(newPosition, data.formatted_address || value.description);
+                const resolvedAddress = data.formatted_address || value.description;
+                updateMapLocation(newPosition, resolvedAddress);
                 setDropoffAddress(prev => ({
                     ...prev,
-                    location: data.formatted_address || value.description,
+                    location: resolvedAddress,
                     lat: newPosition.lat,
                     lng: newPosition.lng
                 }));
+
+                // Parse and backfill administrative levels for accurate pricing and address
+                const parsed = parsePhAdministrativeComponents(data.address_components || []);
+                console.log('[Maps] Parsed PH admin components (details)', parsed);
+                backfillAddressSelections(parsed);
+
+                // Compute pricing using City, Region if available; otherwise resolved address
+                const cityRegion = parsed?.cityName && parsed?.regionName ? `${canonicalizeCityName(parsed.cityName)}, ${canonicalizeRegionName(parsed.regionName)}` : null;
+                fetchAndSetDeliveryFee(cityRegion || resolvedAddress);
             }
         });
     };
@@ -718,6 +737,391 @@ export default function Page() {
             .trim();
     };
 
+    // Pricing helpers (copied logic concept from mobile fetchAndSetDeliveryFee/pricingUtils)
+    const normalizeForPricing = (value) => {
+        const s = String(value || '').toLowerCase().trim();
+        return s
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/\bkalakhang maynila\b/g, 'metro manila')
+            .replace(/\bnational capital region\b/g, 'metro manila')
+            .replace(/\bcity\b/g, '')
+            .replace(/\s*,\s*/g, ', ')
+            .replace(/\s+/g, ' ')
+            .trim();
+    };
+
+    const canonicalizeRegionName = (regionName) => {
+        if (!regionName) return '';
+        const n = normalizeForPricing(regionName);
+        if (/(metro manila|ncr|national capital region)/.test(n)) return 'Metro Manila';
+        // Title case each word
+        return regionName
+            .replace(/\s+/g, ' ')
+            .trim();
+    };
+
+    const canonicalizeCityName = (cityName) => {
+        if (!cityName) return '';
+        const noSuffix = cityName.replace(/\s*City\s*$/i, '').trim();
+        return noSuffix.replace(/\s+/g, ' ');
+    };
+
+    const canonicalizeCityRegionKey = (cityName, regionName) => {
+        const cityCanon = canonicalizeCityName(cityName);
+        const regionCanon = canonicalizeRegionName(regionName);
+        if (!cityCanon || !regionCanon) return '';
+        return `${cityCanon}, ${regionCanon}`;
+    };
+
+    const findPricingMatchFromMap = (pricingMap, address) => {
+        if (!address) return null;
+
+        const normAddress = normalizeForPricing(address);
+        const pricingKeys = Object.keys(pricingMap || {});
+
+        // Build canonical variants for pricing keys to tolerate non-canonical entries
+        const keyVariants = pricingKeys.map((cityKey) => {
+            const normCityKey = normalizeForPricing(cityKey);
+            // Attempt to split into city + region from the key itself
+            const parts = normCityKey.split(',').map(p => p.trim());
+            let canonical = '';
+            if (parts.length >= 2) {
+                const cityPart = parts[0];
+                const regionPart = parts.slice(1).join(', ');
+                canonical = normalizeForPricing(canonicalizeCityRegionKey(cityPart, regionPart));
+            }
+            return { cityKey, normCityKey, canonical };
+        });
+
+        // 0) Prefer exact canonical match if the address looks canonical ("city, region")
+        const addrParts = normAddress.split(',').map(p => p.trim());
+        if (addrParts.length >= 2) {
+            const addrCity = addrParts[0];
+            const addrRegion = addrParts.slice(1).join(', ');
+            const addrCanonical = normalizeForPricing(canonicalizeCityRegionKey(addrCity, addrRegion));
+            if (addrCanonical) {
+                const exactCanon = keyVariants.find(kv => kv.canonical && kv.canonical === addrCanonical);
+                if (exactCanon) {
+                    return { city: exactCanon.cityKey, price: Number(pricingMap[exactCanon.cityKey]) || 0 };
+                }
+            }
+        }
+
+        // 1) Collect all candidate cities whose normalized name appears in the address
+        const candidates = pricingKeys
+            .map((cityKey) => ({ cityKey, normCity: normalizeForPricing(cityKey) }))
+            .filter(({ normCity }) => normAddress.includes(normCity));
+
+        if (candidates.length === 0) return null;
+        if (candidates.length === 1) {
+            const only = candidates[0];
+            return { city: only.cityKey, price: Number(pricingMap[only.cityKey]) || 0 };
+        }
+
+        // 2) Disambiguate using province hints parsed elsewhere
+        // Prefer using currently selected province if available; otherwise try to infer from address
+        const provinceHint = normalizeForPricing(contract?.province || '')
+            || (() => {
+                // Infer by checking known province names inside the address
+                const found = (provinces || []).find((p) => normAddress.includes(normalizeForPricing(p.province_name)));
+                return found ? normalizeForPricing(found.province_name) : '';
+            })();
+
+        if (provinceHint) {
+            // Map candidate city names to their possible city entries and provinces; pick the one that matches provinceHint
+            const matchedByProvince = candidates.find(({ cityKey }) => {
+                const normCityKey = normalizeForPricing(cityKey);
+                // Find city records whose name matches this pricing key
+                const possibleCityRecords = (cities || []).filter((c) => {
+                    const normCityName = normalizeForPricing(c.city_name);
+                    return normCityName === normCityKey || normCityName.includes(normCityKey) || normCityKey.includes(normCityName);
+                });
+                if (possibleCityRecords.length === 0) return false;
+                // If any of the possible records' province matches the hint, accept
+                return possibleCityRecords.some((c) => {
+                    const prov = (provinces || []).find((p) => p.province_code === c.province_code);
+                    if (!prov) return false;
+                    const normProvName = normalizeForPricing(prov.province_name);
+                    return normProvName === provinceHint || provinceHint.includes(normProvName) || normProvName.includes(provinceHint);
+                });
+            });
+
+            if (matchedByProvince) {
+                return { city: matchedByProvince.cityKey, price: Number(pricingMap[matchedByProvince.cityKey]) || 0 };
+            }
+        }
+
+        // 3) If still ambiguous, try exact normalized equality against an address token boundary
+        const strict = candidates.find(({ normCity }) => new RegExp(`(^|[,\s])${normCity}([,\s]|$)`).test(normAddress));
+        if (strict) {
+            return { city: strict.cityKey, price: Number(pricingMap[strict.cityKey]) || 0 };
+        }
+
+        // 4) Fall back to the first candidate deterministically
+        const fallback = candidates[0];
+        return { city: fallback.cityKey, price: Number(pricingMap[fallback.cityKey]) || 0 };
+    };
+
+    const fetchAndSetDeliveryFee = async (address) => {
+        try {
+            if (!address || !address.trim()) {
+                setMapCityPrice(0);
+                return;
+            }
+
+            // Prefer already-fetched pricing map if available
+            let matched = findPricingMatchFromMap(pricingData, address);
+
+            // If no match and pricing data not loaded yet, fetch directly like mobile does
+            if (!matched && (!pricingData || Object.keys(pricingData).length === 0)) {
+                const { data: pricingList, error } = await supabase
+                    .from('pricing')
+                    .select('city, price');
+                if (!error && Array.isArray(pricingList)) {
+                    const listToMap = {};
+                    pricingList.forEach(p => { if (p?.city != null) listToMap[p.city] = Number(p.price) || 0; });
+                    // First, try address as-is; then try city, region form if parsable
+                    matched = findPricingMatchFromMap(listToMap, address);
+                    if (!matched) {
+                        try {
+                            if (window.google) {
+                                const geocoder = new window.google.maps.Geocoder();
+                                const results = await new Promise((resolve, reject) => {
+                                    geocoder.geocode({ address }, (res, status) => {
+                                        if (status === 'OK') resolve(res);
+                                        else reject(new Error(status));
+                                    });
+                                });
+                                const top = results?.[0];
+                                const comps = top?.address_components || [];
+                                const cityComp = comps.find(c => (c.types || []).includes('locality'))
+                                    || comps.find(c => (c.types || []).includes('administrative_area_level_3'))
+                                    || comps.find(c => (c.types || []).includes('administrative_area_level_2'));
+                                const regionComp = comps.find(c => (c.types || []).includes('administrative_area_level_1'))
+                                    || comps.find(c => (c.types || []).includes('administrative_area_level_2'));
+                                const cityName = (cityComp?.long_name || '').replace(/\s*City\s*$/i, '').trim();
+                                const regionName = (regionComp?.long_name || '').trim();
+                                const cityRegion = cityName && regionName ? `${cityName}, ${regionName}` : null;
+                                if (cityRegion) {
+                                    matched = findPricingMatchFromMap(listToMap, cityRegion);
+                                    if (matched) console.log('[Pricing] Late-loaded pricing map matched with city, region', { cityRegion, matched });
+                                }
+                            }
+                        } catch (_) { /* ignore */ }
+                    }
+                }
+            }
+
+            if (matched) {
+                console.log('[Pricing] Matched from pricing map', matched);
+                setMapCity(matched.city.replace(/Kalakhang Maynila/gi, 'Metro Manila'));
+                setMapCityPrice((prev) => {
+                    const next = Number(matched.price) || 0;
+                    if (prev && prev > 0 && prev !== next) {
+                        console.log('[Pricing] Preserving higher-confidence matched price over previous', { prev, next });
+                    }
+                    return next;
+                });
+            } else {
+                // Fallback 1: Geocode the address to extract city, then use city-based matching
+                try {
+                    if (window.google) {
+                        const geocoder = new window.google.maps.Geocoder();
+                        const results = await new Promise((resolve, reject) => {
+                            geocoder.geocode({ address }, (res, status) => {
+                                if (status === 'OK') resolve(res);
+                                else reject(new Error(status));
+                            });
+                        });
+                        const top = results?.[0];
+                        if (top) {
+                            const comps = top.address_components || [];
+                            // Extract locality or admin area as city
+                            const cityComp = comps.find(c => (c.types || []).includes('locality'))
+                                || comps.find(c => (c.types || []).includes('administrative_area_level_3'))
+                                || comps.find(c => (c.types || []).includes('administrative_area_level_2'));
+                            const provinceComp = comps.find(c => (c.types || []).includes('administrative_area_level_2'))
+                                || comps.find(c => (c.types || []).includes('administrative_area_level_1'));
+                            const cityName = (cityComp?.long_name || '').replace(/\s*City\s*$/i, '').trim();
+                            const provinceName = (provinceComp?.long_name || '').trim();
+                            console.log('[Pricing] Fallback geocode parsed', { address, cityName, provinceName });
+
+                            if (cityName) {
+                                const priceByCity = getDeliveryChargeForCity(cityName);
+                                if (typeof priceByCity === 'number') {
+                                    console.log('[Pricing] City-based price match', { cityName, price: priceByCity });
+                                    setMapCity(cityName);
+                                    setMapCityPrice(Number(priceByCity) || 0);
+                                    return;
+                                }
+                            }
+
+                            // Fallback 2: Try disambiguation again by composing "city, province"
+                            const composed = [cityName, provinceName].filter(Boolean).join(', ');
+                            if (composed) {
+                                const retry = findPricingMatchFromMap(pricingData, composed);
+                                if (retry) {
+                                    console.log('[Pricing] Retry with composed city+province', { composed, retry });
+                                    setMapCity(retry.city.replace(/Kalakhang Maynila/gi, 'Metro Manila'));
+                                    setMapCityPrice(Number(retry.price) || 0);
+                                    return;
+                                }
+                            }
+                        }
+                    }
+                } catch (_) { /* swallow and continue to final fallback */ }
+
+                // Final fallback: show error
+                console.warn('[Pricing] No pricing match found for address', { address });
+                setMapCityPrice(0);
+                setSnackbarMessage('The selected address is either invalid or out of bounds');
+                setSnackbarOpen(true);
+            }
+        } catch (err) {
+            console.error('[Pricing] Error computing price', err);
+            setMapCityPrice(0);
+        }
+    };
+
+    // Helpers to resolve PH region/province/city/barangay from Google components
+    const normalizePhName = (value) => {
+        if (!value) return '';
+        return value
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/ñ/g, 'n')
+            .replace(/ã±/g, 'n')
+            .replace(/\s+/g, ' ')
+            .trim();
+    };
+
+    const findRegionByName = (name) => {
+        const target = normalizePhName(name)
+            .replace(/ region$/i, '')
+            .replace(/^region\s*/i, '')
+            .replace(/\b(ncr)\b/i, 'national capital region');
+        return regions.find(r => normalizePhName(r.region_name).includes(target) || target.includes(normalizePhName(r.region_name)));
+    };
+
+    const findProvinceByName = (name) => {
+        const target = normalizePhName(name)
+            .replace(/ province$/i, '')
+            .replace(/^province\s*/i, '');
+        return provinces.find(p => normalizePhName(p.province_name) === target || normalizePhName(p.province_name).includes(target) || target.includes(normalizePhName(p.province_name)));
+    };
+
+    const findCityByName = (name) => {
+        const target = normalizePhName(name).replace(/\s*city\s*$/i, '');
+        return cities.find(c => normalizePhName(c.city_name) === target || normalizePhName(c.city_name).includes(target) || target.includes(normalizePhName(c.city_name)));
+    };
+
+    const findBarangayByNameWithinCity = (brgyName, cityData) => {
+        if (!cityData) return undefined;
+        const target = normalizePhName(brgyName)
+            .replace(/^barangay\s*/i, '')
+            .replace(/^brgy\.?\s*/i, '');
+        const brgys = barangays.filter(b => b.city_code === cityData.city_code);
+        return brgys.find(b => normalizePhName(b.brgy_name) === target);
+    };
+
+    const parsePhAdministrativeComponents = (components) => {
+        if (!components) return {};
+        let regionName = null;
+        let provinceName = null;
+        let cityName = null;
+        let barangayName = null;
+        let postalCode = null;
+
+        components.forEach(comp => {
+            const types = comp.types || [];
+            const long = comp.long_name || comp.short_name;
+            if (!long) return;
+
+            if (types.includes('postal_code')) {
+                postalCode = long;
+            }
+            if (types.includes('administrative_area_level_1')) {
+                regionName = long;
+            }
+            if (types.includes('administrative_area_level_2')) {
+                provinceName = long;
+            }
+            if (types.includes('locality') || types.includes('administrative_area_level_3')) {
+                cityName = cityName || long;
+            }
+            if (types.includes('sublocality') || types.includes('sublocality_level_1') || types.includes('neighborhood') || types.includes('political')) {
+                const n = normalizePhName(long);
+                if (n && (!cityName || n !== normalizePhName(cityName))) {
+                    if (!/(district|zone|city|province|region)$/i.test(long)) {
+                        barangayName = barangayName || long;
+                    }
+                }
+            }
+        });
+
+        if (!provinceName && regionName && /national capital region|ncr/i.test(regionName)) {
+            provinceName = 'Metro Manila';
+        }
+
+        return { regionName, provinceName, cityName, barangayName, postalCode };
+    };
+
+    const backfillAddressSelections = (parsed) => {
+        const { regionName, provinceName, cityName, barangayName, postalCode } = parsed || {};
+
+        let region = regionName ? findRegionByName(regionName) : undefined;
+        if (!region && cityName) {
+            const cd = findCityByName(cityName);
+            if (cd) {
+                region = regions.find(r => r.region_code === cd.region_code);
+            }
+        }
+        const resolvedRegionCode = region?.region_code || '';
+        if (resolvedRegionCode) {
+            setSelectedRegion(resolvedRegionCode);
+            const provs = provinces.filter(p => p.region_code === resolvedRegionCode);
+            setFilteredProvinces(provs);
+        }
+
+        let province = provinceName ? findProvinceByName(provinceName) : undefined;
+        if (!province && cityName) {
+            const cd = findCityByName(cityName);
+            if (cd) {
+                province = provinces.find(p => p.province_code === cd.province_code);
+            }
+        }
+        if (province) {
+            setContract(prev => ({ ...prev, province: province.province_name }));
+            const citiesInProv = cities.filter(c => c.province_code === province.province_code);
+            setFilteredCities(citiesInProv);
+        }
+
+        let cityData = cityName ? findCityByName(cityName) : undefined;
+        if (!cityData && province) {
+            const target = normalizePhName(cityName || '');
+            const candidates = cities.filter(c => c.province_code === province.province_code);
+            cityData = candidates.find(c => normalizePhName(c.city_name).includes(target) || target.includes(normalizePhName(c.city_name)));
+        }
+        if (cityData) {
+            setContract(prev => ({ ...prev, city: cityData.city_name }));
+            const brgys = barangays.filter(b => b.city_code === cityData.city_code);
+            setFilteredBarangays(brgys);
+        }
+
+        let barangayData = barangayName ? findBarangayByNameWithinCity(barangayName, cityData) : undefined;
+        if (barangayData) {
+            setContract(prev => ({ ...prev, barangay: barangayData.brgy_name }));
+        }
+
+        if (postalCode) {
+            setContract(prev => ({ ...prev, postalCode }));
+        } else if (cityData && cityData.postal_code) {
+            setContract(prev => ({ ...prev, postalCode: cityData.postal_code }));
+        }
+    };
+
     // Get delivery charge for city
     const getDeliveryChargeForCity = (cityName) => {
         if (!cityName) return null;
@@ -793,6 +1197,11 @@ export default function Page() {
                     setMapCityPrice(0);
                     return;
                 }
+                // Do not override if we already have a price from City, Region matching
+                if (typeof mapCityPrice === 'number' && mapCityPrice > 0) {
+                    console.log('[Pricing] Skipping coord-based price; existing price preserved', { preservedPrice: mapCityPrice });
+                    return;
+                }
                 const cityName = await getCityFromCoordinates(dropoffAddress.lat, dropoffAddress.lng);
                 setMapCity(cityName || '');
                 const price = cityName ? getDeliveryChargeForCity(cityName) : null;
@@ -803,7 +1212,7 @@ export default function Page() {
             }
         };
         updateMapCityAndPrice();
-    }, [dropoffAddress.lat, dropoffAddress.lng, pricingData]);
+    }, [dropoffAddress.lat, dropoffAddress.lng, pricingData, mapCityPrice]);
 
     const getCityFromCoordinates = async (lat, lng) => {
         if (!window.google) return null;
@@ -829,6 +1238,7 @@ export default function Page() {
                 )?.long_name;
             }
 
+            console.log('[Maps] getCityFromCoordinates', { lat, lng, city, components: response[0].address_components });
             return city?.replace(/\s*City\s*$/i, '').trim() || null;
         } catch (error) {
             console.error('Error getting city from coordinates:', error);
