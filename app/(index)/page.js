@@ -44,6 +44,16 @@ export default function Test() {
   const directionsServiceRef = useRef(null);
   const routeSegmentsRef = useRef([]);
   const supabase = createClientComponentClient();
+  
+  // Debug Supabase client
+  useEffect(() => {
+    console.log('Supabase client initialized:', {
+      hasSupabase: !!supabase,
+      supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
+      hasAnonKey: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+      supabaseKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.substring(0, 10) + '...'
+    });
+  }, []);
   const previousValidContractIdRef = useRef("");
   const scriptLoadingRef = useRef(false);
   const mapInitializedRef = useRef(false);
@@ -66,11 +76,9 @@ export default function Test() {
   }, [images.length]);
 
 
-  // Fetch contract and luggage info from Supabase
+  // Fetch contract and luggage info directly from Supabase
   const fetchData = async (id = contractId) => {
     if (!id.trim()) return;
-    
-    console.log('fetchData called with ID:', id);
     
     const shouldShowErrors = id.length >= previousValidContractIdRef.current.length;
     
@@ -80,129 +88,86 @@ export default function Test() {
     
     setLoading(true);
     try {
-      console.log('Fetching contract data for ID from Supabase:', id);
-      let joinedError = null;
-      const { data: joinedData, error: errJoined } = await supabase
+      console.log('Fetching contract data for ID:', id);
+      
+      // Debug: Check if there are any contracts in the database
+      const { data: allContracts, error: debugError } = await supabase
         .from('contracts')
-        .select(`
-          id, contract_status_id, airline_id, delivery_id,
-          owner_first_name, owner_middle_initial, owner_last_name, owner_contact,
-          luggage_description, luggage_quantity,
-          flight_number,
-          delivery_address, address_line_1, address_line_2,
-          pickup_location, current_location, drop_off_location,
-          pickup_location_geo, current_location_geo, drop_off_location_geo,
-          remarks, passenger_form, passenger_id, proof_of_delivery,
-          created_at, cancelled_at, accepted_at, pickup_at, delivered_at,
-          delivery_charge, delivery_surcharge, delivery_discount,
-          summary_id,
-          airline:airline_id (*),
-          delivery:delivery_id (*),
-          contract_status:contract_status_id (id, status_name)
-        `)
-        .eq('id', id)
-        .is('summary_id', null)
-        .single();
-
-      if (!errJoined && joinedData) {
-        previousValidContractIdRef.current = id;
-        const newContract = {
-          ...joinedData,
-          pickup_location_geo: joinedData.pickup_location_geo || null,
-          drop_off_location_geo: joinedData.drop_off_location_geo || null,
-          current_location_geo: joinedData.current_location_geo || null
-        };
-        setContract(prev => {
-          const shouldUpdate = JSON.stringify(prev) !== JSON.stringify(newContract);
-          return shouldUpdate ? newContract : prev;
-        });
-        setExpanded(true); // Auto-expand when contract is found
-        return;
+        .select('id')
+        .limit(5);
+      console.log('Available contracts in database:', allContracts?.length || 0, 'contracts found');
+      if (debugError) {
+        console.log('Debug error:', debugError);
       }
-
-      joinedError = errJoined;
-      if (joinedError) {
-        console.warn('Joined select blocked or failed, falling back to base columns:', JSON.stringify(joinedError || {}, null, 2));
-      }
-
-      console.log('Fetching contract data (fallback base columns):', id);
-      const { data, error } = await supabase
+      
+      // Try a simple query first - remove .single() to handle no results gracefully
+      const { data: contracts, error: mainContractError } = await supabase
         .from('contracts')
-        .select(`
-          id, contract_status_id, airline_id, delivery_id,
-          owner_first_name, owner_middle_initial, owner_last_name, owner_contact,
-          luggage_description, luggage_weight, luggage_quantity,
-          flight_number, case_number,
-          delivery_address, address_line_1, address_line_2,
-          pickup_location, current_location, drop_off_location,
-          pickup_location_geo, current_location_geo, drop_off_location_geo,
-          remarks, passenger_form, passenger_id, proof_of_delivery,
-          created_at, cancelled_at, accepted_at, pickup_at, delivered_at,
-          delivery_charge, delivery_surcharge, delivery_discount,
-          summary_id
-        `)
-        .eq('id', id)
-        .is('summary_id', null)
-        .single();
+        .select('*')
+        .eq('id', id);
 
-      if (error) {
-        if (error.code === 'PGRST116' || (error.message && error.message.includes('no) rows returned'))) {
-          if (shouldShowErrors) {
-            setError('No contract data found');
-            setSnackbarMessage('Invalid luggage tracking ID. No contract found.');
-            setSnackbarSeverity('error');
-            setSnackbarOpen(true);
-          }
-          return;
-        }
-        console.error('Supabase error fetching contract (fallback):', JSON.stringify(error || {}, null, 2));
-        throw new Error('Contract not found');
+      console.log('Contract query result:', { contracts, mainContractError });
+
+      if (mainContractError) {
+        console.error('Error fetching contract:', mainContractError);
+        throw new Error(`Database error: ${mainContractError.message}`);
       }
 
-      if (data) {
-        let statusObj = null;
-        if (data.contract_status_id != null) {
-          const { data: statusRow } = await supabase
-            .from('contract_status')
-            .select('id, status_name')
-            .eq('id', data.contract_status_id)
-            .maybeSingle();
-          statusObj = statusRow || null;
+      if (!contracts || contracts.length === 0) {
+        throw new Error(`Contract ID "${id}" (make sure that it's the contract id) not found.`);
+      }
+
+      const contract = contracts[0];
+      console.log('✅ Contract found successfully:', contract.id);
+
+      // Fetch luggage information if available
+      let luggage = [];
+      if (contract.id) {
+        const { data: luggageData, error: luggageError } = await supabase
+          .from('luggage')
+          .select('*')
+          .eq('contract_id', contract.id);
+
+        if (!luggageError && luggageData) {
+          luggage = luggageData;
         }
-        let airlineObj = null;
-        if (data.airline_id) {
-          const { data: airlineRow } = await supabase
-            .from('profiles')
-            .select('id, first_name, middle_initial, last_name, suffix, email, contact_number')
-            .eq('id', data.airline_id)
-            .maybeSingle();
-          airlineObj = airlineRow || null;
+      }
+
+      // Fetch route history if available
+      let route_history = [];
+      if (contract.id) {
+        const { data: routeData, error: routeError } = await supabase
+          .from('route_history')
+          .select('*')
+          .eq('contract_id', contract.id)
+          .order('created_at', { ascending: true });
+
+        if (!routeError && routeData) {
+          route_history = routeData.map(route => ({
+            lat: route.latitude,
+            lng: route.longitude,
+            timestamp: route.created_at
+          }));
         }
-        let deliveryObj = null;
-        if (data.delivery_id) {
-          const { data: deliveryRow } = await supabase
-            .from('profiles')
-            .select('id, first_name, middle_initial, last_name, suffix, email, contact_number')
-            .eq('id', data.delivery_id)
-            .maybeSingle();
-          deliveryObj = deliveryRow || null;
-        }
-        
+      }
+
+      console.log('Received contract data:', contract);
+      
+      if (contract) {
         previousValidContractIdRef.current = id;
         
         const newContract = {
-          ...data,
-          pickup_location_geo: data.pickup_location_geo || null,
-          drop_off_location_geo: data.drop_off_location_geo || null,
-          current_location_geo: data.current_location_geo || null,
-          contract_status: statusObj,
-          airline: airlineObj,
-          delivery: deliveryObj
+          ...contract,
+          luggage: luggage || [],
+          pickup_location_geo: contract.pickup_location_geo || null,
+          drop_off_location_geo: contract.drop_off_location_geo || null,
+          current_location_geo: contract.current_location_geo || null,
+          route_history: route_history || []
         };
         console.log('Processed contract data:', newContract);
+        
         setContract(prev => {
-          const shouldUpdate = JSON.stringify(prev) !== JSON.stringify(newContract);
-          return shouldUpdate ? newContract : prev;
+          return JSON.stringify(prev) !== JSON.stringify(newContract) ? newContract : prev;
         });
         setExpanded(true); // Auto-expand when contract is found
       } else {
@@ -213,11 +178,11 @@ export default function Test() {
           setSnackbarOpen(true);
         }
       }
-    } catch (err) { 
+    } catch (err) {
       console.error('Error fetching contract:', err);
       if (shouldShowErrors) {
         setError(err.message || 'Failed to fetch contract');
-        setSnackbarMessage('Invalid luggage tracking ID. No contract found.');
+        setSnackbarMessage(`Contract ID "${id}" (make sure that it's the contract id) not found.`);
         setSnackbarSeverity('error');
         setSnackbarOpen(true);
       }
@@ -256,24 +221,8 @@ export default function Test() {
           return merged;
         });
 
-        if (updatedRow?.current_location_geo?.coordinates) {
-          const newPosition = {
-            lat: updatedRow.current_location_geo.coordinates[1],
-            lng: updatedRow.current_location_geo.coordinates[0]
-          };
-
-          if (Array.isArray(pathRef.current)) {
-            const lastPoint = pathRef.current[pathRef.current.length - 1];
-            pathRef.current.push(newPosition);
-            if (lastPoint && map && window?.google) {
-              await updatePolylineWithDirections(lastPoint, newPosition);
-            }
-          }
-
-          if (map && updatedRow.current_location_geo?.coordinates) {
-            await updateMapLocation();
-          }
-        }
+        // Note: Map marker updates are now handled manually via the Get Directions button
+        // Real-time updates only update the contract data, not the map visualization
       } catch (err) {
         console.error('Realtime update handling error:', err);
       }
@@ -311,7 +260,7 @@ export default function Test() {
       channelContract.unsubscribe();
       channelContracts.unsubscribe();
     };
-  }, [contractId, supabase]);
+  }, [contractId, supabase, map]);
 
   // Update polyline with directions
   const updatePolylineWithDirections = async (start, end) => {
@@ -378,10 +327,16 @@ export default function Test() {
 
   // Google Maps script loader
   useEffect(() => {
-    if (!isScriptLoaded && !window.google && !scriptLoadingRef.current) {
+    if (!contract) return;
+
+    // If Google Maps is already available (loaded elsewhere), mark as loaded
+    if (typeof window !== 'undefined' && window.google) {
+      if (!isScriptLoaded) setIsScriptLoaded(true);
+      return;
+    }
+
+    if (!isScriptLoaded) {
       console.log('Loading Google Maps script...');
-      scriptLoadingRef.current = true;
-      
       const script = document.createElement('script');
       script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places,marker`;
       script.async = true;
@@ -389,72 +344,42 @@ export default function Test() {
       script.onload = () => {
         console.log('Google Maps script loaded successfully');
         setIsScriptLoaded(true);
-        scriptLoadingRef.current = false;
       };
       script.onerror = (error) => {
         console.error('Failed to load Google Maps:', error);
         setMapError('Failed to load Google Maps');
-        scriptLoadingRef.current = false;
       };
       document.head.appendChild(script);
+      return () => {
+        if (document.head.contains(script)) {
+          document.head.removeChild(script);
+        }
+      };
     }
-  }, [isScriptLoaded]);
+  }, [contract, isScriptLoaded]);
 
-  // Initialize map when script is loaded and contract is available
+  // Initialize map
   useEffect(() => {
-    if (isScriptLoaded && contract && !map && mapRef.current && !mapInitializedRef.current && currentContractIdRef.current === contract.id) {
-      const hasLocationData = contract.pickup_location_geo?.coordinates || 
-                             contract.drop_off_location_geo?.coordinates || 
-                             contract.current_location_geo?.coordinates;
-      
-      if (hasLocationData) {
-        console.log('Initializing map with location data...');
-        mapInitializedRef.current = true;
-        const timer = setTimeout(() => {
-          initMap();
-        }, 100);
-        return () => clearTimeout(timer);
-      } else {
-        console.log('No location data available, skipping map initialization');
-        mapInitializedRef.current = true;
-      }
+    if (isScriptLoaded && contract && !map) {
+      console.log('Initializing map...');
+      initMap();
     }
   }, [isScriptLoaded, contract, map]);
 
   // Map initialization
   const initMap = () => {
-    if (!window.google || !mapRef.current || !contract || currentContractIdRef.current !== contract.id) {
-      return;
-    }
-    
-    const hasLocationData = contract.pickup_location_geo?.coordinates || 
-                           contract.drop_off_location_geo?.coordinates || 
-                           contract.current_location_geo?.coordinates;
-    
-    if (!hasLocationData) {
-      console.log('No location data available for map initialization');
+    if (!window.google || !mapRef.current || !contract) {
+      console.log('Map initialization skipped:', {
+        hasGoogle: !!window.google,
+        hasMapRef: !!mapRef.current,
+        hasContract: !!contract
+      });
       return;
     }
     
     try {
       console.log('Initializing map with contract:', contract);
-      if (contract.route_history && Array.isArray(contract.route_history) && contract.route_history.length > 0) {
-        pathRef.current = contract.route_history.map(point => ({ lat: point.lat, lng: point.lng }));
-      } else if (contract.current_location_geo?.coordinates) {
-        pathRef.current = [{
-          lat: contract.current_location_geo.coordinates[1],
-          lng: contract.current_location_geo.coordinates[0]
-        }];
-      } else {
-        pathRef.current = [];
-      }
       
-      if (polylineRef.current) {
-        polylineRef.current.forEach(polyline => polyline.setMap(null));
-        polylineRef.current = [];
-      }
-      routeSegmentsRef.current = [];
-
       const defaultCenter = { lat: 14.5350, lng: 120.9821 };
       const mapOptions = {
         center: defaultCenter,
@@ -462,7 +387,7 @@ export default function Test() {
         mapTypeControl: false,
         streetViewControl: false,
         fullscreenControl: false,
-        zoomControl: false,
+        zoomControl: true,
         scaleControl: false,
         rotateControl: false,
         panControl: false,
@@ -480,6 +405,7 @@ export default function Test() {
 
       const markers = [];
 
+      // Add current location marker
       if (contract.current_location_geo?.coordinates) {
         console.log('Adding current location marker:', contract.current_location_geo.coordinates);
         const currentPosition = {
@@ -502,10 +428,10 @@ export default function Test() {
           </style>
           <div class="location-marker">
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="12" cy="12" r="10" fill="success.main" fill-opacity="0.6"/>
-              <circle cx="12" cy="12" r="8" fill="success.main" fill-opacity="0.8"/>
-              <circle cx="12" cy="12" r="6" fill="success.main" fill-opacity="0.9"/>
-              <circle cx="12" cy="12" r="4" fill="success.main"/>
+              <circle cx="12" cy="12" r="10" fill="#4CAF50" fill-opacity="0.6"/>
+              <circle cx="12" cy="12" r="8" fill="#4CAF50" fill-opacity="0.8"/>
+              <circle cx="12" cy="12" r="6" fill="#4CAF50" fill-opacity="0.9"/>
+              <circle cx="12" cy="12" r="4" fill="#4CAF50"/>
               <circle cx="12" cy="12" r="2" fill="white"/>
             </svg>
           </div>
@@ -522,6 +448,7 @@ export default function Test() {
         markers.push(currentPosition);
       }
 
+      // Add pickup location marker
       if (contract.pickup_location_geo?.coordinates) {
         console.log('Adding pickup location marker:', contract.pickup_location_geo.coordinates);
         const pickupMarker = new window.google.maps.marker.PinElement({
@@ -547,6 +474,7 @@ export default function Test() {
         markers.push(pickupPosition);
       }
 
+      // Add drop-off location marker
       if (contract.drop_off_location_geo?.coordinates) {
         console.log('Adding drop-off location marker:', contract.drop_off_location_geo.coordinates);
         const dropoffMarker = new window.google.maps.marker.PinElement({
@@ -572,11 +500,7 @@ export default function Test() {
         markers.push(dropoffPosition);
       }
 
-      if (pathRef.current.length >= 2) {
-        console.log('Drawing route history:', pathRef.current);
-        drawCompleteRoute();
-      }
-
+      // Fit bounds to show all markers
       if (markers.length > 0) {
         if (contract.current_location_geo?.coordinates) {
           const currentPosition = {
@@ -596,10 +520,6 @@ export default function Test() {
           bounds.extend({ lat: sw.lat() - padding, lng: sw.lng() - padding });
           newMap.fitBounds(bounds);
         }
-      } else {
-        console.log('No markers to display, using default center');
-        newMap.setCenter(defaultCenter);
-        newMap.setZoom(10);
       }
 
       console.log('Map initialization completed successfully');
@@ -685,86 +605,7 @@ export default function Test() {
     }
   };
 
-  // Polling effect for location updates
-  useEffect(() => {
-    let pollInterval;
-    let retryCount = 0;
-    const MAX_RETRIES = 3;
-
-    const startPolling = () => {
-      if (contract?.id) {
-        console.log('Starting location polling for contract:', contract.id);
-        pollInterval = setInterval(async () => {
-          try {
-            const { data, error } = await supabase
-              .from('contracts')
-              .select(`
-                id, contract_status_id, airline_id, delivery_id,
-                owner_first_name, owner_middle_initial, owner_last_name, owner_contact,
-                luggage_description, luggage_weight, luggage_quantity,
-                flight_number, case_number,
-                delivery_address, address_line_1, address_line_2,
-                pickup_location, current_location, drop_off_location,
-                pickup_location_geo, current_location_geo, drop_off_location_geo,
-                remarks, passenger_form, passenger_id, proof_of_delivery,
-                created_at, cancelled_at, accepted_at, pickup_at, delivered_at,
-                delivery_charge, delivery_surcharge, delivery_discount,
-                summary_id
-              `)
-              .eq('id', contract.id)
-              .is('summary_id', null)
-              .single();
-
-            if (error) {
-              if (error.code === 'PGRST116' || (error.message && error.message.includes('no) rows returned'))) {
-                return;
-              }
-              throw error;
-            }
-
-            if (data) {
-              let statusObj = null;
-              if (data.contract_status_id != null) {
-                const { data: statusRow } = await supabase
-                  .from('contract_status')
-                  .select('id, status_name')
-                  .eq('id', data.contract_status_id)
-                  .maybeSingle();
-                statusObj = statusRow || null;
-              }
-
-              setContract(prev => ({
-                ...prev,
-                ...data,
-                contract_status: statusObj ?? prev?.contract_status ?? null
-              }));
-              if (data.current_location_geo?.coordinates) {
-                await updateMapLocation();
-              }
-              retryCount = 0;
-            }
-          } catch (error) {
-            console.error('Error polling location:', error);
-            retryCount++;
-            if (retryCount >= MAX_RETRIES) {
-              console.log('Max retries reached, stopping polling');
-              clearInterval(pollInterval);
-              setMapError('Failed to update location after multiple attempts');
-            }
-          }
-        }, 5000);
-      }
-    };
-
-    startPolling();
-
-    return () => {
-      if (pollInterval) {
-        console.log('Clearing polling interval');
-        clearInterval(pollInterval);
-      }
-    };
-  }, [contract?.id]);
+  // Removed complex polling logic - real-time updates are handled via Supabase subscriptions
 
   // Handle search
   const handleSearch = (id = contractId) => {
@@ -786,8 +627,6 @@ export default function Test() {
     setError(null);
     setExpanded(false);
     previousValidContractIdRef.current = "";
-    currentContractIdRef.current = "";
-    mapInitializedRef.current = false;
     if (map) setMap(null);
     if (markerRef.current) {
       markerRef.current.map = null;
@@ -797,6 +636,11 @@ export default function Test() {
       currentLocationMarkerRef.current.map = null;
       currentLocationMarkerRef.current = null;
     }
+    if (polylineRef.current) {
+      polylineRef.current.setMap(null);
+      polylineRef.current = null;
+    }
+    setIsScriptLoaded(false);
     setSnackbarOpen(false);
   };
 
