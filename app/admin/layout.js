@@ -9,6 +9,7 @@ import { useTheme } from "@mui/material/styles";
 import AdminSidebar from "../components/AdminSidebar";
 import LoadingSpinner from '../components/LoadingSpinner';
 import { useTimeoutManager } from '../../utils/timeoutManager';
+import { isAdminDomain, getDomainConfig } from '../../config/domains';
 
 export default function Layout({ children }) {
     return (
@@ -94,6 +95,20 @@ function AdminLayoutContent({ children }) {
     const normalizedPath = pathname?.startsWith('/admin') ? pathname.replace(/^\/admin/, '') || '/' : pathname;
     const isAuthPage = normalizedPath === "/login" || normalizedPath === "/forgot-password" || normalizedPath === "/reset-password" || normalizedPath === "/verify" || normalizedPath === "/otp";
     const isLuggageManagementPage = normalizedPath === "/luggage-management";
+
+    // Domain-aware redirect logic (only in production)
+    useEffect(() => {
+        if (typeof window !== 'undefined' && process.env.NODE_ENV === 'production') {
+            const hostname = window.location.hostname;
+            const config = getDomainConfig();
+            
+            // If on admin domain but accessing /admin path, redirect to clean URL
+            if (isAdminDomain(hostname) && pathname.startsWith('/admin')) {
+                const cleanPath = pathname.replace('/admin', '') || '/';
+                router.replace(cleanPath);
+            }
+        }
+    }, [pathname, router]);
 
     // Enhanced session management
     useEffect(() => {

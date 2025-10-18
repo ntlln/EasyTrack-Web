@@ -7,6 +7,7 @@ import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { Box } from "@mui/material";
 import LoadingSpinner from '../components/LoadingSpinner';
 import { useTimeoutManager } from '../../utils/timeoutManager';
+import { isAirlineDomain, getDomainConfig } from '../../config/domains';
 
 export default function Layout({ children }) {
   return (
@@ -26,6 +27,20 @@ function ContractorLayoutContent({ children }) {
   const normalizedPath = pathname?.startsWith('/airline') ? pathname.replace(/^\/airline/, '') || '/' : pathname;
   const isAuthPage = normalizedPath === "/login" || normalizedPath === "/forgot-password" || normalizedPath === "/reset-password" || normalizedPath === "/verify" || normalizedPath === "/otp";
   const airlineRoleId = 3; // Contractor
+
+  // Domain-aware redirect logic (only in production)
+  useEffect(() => {
+    if (typeof window !== 'undefined' && process.env.NODE_ENV === 'production') {
+      const hostname = window.location.hostname;
+      const config = getDomainConfig();
+      
+      // If on airline domain but accessing /airline path, redirect to clean URL
+      if (isAirlineDomain(hostname) && pathname.startsWith('/airline')) {
+        const cleanPath = pathname.replace('/airline', '') || '/';
+        router.replace(cleanPath);
+      }
+    }
+  }, [pathname, router]);
 
   // Timeout manager for automatic logout after 30 minutes of inactivity
   useTimeoutManager();

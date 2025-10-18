@@ -21,6 +21,59 @@ const nextConfig = {
     // Enable security features
     serverComponentsExternalPackages: [],
   },
+  // Domain configuration for production
+  async rewrites() {
+    return [
+      // Handle www redirect to main domain
+      {
+        source: '/:path*',
+        destination: '/:path*',
+        has: [
+          {
+            type: 'host',
+            value: 'www.ghe-easytrack.org',
+          },
+        ],
+      },
+      // Handle main domain routing
+      {
+        source: '/:path*',
+        destination: '/:path*',
+        has: [
+          {
+            type: 'host',
+            value: 'ghe-easytrack.org',
+          },
+        ],
+      },
+      // Handle admin domain routing
+      {
+        source: '/admin/:path*',
+        destination: '/admin/:path*',
+        has: [
+          {
+            type: 'host',
+            value: 'admin.ghe-easytrack.org',
+          },
+        ],
+      },
+      // Handle airline domain routing
+      {
+        source: '/airline/:path*',
+        destination: '/airline/:path*',
+        has: [
+          {
+            type: 'host',
+            value: 'airline.ghe-easytrack.org',
+          },
+        ],
+      },
+    ];
+  },
+  // Environment-specific configuration
+  env: {
+    CUSTOM_KEY: process.env.CUSTOM_KEY,
+  },
 };
 
 export default nextConfig;

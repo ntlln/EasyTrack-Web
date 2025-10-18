@@ -13,6 +13,7 @@ import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import AddIcon from '@mui/icons-material/Add';
+import { fetchBaseDeliveryFeeForAddress, fetchPricingRegions, fetchCitiesByRegion, fetchAllPricingData } from '../../../utils/pricingUtils';
 
 // Date filter options
 const dateOptions = [
@@ -132,7 +133,6 @@ export default function Page() {
     const [contractList, setContractList] = useState([]);
     const [contractListLoading, setContractListLoading] = useState(false);
     const [contractListError, setContractListError] = useState(null);
-    const [pricingData, setPricingData] = useState({});
     const [snackbarOpen, setSnackbarOpen] = useState(false);
     const [snackbarMessage, setSnackbarMessage] = useState('');
     const [statusFilter, setStatusFilter] = useState('all');
@@ -159,13 +159,23 @@ export default function Page() {
     const [flightPrefix, setFlightPrefix] = useState('');
     const [mapCity, setMapCity] = useState('');
     const [mapCityPrice, setMapCityPrice] = useState(0);
+    const [pricingRegions, setPricingRegions] = useState([]);
+    const [pricingCities, setPricingCities] = useState([]);
+    const [selectedPricingRegion, setSelectedPricingRegion] = useState(null);
+    const [selectedPricingCity, setSelectedPricingCity] = useState('');
+    const [showPricingRegionMenu, setShowPricingRegionMenu] = useState(false);
+    const [showPricingCityMenu, setShowPricingCityMenu] = useState(false);
+    const [pricingRegionQuery, setPricingRegionQuery] = useState('');
+    const [pricingCityQuery, setPricingCityQuery] = useState('');
+    const [loadingPricingData, setLoadingPricingData] = useState(false);
+    const [pricingStatus, setPricingStatus] = useState(null); // 'ok', 'no_pricing', 'no_match'
 
     // Terminal coordinates data
     const terminalCoordinates = {
         'Terminal 1': { lat: 14.508963226090515, lng: 121.00417400814496 },
         'Terminal 2': { lat: 14.511166725278645, lng: 121.01288969053523 },
         'Terminal 3': { lat: 14.5201168528943, lng: 121.01377520505147 },
-        'Terminal 4': { lat: 14.525440177319647, lng: 121.00111980000001 }
+        // 'Terminal 4': { lat: 14.525440177319647, lng: 121.00111980000001 }
     };
 
     // Mount component
@@ -303,7 +313,23 @@ export default function Page() {
             script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places,marker`;
             script.async = true;
             script.defer = true;
-            script.onload = () => { setIsScriptLoaded(true); setIsGoogleMapsReady(true); };
+            script.onload = () => { 
+                // Check WebGL support before initializing map
+                if (window.google && window.google.maps) {
+                    console.log('[Maps] Google Maps loaded successfully');
+                    // Suppress WebGL warnings by overriding console.warn temporarily
+                    const originalWarn = console.warn;
+                    console.warn = (...args) => {
+                        if (args[0] && args[0].includes && args[0].includes('Vector Map')) {
+                            // Suppress WebGL/Vector Map warnings
+                            return;
+                        }
+                        originalWarn.apply(console, args);
+                    };
+                }
+                setIsScriptLoaded(true); 
+                setIsGoogleMapsReady(true); 
+            };
             script.onerror = (e) => { setMapError('Failed to load Google Maps'); };
             document.head.appendChild(script);
             return () => { if (document.head.contains(script)) { document.head.removeChild(script); } };
@@ -317,6 +343,7 @@ export default function Page() {
             return () => clearTimeout(timer);
         }
     }, [mounted, isGoogleMapsReady, activeTab]);
+
 
     useEffect(() => {
         if (window.google && map && activeTab === 1) {
@@ -416,19 +443,109 @@ export default function Page() {
                 const lat = event.latLng.lat();
                 const lng = event.latLng.lng();
                 console.log('[Maps] Map click', { lat, lng });
+                
+                // Clear dropdown selections when using map
+                setSelectedPricingRegion(null);
+                setSelectedPricingCity('');
+                setPricingCityQuery('');
+                
                 updateMarkerAndAddress({ lat, lng });
             });
 
             markerRef.current.addListener('dragend', () => {
                 const position = markerRef.current.position;
+                
+                // Clear dropdown selections when dragging marker
+                setSelectedPricingRegion(null);
+                setSelectedPricingCity('');
+                setPricingCityQuery('');
+                
                 updateAddressFromPosition(position);
             });
         } catch (error) {
             setMapError(error.message);
         }
     };
-    const updateAddressFromPosition = (position) => { const lat = position.lat(); const lng = position.lng(); const geocoder = new window.google.maps.Geocoder(); geocoder.geocode({ location: { lat, lng } }, (results, status) => { if (status === 'OK' && results[0]) { const top = results[0]; console.log('[Maps] Reverse geocode from marker/map center', { lat, lng, formatted_address: top.formatted_address, components: top.address_components }); setDropoffAddress(prev => ({ ...prev, location: top.formatted_address, lat: lat, lng: lng })); const parsed = parsePhAdministrativeComponents(top.address_components); console.log('[Maps] Parsed PH admin components', parsed); backfillAddressSelections(parsed); const cityRegion = parsed?.cityName && parsed?.regionName ? `${canonicalizeCityName(parsed.cityName)}, ${canonicalizeRegionName(parsed.regionName)}` : null; fetchAndSetDeliveryFee(cityRegion || top.formatted_address); } else { console.warn('[Maps] Reverse geocode failed', status); } }); };
-    const updateMarkerAndAddress = (position) => { if (!window.google || !map) return; const markerView = new window.google.maps.marker.PinElement({ scale: 1, background: theme.palette.primary.main, borderColor: theme.palette.primary.dark, glyphColor: '#FFFFFF' }); if (markerRef.current) { markerRef.current.position = position; } else { markerRef.current = new window.google.maps.marker.AdvancedMarkerElement({ map: map, position: position, content: markerView.element, gmpDraggable: true, collisionBehavior: window.google.maps.CollisionBehavior.OPTIONAL_AND_HIDES_LOWER_PRIORITY }); } map.panTo(position); const geocoder = new window.google.maps.Geocoder(); geocoder.geocode({ location: position }, (results, status) => { if (status === 'OK' && results[0]) { const top = results[0]; const formattedAddress = top.formatted_address; console.log('[Maps] Reverse geocode from click', { position, formattedAddress, components: top.address_components }); setDropoffAddress(prev => ({ ...prev, location: formattedAddress, lat: position.lat, lng: position.lng })); const parsed = parsePhAdministrativeComponents(top.address_components); console.log('[Maps] Parsed PH admin components', parsed); backfillAddressSelections(parsed); const cityRegion = parsed?.cityName && parsed?.regionName ? `${canonicalizeCityName(parsed.cityName)}, ${canonicalizeRegionName(parsed.regionName)}` : null; fetchAndSetDeliveryFee(cityRegion || formattedAddress); } else { console.warn('[Maps] Reverse geocode (click) failed', status); } }); };
+
+    // Reload map to current pin location
+    const reloadMapToPin = () => {
+        if (!map || !markerRef.current) return;
+        
+        try {
+            const currentPosition = markerRef.current.position;
+            if (currentPosition) {
+                // Get current coordinates
+                const lat = typeof currentPosition.lat === 'function' ? currentPosition.lat() : currentPosition.lat;
+                const lng = typeof currentPosition.lng === 'function' ? currentPosition.lng() : currentPosition.lng;
+                
+                // Re-center map to current pin location
+                map.panTo({ lat, lng });
+                map.setZoom(15);
+                
+                // Trigger resize to ensure map renders properly
+                setTimeout(() => {
+                    window.google.maps.event.trigger(map, 'resize');
+                }, 100);
+                
+                console.log('[Maps] Reloaded map to pin location:', { lat, lng });
+            }
+        } catch (error) {
+            console.error('Error reloading map to pin:', error);
+        }
+    };
+    const updateAddressFromPosition = (position) => { 
+        const lat = position.lat(); 
+        const lng = position.lng(); 
+        
+        // Clear dropdown selections when updating from position
+        setSelectedPricingRegion(null);
+        setSelectedPricingCity('');
+        setPricingCityQuery('');
+        
+        const geocoder = new window.google.maps.Geocoder(); 
+        geocoder.geocode({ location: { lat, lng } }, (results, status) => { 
+            if (status === 'OK' && results[0]) { 
+                const top = results[0]; 
+                console.log('[Maps] Reverse geocode from marker/map center', { lat, lng, formatted_address: top.formatted_address, components: top.address_components }); 
+                setDropoffAddress(prev => ({ ...prev, location: top.formatted_address, lat: lat, lng: lng })); 
+                const parsed = parsePhAdministrativeComponents(top.address_components); 
+                console.log('[Maps] Parsed PH admin components', parsed); 
+                backfillAddressSelections(parsed); 
+            } else { 
+                console.warn('[Maps] Reverse geocode failed', status); 
+            } 
+        }); 
+    };
+    const updateMarkerAndAddress = (position) => { 
+        if (!window.google || !map) return; 
+        
+        // Clear dropdown selections when updating marker position
+        setSelectedPricingRegion(null);
+        setSelectedPricingCity('');
+        setPricingCityQuery('');
+        
+        const markerView = new window.google.maps.marker.PinElement({ scale: 1, background: theme.palette.primary.main, borderColor: theme.palette.primary.dark, glyphColor: '#FFFFFF' }); 
+        if (markerRef.current) { 
+            markerRef.current.position = position; 
+        } else { 
+            markerRef.current = new window.google.maps.marker.AdvancedMarkerElement({ map: map, position: position, content: markerView.element, gmpDraggable: true, collisionBehavior: window.google.maps.CollisionBehavior.OPTIONAL_AND_HIDES_LOWER_PRIORITY }); 
+        } 
+        map.panTo(position); 
+        const geocoder = new window.google.maps.Geocoder(); 
+        geocoder.geocode({ location: position }, (results, status) => { 
+            if (status === 'OK' && results[0]) { 
+                const top = results[0]; 
+                const formattedAddress = top.formatted_address; 
+                console.log('[Maps] Reverse geocode from click', { position, formattedAddress, components: top.address_components }); 
+                setDropoffAddress(prev => ({ ...prev, location: formattedAddress, lat: position.lat, lng: position.lng })); 
+                const parsed = parsePhAdministrativeComponents(top.address_components); 
+                console.log('[Maps] Parsed PH admin components', parsed); 
+                backfillAddressSelections(parsed); 
+            } else { 
+                console.warn('[Maps] Reverse geocode (click) failed', status); 
+            } 
+        }); 
+    };
     const updateMapLocation = useCallback((position, address) => {
         if (!window.google || !map) return;
         const markerView = new window.google.maps.marker.PinElement({
@@ -511,9 +628,19 @@ export default function Page() {
             setPlaceLoading(false);
         });
     };
-    const handleDropoffInputChange = (event, value) => { setDropoffAddress(prev => ({ ...prev, location: value })); fetchPlaceSuggestions(value); };
+    const handleDropoffInputChange = (event, value) => { 
+        setDropoffAddress(prev => ({ ...prev, location: value })); 
+        fetchPlaceSuggestions(value); 
+    };
+    
     const handleDropoffSelect = (event, value) => {
         if (!value || !placesServiceRef.current) return;
+        
+        // Clear dropdown selections when using map/search
+        setSelectedPricingRegion(null);
+        setSelectedPricingCity('');
+        setPricingCityQuery('');
+        
         setDropoffAddress(prev => ({ ...prev, location: value.description }));
         placesServiceRef.current.getDetails({ placeId: value.place_id }, (data, status) => {
             if (status === window.google.maps.places.PlacesServiceStatus.OK && data && data.geometry) {
@@ -541,10 +668,6 @@ export default function Page() {
                 const parsed = parsePhAdministrativeComponents(data.address_components || []);
                 console.log('[Maps] Parsed PH admin components (details)', parsed);
                 backfillAddressSelections(parsed);
-
-                // Compute pricing using City, Region if available; otherwise resolved address
-                const cityRegion = parsed?.cityName && parsed?.regionName ? `${canonicalizeCityName(parsed.cityName)}, ${canonicalizeRegionName(parsed.regionName)}` : null;
-                fetchAndSetDeliveryFee(cityRegion || resolvedAddress);
             }
         });
     };
@@ -692,40 +815,50 @@ export default function Page() {
         return `${year}${month}${day}TRKLG${randomPart}`
     }
 
-    // Fetch pricing data
+
+    // Fetch pricing regions on mount
     useEffect(() => {
-        const fetchPricingData = async () => {
+        const loadPricingRegions = async () => {
             try {
-                const { data: pricing, error } = await supabase
-                    .from('pricing')
-                    .select('city, price');
-
-                if (error) {
-                    console.error('Error fetching pricing data:', error);
-                    return;
-                }
-
-                if (!pricing || pricing.length === 0) {
-                    console.warn('No pricing data found in the database');
-                    return;
-                }
-
-                const pricingMap = {};
-                pricing.forEach(item => {
-                    if (!item.city || item.price === null || item.price === undefined) {
-                        console.warn('Invalid pricing data:', item);
-                        return;
-                    }
-                    pricingMap[item.city] = Number(item.price);
-                });
-                setPricingData(pricingMap);
+                setLoadingPricingData(true);
+                const regions = await fetchPricingRegions();
+                setPricingRegions(regions);
             } catch (error) {
-                console.error('Error in fetchPricingData:', error);
+                console.error('Error fetching pricing regions:', error);
+                setSnackbarMessage('Failed to load pricing regions');
+                setSnackbarOpen(true);
+            } finally {
+                setLoadingPricingData(false);
             }
         };
 
-        fetchPricingData();
+        loadPricingRegions();
     }, []);
+
+    // Fetch cities when region is selected
+    useEffect(() => {
+        const loadCitiesByRegion = async () => {
+            if (!selectedPricingRegion) {
+                setPricingCities([]);
+                        return;
+                    }
+
+            try {
+                setLoadingPricingData(true);
+                const cities = await fetchCitiesByRegion(selectedPricingRegion.id);
+                setPricingCities(cities);
+            } catch (error) {
+                console.error('Error fetching pricing cities:', error);
+                setSnackbarMessage('Failed to load cities');
+                setSnackbarOpen(true);
+                setPricingCities([]);
+            } finally {
+                setLoadingPricingData(false);
+            }
+        };
+
+        loadCitiesByRegion();
+    }, [selectedPricingRegion]);
 
     // Normalize strings for city matching (e.g., Ã±/ñ -> n, remove accents)
     const normalizeCityString = (value) => {
@@ -869,25 +1002,16 @@ export default function Page() {
         try {
             if (!address || !address.trim()) {
                 setMapCityPrice(0);
+                setPricingStatus(null);
                 return;
             }
 
-            // Prefer already-fetched pricing map if available
-            let matched = findPricingMatchFromMap(pricingData, address);
-
-            // If no match and pricing data not loaded yet, fetch directly like mobile does
-            if (!matched && (!pricingData || Object.keys(pricingData).length === 0)) {
-                const { data: pricingList, error } = await supabase
-                    .from('pricing')
-                    .select('city, price');
-                if (!error && Array.isArray(pricingList)) {
-                    const listToMap = {};
-                    pricingList.forEach(p => { if (p?.city != null) listToMap[p.city] = Number(p.price) || 0; });
-                    // First, try address as-is; then try city, region form if parsable
-                    matched = findPricingMatchFromMap(listToMap, address);
-                    if (!matched) {
-                        try {
+            // Try to extract city and region from address using Google Geocoding
+            let cityName = '';
+            let regionName = '';
+            
                             if (window.google) {
+                try {
                                 const geocoder = new window.google.maps.Geocoder();
                                 const results = await new Promise((resolve, reject) => {
                                     geocoder.geocode({ address }, (res, status) => {
@@ -895,94 +1019,60 @@ export default function Page() {
                                         else reject(new Error(status));
                                     });
                                 });
-                                const top = results?.[0];
-                                const comps = top?.address_components || [];
+                    
+                    if (results && results.length > 0) {
+                        const comps = results[0].address_components || [];
                                 const cityComp = comps.find(c => (c.types || []).includes('locality'))
                                     || comps.find(c => (c.types || []).includes('administrative_area_level_3'))
                                     || comps.find(c => (c.types || []).includes('administrative_area_level_2'));
                                 const regionComp = comps.find(c => (c.types || []).includes('administrative_area_level_1'))
                                     || comps.find(c => (c.types || []).includes('administrative_area_level_2'));
-                                const cityName = (cityComp?.long_name || '').replace(/\s*City\s*$/i, '').trim();
-                                const regionName = (regionComp?.long_name || '').trim();
-                                const cityRegion = cityName && regionName ? `${cityName}, ${regionName}` : null;
-                                if (cityRegion) {
-                                    matched = findPricingMatchFromMap(listToMap, cityRegion);
-                                    if (matched) console.log('[Pricing] Late-loaded pricing map matched with city, region', { cityRegion, matched });
-                                }
-                            }
-                        } catch (_) { /* ignore */ }
+                        
+                        cityName = (cityComp?.long_name || '').replace(/\s*City\s*$/i, '').trim();
+                        regionName = (regionComp?.long_name || '').trim();
                     }
+                } catch (error) {
+                    console.error('Error geocoding address:', error);
                 }
             }
+
+            // Use the new pricing utility function
+            if (cityName && regionName) {
+                const { fee, status } = await fetchBaseDeliveryFeeForAddress(cityName, regionName);
+                setMapCityPrice(fee);
+                setPricingStatus(status);
+                
+                if (status === 'ok') {
+                    setMapCity(cityName);
+                    console.log('[Pricing] Matched with new utility', { cityName, regionName, fee });
+                } else if (status === 'no_pricing') {
+                    setSnackbarMessage('No pricing data available for this location');
+                    setSnackbarOpen(true);
+                } else if (status === 'no_match') {
+                    setSnackbarMessage('This location is either invalid or out of delivery bounds');
+                    setSnackbarOpen(true);
+                }
+            } else {
+                // Fallback to old method if geocoding fails
+                let matched = findPricingMatchFromMap(pricingData, address);
 
             if (matched) {
                 console.log('[Pricing] Matched from pricing map', matched);
                 setMapCity(matched.city.replace(/Kalakhang Maynila/gi, 'Metro Manila'));
-                setMapCityPrice((prev) => {
-                    const next = Number(matched.price) || 0;
-                    if (prev && prev > 0 && prev !== next) {
-                        console.log('[Pricing] Preserving higher-confidence matched price over previous', { prev, next });
-                    }
-                    return next;
-                });
+                    setMapCityPrice(Number(matched.price) || 0);
+                    setPricingStatus('ok');
             } else {
-                // Fallback 1: Geocode the address to extract city, then use city-based matching
-                try {
-                    if (window.google) {
-                        const geocoder = new window.google.maps.Geocoder();
-                        const results = await new Promise((resolve, reject) => {
-                            geocoder.geocode({ address }, (res, status) => {
-                                if (status === 'OK') resolve(res);
-                                else reject(new Error(status));
-                            });
-                        });
-                        const top = results?.[0];
-                        if (top) {
-                            const comps = top.address_components || [];
-                            // Extract locality or admin area as city
-                            const cityComp = comps.find(c => (c.types || []).includes('locality'))
-                                || comps.find(c => (c.types || []).includes('administrative_area_level_3'))
-                                || comps.find(c => (c.types || []).includes('administrative_area_level_2'));
-                            const provinceComp = comps.find(c => (c.types || []).includes('administrative_area_level_2'))
-                                || comps.find(c => (c.types || []).includes('administrative_area_level_1'));
-                            const cityName = (cityComp?.long_name || '').replace(/\s*City\s*$/i, '').trim();
-                            const provinceName = (provinceComp?.long_name || '').trim();
-                            console.log('[Pricing] Fallback geocode parsed', { address, cityName, provinceName });
-
-                            if (cityName) {
-                                const priceByCity = getDeliveryChargeForCity(cityName);
-                                if (typeof priceByCity === 'number') {
-                                    console.log('[Pricing] City-based price match', { cityName, price: priceByCity });
-                                    setMapCity(cityName);
-                                    setMapCityPrice(Number(priceByCity) || 0);
-                                    return;
-                                }
-                            }
-
-                            // Fallback 2: Try disambiguation again by composing "city, province"
-                            const composed = [cityName, provinceName].filter(Boolean).join(', ');
-                            if (composed) {
-                                const retry = findPricingMatchFromMap(pricingData, composed);
-                                if (retry) {
-                                    console.log('[Pricing] Retry with composed city+province', { composed, retry });
-                                    setMapCity(retry.city.replace(/Kalakhang Maynila/gi, 'Metro Manila'));
-                                    setMapCityPrice(Number(retry.price) || 0);
-                                    return;
-                                }
-                            }
-                        }
-                    }
-                } catch (_) { /* swallow and continue to final fallback */ }
-
-                // Final fallback: show error
                 console.warn('[Pricing] No pricing match found for address', { address });
                 setMapCityPrice(0);
+                    setPricingStatus('no_match');
                 setSnackbarMessage('The selected address is either invalid or out of bounds');
                 setSnackbarOpen(true);
+                }
             }
         } catch (err) {
             console.error('[Pricing] Error computing price', err);
             setMapCityPrice(0);
+            setPricingStatus('no_match');
         }
     };
 
@@ -1124,27 +1214,8 @@ export default function Page() {
         }
     };
 
-    // Get delivery charge for city
-    const getDeliveryChargeForCity = (cityName) => {
-        if (!cityName) return null;
-        const cleanCity = cityName.replace(/\s*City\s*$/i, '').trim();
-        const normTarget = normalizeCityString(cleanCity);
 
-        // Exact normalized match
-        const exactKey = Object.keys(pricingData).find((k) => normalizeCityString(k) === normTarget);
-        if (exactKey !== undefined) return pricingData[exactKey];
-
-        // Partial normalized match
-        const partialKey = Object.keys(pricingData).find((k) => {
-            const nk = normalizeCityString(k);
-            return nk.includes(normTarget) || normTarget.includes(nk);
-        });
-        if (partialKey !== undefined) return pricingData[partialKey];
-
-        return null;
-    };
-
-    // Calculate pricing
+    // Calculate pricing - use the price from selected delivery location dropdown
     const basePrice = mapCityPrice || 0;
     const passengerCount = (luggageForms || []).length;
 
@@ -1190,31 +1261,15 @@ export default function Page() {
         return sum + (isNaN(qty) ? 0 : qty);
     }, 0);
 
-    // Update city and price when drop-off coordinates change
+
+    // Debug pricing status changes
     useEffect(() => {
-        const updateMapCityAndPrice = async () => {
-            try {
-                if (!dropoffAddress.lat || !dropoffAddress.lng) {
-                    setMapCity('');
-                    setMapCityPrice(0);
-                    return;
-                }
-                // Do not override if we already have a price from City, Region matching
-                if (typeof mapCityPrice === 'number' && mapCityPrice > 0) {
-                    console.log('[Pricing] Skipping coord-based price; existing price preserved', { preservedPrice: mapCityPrice });
-                    return;
-                }
-                const cityName = await getCityFromCoordinates(dropoffAddress.lat, dropoffAddress.lng);
-                setMapCity(cityName || '');
-                const price = cityName ? getDeliveryChargeForCity(cityName) : null;
-                setMapCityPrice(typeof price === 'number' ? price : 0);
-            } catch (_) {
-                setMapCity('');
-                setMapCityPrice(0);
-            }
-        };
-        updateMapCityAndPrice();
-    }, [dropoffAddress.lat, dropoffAddress.lng, pricingData, mapCityPrice]);
+        console.log('[Pricing] Status changed:', { 
+            selectedPricingCity,
+            mapCityPrice,
+            basePrice: mapCityPrice || 0
+        });
+    }, [selectedPricingCity, mapCityPrice]);
 
     const getCityFromCoordinates = async (lat, lng) => {
         if (!window.google) return null;
@@ -1490,16 +1545,13 @@ export default function Page() {
                 city = await getCityFromCoordinates(dropoffAddress.lat, dropoffAddress.lng);
             }
 
-            let deliveryCharge = 0;
-            if (city) {
-                const charge = getDeliveryChargeForCity(city);
-                if (typeof charge === 'number') deliveryCharge = charge;
-            }
+            // Use the price from selected delivery location dropdown
+            const baseDeliveryCharge = mapCityPrice || 0;
+            console.log('[Booking] Using dropdown price:', baseDeliveryCharge);
 
             for (let i = 0; i < luggageForms.length; i++) {
                 const form = luggageForms[i];
                 const perPassenger = passengerCostBreakdown?.[i];
-                const deliveryCharge = basePrice; // base city price only
                 const deliverySurcharge = Number(perPassenger?.surchargeAmount || 0);
                 const contractData = {
                     id: contractTrackingIDs[i],
@@ -1524,7 +1576,7 @@ export default function Page() {
                     ].filter(Boolean).join(', '),
                     address_line_1: contract.addressLine1 || null,
                     address_line_2: contract.addressLine2 || null,
-                    delivery_charge: deliveryCharge,
+                    delivery_charge: baseDeliveryCharge,
                     delivery_surcharge: deliverySurcharge
                 };
 
@@ -2135,7 +2187,160 @@ export default function Page() {
                     </Paper>
                     <Paper elevation={3} sx={{ maxWidth: 700, mx: "auto", mt: 3, p: 4, pt: 2, borderRadius: 3, backgroundColor: theme.palette.background.paper, position: "relative" }}>
                         <Typography variant="h6" fontWeight="bold" align="center" mb={3}>Drop-off Location</Typography>
-                        <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mb: 2 }}>
+                        
+                        {/* Primary Location Selection - Pricing Database */}
+                        <Paper elevation={2} sx={{ p: 3, mb: 3, borderRadius: 2, backgroundColor: theme.palette.background.default, border: `2px solid ${theme.palette.primary.main}` }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+                                <Typography variant="h6" sx={{ color: 'primary.main', fontWeight: 700, flex: 1 }}>
+                                    Select Delivery Location
+                                </Typography>
+                                {loadingPricingData && <CircularProgress size={20} color="primary" />}
+                            </Box>
+                            
+                            <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+                                <FormControl fullWidth size="medium">
+                                    <InputLabel>Select Region</InputLabel>
+                                    <Select
+                                        value={selectedPricingRegion?.id || ''}
+                                        label="Select Region"
+                                        onChange={(e) => {
+                                            const region = pricingRegions.find(r => r.id === e.target.value);
+                                            setSelectedPricingRegion(region);
+                                            setSelectedPricingCity('');
+                                            setPricingCityQuery('');
+                                            
+                                            // Clear pricing when region changes
+                                            setMapCityPrice(0);
+                                            setPricingStatus(null);
+                                            setMapCity('');
+                                        }}
+                                    >
+                                        {pricingRegions.map((region) => (
+                                            <MenuItem key={region.id} value={region.id}>
+                                                {region.region}
+                                            </MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
+                                
+                                <FormControl fullWidth size="medium" disabled={!selectedPricingRegion}>
+                                    <InputLabel>Select City</InputLabel>
+                                    <Select
+                                        value={selectedPricingCity}
+                                        label="Select City"
+                                        onChange={async (e) => {
+                                            const city = pricingCities.find(c => c.city === e.target.value);
+                                            setSelectedPricingCity(e.target.value);
+                                            if (city) {
+                                                const price = Number(city.price) || 0;
+                                                console.log('[Pricing] Setting city price:', { city: city.city, price, originalPrice: city.price });
+                                                
+                                                setMapCityPrice(price);
+                                                setPricingStatus('ok');
+                                                setMapCity(city.city);
+                                                
+                                                // Update dropoff address with selected city
+                                                const fullAddress = `${city.city}, ${selectedPricingRegion?.region || ''}, Philippines`;
+                                                setDropoffAddress(prev => ({
+                                                    ...prev,
+                                                    location: fullAddress,
+                                                    lat: null,
+                                                    lng: null
+                                                }));
+                                                
+                                                console.log('[Pricing] City selected:', { city: city.city, price, status: 'ok' });
+
+                                                // Geocode the selected city and re-center the map
+                                                if (window.google && map) {
+                                                    try {
+                                                        const geocoder = new window.google.maps.Geocoder();
+                                                        const results = await new Promise((resolve, reject) => {
+                                                            geocoder.geocode({ address: fullAddress }, (res, status) => {
+                                                                if (status === 'OK') resolve(res);
+                                                                else reject(new Error(status));
+                                                            });
+                                                        });
+                                                        
+                                                        if (results && results.length > 0) {
+                                                            const location = results[0].geometry.location;
+                                                            const lat = location.lat();
+                                                            const lng = location.lng();
+                                                            
+                                                            // Update coordinates
+                                                            setDropoffAddress(prev => ({
+                                                                ...prev,
+                                                                lat: lat,
+                                                                lng: lng
+                                                            }));
+                                                            
+                                                            // Update marker position first
+                                                            if (markerRef.current) {
+                                                                markerRef.current.position = { lat, lng };
+                                                            }
+                                                            
+                                                            // Re-center map to the selected city with smooth animation
+                                                            map.panTo({ lat, lng });
+                                                            map.setZoom(12);
+                                                            
+                                                            // Ensure map is properly focused on the new location
+                                                            setTimeout(() => {
+                                                                map.panTo({ lat, lng });
+                                                                window.google.maps.event.trigger(map, 'resize');
+                                                            }, 100);
+                                                            
+                                                            console.log('[Map] Re-centered to selected city:', { city: city.city, lat, lng });
+                                                        }
+                                                    } catch (error) {
+                                                        console.error('Error geocoding selected city:', error);
+                                                        setSnackbarMessage('Could not locate city on map');
+                                                        setSnackbarOpen(true);
+                                                    }
+                                                }
+                                            }
+                                        }}
+                                    >
+                                        {pricingCities.map((city) => (
+                                            <MenuItem key={city.id} value={city.city}>
+                                                <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
+                                                    <Typography variant="body1" sx={{ flex: 1 }}>
+                                                        {city.city}
+                                                    </Typography>
+                                                    <Typography variant="body2" sx={{ 
+                                                        color: 'text.primary', 
+                                                        fontWeight: 'bold',
+                                                        px: 1,
+                                                        py: 0.5,
+                                                        borderRadius: 1,
+                                                        ml: 2,
+                                                        border: `1px solid ${theme.palette.divider}`
+                                                    }}>
+                                                        ₱{city.price?.toFixed(2) || '0.00'}
+                                                    </Typography>
+                                                </Box>
+                                            </MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
+                            </Box>
+                            
+                            {selectedPricingCity && (
+                                <Box sx={{ 
+                                    p: 2, 
+                                    borderRadius: 1,
+                                    border: `1px solid ${theme.palette.divider}`,
+                                    backgroundColor: theme.palette.background.paper
+                                }}>
+                                    <Typography variant="body2" sx={{ color: 'text.primary', fontWeight: 600 }}>
+                                        ✓ Selected: {selectedPricingCity} - ₱{mapCityPrice.toFixed(2)} base delivery fee
+                                    </Typography>
+                                </Box>
+                            )}
+                        </Paper>
+                        
+                        {/* Secondary Location Selection - Map Interface */}
+                        <Paper elevation={1} sx={{ p: 2, mb: 2, borderRadius: 2, backgroundColor: theme.palette.background.default }}>
+                            
+                            <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
                             {isFormMounted && (
                                 <Box>
                                     <Autocomplete
@@ -2153,11 +2358,10 @@ export default function Page() {
                                         renderInput={(params) => (
                                             <TextField
                                                 {...params}
-                                                label="Drop-off Location"
+                                                    label="Search for a location (optional)"
                                                 fullWidth
                                                 size="small"
                                                 placeholder="Search for a location"
-                                                required
                                                 error={!!validationErrors.dropoffLocation}
                                                 helperText={validationErrors.dropoffLocation}
                                                 InputProps={{
@@ -2184,7 +2388,8 @@ export default function Page() {
                             {mounted && <MapComponent mapRef={mapRef} mapError={mapError} />}
                         </Box>
                     </Paper>
-                    <Paper elevation={3} sx={{ maxWidth: 700, mx: "auto", mt: 4, p: 4, pt: 2, borderRadius: 3, backgroundColor: theme.palette.background.paper, position: "relative" }}>
+                    </Paper>
+                    <Paper elevation={3} sx={{ maxWidth: 700, mx: "auto", mt: 3, p: 4, pt: 2, borderRadius: 3, backgroundColor: theme.palette.background.paper, position: "relative" }}>
                         <Typography variant="h6" fontWeight="bold" align="center" mb={3}>Delivery Information</Typography>
                         <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mb: 2 }}>
                             <Box sx={{ display: 'flex', gap: 2, width: '100%' }}>
@@ -2214,11 +2419,14 @@ export default function Page() {
                                             }}
                                         />
                                     )}
-                                    renderOption={(props, option) => (
-                                        <Box component="li" {...props}>
+                                    renderOption={(props, option) => {
+                                        const { key, ...otherProps } = props;
+                                        return (
+                                            <Box key={key} component="li" {...otherProps}>
                                             {option.region_name}
                                         </Box>
-                                    )}
+                                        );
+                                    }}
                                 />
                                 <Autocomplete
                                     fullWidth
@@ -2248,11 +2456,14 @@ export default function Page() {
                                             }}
                                         />
                                     )}
-                                    renderOption={(props, option) => (
-                                        <Box component="li" {...props}>
+                                    renderOption={(props, option) => {
+                                        const { key, ...otherProps } = props;
+                                        return (
+                                            <Box key={key} component="li" {...otherProps}>
                                             {option.province_name}
                                         </Box>
-                                    )}
+                                        );
+                                    }}
                                 />
                             </Box>
                             <Box sx={{ display: 'flex', gap: 2, width: '100%' }}>
@@ -2284,11 +2495,14 @@ export default function Page() {
                                             }}
                                         />
                                     )}
-                                    renderOption={(props, option) => (
-                                        <Box component="li" {...props}>
+                                    renderOption={(props, option) => {
+                                        const { key, ...otherProps } = props;
+                                        return (
+                                            <Box key={key} component="li" {...otherProps}>
                                             {option.city_name}
                                         </Box>
-                                    )}
+                                        );
+                                    }}
                                 />
                                 <Autocomplete
                                     fullWidth
@@ -2316,11 +2530,14 @@ export default function Page() {
                                             }}
                                         />
                                     )}
-                                    renderOption={(props, option) => (
-                                        <Box component="li" {...props}>
+                                    renderOption={(props, option) => {
+                                        const { key, ...otherProps } = props;
+                                        return (
+                                            <Box key={key} component="li" {...otherProps}>
                                             {option.brgy_name}
                                         </Box>
-                                    )}
+                                        );
+                                    }}
                                 />
                                 <TextField
                                     label="Postal Code"
@@ -2636,6 +2853,8 @@ export default function Page() {
                             <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
                                 Estimated Price
                             </Typography>
+                            
+                            
                             <Box sx={{ mt: 0.5 }}>
                                 {(passengerCostBreakdown || []).map((p) => (
                                     <Box key={`price-break-${p.index}`} sx={{ mb: 0.75 }}>
@@ -2746,7 +2965,8 @@ export default function Page() {
                             <Divider sx={{ my: 2 }} />
                             <Typography variant="subtitle2" sx={{ color: 'primary.main', fontWeight: 700, mb: 1 }}>Pricing</Typography>
                             <Box sx={{ ml: 1 }}>
-                                <Typography variant="body2"><b>Base price per tier:</b> <span>₱{Number(basePrice || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></Typography>
+                                <Typography variant="body2"><b>Base price per tier:</b> <span>₱{Number(mapCityPrice || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></Typography>
+                                <Typography variant="body2"><b>Delivery location:</b> <span>{selectedPricingCity || mapCity || 'Not selected'}</span></Typography>
                                 <Typography variant="body2"><b>Total luggages:</b> <span>{totalLuggages}</span></Typography>
                                 <Typography variant="body2"><b>Pricing rule:</b> <span>Base price increases after every 3 luggages per passenger.</span></Typography>
                                 <Box sx={{ mt: 1.5 }}>
@@ -2762,7 +2982,7 @@ export default function Page() {
                                                 </Typography>
                                             </Box>
                                             <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                                                Base: ₱{Number(basePrice).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} — {p.surchargeText}
+                                                Base: ₱{Number(mapCityPrice || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} — {p.surchargeText}
                                             </Typography>
                                         </Box>
                                     ))}

@@ -1,6 +1,6 @@
 "use client";
 
-import { Box, Button, Container, Typography, Paper, Grid, Card, CardContent, Avatar, Chip, TextField, Divider, IconButton, Collapse, CircularProgress, Snackbar, Alert } from '@mui/material';
+import { Box, Button, Container, Typography, Paper, Grid, Card, CardContent, Avatar, Chip, TextField, Divider, IconButton, Collapse, CircularProgress, Snackbar, Alert, ThemeProvider } from '@mui/material';
 import { useState, useEffect, useRef, Suspense } from 'react';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import CloseIcon from '@mui/icons-material/Close';
@@ -8,6 +8,9 @@ import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import dynamic from 'next/dynamic';
 import Layout from '../components/Layout';
 import Navbar from '../components/Navbar';
+import { isMainDomain, isWwwDomain, getDomainConfig } from '../../config/domains';
+import { useRouter } from 'next/navigation';
+import { getTheme } from '../theme';
 
 // Map component
 const MapComponent = dynamic(() => Promise.resolve(({ mapRef, mapError }) => (
@@ -15,6 +18,7 @@ const MapComponent = dynamic(() => Promise.resolve(({ mapRef, mapError }) => (
 )), { ssr: false });
 
 export default function Test() {
+  const router = useRouter();
   const [selectedVehicle, setSelectedVehicle] = useState('motorcycle');
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   
@@ -44,6 +48,27 @@ export default function Test() {
   const directionsServiceRef = useRef(null);
   const routeSegmentsRef = useRef([]);
   const supabase = createClientComponentClient();
+  
+  // Domain redirect logic (only in production)
+  useEffect(() => {
+    if (typeof window !== 'undefined' && process.env.NODE_ENV === 'production') {
+      const hostname = window.location.hostname;
+      const config = getDomainConfig();
+      
+      // Handle www redirect to main domain
+      if (isWwwDomain(hostname)) {
+        const redirectUrl = `https://${config.mainDomain}${window.location.pathname}`;
+        window.location.replace(redirectUrl);
+        return;
+      }
+      
+      // Handle main domain redirect to admin portal
+      if (isMainDomain(hostname)) {
+        router.replace('/admin');
+        return;
+      }
+    }
+  }, [router]);
   
   // Debug Supabase client
   useEffect(() => {
@@ -820,8 +845,9 @@ export default function Test() {
 
 
      return (
-     <Layout>
-      <Navbar currentPage="home" />
+     <ThemeProvider theme={getTheme("light")}>
+      <Layout>
+       <Navbar currentPage="home" />
 
 
 
@@ -1578,6 +1604,7 @@ export default function Test() {
           {snackbarMessage}
         </Alert>
       </Snackbar>
-    </Layout>
+      </Layout>
+     </ThemeProvider>
   );
 }

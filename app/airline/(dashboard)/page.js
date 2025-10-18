@@ -73,8 +73,14 @@ export default function Page() {
 
   // Styles
   const titleStyles = { mb: 4 };
-  const cardStyles = { height: "100%", width: "35vh" };
-  const linkStyles = { textDecoration: "none" };
+  const cardStyles = { 
+    height: "100%", 
+    minHeight: "200px",
+    width: "100%",
+    maxWidth: "300px",
+    transition: "all 0.3s ease-in-out"
+  };
+  const linkStyles = { textDecoration: "none", width: "100%" };
   const iconStyles = { fontSize: 40, color: "primary.main", mb: 2 };
 
   // Show loading spinner while checking verification
@@ -95,7 +101,17 @@ export default function Page() {
         </Alert>
       )}
       
-      <Grid container spacing={3}>
+      <Box sx={{
+        display: 'flex',
+        flexWrap: 'wrap',
+        gap: 3,
+        justifyContent: { xs: 'center', sm: 'flex-start' },
+        alignItems: 'stretch',
+        width: '100%',
+        maxWidth: '1200px',
+        mx: 'auto',
+        px: { xs: 2, sm: 0 }
+      }}>
         {cards.map((card, index) => {
           const isDisabled = card.requiresVerification && !isVerified;
           const cardContent = (
@@ -103,10 +119,22 @@ export default function Page() {
               ...cardStyles, 
               cursor: isDisabled ? 'not-allowed' : 'pointer',
               opacity: isDisabled ? 0.5 : 1,
-              '&:hover': isDisabled ? {} : { transform: 'scale(1.02)', transition: 'transform 0.2s ease-in-out' }
+              '&:hover': isDisabled ? {} : { 
+                transform: 'scale(1.02)', 
+                boxShadow: 6,
+                transition: 'all 0.3s ease-in-out' 
+              }
             }}>
               <CardContent 
-                sx={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}
+                sx={{ 
+                  height: '100%', 
+                  display: 'flex', 
+                  flexDirection: 'column', 
+                  alignItems: 'center', 
+                  justifyContent: 'center',
+                  p: 3,
+                  textAlign: 'center'
+                }}
                 onClick={isDisabled ? () => setShowVerificationMessage(true) : undefined}
               >
                 <card.icon sx={{ ...iconStyles, opacity: isDisabled ? 0.5 : 1 }} />
@@ -123,7 +151,15 @@ export default function Page() {
           );
 
           return (
-            <Grid item xs={12} sm={6} md={4} key={index}>
+            <Box 
+              key={index}
+              sx={{
+                flex: '1 1 auto',
+                minWidth: { xs: '280px', sm: '250px', md: '280px' },
+                maxWidth: { xs: '100%', sm: '300px' },
+                width: { xs: '100%', sm: 'auto' }
+              }}
+            >
               {isDisabled ? (
                 cardContent
               ) : (
@@ -131,10 +167,10 @@ export default function Page() {
                   {cardContent}
                 </Link>
               )}
-            </Grid>
+            </Box>
           );
         })}
-      </Grid>
+      </Box>
 
       {/* Account Not Verified Message */}
       {showVerificationMessage && (
