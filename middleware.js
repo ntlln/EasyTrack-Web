@@ -13,6 +13,7 @@ export async function middleware(req) {
     const hostname = req.headers.get('host') || '';
     const pathname = req.nextUrl.pathname;
     
+    
     // Handle www redirect to main domain
     if (isWwwDomain(hostname)) {
       const redirectUrl = getRedirectUrl(hostname, pathname);
@@ -48,6 +49,11 @@ export async function middleware(req) {
           return NextResponse.redirect(redirectUrl);
         }
       }
+      // For admin domain, only redirect root path to admin dashboard
+      if (pathname === '/') {
+        const adminUrl = new URL('/admin', req.url);
+        return NextResponse.redirect(adminUrl);
+      }
     }
     
     if (isAirlineDomain(hostname)) {
@@ -57,6 +63,11 @@ export async function middleware(req) {
         if (redirectUrl) {
           return NextResponse.redirect(redirectUrl);
         }
+      }
+      // For airline domain, only redirect root path to airline dashboard
+      if (pathname === '/') {
+        const airlineUrl = new URL('/airline', req.url);
+        return NextResponse.redirect(airlineUrl);
       }
     }
   }

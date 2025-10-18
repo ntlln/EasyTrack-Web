@@ -49,9 +49,9 @@ export default function Test() {
   const routeSegmentsRef = useRef([]);
   const supabase = createClientComponentClient();
   
-  // Domain redirect logic (only in production)
+  // Domain redirect logic
   useEffect(() => {
-    if (typeof window !== 'undefined' && process.env.NODE_ENV === 'production') {
+    if (typeof window !== 'undefined') {
       const hostname = window.location.hostname;
       const config = getDomainConfig();
       

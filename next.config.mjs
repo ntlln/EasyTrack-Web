@@ -21,7 +21,7 @@ const nextConfig = {
     // Enable security features
     serverComponentsExternalPackages: [],
   },
-  // Domain configuration for production
+  // Domain configuration for production and development
   async rewrites() {
     return [
       // Handle www redirect to main domain
@@ -46,7 +46,7 @@ const nextConfig = {
           },
         ],
       },
-      // Handle admin domain routing
+      // Handle admin domain routing (production)
       {
         source: '/admin/:path*',
         destination: '/admin/:path*',
@@ -57,7 +57,7 @@ const nextConfig = {
           },
         ],
       },
-      // Handle airline domain routing
+      // Handle airline domain routing (production)
       {
         source: '/airline/:path*',
         destination: '/airline/:path*',

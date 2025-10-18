@@ -67,16 +67,16 @@ The server should be configured to:
 
 ## Testing
 
-### Local Testing
-1. Add entries to your `/etc/hosts` file:
-   ```
-   127.0.0.1 admin.localhost
-   127.0.0.1 airline.localhost
+### Local Development Setup
+1. Start your development server:
+   ```bash
+   npm run dev
    ```
 
 2. Access the application via:
-   - `http://admin.localhost:3000` (should redirect to admin portal)
-   - `http://airline.localhost:3000` (should redirect to airline portal)
+   - `http://localhost:3000` (main application)
+   - `http://localhost:3000/admin` (admin portal)
+   - `http://localhost:3000/airline` (airline portal)
 
 ### Production Testing
 1. Verify domain redirects work correctly

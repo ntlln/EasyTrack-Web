@@ -36,19 +36,11 @@ export const isAirlineDomain = (hostname) => {
 
 export const isMainDomain = (hostname) => {
   const config = getDomainConfig();
-  // In development, only check for production domains
-  if (process.env.NODE_ENV === 'development') {
-    return hostname === config.mainDomain || hostname === config.wwwDomain;
-  }
   return hostname === config.mainDomain || hostname === config.wwwDomain;
 };
 
 export const isWwwDomain = (hostname) => {
   const config = getDomainConfig();
-  // In development, only check for production domains
-  if (process.env.NODE_ENV === 'development') {
-    return hostname === config.wwwDomain;
-  }
   return hostname === config.wwwDomain;
 };
 
