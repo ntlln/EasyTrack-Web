@@ -1,12 +1,10 @@
 "use client";
 
 import { ThemeProvider } from "@mui/material/styles";
-import { CssBaseline, Box, CircularProgress } from "@mui/material";
+import { CssBaseline, Box } from "@mui/material";
 import { getTheme } from "./theme";
 import { useState, useEffect, createContext, useContext, Suspense } from "react";
-import { usePathname, useSearchParams } from 'next/navigation';
 import { setCookie, getCookie } from 'cookies-next';
-import LoadingSpinner from './components/LoadingSpinner';
 
 export const ColorModeContext = createContext({ toggleMode: () => {}, mode: "light" });
 
@@ -21,32 +19,12 @@ export default function Layout({ children }) {
 function LayoutContent({ children }) {
     // State setup
     const [mode, setMode] = useState("light");
-    const [isLoading, setIsLoading] = useState(false);
-    const pathname = usePathname();
-    const searchParams = useSearchParams();
 
     // Theme initialization - check cookies for saved theme, default to light
     useEffect(() => {
         const savedMode = getCookie('theme-mode') || 'light';
         setMode(savedMode);
     }, []);
-
-    // Loading state management - show spinner immediately on navigation
-    useEffect(() => {
-        // Skip loading for contractor and admin routes as they have their own loading
-        if (pathname?.startsWith('/contractor') || pathname?.startsWith('/egc-admin')) {
-            setIsLoading(false);
-            return;
-        }
-        
-        setIsLoading(true);
-        
-        // Show loading for minimum time to ensure smooth transition
-        const timer = setTimeout(() => {
-            setIsLoading(false);
-        }, 100);
-        return () => clearTimeout(timer);
-    }, [pathname, searchParams]);
 
     // Theme toggle handler
     const toggleMode = () => {
@@ -78,8 +56,7 @@ function LayoutContent({ children }) {
                     <ThemeProvider theme={getTheme(mode)}>
                         <CssBaseline />
                         <Box sx={{ margin: 0, padding: 0, overflowX: 'hidden', height: '100vh' }}>
-                            {isLoading && <LoadingSpinner />}
-                            {!isLoading && children}
+                            {children}
                         </Box>
                     </ThemeProvider>
                 </ColorModeContext.Provider>
