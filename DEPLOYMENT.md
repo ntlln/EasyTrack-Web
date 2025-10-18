@@ -12,8 +12,10 @@ This document outlines the domain configuration for the EasyTrack application in
 
 ### Development Domains
 - **Local Development**: `http://localhost:3000`
-- **Admin Routes**: `http://localhost:3000/admin`
-- **Airline Routes**: `http://localhost:3000/airline`
+- **Admin Portal**: `http://admin.localhost:3000` (clean URL, no /admin suffix)
+- **Airline Portal**: `http://airline.localhost:3000` (clean URL, no /airline suffix)
+- **Admin Routes**: `http://localhost:3000/admin` (fallback)
+- **Airline Routes**: `http://localhost:3000/airline` (fallback)
 
 ## Configuration Files
 
@@ -68,15 +70,23 @@ The server should be configured to:
 ## Testing
 
 ### Local Development Setup
-1. Start your development server:
+1. Add entries to your hosts file (Windows: `C:\Windows\System32\drivers\etc\hosts`):
+   ```
+   127.0.0.1 admin.localhost
+   127.0.0.1 airline.localhost
+   ```
+
+2. Start your development server:
    ```bash
    npm run dev
    ```
 
-2. Access the application via:
+3. Access the application via:
    - `http://localhost:3000` (main application)
-   - `http://localhost:3000/admin` (admin portal)
-   - `http://localhost:3000/airline` (airline portal)
+   - `http://admin.localhost:3000` (admin portal - clean URL)
+   - `http://airline.localhost:3000` (airline portal - clean URL)
+   - `http://localhost:3000/admin` (admin fallback)
+   - `http://localhost:3000/airline` (airline fallback)
 
 ### Production Testing
 1. Verify domain redirects work correctly

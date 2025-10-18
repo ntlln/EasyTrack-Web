@@ -8,8 +8,8 @@ export async function middleware(req) {
   // Apply security headers
   res = applySecurityHeaders(res);
   
-  // Handle domain-based routing (only in production)
-  if (process.env.NODE_ENV === 'production') {
+  // Handle domain-based routing
+  if (process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'development') {
     const hostname = req.headers.get('host') || '';
     const pathname = req.nextUrl.pathname;
     
@@ -40,34 +40,32 @@ export async function middleware(req) {
       }
     }
     
-    // Domain routing for subdomains
+    // Domain routing for subdomains - handle clean URLs
     if (isAdminDomain(hostname)) {
       // If accessing /admin path on admin domain, redirect to clean URL
       if (pathname.startsWith('/admin')) {
-        const redirectUrl = getRedirectUrl(hostname, pathname);
-        if (redirectUrl) {
-          return NextResponse.redirect(redirectUrl);
-        }
+        const cleanPath = pathname.replace('/admin', '') || '/';
+        const cleanUrl = new URL(cleanPath, req.url);
+        return NextResponse.redirect(cleanUrl);
       }
-      // For admin domain, only redirect root path to admin dashboard
-      if (pathname === '/') {
-        const adminUrl = new URL('/admin', req.url);
-        return NextResponse.redirect(adminUrl);
+      // For admin domain, rewrite to /admin path internally
+      if (pathname !== '/admin' && !pathname.startsWith('/admin/')) {
+        const adminUrl = new URL(`/admin${pathname}`, req.url);
+        return NextResponse.rewrite(adminUrl);
       }
     }
     
     if (isAirlineDomain(hostname)) {
       // If accessing /airline path on airline domain, redirect to clean URL
       if (pathname.startsWith('/airline')) {
-        const redirectUrl = getRedirectUrl(hostname, pathname);
-        if (redirectUrl) {
-          return NextResponse.redirect(redirectUrl);
-        }
+        const cleanPath = pathname.replace('/airline', '') || '/';
+        const cleanUrl = new URL(cleanPath, req.url);
+        return NextResponse.redirect(cleanUrl);
       }
-      // For airline domain, only redirect root path to airline dashboard
-      if (pathname === '/') {
-        const airlineUrl = new URL('/airline', req.url);
-        return NextResponse.redirect(airlineUrl);
+      // For airline domain, rewrite to /airline path internally
+      if (pathname !== '/airline' && !pathname.startsWith('/airline/')) {
+        const airlineUrl = new URL(`/airline${pathname}`, req.url);
+        return NextResponse.rewrite(airlineUrl);
       }
     }
   }

@@ -2,10 +2,10 @@
 const domainConfig = {
   development: {
     baseUrl: 'http://localhost:3000',
-    adminUrl: 'http://localhost:3000/admin',
-    airlineUrl: 'http://localhost:3000/airline',
-    adminDomain: 'localhost:3000',
-    airlineDomain: 'localhost:3000',
+    adminUrl: 'http://admin.localhost:3000',
+    airlineUrl: 'http://airline.localhost:3000',
+    adminDomain: 'admin.localhost:3000',
+    airlineDomain: 'airline.localhost:3000',
     mainDomain: 'localhost:3000'
   },
   production: {
@@ -26,12 +26,12 @@ export const getDomainConfig = () => {
 
 export const isAdminDomain = (hostname) => {
   const config = getDomainConfig();
-  return hostname.includes(config.adminDomain);
+  return hostname === config.adminDomain || hostname.includes('admin.localhost') || hostname.includes('admin.ghe-easytrack.org');
 };
 
 export const isAirlineDomain = (hostname) => {
   const config = getDomainConfig();
-  return hostname.includes(config.airlineDomain);
+  return hostname === config.airlineDomain || hostname.includes('airline.localhost') || hostname.includes('airline.ghe-easytrack.org');
 };
 
 export const isMainDomain = (hostname) => {
