@@ -269,37 +269,44 @@ function LuggageTrackingContent() {
           </div>`;
         currentLocationMarkerRef.current = new window.google.maps.marker.AdvancedMarkerElement({
           map: newMap, position: currentPosition, title: 'Current Location', content: currentLocationMarker,
-          collisionBehavior: window.google.maps.CollisionBehavior.OPTIONAL_AND_HIDES_LOWER_PRIORITY
+          collisionBehavior: window.google.maps.CollisionBehavior.REQUIRED
         });
         markers.push(currentPosition);
       }
       if (contract.pickup_location_geo?.coordinates) {
-        const pickupMarker = new window.google.maps.marker.PinElement({ scale: 1, background: 'info.main', borderColor: 'info.dark', glyphColor: 'info.contrastText' });
+        const pickupMarker = new window.google.maps.marker.PinElement({
+          scale: 1.2,
+          background: '#0288D1', // MUI info.main equivalent
+          borderColor: '#01579B', // MUI info.dark equivalent
+          glyphColor: '#FFFFFF'   // MUI info.contrastText equivalent
+        });
         const pickupPosition = { lat: contract.pickup_location_geo.coordinates[1], lng: contract.pickup_location_geo.coordinates[0] };
-        new window.google.maps.marker.AdvancedMarkerElement({ map: newMap, position: pickupPosition, title: 'Pickup Location', content: pickupMarker.element, collisionBehavior: window.google.maps.CollisionBehavior.OPTIONAL_AND_HIDES_LOWER_PRIORITY });
+        new window.google.maps.marker.AdvancedMarkerElement({ map: newMap, position: pickupPosition, title: 'Pickup Location', content: pickupMarker.element, collisionBehavior: window.google.maps.CollisionBehavior.REQUIRED });
         markers.push(pickupPosition);
       }
       if (contract.drop_off_location_geo?.coordinates) {
-        const dropoffMarker = new window.google.maps.marker.PinElement({ scale: 1, background: 'warning.main', borderColor: 'warning.dark', glyphColor: 'warning.contrastText' });
+        const dropoffMarker = new window.google.maps.marker.PinElement({
+          scale: 1.2,
+          background: '#F57C00', // MUI warning.main equivalent
+          borderColor: '#E65100', // MUI warning.dark equivalent
+          glyphColor: '#FFFFFF'   // MUI warning contrast text
+        });
         const dropoffPosition = { lat: contract.drop_off_location_geo.coordinates[1], lng: contract.drop_off_location_geo.coordinates[0] };
-        markerRef.current = new window.google.maps.marker.AdvancedMarkerElement({ map: newMap, position: dropoffPosition, title: 'Drop-off Location', content: dropoffMarker.element, collisionBehavior: window.google.maps.CollisionBehavior.OPTIONAL_AND_HIDES_LOWER_PRIORITY });
+        markerRef.current = new window.google.maps.marker.AdvancedMarkerElement({ map: newMap, position: dropoffPosition, title: 'Drop-off Location', content: dropoffMarker.element, collisionBehavior: window.google.maps.CollisionBehavior.REQUIRED });
         markers.push(dropoffPosition);
       }
       if (markers.length > 0) {
-        if (contract.current_location_geo?.coordinates) {
-          const currentPosition = { lat: contract.current_location_geo.coordinates[1], lng: contract.current_location_geo.coordinates[0] };
-          newMap.setCenter(currentPosition);
+        const bounds = new window.google.maps.LatLngBounds();
+        markers.forEach(marker => bounds.extend(marker));
+        newMap.fitBounds(bounds);
+        const padding = 0.02;
+        const ne = bounds.getNorthEast();
+        const sw = bounds.getSouthWest();
+        bounds.extend({ lat: ne.lat() + padding, lng: ne.lng() + padding });
+        bounds.extend({ lat: sw.lat() - padding, lng: sw.lng() - padding });
+        newMap.fitBounds(bounds);
+        if (markers.length === 1) {
           newMap.setZoom(15);
-        } else {
-          const bounds = new window.google.maps.LatLngBounds();
-          markers.forEach(marker => bounds.extend(marker));
-          newMap.fitBounds(bounds);
-          const padding = 0.02;
-          const ne = bounds.getNorthEast();
-          const sw = bounds.getSouthWest();
-          bounds.extend({ lat: ne.lat() + padding, lng: ne.lng() + padding });
-          bounds.extend({ lat: sw.lat() - padding, lng: sw.lng() - padding });
-          newMap.fitBounds(bounds);
         }
       }
     } catch (error) {

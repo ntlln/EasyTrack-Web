@@ -1394,8 +1394,10 @@ const Page = () => {
   }, []);
 
   const handleTrackContract = (contractId) => {
-    setRedirectContractId(contractId.toString());
-    router.push(`/admin/luggage-tracking?contractId=${contractId}`);
+    router.push('/admin/luggage-tracking');
+    setTimeout(() => {
+      localStorage.setItem('trackContractId', contractId);
+    }, 100);
   };
 
   const handleAssignmentComplete = (contractId) => {

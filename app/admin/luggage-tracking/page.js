@@ -58,53 +58,31 @@ function LuggageTrackingContent() {
   const didInitialRefreshRef = useRef(false);
 
   useEffect(() => {
-    try {
-      if (typeof window === 'undefined') return;
-      const idFromUrl = new URLSearchParams(window.location.search).get('contractId');
-      if (idFromUrl) {
-        if (!didInitialRefreshRef.current) {
-          didInitialRefreshRef.current = true;
-          router.refresh();
-          setTimeout(() => {
-            setContractId((prev) => prev || idFromUrl);
-            if (!contract) {
-              handleSearch(idFromUrl);
-            }
-          }, 50);
-        } else {
-          setContractId((prev) => prev || idFromUrl);
-          if (!contract) {
-            handleSearch(idFromUrl);
-          }
-        }
+    const checkForContractId = () => {
+      const contractIdFromStorage = localStorage.getItem('trackContractId');
+      if (contractIdFromStorage) {
+        localStorage.removeItem('trackContractId');
+        setContractId(contractIdFromStorage);
+        handleSearch(contractIdFromStorage);
+        return true;
       }
-    } catch {}
+
+      const contractIdFromUrl = new URLSearchParams(window.location.search).get('contractId');
+      if (contractIdFromUrl) {
+        setContractId(contractIdFromUrl);
+        handleSearch(contractIdFromUrl);
+        return true;
+      }
+      
+      return false;
+    };
+
+    if (!checkForContractId()) {
+      const timeoutId = setTimeout(checkForContractId, 200);
+      return () => clearTimeout(timeoutId);
+    }
   }, []);
 
-  useEffect(() => {
-    try {
-      let idFromUrl = null;
-      if (typeof window !== 'undefined') {
-        idFromUrl = new URLSearchParams(window.location.search).get('contractId');
-      }
-      if (!idFromUrl) {
-        idFromUrl = searchParams.get('contractId');
-      }
-      if (idFromUrl && idFromUrl !== contractId) {
-        if (!didInitialRefreshRef.current) {
-          didInitialRefreshRef.current = true;
-          router.refresh();
-          setTimeout(() => {
-            setContractId(idFromUrl);
-            handleSearch(idFromUrl);
-          }, 50);
-        } else {
-          setContractId(idFromUrl);
-          handleSearch(idFromUrl);
-        }
-      }
-    } catch (e) {}
-  }, [searchParams]);
 
   const fetchData = async (id = contractId) => {
     if (!id.trim()) return;
@@ -162,6 +140,10 @@ function LuggageTrackingContent() {
         setSnackbarOpen(true);
       }
     }
+  };
+
+  const handleSearch = (id = contractId) => { 
+    fetchData(id); 
   };
 
   useEffect(() => {
@@ -316,7 +298,7 @@ function LuggageTrackingContent() {
           position: currentPosition,
           title: 'Current Location',
           content: currentLocationMarker,
-          collisionBehavior: window.google.maps.CollisionBehavior.OPTIONAL_AND_HIDES_LOWER_PRIORITY
+          collisionBehavior: window.google.maps.CollisionBehavior.REQUIRED
         });
 
         markers.push(currentPosition);
@@ -324,10 +306,10 @@ function LuggageTrackingContent() {
 
       if (contract.pickup_location_geo?.coordinates) {
         const pickupMarker = new window.google.maps.marker.PinElement({
-          scale: 1,
-          background: 'info.main',
-          borderColor: 'info.dark',
-          glyphColor: 'info.contrastText'
+          scale: 1.2,
+          background: '#0288D1', // MUI info.main equivalent
+          borderColor: '#01579B', // MUI info.dark equivalent
+          glyphColor: '#FFFFFF'   // MUI info.contrastText equivalent
         });
 
         const pickupPosition = {
@@ -340,7 +322,7 @@ function LuggageTrackingContent() {
           position: pickupPosition,
           title: 'Pickup Location',
           content: pickupMarker.element,
-          collisionBehavior: window.google.maps.CollisionBehavior.OPTIONAL_AND_HIDES_LOWER_PRIORITY
+          collisionBehavior: window.google.maps.CollisionBehavior.REQUIRED
         });
 
         markers.push(pickupPosition);
@@ -348,10 +330,10 @@ function LuggageTrackingContent() {
 
       if (contract.drop_off_location_geo?.coordinates) {
         const dropoffMarker = new window.google.maps.marker.PinElement({
-          scale: 1,
-          background: 'warning.main',
-          borderColor: 'warning.dark',
-          glyphColor: 'warning.contrastText'
+          scale: 1.2,
+          background: '#F57C00', // MUI warning.main equivalent
+          borderColor: '#E65100', // MUI warning.dark equivalent
+          glyphColor: '#FFFFFF'   // MUI warning contrast text
         });
 
         const dropoffPosition = {
@@ -364,30 +346,24 @@ function LuggageTrackingContent() {
           position: dropoffPosition,
           title: 'Drop-off Location',
           content: dropoffMarker.element,
-          collisionBehavior: window.google.maps.CollisionBehavior.OPTIONAL_AND_HIDES_LOWER_PRIORITY
+          collisionBehavior: window.google.maps.CollisionBehavior.REQUIRED
         });
 
         markers.push(dropoffPosition);
       }
 
       if (markers.length > 0) {
-        if (contract.current_location_geo?.coordinates) {
-          const currentPosition = {
-            lat: contract.current_location_geo.coordinates[1],
-            lng: contract.current_location_geo.coordinates[0]
-          };
-          newMap.setCenter(currentPosition);
+        const bounds = new window.google.maps.LatLngBounds();
+        markers.forEach(marker => bounds.extend(marker));
+        newMap.fitBounds(bounds);
+        const padding = 0.02;
+        const ne = bounds.getNorthEast();
+        const sw = bounds.getSouthWest();
+        bounds.extend({ lat: ne.lat() + padding, lng: ne.lng() + padding });
+        bounds.extend({ lat: sw.lat() - padding, lng: sw.lng() - padding });
+        newMap.fitBounds(bounds);
+        if (markers.length === 1) {
           newMap.setZoom(15);
-        } else {
-          const bounds = new window.google.maps.LatLngBounds();
-          markers.forEach(marker => bounds.extend(marker));
-          newMap.fitBounds(bounds);
-          const padding = 0.02;
-          const ne = bounds.getNorthEast();
-          const sw = bounds.getSouthWest();
-          bounds.extend({ lat: ne.lat() + padding, lng: ne.lng() + padding });
-          bounds.extend({ lat: sw.lat() - padding, lng: sw.lng() - padding });
-          newMap.fitBounds(bounds);
         }
       }
     } catch (error) {
@@ -516,7 +492,6 @@ function LuggageTrackingContent() {
     }
   };
 
-  const handleSearch = (id = contractId) => fetchData(id);
   const handleExpandClick = () => setExpanded(!expanded);
 
   const handleClearSearch = () => {
