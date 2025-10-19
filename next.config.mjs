@@ -15,9 +15,7 @@ const nextConfig = {
   },
   poweredByHeader: false,
   compress: true,
-  experimental: {
-    serverComponentsExternalPackages: [],
-  },
+  serverExternalPackages: [],
   env: {
     CUSTOM_KEY: process.env.CUSTOM_KEY,
   },
