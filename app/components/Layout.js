@@ -10,7 +10,7 @@ export default function Layout({ children }) {
         minHeight: '100vh',
       }}
     >
-      <Box component="main" sx={{ flexGrow: 1 }}>
+      <Box sx={{ flex: 1 }}>
         {children}
       </Box>
       <Footer />

@@ -34,7 +34,6 @@ export default function Page() {
     { title: "System Logs", route: "/admin/logs", icon: HistoryIcon, requiresVerification: false },
   ];
 
-  // Contract status definitions (from image)
   const statusList = [
     { id: 1, name: 'Available for Pickup' },
     { id: 2, name: 'Cancelled' },
@@ -44,7 +43,6 @@ export default function Page() {
     { id: 6, name: 'Delivery Failed' },
   ];
 
-  // Contracts state
   const [contracts, setContracts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isVerified, setIsVerified] = useState(false);
@@ -53,7 +51,6 @@ export default function Page() {
   const supabase = createClientComponentClient();
   const router = useRouter();
 
-  // Check verification status
   useEffect(() => {
     const checkVerification = async () => {
       try {
@@ -68,14 +65,7 @@ export default function Page() {
 
         const verified = profile?.verify_status?.status_name === 'Verified';
         setIsVerified(verified);
-        
-        console.log('[AdminDashboard] Verification status:', {
-          verifyStatusId: profile?.verify_status_id,
-          statusName: profile?.verify_status?.status_name,
-          isVerified: verified
-        });
       } catch (error) {
-        console.error('[AdminDashboard] Error checking verification:', error);
         setIsVerified(false);
       } finally {
         setVerificationLoading(false);
@@ -101,26 +91,23 @@ export default function Page() {
     fetchContracts();
   }, []);
 
-  // Derived statistics (fixed total per requirements)
   const totalDeliveries = 50;
   const statusCounts = useMemo(() => {
     const counts = {};
     statusList.forEach(s => { counts[s.id] = 0; });
     contracts.forEach(contract => {
-      if (contract.contract_status_id && Object.prototype.hasOwnProperty.call(counts, contract.contract_status_id)) {
+      if (contract.contract_status_id && counts.hasOwnProperty(contract.contract_status_id)) {
         counts[contract.contract_status_id]++;
       }
     });
     return counts;
   }, [contracts]);
 
-  // Styles
   const titleStyles = { mb: 4 };
   const cardStyles = { height: "100%", width: "35vh" };
   const linkStyles = { textDecoration: "none" };
   const iconStyles = { fontSize: 40, color: "primary.main", mb: 2 };
 
-  // Gauge card style aligned with statistics page
   const gaugeCardStyles = {
     display: 'flex',
     flexDirection: 'column',
@@ -137,13 +124,10 @@ export default function Page() {
     transition: 'background 0.3s'
   };
 
-  
-
   return (
     <Box>
       <Box sx={titleStyles}><Typography variant="h4" color="primary.main" fontWeight="bold">Dashboard</Typography></Box>
       
-      {/* Verification Status Alert */}
       {!verificationLoading && !isVerified && (
         <Alert severity="warning" sx={{ mb: 3 }}>
           <Typography variant="body2">
@@ -181,9 +165,7 @@ export default function Page() {
 
           return (
             <Grid item xs={12} sm={6} md={4} key={index}>
-              {isDisabled ? (
-                cardContent
-              ) : (
+              {isDisabled ? cardContent : (
                 <Link href={card.route} style={linkStyles}>
                   {cardContent}
                 </Link>
@@ -193,18 +175,13 @@ export default function Page() {
         })}
       </Grid>
       <Divider sx={{ my: 4 }} />
-      {/* Status Gauges */}
       <Box sx={{ mb: 4 }}>
         <Typography variant="h6" color="primary.main" fontWeight="bold" mb={2}>Performance Overview</Typography>
         <Grid container spacing={3} justifyContent="center">
           {statusList.map((status) => {
             const statusFilterMap = {
-              1: 'available',
-              2: 'cancelled',
-              3: 'accepted',
-              4: 'transit',
-              5: 'delivered',
-              6: 'failed'
+              1: 'available', 2: 'cancelled', 3: 'accepted',
+              4: 'transit', 5: 'delivered', 6: 'failed'
             };
             const filterValue = statusFilterMap[status.id];
             const value = totalDeliveries ? Math.round((statusCounts[status.id] || 0) / totalDeliveries * 100) : 0;
@@ -225,28 +202,15 @@ export default function Page() {
 
       {loading && <Typography>Loading...</Typography>}
 
-      {/* Account Not Verified Message */}
       {showVerificationMessage && (
         <Box sx={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 9999
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)', display: 'flex',
+          alignItems: 'center', justifyContent: 'center', zIndex: 9999
         }}>
           <Box sx={{
-            backgroundColor: 'background.paper',
-            borderRadius: 2,
-            p: 4,
-            maxWidth: 500,
-            width: '90%',
-            textAlign: 'center',
-            boxShadow: 3
+            backgroundColor: 'background.paper', borderRadius: 2, p: 4,
+            maxWidth: 500, width: '90%', textAlign: 'center', boxShadow: 3
           }}>
             <WarningIcon sx={{ fontSize: 60, color: 'warning.main', mb: 2 }} />
             <Typography variant="h4" color="warning.main" fontWeight="bold" mb={2}>
@@ -256,22 +220,13 @@ export default function Page() {
               You need to complete your profile verification before accessing this feature. Please complete your profile information and upload your government ID documents.
             </Typography>
             <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center' }}>
-              <Button 
-                variant="outlined" 
-                onClick={() => setShowVerificationMessage(false)}
-                sx={{ minWidth: 120 }}
-              >
+              <Button variant="outlined" onClick={() => setShowVerificationMessage(false)} sx={{ minWidth: 120 }}>
                 Close
               </Button>
-              <Button 
-                variant="contained" 
-                color="primary"
-                onClick={() => {
-                  setShowVerificationMessage(false);
-                  router.push('/admin/profile');
-                }}
-                sx={{ minWidth: 200 }}
-              >
+              <Button variant="contained" color="primary" onClick={() => {
+                setShowVerificationMessage(false);
+                router.push('/admin/profile');
+              }} sx={{ minWidth: 200 }}>
                 Complete Profile Verification
               </Button>
             </Box>

@@ -8,7 +8,7 @@ import LoadingSpinner from '../../components/LoadingSpinner';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
-import { PDFDownloadLink, PDFViewer, pdf, Document, Page as PDFPage, Text, View, Font, Image } from '@react-pdf/renderer';
+import { PDFDownloadLink, PDFViewer, pdf, Document, Page as PDFPage, Text, View, Image } from '@react-pdf/renderer';
 import { CombinedSOAInvoicePDF as CombinedPDFTemplate } from '../../../utils/pdf-templates';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
@@ -16,553 +16,7 @@ import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { format as formatDateFns } from 'date-fns';
 
-// Font registration is handled in pdf-templates.js
-
-// Utility: format date for table
 const formatDate = (date) => date ? new Date(date).toISOString().split('T')[0] : '';
-
-// PDF Receipt component
-const ReceiptPDF = ({ contracts = [], dateRange }) => {
-    // Ensure contracts is always an array and has valid data
-    const safeContracts = React.useMemo(() => {
-        if (!Array.isArray(contracts)) return [];
-        return contracts.filter(c => c && typeof c === 'object');
-    }, [contracts]);
-
-    // If no valid contracts, return empty document
-    if (safeContracts.length === 0) {
-        return (
-            <Document>
-                <PDFPage size="A4" style={{ padding: 24, fontSize: 10, fontFamily: 'Roboto' }}>
-                    <View style={{ alignItems: 'center', marginBottom: 8 }}>
-                        <Text style={{ fontSize: 16, fontWeight: 'bold' }}>No contracts selected</Text>
-                    </View>
-                </PDFPage>
-            </Document>
-        );
-    }
-
-    const formatDate = (dateString) => {
-        if (!dateString) return 'N/A';
-        try {
-            const date = new Date(dateString);
-            return date.toLocaleString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
-        } catch { return 'N/A'; }
-    };
-
-    // Calculate totals safely
-    const subtotal = safeContracts.reduce((sum, c) => sum + (Number(c.delivery_charge) || 0), 0);
-    const surchargeTotal = safeContracts.reduce((sum, c) => sum + (Number(c.delivery_surcharge || c.surcharge) || 0), 0);
-    const discountTotal = safeContracts.reduce((sum, c) => sum + (Number(c.delivery_discount || c.discount) || 0), 0);
-    const getRowAmount = (c) => {
-        const delivery_charge = Number(c.delivery_charge) || 0;
-        const delivery_surcharge = Number(c.delivery_surcharge || c.surcharge) || 0;
-        const delivery_discount = Number(c.delivery_discount || c.discount) || 0;
-        return Math.max(0, (delivery_charge + delivery_surcharge) - delivery_discount);
-    };
-    const totalAmount = safeContracts.reduce((sum, c) => sum + getRowAmount(c), 0);
-
-    return (
-        <Document>
-            <PDFPage size="A4" style={{ padding: 12, fontSize: 8, fontFamily: 'Roboto' }}>
-                <View style={{ alignItems: 'center', marginBottom: 4 }}>
-                    <Text style={{ fontSize: 14, fontWeight: 'bold' }}>GHE TRANSMITTAL - AIRPORT CLIENTS PROPERTY IRREGULARITY SUMMARY REPORT</Text>
-                    <Text style={{ fontSize: 12, marginTop: 2 }}>{dateRange || 'No date range specified'}</Text>
-                </View>
-                <View style={{ borderWidth: 1, borderColor: '#000', marginBottom: 4 }}>
-                    <View style={{ flexDirection: 'row', backgroundColor: '#eee', borderBottomWidth: 1, borderColor: '#000' }}>
-                        <Text style={{ flex: 0.5, fontWeight: 'bold', padding: 2, fontSize: 8 }}>No.</Text>
-                        <Text style={{ flex: 1, fontWeight: 'bold', padding: 2, fontSize: 8 }}>Tracking ID</Text>
-                        <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 2, fontSize: 8 }}>Invoice No.</Text>
-                        <Text style={{ flex: 2, fontWeight: 'bold', padding: 2, fontSize: 8 }}>Luggage Owner</Text>
-                        <Text style={{ flex: 1, fontWeight: 'bold', padding: 2, fontSize: 8 }}>Flight No.</Text>
-                        <Text style={{ flex: 2.5, fontWeight: 'bold', padding: 2, fontSize: 8 }}>Address</Text>
-                        <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 2, fontSize: 8 }}>Date Received</Text>
-                        <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 2, fontSize: 8 }}>Status</Text>
-                        <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 2, fontSize: 8 }}>Amount</Text>
-                        <Text style={{ flex: 1, fontWeight: 'bold', padding: 2, fontSize: 8 }}>Remarks</Text>
-                    </View>
-                    {safeContracts.map((c, idx) => (
-                        <View key={c.id || idx} style={{ flexDirection: 'row', borderBottomWidth: 1, borderColor: '#000' }}>
-                            <Text style={{ flex: 0.5, padding: 2, fontSize: 8 }}>{idx + 1}</Text>
-                            <Text style={{ flex: 1, padding: 2, fontSize: 8 }}>{c.id}</Text>
-                            <Text style={{ flex: 1.5, padding: 2, fontSize: 8 }}>{c.summary_id || 'N/A'}</Text>
-                            <Text style={{ flex: 2, padding: 2, fontSize: 8 }}>{c.owner_first_name || c.owner_middle_initial || c.owner_last_name ? `${c.owner_first_name || ''} ${c.owner_middle_initial || ''} ${c.owner_last_name || ''}`.replace(/  +/g, ' ').trim() : 'N/A'}</Text>
-                            <Text style={{ flex: 1, padding: 2, fontSize: 8 }}>{c.flight_number || 'N/A'}</Text>
-                            <Text style={{ flex: 2.5, padding: 2, fontSize: 8 }}>{c.drop_off_location || 'N/A'}</Text>
-                            <Text style={{ flex: 1.5, padding: 2, fontSize: 8 }}>{formatDate(c.delivered_at || c.created_at)}</Text>
-                            <Text style={{ flex: 1.5, padding: 2, fontSize: 8 }}>{c.contract_status?.status_name || 'N/A'}</Text>
-                            <Text style={{ flex: 1.5, padding: 2, fontFamily: 'Roboto', fontSize: 8 }}>{'\u20B1\u00A0'}{getRowAmount(c).toFixed(2)}</Text>
-                            <Text style={{ flex: 1, padding: 2, fontSize: 8 }}>{c.contract_status?.status_name === 'Delivery Failed' ? 'Delivery Failed' : ''}</Text>
-                        </View>
-                    ))}
-                    <View style={{ flexDirection: 'row', borderTopWidth: 1, borderColor: '#000', backgroundColor: '#f7f7f7' }}>
-                        <Text style={{ flex: 9, fontWeight: 'bold', padding: 2, textAlign: 'right', fontSize: 8 }}>Subtotal:</Text>
-                        <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 2, fontFamily: 'Roboto', fontSize: 8 }}>{'\u20B1\u00A0'}{subtotal.toFixed(2)}</Text>
-                        <Text style={{ flex: 1 }}></Text>
-                    </View>
-                    <View style={{ flexDirection: 'row', borderTopWidth: 1, borderColor: '#000', backgroundColor: '#f7f7f7' }}>
-                        <Text style={{ flex: 9, fontWeight: 'bold', padding: 2, textAlign: 'right', fontSize: 8 }}>Surcharge Total:</Text>
-                        <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 2, fontFamily: 'Roboto', fontSize: 8 }}>{'\u20B1\u00A0'}{surchargeTotal.toFixed(2)}</Text>
-                        <Text style={{ flex: 1 }}></Text>
-                    </View>
-                    <View style={{ flexDirection: 'row', borderTopWidth: 1, borderColor: '#000', backgroundColor: '#f7f7f7' }}>
-                        <Text style={{ flex: 9, fontWeight: 'bold', padding: 2, textAlign: 'right', fontSize: 8 }}>Discount Total:</Text>
-                        <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 2, fontFamily: 'Roboto', fontSize: 8 }}>{'\u20B1\u00A0'}{discountTotal.toFixed(2)}</Text>
-                        <Text style={{ flex: 1 }}></Text>
-                    </View>
-                    <View style={{ flexDirection: 'row', borderTopWidth: 2, borderColor: '#000', backgroundColor: '#eee' }}>
-                        <Text style={{ flex: 10.5, fontWeight: 'bold', padding: 2, textAlign: 'right', fontSize: 8 }}>TOTAL</Text>
-                        <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 2, fontFamily: 'Roboto', fontSize: 8 }}>{'\u20B1\u00A0'}{totalAmount.toFixed(2)}</Text>
-                    </View>
-                </View>
-                <View style={{ flexDirection: 'row', marginTop: 12, justifyContent: 'space-between' }}>
-                    <View>
-                        <Text style={{ fontSize: 8 }}>Received by: _______________, Date: _______________</Text>
-                        <Text style={{ fontWeight: 'bold', marginTop: 4, fontSize: 8 }}>AIRLINE'S REPRESENTATIVE</Text>
-                    </View>
-                    <View style={{ alignItems: 'flex-end' }}>
-                        <Text style={{ fontSize: 8 }}>GENERATED ON: {formatDate(new Date().toISOString())}</Text>
-                        <Text style={{ fontSize: 8 }}>*************SUBMITTED ALL ORIGINAL SIGNED PIR*****</Text>
-                        <Text style={{ fontSize: 8 }}>Total PIR submitted: {safeContracts.length}</Text>
-                    </View>
-                </View>
-            </PDFPage>
-        </Document>
-    );
-};
-
-// --- INVOICE PDF COMPONENT (BASIC FORMAT) ---
-const InvoicePDF = ({ contracts = [], invoiceNumber = null }) => {
-    const today = new Date();
-    const todayFormatted = formatDateFns(today, 'MMMM d, yyyy');
-    const invoiceNo = invoiceNumber || formatDateFns(today, 'yyyyMMdd');
-    const monthStart = startOfMonth(today);
-    const monthEnd = endOfMonth(today);
-    const dueDate = formatDateFns(monthEnd, 'MMMM d, yyyy');
-    const desc = `PIR Luggage Delivery – ${formatDateFns(monthStart, 'MMMM d, yyyy')} to ${formatDateFns(monthEnd, 'MMMM d, yyyy')}`;
-    // Compute totals (VAT included in subtotal; VAT is not added on top)
-    const subtotal = contracts.reduce((sum, c) => {
-        const delivery_charge = Number(c.delivery_charge) || 0;
-        const delivery_surcharge = Number(c.delivery_surcharge || c.surcharge) || 0;
-        const delivery_discount = Number(c.delivery_discount || c.discount) || 0;
-        return sum + Math.max(0, (delivery_charge + delivery_surcharge) - delivery_discount);
-    }, 0);
-    const vat = subtotal * 0.12;
-    const totalAmount = subtotal; // Amount due is VAT-inclusive; do not add VAT on top
-    return (
-        <Document>
-            <PDFPage size="A4" style={{ padding: 24, fontSize: 10, fontFamily: 'Roboto', position: 'relative' }}>
-                {/* Header */}
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 }}>
-                    <View style={{ flex: 1 }}>
-                        <Text style={{ fontWeight: 'bold', color: '#2d3991', fontSize: 12 }}>GREEN HANGAR EMISSION TESTING CENTER</Text>
-                        <Text style={{ fontWeight: 'bold', color: '#2d3991', fontSize: 10 }}>PROPRIETOR: JONALIZ L. CABALUNA</Text>
-                        <Text style={{ fontSize: 9 }}>ATAYDE ST. BRGY.191 PASAY CITY</Text>
-                        <Text style={{ fontSize: 9 }}>VAT REG. TIN: 234-449-892-00000</Text>
-                    </View>
-                    <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                        <Text style={{ fontWeight: 'bold', fontSize: 10 }}>BILL TO PHILLIPINES AIR ASIA INC.</Text>
-                        <Text style={{ fontSize: 9 }}>2ND LEVEL MEZZANINE</Text>
-                        <Text style={{ fontSize: 9 }}>AREA NAIA T3, PASAY CITY</Text>
-                        <Text style={{ fontSize: 9 }}>TIN# 005-838-00016</Text>
-                        <Text style={{ fontSize: 9, marginTop: 4 }}>DATE      {todayFormatted}</Text>
-                        <Text style={{ fontSize: 9 }}>SOA #     {invoiceNo}</Text>
-                    </View>
-                </View>
-                <Text style={{ fontWeight: 'bold', fontSize: 11, marginBottom: 8 }}>SALES INVOICE NO. {invoiceNo}</Text>
-                {/* Terms Table */}
-                <View style={{ flexDirection: 'row', backgroundColor: '#2d3991', color: 'white', fontWeight: 'bold', fontSize: 9 }}>
-                    <Text style={{ flex: 1, padding: 4 }}>TERMS</Text>
-                    <Text style={{ flex: 1, padding: 4 }}>PAYMENT METHOD</Text>
-                    <Text style={{ flex: 1, padding: 4 }}>DUE DATE</Text>
-                </View>
-                <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderColor: '#2d3991', fontSize: 9 }}>
-                    <Text style={{ flex: 1, padding: 4, backgroundColor: '#f7f3d6' }}>30 DAYS</Text>
-                    <Text style={{ flex: 1, padding: 4, backgroundColor: '#f7f3d6' }}>DOMESTIC FUNDS TRANSFER</Text>
-                    <Text style={{ flex: 1, padding: 4, backgroundColor: '#f7f3d6' }}>{dueDate}</Text>
-                </View>
-                {/* Invoice Table */}
-                <View style={{ marginTop: 12 }}>
-                    <View style={{ flexDirection: 'row', backgroundColor: '#2d3991', color: 'white', fontWeight: 'bold', fontSize: 9 }}>
-                        <Text style={{ flex: 0.5, padding: 4 }}>QTY</Text>
-                        <Text style={{ flex: 1, padding: 4 }}>UNIT</Text>
-                        <Text style={{ flex: 4, padding: 4 }}>DESCRIPTION</Text>
-                        <Text style={{ flex: 1, padding: 4 }}>AMOUNT</Text>
-                    </View>
-                    <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderColor: '#2d3991', fontSize: 9 }}>
-                        <Text style={{ flex: 0.5, padding: 4, backgroundColor: '#f7f3d6' }}>{safeContracts.length}</Text>
-                        <Text style={{ flex: 1, padding: 4, backgroundColor: '#f7f3d6' }}>PCS</Text>
-                        <Text style={{ flex: 4, padding: 4, backgroundColor: '#f7f3d6' }}>{desc}</Text>
-                        <Text style={{ flex: 1, padding: 4, backgroundColor: '#f7f3d6' }}>₱{subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
-                    </View>
-                    {/* Empty rows for formatting */}
-                    {[...Array(7)].map((_, i) => (
-                        <View key={i} style={{ flexDirection: 'row', fontSize: 9 }}>
-                            <Text style={{ flex: 0.5, padding: 4, backgroundColor: '#f7f3d6' }}></Text>
-                            <Text style={{ flex: 1, padding: 4, backgroundColor: '#f7f3d6' }}></Text>
-                            <Text style={{ flex: 4, padding: 4, backgroundColor: '#f7f3d6' }}></Text>
-                            <Text style={{ flex: 1, padding: 4, backgroundColor: '#f7f3d6' }}></Text>
-                        </View>
-                    ))}
-                    {/* Note row */}
-                    <View style={{ flexDirection: 'row', fontSize: 9 }}>
-                        <Text style={{ flex: 6.5, padding: 4, backgroundColor: '#f7f3d6', fontWeight: 'bold' }}>Note: All Original Documents are Included in this statement</Text>
-                        <Text style={{ flex: 1, padding: 4, backgroundColor: '#f7f3d6' }}></Text>
-                    </View>
-                    {/* Total row */}
-                    <View style={{ flexDirection: 'row', fontSize: 9 }}>
-                        <Text style={{ flex: 6.5, padding: 4, backgroundColor: '#f7f3d6', fontWeight: 'bold', textAlign: 'right' }}>Total Amount Due:</Text>
-                        <Text style={{ flex: 1, padding: 4, backgroundColor: '#f7f3d6', fontWeight: 'bold' }}>₱{totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
-                    </View>
-                </View>
-                {/* Footer Notes */}
-                <Text style={{ fontSize: 9, marginTop: 8, fontWeight: 'bold' }}>Note: Please make check payable to JONALIZ L. CABALUNA</Text>
-                {/* Summary Box */}
-                <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 8 }}>
-                    <View style={{ width: 180, borderWidth: 1, borderColor: '#2d3991', padding: 8 }}>
-                        <Text style={{ fontSize: 9 }}>RCBC ACCT NUMBER: 7591033191</Text>
-                        <Text style={{ fontSize: 9 }}>VATABLE: {`₱${(subtotal - vat).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</Text>
-                        <Text style={{ fontSize: 9 }}>VAT EXEMPT:</Text>
-                        <Text style={{ fontSize: 9 }}>ZERO RATED:</Text>
-                        <Text style={{ fontSize: 9 }}>TOTAL SALES:</Text>
-                        <Text style={{ fontSize: 9 }}>TOTAL VAT: {`₱${vat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</Text>
-                        <Text style={{ fontSize: 9 }}>AMOUNT DUE: {`₱${subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</Text>
-                    </View>
-                </View>
-                {/* Footer Signature Block - Always at the bottom */}
-                <View style={{
-                    position: 'absolute',
-                    left: 24,
-                    right: 24,
-                    bottom: 24,
-                    flexDirection: 'row',
-                    justifyContent: 'space-between',
-                    alignItems: 'flex-end',
-                }}>
-                    <View>
-                        <Text style={{ fontSize: 8, fontWeight: 'bold', color: '#2d3991' }}>Prepared by: K. SAMKIAN</Text>
-                        <Text style={{ fontSize: 8 }}>Revenue Supervisor</Text>
-                    </View>
-                    <View>
-                        <Text style={{ fontSize: 8, fontWeight: 'bold', color: '#2d3991' }}>CHECKED BY: J.LARA</Text>
-                        <Text style={{ fontSize: 8 }}>ACCOUNTING</Text>
-                    </View>
-                    <View>
-                        <Text style={{ fontSize: 8, fontWeight: 'bold', color: '#2d3991' }}>RECEIVED BY: ___________</Text>
-                        <Text style={{ fontSize: 8, fontWeight: 'bold', color: '#2d3991' }}>DATE: {todayFormatted}</Text>
-                    </View>
-                </View>
-            </PDFPage>
-        </Document>
-    );
-};
-
-// --- COMBINED SOA AND INVOICE PDF COMPONENT ---
-const CombinedSOAInvoicePDF = ({ contracts = [], dateRange, invoiceNumber = null, proofOfDeliveryData = {} }) => {
-    // Add error boundary and validation
-    try {
-        const today = new Date();
-        const todayFormatted = formatDateFns(today, 'MMMM d, yyyy');
-        const invoiceNo = invoiceNumber || formatDateFns(today, 'yyyyMMdd');
-        const monthStart = startOfMonth(today);
-        const monthEnd = endOfMonth(today);
-        const dueDate = formatDateFns(monthEnd, 'MMMM d, yyyy');
-        const desc = `PIR Luggage Delivery – ${formatDateFns(monthStart, 'MMMM d, yyyy')} to ${formatDateFns(monthEnd, 'MMMM d, yyyy')}`;
-
-        // Ensure contracts is an array
-        const safeContracts = Array.isArray(contracts) ? contracts : [];
-        const soaNumber = (safeContracts[0] && (safeContracts[0].summary_id || safeContracts[0].summaryId)) || invoiceNo;
-
-        // Calculate totals safely
-        // Totals for SOA (VAT is included in totals; do not add on top)
-        const subtotal = safeContracts.reduce((sum, c) => sum + (Number(c.delivery_charge) || 0), 0);
-        const surchargeTotal = safeContracts.reduce((sum, c) => sum + (Number(c.delivery_surcharge || c.surcharge) || 0), 0);
-        const discountTotal = safeContracts.reduce((sum, c) => sum + (Number(c.delivery_discount || c.discount) || 0), 0);
-        const getRowAmount = (c) => {
-            const delivery_charge = Number(c.delivery_charge) || 0;
-            const delivery_surcharge = Number(c.delivery_surcharge || c.surcharge) || 0;
-            const delivery_discount = Number(c.delivery_discount || c.discount) || 0;
-            return Math.max(0, (delivery_charge + delivery_surcharge) - delivery_discount);
-        };
-        const totalAmount = safeContracts.reduce((sum, c) => sum + getRowAmount(c), 0);
-        const vat = totalAmount * 0.12;
-        const finalTotal = totalAmount; // Amount due equals total; VAT not added on top
-
-        const formatDate = (dateString) => {
-            if (!dateString) return 'N/A';
-            try {
-                const date = new Date(dateString);
-                return date.toLocaleString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
-            } catch { return 'N/A'; }
-        };
-
-        return (
-            <Document>
-                {/* First Page - Invoice */}
-                <PDFPage size="A4" style={{ padding: 24, fontSize: 10, fontFamily: 'Roboto' }}>
-                    {/* Header */}
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                        <View style={{ flex: 1 }}>
-                            <Text style={{ fontWeight: 'bold', fontSize: 12 }}>GREEN HANGAR EMISSION TESTING CENTER</Text>
-                            <Text style={{ fontWeight: 'bold', fontSize: 10 }}>PROPRIETOR: JONALIZ L. CABALUNA</Text>
-                            <Text style={{ fontSize: 9 }}>ATAYDE ST. BRGY.191 PASAY CITY</Text>
-                            <Text style={{ fontSize: 9 }}>VAT REG. TIN: 234-449-892-00000</Text>
-                        </View>
-                        <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                            <Text style={{ fontWeight: 'bold', fontSize: 10 }}>BILL TO</Text>
-                            <Text style={{ fontSize: 9 }}>PHILIPPINES AIR ASIA INC.</Text>
-                            <Text style={{ fontSize: 9 }}>2ND LEVEL MEZZANINE</Text>
-                            <Text style={{ fontSize: 9 }}>AREA NAIA T3, PASAY CITY</Text>
-                            <Text style={{ fontSize: 9 }}>TIN# 005-838-00016</Text>
-                        </View>
-                    </View>
-                    <View style={{ borderTopWidth: 1, borderColor: '#000', marginVertical: 10 }} />
-                    {/* Date and SOA row */}
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                            <Text style={{ fontSize: 9, fontWeight: 'bold' }}>DATE:&nbsp;</Text>
-                            <Text style={{ fontSize: 9 }}>{todayFormatted}</Text>
-                        </View>
-                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                            <Text style={{ fontSize: 9, fontWeight: 'bold' }}>SOA #:&nbsp;</Text>
-                            <Text style={{ fontSize: 9 }}>{soaNumber}</Text>
-                        </View>
-                    </View>
-                    <Text style={{ fontWeight: 'bold', fontSize: 12, textAlign: 'center', marginBottom: 8 }}>SALES INVOICE NO. {invoiceNo}</Text>
-                    {/* Terms Table */}
-                    <View style={{ flexDirection: 'row', fontWeight: 'bold', fontSize: 9, borderWidth: 1, borderColor: '#000' }}>
-                        <Text style={{ flex: 1, padding: 4, borderRightWidth: 1, borderColor: '#000' }}>TERMS</Text>
-                        <Text style={{ flex: 1, padding: 4, borderRightWidth: 1, borderColor: '#000' }}>PAYMENT METHOD</Text>
-                        <Text style={{ flex: 1, padding: 4 }}>DUE DATE</Text>
-                    </View>
-                    <View style={{ flexDirection: 'row', fontSize: 9, borderLeftWidth: 1, borderRightWidth: 1, borderBottomWidth: 1, borderColor: '#000' }}>
-                        <Text style={{ flex: 1, padding: 4, borderRightWidth: 1, borderColor: '#000' }}>30 DAYS</Text>
-                        <Text style={{ flex: 1, padding: 4, borderRightWidth: 1, borderColor: '#000' }}>DOMESTIC FUND TRANSFER</Text>
-                        <Text style={{ flex: 1, padding: 4 }}>{dueDate}</Text>
-                    </View>
-                    {/* Invoice Table */}
-                    <View style={{ marginTop: 12 }}>
-                        <View style={{ flexDirection: 'row', fontWeight: 'bold', fontSize: 9, borderWidth: 1, borderColor: '#000' }}>
-                            <Text style={{ flex: 0.5, padding: 4, borderRightWidth: 1, borderColor: '#000' }}>QTY</Text>
-                            <Text style={{ flex: 1, padding: 4, borderRightWidth: 1, borderColor: '#000' }}>UNIT</Text>
-                            <Text style={{ flex: 4, padding: 4, borderRightWidth: 1, borderColor: '#000' }}>DESCRIPTION</Text>
-                            <Text style={{ flex: 1, padding: 4 }}>TOTAL AMOUNT DUE</Text>
-                        </View>
-                        <View style={{ flexDirection: 'row', fontSize: 9, borderLeftWidth: 1, borderRightWidth: 1, borderBottomWidth: 1, borderColor: '#000', minHeight: 20, alignItems: 'center' }}>
-                            <Text style={{ flex: 0.5, padding: 4, borderRightWidth: 1, borderColor: '#000' }}>{safeContracts.length}</Text>
-                            <Text style={{ flex: 1, padding: 4, borderRightWidth: 1, borderColor: '#000' }}>PCS</Text>
-                            <Text style={{ flex: 4, padding: 4, borderRightWidth: 1, borderColor: '#000' }}>{`PIRs Luggage Delivery - (${formatDateFns(monthStart, 'dd/MM/yyyy')} to ${formatDateFns(monthEnd, 'dd/MM/yyyy')})`}</Text>
-                            <Text style={{ flex: 1, padding: 4 }}>PHP</Text>
-                        </View>
-                        {[...Array(7)].map((_, i) => (
-                            <View key={i} style={{ flexDirection: 'row', fontSize: 9, borderLeftWidth: 1, borderRightWidth: 1, borderBottomWidth: 1, borderColor: '#000', minHeight: 20, alignItems: 'center' }}>
-                                <Text style={{ flex: 0.5, padding: 4, borderRightWidth: 1, borderColor: '#000' }}></Text>
-                                <Text style={{ flex: 1, padding: 4, borderRightWidth: 1, borderColor: '#000' }}></Text>
-                                <Text style={{ flex: 4, padding: 4, borderRightWidth: 1, borderColor: '#000' }}></Text>
-                                <Text style={{ flex: 1, padding: 4 }}></Text>
-                            </View>
-                        ))}
-                        {/* Note row - keep all column lines continuous; text in Description column */}
-                        <View style={{ flexDirection: 'row', fontSize: 9, borderLeftWidth: 1, borderRightWidth: 1, borderBottomWidth: 1, borderColor: '#000', minHeight: 20, alignItems: 'center' }}>
-                            <Text style={{ flex: 0.5, padding: 4, borderRightWidth: 1, borderColor: '#000' }}></Text>
-                            <Text style={{ flex: 1, padding: 4, borderRightWidth: 1, borderColor: '#000' }}></Text>
-                            <Text style={{ flex: 4, padding: 4, borderRightWidth: 1, borderColor: '#000', fontWeight: 'bold' }}>Note: All Original Documents are Included in this statement</Text>
-                            <Text style={{ flex: 1, padding: 4 }}></Text>
-                        </View>
-                        {/* Total row - align with columns and remove extra horizontal divider below */}
-                        <View style={{ flexDirection: 'row', fontSize: 9, borderLeftWidth: 1, borderRightWidth: 1, borderBottomWidth: 1, borderColor: '#000', minHeight: 20, alignItems: 'center' }}>
-                            <Text style={{ flex: 0.5, padding: 4, borderRightWidth: 1, borderColor: '#000' }}></Text>
-                            <Text style={{ flex: 1, padding: 4, borderRightWidth: 1, borderColor: '#000' }}></Text>
-                            <Text style={{ flex: 4, padding: 4, borderRightWidth: 1, borderColor: '#000', fontWeight: 'bold', textAlign: 'right' }}>Total Amount Due:</Text>
-                            <Text style={{ flex: 1, padding: 4, fontWeight: 'bold' }}>{`₱${totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</Text>
-                        </View>
-                    </View>
-                    <Text style={{ fontSize: 9, marginTop: 8, fontWeight: 'bold' }}>Note: Please make check payable to JONALIZ L. CABALUNA</Text>
-                    {/* Summary Box */}
-                    <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 8 }}>
-                        <View style={{ width: 180, borderWidth: 1, borderColor: '#000', padding: 8 }}>
-                            <Text style={{ fontSize: 9 }}>RCBC ACCT NUMBER: 7591033191</Text>
-                            <Text style={{ fontSize: 9 }}>VATABLE: {`₱${(totalAmount - vat).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</Text>
-                            <Text style={{ fontSize: 9 }}>VAT EXEMPT:</Text>
-                            <Text style={{ fontSize: 9 }}>ZERO RATED:</Text>
-                            <Text style={{ fontSize: 9 }}>TOTAL SALES:</Text>
-                            <Text style={{ fontSize: 9 }}>TOTAL VAT: {`₱${vat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</Text>
-                            <Text style={{ fontSize: 9 }}>AMOUNT DUE: {`₱${totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</Text>
-                        </View>
-                    </View>
-                    {/* Signature lines */}
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 16 }}>
-                        <View style={{ width: '45%' }}>
-                            <Text style={{ fontSize: 8, fontWeight: 'bold' }}>PREPARED BY:</Text>
-                            <View style={{ borderBottomWidth: 1, borderColor: '#000', marginTop: 16 }} />
-                        </View>
-                        <View style={{ width: '45%' }}>
-                            <Text style={{ fontSize: 8, fontWeight: 'bold' }}>CHECKED BY:</Text>
-                            <View style={{ borderBottomWidth: 1, borderColor: '#000', marginTop: 16 }} />
-                        </View>
-                    </View>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 12 }}>
-                        <View style={{ width: '45%' }}>
-                            <Text style={{ fontSize: 8, fontWeight: 'bold' }}>RECEIVED BY:</Text>
-                            <View style={{ borderBottomWidth: 1, borderColor: '#000', marginTop: 16 }} />
-                        </View>
-                        <View style={{ width: '45%' }}>
-                            <Text style={{ fontSize: 8, fontWeight: 'bold' }}>DATE:</Text>
-                            <View style={{ borderBottomWidth: 1, borderColor: '#000', marginTop: 16 }} />
-                        </View>
-                    </View>
-                </PDFPage>
-
-                {/* Second Page - SOA */}
-                <PDFPage size="A4" style={{ padding: 12, fontSize: 8, fontFamily: 'Roboto' }}>
-                    <View style={{ alignItems: 'center', marginBottom: 4 }}>
-                        <Text style={{ fontSize: 14, fontWeight: 'bold' }}>GHE TRANSMITTAL - AIRPORT CLIENTS PROPERTY IRREGULARITY SUMMARY REPORT</Text>
-                        <Text style={{ fontSize: 12, marginTop: 2 }}>{dateRange || 'No date range specified'}</Text>
-                    </View>
-                    <View style={{ borderWidth: 1, borderColor: '#000', marginBottom: 4 }}>
-                        <View style={{ flexDirection: 'row', backgroundColor: '#eee', borderBottomWidth: 1, borderColor: '#000' }}>
-                            <Text style={{ flex: 0.5, fontWeight: 'bold', padding: 2, fontSize: 8 }}>No.</Text>
-                            <Text style={{ flex: 1, fontWeight: 'bold', padding: 2, fontSize: 8 }}>Tracking ID</Text>
-                            <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 2, fontSize: 8 }}>Invoice No.</Text>
-                            <Text style={{ flex: 2, fontWeight: 'bold', padding: 2, fontSize: 8 }}>Luggage Owner</Text>
-                            <Text style={{ flex: 1, fontWeight: 'bold', padding: 2, fontSize: 8 }}>Flight No.</Text>
-                            <Text style={{ flex: 2.5, fontWeight: 'bold', padding: 2, fontSize: 8 }}>Address</Text>
-                            <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 2, fontSize: 8 }}>Date Received</Text>
-                            <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 2, fontSize: 8 }}>Status</Text>
-                            <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 2, fontSize: 8 }}>Amount</Text>
-                            <Text style={{ flex: 1, fontWeight: 'bold', padding: 2, fontSize: 8 }}>Remarks</Text>
-                        </View>
-                        {safeContracts.map((c, idx) => (
-                            <View key={c.id || idx} style={{ flexDirection: 'row', borderBottomWidth: 1, borderColor: '#000' }}>
-                                <Text style={{ flex: 0.5, padding: 2, fontSize: 8 }}>{idx + 1}</Text>
-                                <Text style={{ flex: 1, padding: 2, fontSize: 8 }}>{c.id}</Text>
-                                <Text style={{ flex: 1.5, padding: 2, fontSize: 8 }}>{c.summary_id || 'N/A'}</Text>
-                                <Text style={{ flex: 2, padding: 2, fontSize: 8 }}>{c.owner_first_name || c.owner_middle_initial || c.owner_last_name ? `${c.owner_first_name || ''} ${c.owner_middle_initial || ''} ${c.owner_last_name || ''}`.replace(/  +/g, ' ').trim() : 'N/A'}</Text>
-                                <Text style={{ flex: 1, padding: 2, fontSize: 8 }}>{c.flight_number || 'N/A'}</Text>
-                                <Text style={{ flex: 2.5, padding: 2, fontSize: 8 }}>{c.drop_off_location || 'N/A'}</Text>
-                                <Text style={{ flex: 1.5, padding: 2, fontSize: 8 }}>{formatDate(c.delivered_at || c.created_at)}</Text>
-                                <Text style={{ flex: 1.5, padding: 2, fontSize: 8 }}>{c.contract_status?.status_name || 'N/A'}</Text>
-                                <Text style={{ flex: 1.5, padding: 2, fontFamily: 'Roboto', fontSize: 8 }}>{'\u20B1\u00A0'}{getRowAmount(c).toFixed(2)}</Text>
-                                <Text style={{ flex: 1, padding: 2, fontSize: 8 }}>{c.contract_status?.status_name === 'Delivery Failed' ? 'Delivery Failed' : ''}</Text>
-                            </View>
-                        ))}
-                        <View style={{ flexDirection: 'row', borderTopWidth: 1, borderColor: '#000', backgroundColor: '#f7f7f7' }}>
-                            <Text style={{ flex: 9, fontWeight: 'bold', padding: 2, textAlign: 'right', fontSize: 8 }}>Subtotal:</Text>
-                            <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 2, fontFamily: 'Roboto', fontSize: 8 }}>{'\u20B1\u00A0'}{subtotal.toFixed(2)}</Text>
-                            <Text style={{ flex: 1 }}></Text>
-                        </View>
-                        <View style={{ flexDirection: 'row', borderTopWidth: 1, borderColor: '#000', backgroundColor: '#f7f7f7' }}>
-                            <Text style={{ flex: 9, fontWeight: 'bold', padding: 2, textAlign: 'right', fontSize: 8 }}>Surcharge Total:</Text>
-                            <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 2, fontFamily: 'Roboto', fontSize: 8 }}>{'\u20B1\u00A0'}{surchargeTotal.toFixed(2)}</Text>
-                            <Text style={{ flex: 1 }}></Text>
-                        </View>
-                        <View style={{ flexDirection: 'row', borderTopWidth: 1, borderColor: '#000', backgroundColor: '#f7f7f7' }}>
-                            <Text style={{ flex: 9, fontWeight: 'bold', padding: 2, textAlign: 'right', fontSize: 8 }}>Discount Total:</Text>
-                            <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 2, fontFamily: 'Roboto', fontSize: 8 }}>{'\u20B1\u00A0'}{discountTotal.toFixed(2)}</Text>
-                            <Text style={{ flex: 1 }}></Text>
-                        </View>
-                        <View style={{ flexDirection: 'row', borderTopWidth: 2, borderColor: '#000', backgroundColor: '#eee' }}>
-                            <Text style={{ flex: 10.5, fontWeight: 'bold', padding: 2, textAlign: 'right', fontSize: 8 }}>TOTAL</Text>
-                            <Text style={{ flex: 1.5, fontWeight: 'bold', padding: 2, fontFamily: 'Roboto', fontSize: 8 }}>{'\u20B1\u00A0'}{totalAmount.toFixed(2)}</Text>
-                        </View>
-                    </View>
-                    <View style={{ flexDirection: 'row', marginTop: 12, justifyContent: 'space-between' }}>
-                        <View>
-                            <Text style={{ fontSize: 8 }}>Received by: _______________, Date: _______________</Text>
-                            <Text style={{ fontWeight: 'bold', marginTop: 4, fontSize: 8 }}>AIRLINE'S REPRESENTATIVE</Text>
-                        </View>
-                        <View style={{ alignItems: 'flex-end' }}>
-                            <Text style={{ fontSize: 8 }}>GENERATED ON: {formatDate(new Date().toISOString())}</Text>
-                            <Text style={{ fontSize: 8 }}>*************SUBMITTED ALL ORIGINAL SIGNED PIR*****</Text>
-                            <Text style={{ fontSize: 8 }}>Total PIR submitted: {safeContracts.length}</Text>
-                        </View>
-                    </View>
-                </PDFPage>
-
-                {/* Proof of Delivery Pages - One per contract */}
-                {safeContracts.map((contract, index) => {
-                    const podData = proofOfDeliveryData[contract.id];
-                    const ownerName = contract.owner_first_name || contract.owner_middle_initial || contract.owner_last_name
-                        ? `${contract.owner_first_name || ''} ${contract.owner_middle_initial || ''} ${contract.owner_last_name || ''}`.replace(/  +/g, ' ').trim()
-                        : 'N/A';
-
-                    return (
-                        <PDFPage key={`pod-${contract.id}`} size="A4" style={{ padding: 24, fontSize: 10, fontFamily: 'Roboto' }}>
-                            <View style={{ alignItems: 'center', marginBottom: 16 }}>
-                                <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#2d3991' }}>PROOF OF DELIVERY</Text>
-                                <Text style={{ fontSize: 12, marginTop: 4 }}>Contract ID: {contract.id}</Text>
-                            </View>
-
-                            <View style={{ marginBottom: 16 }}>
-                                <Text style={{ fontSize: 12, fontWeight: 'bold', marginBottom: 8 }}>Contract Details:</Text>
-                                <View style={{ padding: 8, backgroundColor: '#f5f5f5', borderRadius: 4 }}>
-                                    <Text style={{ fontSize: 10, marginBottom: 2 }}>Contract ID: {contract.id}</Text>
-                                    <Text style={{ fontSize: 10, marginBottom: 2 }}>Luggage Owner: {ownerName}</Text>
-                                    <Text style={{ fontSize: 10, marginBottom: 2 }}>Flight Number: {contract.flight_number || 'N/A'}</Text>
-                                    <Text style={{ fontSize: 10, marginBottom: 2 }}>Pickup Location: {contract.pickup_location || 'N/A'}</Text>
-                                    <Text style={{ fontSize: 10, marginBottom: 2 }}>Drop-off Location: {contract.drop_off_location || 'N/A'}</Text>
-                                    <Text style={{ fontSize: 10, marginBottom: 2 }}>Delivery Date: {formatDate(contract.delivered_at || contract.created_at)}</Text>
-                                    <Text style={{ fontSize: 10, marginBottom: 2 }}>Status: {contract.contract_status?.status_name || 'N/A'}</Text>
-                                </View>
-                            </View>
-
-                            {podData && podData.proof_of_delivery ? (
-                                <View style={{ alignItems: 'center', marginBottom: 16 }}>
-                                    <Text style={{ fontSize: 12, fontWeight: 'bold', marginBottom: 8 }}>Proof of Delivery Image:</Text>
-                                    <View style={{
-                                        width: '100%',
-                                        height: 400,
-                                        border: '1px solid #ddd',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        backgroundColor: '#f9f9f9'
-                                    }}>
-                                        <Image
-                                            src={podData.proof_of_delivery}
-                                            style={{
-                                                maxWidth: '100%',
-                                                maxHeight: '100%',
-                                                objectFit: 'contain'
-                                            }}
-                                            cache={false}
-                                        />
-                                    </View>
-                                    {podData.delivery_timestamp && (
-                                        <Text style={{ fontSize: 10, marginTop: 8, color: '#666' }}>
-                                            Delivered at: {formatDate(podData.delivery_timestamp)}
-                                        </Text>
-                                    )}
-                                </View>
-                            ) : (
-                                <View style={{ alignItems: 'center', marginBottom: 16, padding: 20, backgroundColor: '#f9f9f9', borderRadius: 4 }}>
-                                    <Text style={{ fontSize: 12, color: '#666' }}>No proof of delivery available for this contract</Text>
-                                </View>
-                            )}
-
-                            {/* Removed signature/date/time section as requested */}
-                        </PDFPage>
-                    );
-                })}
-            </Document>
-        );
-    } catch (error) {
-        console.error('Error in CombinedSOAInvoicePDF:', error);
-        return (
-            <Document>
-                <PDFPage size="A4" style={{ padding: 24, fontSize: 10, fontFamily: 'Roboto' }}>
-                    <View style={{ alignItems: 'center', marginBottom: 8 }}>
-                        <Text style={{ fontSize: 16, fontWeight: 'bold', color: 'red' }}>Error generating PDF</Text>
-                        <Text style={{ fontSize: 12, marginTop: 4 }}>Please try again or contact support</Text>
-                    </View>
-                </PDFPage>
-            </Document>
-        );
-    }
-};
-
-// Transaction management main logic
 const TransactionManagement = () => {
     const router = useRouter();
     const [tabValue, setTabValue] = useState(0);
@@ -608,7 +62,7 @@ const TransactionManagement = () => {
     const showToast = (message, severity = 'success', dedupeMs = 8000) => {
         const now = Date.now();
         if (message === lastToastRef.current.message && now - lastToastRef.current.time < dedupeMs) {
-            return; // dedupe repeated messages
+            return;
         }
         lastToastRef.current = { message, time: now };
         setSnackbar({ open: true, message, severity });
@@ -620,20 +74,13 @@ const TransactionManagement = () => {
     const [selectedPricingRows, setSelectedPricingRows] = useState([]);
     const [regionFilter, setRegionFilter] = useState('');
     const [citySearch, setCitySearch] = useState('');
-    // Add new state for edit price dialog
     const [editPriceDialogOpen, setEditPriceDialogOpen] = useState(false);
     const [editPriceValue, setEditPriceValue] = useState('');
     const [editPriceLoading, setEditPriceLoading] = useState(false);
     const [editPriceError, setEditPriceError] = useState('');
     const [selectedPricingRow, setSelectedPricingRow] = useState(null);
-    // Add new state for confirmation dialog
     const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
     const [pendingPriceUpdate, setPendingPriceUpdate] = useState(null);
-
-
-    // Removed complete confirmation dialog state
-
-    // Add new state for summarize confirmation dialog
     const [summarizeConfirmDialogOpen, setSummarizeConfirmDialogOpen] = useState(false);
     const [pendingSummarizeData, setPendingSummarizeData] = useState(null);
 
@@ -649,7 +96,6 @@ const TransactionManagement = () => {
     const [summariesError, setSummariesError] = useState(null);
     const [summaryDateSpans, setSummaryDateSpans] = useState({});
     const [loadingDateSpans, setLoadingDateSpans] = useState(false);
-    // Preview dialog state
     const [previewOpen, setPreviewOpen] = useState(false);
     const [previewSummary, setPreviewSummary] = useState(null);
     const [previewLoading, setPreviewLoading] = useState(false);
@@ -661,26 +107,17 @@ const TransactionManagement = () => {
     const [showShareEmailField, setShowShareEmailField] = useState(false);
     const [shareEmail, setShareEmail] = useState('');
     const [shareEmailError, setShareEmailError] = useState('');
-    // Corporations map for airline_id -> corporation name
     const [corporationsById, setCorporationsById] = useState(new Map());
     const [corporationFilter, setCorporationFilter] = useState('');
-    // Corporation emails for share PDF functionality
     const [corporationEmails, setCorporationEmails] = useState([]);
     const [loadingCorporationEmails, setLoadingCorporationEmails] = useState(false);
 
-    // Sorting state for Summary table
     const [summarySortField, setSummarySortField] = useState('due_date');
     const [summarySortDirection, setSummarySortDirection] = useState('desc');
-
-    // Sorting state for Pending table
     const [pendingSortField, setPendingSortField] = useState('created_at');
     const [pendingSortDirection, setPendingSortDirection] = useState('desc');
-
-    // Sorting state for Pricing Update table
     const [pricingSortField, setPricingSortField] = useState('region');
     const [pricingSortDirection, setPricingSortDirection] = useState('asc');
-
-    // Data fetching
     useEffect(() => {
         const fetchData = async () => {
             setLoading(true);
@@ -727,7 +164,6 @@ const TransactionManagement = () => {
                     setCorporationEmails(data.corporationEmails || []);
                 }
             } catch (error) {
-                console.error('Error fetching corporation emails:', error);
             } finally {
                 setLoadingCorporationEmails(false);
             }
@@ -736,9 +172,8 @@ const TransactionManagement = () => {
         fetchCorporationEmails();
     }, []);
 
-    // Silent background refresh every 5 seconds for Pending (Pay) tab only
     useEffect(() => {
-        if (tabValue !== 0) return; // Only refresh when Pay tab is active
+        if (tabValue !== 0) return;
         let cancelled = false;
         const controller = new AbortController();
 
@@ -761,7 +196,7 @@ const TransactionManagement = () => {
                     prevRow.summary_id === nextRow.summary_id
                 );
 
-                if (isSame) return prevRow; // preserve reference to avoid re-render
+                if (isSame) return prevRow;
                 hasChanges = true;
                 return { ...prevRow, ...nextRow };
             });
@@ -784,7 +219,6 @@ const TransactionManagement = () => {
             refreshPendingQuietly();
         }, 5000);
 
-        // initial silent refresh
         refreshPendingQuietly();
 
         return () => {
@@ -794,7 +228,6 @@ const TransactionManagement = () => {
         };
     }, [tabValue]);
 
-    // Fetch pricing regions
     useEffect(() => {
         const fetchPricingRegions = async () => {
             try {
@@ -815,7 +248,6 @@ const TransactionManagement = () => {
                 const data = await response.json();
                 setPricingRegions(data.regions || []);
             } catch (error) {
-                console.error('Error fetching pricing regions:', error);
                 showToast('Failed to load pricing regions', 'error');
             } finally {
                 setLoadingRegions(false);
@@ -825,7 +257,6 @@ const TransactionManagement = () => {
         fetchPricingRegions();
     }, []);
 
-    // Fetch cities when region changes
     useEffect(() => {
         if (!selectedLocation) {
             setCities([]);
@@ -857,7 +288,6 @@ const TransactionManagement = () => {
         fetchCities();
     }, [selectedLocation]);
 
-    // Fetch price when city changes
     useEffect(() => {
         if (!selectedCity) {
             setPriceValue('');
@@ -887,7 +317,6 @@ const TransactionManagement = () => {
         fetchPrice();
     }, [selectedCity]);
 
-    // Fetch all pricing data for the table
     useEffect(() => {
         if (tabValue !== 2) return;
         setLoadingPricingTable(true);
@@ -911,10 +340,7 @@ const TransactionManagement = () => {
         fetchPricingTable();
     }, [tabValue]);
 
-    // Filter data based on selected month using created_at
-    // Additionally, only include contracts with Delivered or Delivery Failed statuses (IDs 5 and 6)
     const filteredData = React.useMemo(() => {
-        // Show ALL delivered or failed contracts regardless of month
         return data.filter(contract => {
             const statusId = Number(contract.contract_status_id);
             const statusOk = statusId === 5 || statusId === 6;
@@ -925,14 +351,9 @@ const TransactionManagement = () => {
         });
     }, [data, corporationFilter, corporationsById]);
 
-    // Helpers for selection lock (already summarized/invoiced)
-    const isRowLocked = (row) => {
-        // Lock selection if the contract already has a summary in contracts.summary_id
-        return Boolean(row.summary_id);
-    };
+    const isRowLocked = (row) => Boolean(row.summary_id);
     const selectableFilteredData = React.useMemo(() => filteredData.filter(row => !isRowLocked(row)), [filteredData]);
 
-    // Table and dialog handlers
     const handleChangePage = (event, newPage) => setPage(newPage);
     const handleChangeRowsPerPage = (event) => { setRowsPerPage(parseInt(event.target.value, 10)); setPage(0); };
     const handleMenuClick = (event, row) => { setAnchorEl(event.currentTarget); setSelectedRow(row); };
@@ -1014,7 +435,7 @@ const TransactionManagement = () => {
     const isRowSelected = (id) => selectedRows.includes(id);
     const handleSelectRow = (id) => {
         const row = filteredData.find(r => r.id === id);
-        if (row && isRowLocked(row)) return; // block selecting locked rows
+        if (row && isRowLocked(row)) return;
         setSelectedRows((prev) => {
             const newSelection = prev.includes(id)
                 ? prev.filter((rowId) => rowId !== id)
@@ -1043,7 +464,6 @@ const TransactionManagement = () => {
                 return status !== 'cancelled';
             });
         } catch (error) {
-            console.error('Error getting selected contracts:', error);
             return [];
         }
     };
@@ -1051,15 +471,14 @@ const TransactionManagement = () => {
 
     const handleMonthChange = (newDate) => {
         setSelectedMonth(newDate);
-        setSelectedRows([]); // Reset selection when month changes
-        setPage(0); // Reset to first page when month changes
+        setSelectedRows([]);
+        setPage(0);
     };
 
 
 
     const handleTabChange = (event, newValue) => {
         setTabValue(newValue);
-        // Reset form when switching tabs
         if (newValue === 1) {
             setSelectedPricingType('');
             setSelectedLocation('');
@@ -1067,7 +486,6 @@ const TransactionManagement = () => {
         }
     };
 
-    // Checkbox handlers
     const isPricingRowSelected = (id) => selectedPricingRows.includes(id);
     const handleSelectPricingRow = (id) => {
         setSelectedPricingRows((prev) =>
@@ -1086,17 +504,14 @@ const TransactionManagement = () => {
     const allPagePricingRowsSelected = pricingTable.length > 0 && pricingTable.slice(pricingPage * pricingRowsPerPage, pricingPage * pricingRowsPerPage + pricingRowsPerPage).every((row) => selectedPricingRows.includes(row.id));
     const somePagePricingRowsSelected = pricingTable.slice(pricingPage * pricingRowsPerPage, pricingPage * pricingRowsPerPage + pricingRowsPerPage).some((row) => selectedPricingRows.includes(row.id));
 
-    // Get unique regions for filter
     const uniqueRegions = Array.from(new Set(pricingTable.map(row => row.region))).filter(Boolean);
 
-    // Filtered table data
     const filteredPricingTable = pricingTable.filter(row => {
         const regionMatch = !regionFilter || row.region === regionFilter;
         const cityMatch = !citySearch || row.city.toLowerCase().includes(citySearch.toLowerCase());
         return regionMatch && cityMatch;
     });
 
-    // Sorting functions for Pricing Update table
     const handlePricingSort = (field) => {
         const isAsc = pricingSortField === field && pricingSortDirection === 'asc';
         setPricingSortDirection(isAsc ? 'desc' : 'asc');
@@ -1146,10 +561,8 @@ const TransactionManagement = () => {
         return pricingSortDirection === 'asc' ? <ArrowUpwardIcon /> : <ArrowDownwardIcon />;
     };
 
-    // Pagination logic
     const paginatedPricingTable = getSortedPricingData().slice(pricingPage * pricingRowsPerPage, pricingPage * pricingRowsPerPage + pricingRowsPerPage);
 
-    // Modify the edit price handlers
     const handleEditPriceClick = (row) => {
         setSelectedPricingRow(row);
         setEditPriceValue(row.price.toString());
@@ -1173,7 +586,6 @@ const TransactionManagement = () => {
             return;
         }
 
-        // Store the pending update and show confirmation dialog
         setPendingPriceUpdate({
             city_id: selectedPricingRow.id,
             price: newPrice,
@@ -1210,7 +622,6 @@ const TransactionManagement = () => {
 
             const { data } = await response.json();
 
-            // Update the local state with the new price and updated_at timestamp
             setPricingTable(prev => prev.map(row =>
                 row.id === pendingPriceUpdate.city_id
                     ? {
@@ -1239,7 +650,6 @@ const TransactionManagement = () => {
 
 
 
-    // Fetch summaries when Summary tab is selected
     useEffect(() => {
         if (tabValue !== 1) return;
         setLoadingSummaries(true);
@@ -1255,7 +665,6 @@ const TransactionManagement = () => {
                 const summaries = json.summaries || [];
                 setSummaries(summaries);
 
-                // Fetch date spans for each summary
                 setLoadingDateSpans(true);
                 const dateSpanPromises = summaries.map(async (summary) => {
                     try {
@@ -1282,7 +691,6 @@ const TransactionManagement = () => {
                         }
                         return { summaryId: summary.id, dateSpan: 'N/A' };
                     } catch (error) {
-                        console.error(`Error fetching date span for summary ${summary.id}:`, error);
                         return { summaryId: summary.id, dateSpan: 'N/A' };
                     }
                 });
@@ -1303,7 +711,6 @@ const TransactionManagement = () => {
 
 
 
-    // Sorting functions for Pending table
     const handlePendingSort = (field) => {
         const isAsc = pendingSortField === field && pendingSortDirection === 'asc';
         setPendingSortDirection(isAsc ? 'desc' : 'asc');
@@ -1376,7 +783,6 @@ const TransactionManagement = () => {
         return pendingSortDirection === 'asc' ? <ArrowUpwardIcon /> : <ArrowDownwardIcon />;
     };
 
-    // Transaction Management pagination state
     const [tmPage, setTmPage] = useState(0);
     const [tmRowsPerPage, setTmRowsPerPage] = useState(10);
     const paginatedFilteredData = getSortedPendingData().slice(tmPage * tmRowsPerPage, tmPage * tmRowsPerPage + tmRowsPerPage);
@@ -1386,7 +792,6 @@ const TransactionManagement = () => {
         setTmPage(0);
     };
 
-    // Pricing Update pagination handlers
     const handlePricingPageChange = (event, newPage) => setPricingPage(newPage);
     const handlePricingRowsPerPageChange = (event) => {
         setPricingRowsPerPage(parseInt(event.target.value, 10));
@@ -1411,7 +816,6 @@ const TransactionManagement = () => {
             return;
         }
 
-        // Generate summary ID and invoice ID with same alphanumeric characters
         const today = new Date();
         const datePart = formatDateFns(today, 'yyyyMMdd');
         const randomPart = Math.random().toString(36).substring(2, 6).toUpperCase();
@@ -1419,14 +823,12 @@ const TransactionManagement = () => {
         const summaryId = `SUM${commonId}`;
         const invoiceId = `INV${commonId}`;
 
-        // Calculate date span for contracts
         const contractDates = contracts.map(c => new Date(c.created_at)).filter(date => !isNaN(date));
         const minDate = contractDates.length > 0 ? new Date(Math.min(...contractDates)) : new Date();
         const maxDate = contractDates.length > 0 ? new Date(Math.max(...contractDates)) : new Date();
 
         const dateSpan = `${formatDateFns(minDate, 'MMM d')} to ${formatDateFns(maxDate, 'MMM d, yyyy')}`;
 
-        // Calculate summary statistics
         const totalContracts = contracts.length;
         const totalAmount = contracts.reduce((sum, c) => {
             const delivery_charge = Number(c.delivery_charge) || 0;
@@ -1438,7 +840,6 @@ const TransactionManagement = () => {
         const deliveredContracts = contracts.filter(c => c.contract_status?.status_name === 'Delivered').length;
         const failedContracts = contracts.filter(c => c.contract_status?.status_name === 'Delivery Failed').length;
 
-        // Set pending data for confirmation dialog
         setPendingSummarizeData({
             summaryId,
             invoiceId,
@@ -1450,7 +851,6 @@ const TransactionManagement = () => {
             contracts
         });
 
-        // Show confirmation dialog
         setSummarizeConfirmDialogOpen(true);
     };
 
@@ -1465,7 +865,6 @@ const TransactionManagement = () => {
         try {
             const { summaryId, invoiceId, totalContracts, totalAmount, deliveredContracts, failedContracts, contracts } = pendingSummarizeData;
 
-            // Create summary record and update contracts
             const contractIds = contracts.map(c => c.id);
             const createSummaryPayload = {
                 action: 'createSummary',
@@ -1492,7 +891,6 @@ const TransactionManagement = () => {
 
             const result = await createSummaryRes.json();
 
-            // Update the summary record with the generated invoice number
             const invoiceResponse = await fetch('/api/admin', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -1530,14 +928,11 @@ const TransactionManagement = () => {
                 severity: 'success'
             });
 
-            // Close confirmation dialog
             setSummarizeConfirmDialogOpen(false);
             setPendingSummarizeData(null);
 
-            // Refresh the data to reflect the changes
             window.location.reload();
         } catch (error) {
-            console.error('Error creating summary:', error);
             setSnackbar({
                 open: true,
                 message: error.message || 'Failed to create summary',
@@ -1552,22 +947,19 @@ const TransactionManagement = () => {
     };
 
     const handleViewSummaryDetails = (summary) => {
-        // For now, just show the summary data in the existing summary dialog
-        // You can expand this to fetch more detailed information if needed
         setSummaryData({
             summaryId: summary.id,
-            totalContracts: 0, // This would need to be fetched from the database
+            totalContracts: 0,
             totalAmount: summary.total_charge || 0,
-            deliveredContracts: 0, // This would need to be fetched from the database
-            failedContracts: 0, // This would need to be fetched from the database
-            contracts: [], // This would need to be fetched from the database
+            deliveredContracts: 0,
+            failedContracts: 0,
+            contracts: [],
             summaryRecord: summary
         });
         setSummaryOpen(true);
     };
 
 
-    // Removed complete summary handlers
 
     const handlePreviewClose = () => {
         setPreviewOpen(false);
@@ -1599,7 +991,6 @@ const TransactionManagement = () => {
 
     const handlePreviewShare = async () => {
         try {
-            // Toggle the email share field. When closing, clear inputs and errors.
             if (showShareEmailField) {
                 setShowShareEmailField(false);
                 setShareEmail('');
@@ -1613,9 +1004,7 @@ const TransactionManagement = () => {
     };
 
     const handleSendEmailPdf = async () => {
-        // Basic email validation
         const email = (shareEmail || '').trim();
-        // Allow empty email to send-to-self via API fallback
         if (email) {
             const emailRegex = /[^\s@]+@[^\s@]+\.[^\s@]+/;
             if (!emailRegex.test(email)) {
@@ -1627,14 +1016,12 @@ const TransactionManagement = () => {
         try {
             if (!previewDoc) throw new Error('PDF is not ready');
             const blob = await pdf(previewDoc).toBlob();
-            // Convert Blob -> Base64 using FileReader to avoid large spread causing stack overflow
             const base64 = await new Promise((resolve, reject) => {
                 try {
                     const reader = new FileReader();
                     reader.onerror = () => reject(new Error('Failed to read PDF blob'));
                     reader.onload = () => {
                         const result = reader.result;
-                        // result is like: data:application/pdf;base64,JVBERi0x...
                         const commaIdx = typeof result === 'string' ? result.indexOf(',') : -1;
                         const b64 = commaIdx >= 0 ? result.substring(commaIdx + 1) : result;
                         resolve(b64);
@@ -1664,7 +1051,6 @@ const TransactionManagement = () => {
 
             showToast('Email sent successfully', 'success');
 
-            // After successful email, mark summary as "Issued a receipt" (status_id = 2)
             if (previewSummary?.id) {
                 try {
                     const updateRes = await fetch('/api/admin', {
@@ -1675,14 +1061,12 @@ const TransactionManagement = () => {
                             params: { summaryId: previewSummary.id, statusId: 2 }
                         })
                     });
-                    // Optimistically update UI if request accepted
                     if (updateRes.ok) {
                         setSummaries(prev => prev.map(s => s.id === previewSummary.id ? { ...s, status_id: 2, status_name: 'Issued a receipt' } : s));
                     }
                 } catch { }
             }
 
-            // Close share input after sending
             setShowShareEmailField(false);
             setShareEmail('');
             setShareEmailError('');
@@ -1696,7 +1080,6 @@ const TransactionManagement = () => {
             setPreviewLoading(true);
             setPreviewError('');
             setPreviewSummary(summary);
-            // Reuse fetch logic from handleGenerateSummaryReport but without auto-download
             const response = await fetch('/api/admin', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -1709,8 +1092,6 @@ const TransactionManagement = () => {
             const data = await response.json();
             const contracts = data.contracts || [];
             if (contracts.length === 0) throw new Error('No contracts found for this summary');
-
-            // Fetch proof of delivery for all contracts
             const proofOfDeliveryData = {};
             await Promise.all(contracts.map(async (contract) => {
                 try {
@@ -1767,13 +1148,11 @@ const TransactionManagement = () => {
 
     const handleGenerateSummaryReport = async (summary) => {
         try {
-            // Prevent multiple simultaneous PDF generations
             if (shouldRenderCombinedPDF) {
                 showToast('PDF generation in progress. Please wait...', 'warning');
                 return;
             }
 
-            // Reset previous PDF state
             setShouldRenderCombinedPDF(false);
             setCombinedPDFData(null);
 
@@ -1799,7 +1178,6 @@ const TransactionManagement = () => {
                 return;
             }
 
-            // Fetch proof of delivery for all contracts
             const proofOfDeliveryData = {};
             const podPromises = contracts.map(async (contract) => {
                 try {
@@ -1825,12 +1203,10 @@ const TransactionManagement = () => {
 
             await Promise.all(podPromises);
 
-            // Generate date range for the contracts
             const minDate = contracts.reduce((min, c) => c.created_at && c.created_at < min ? c.created_at : min, contracts[0].created_at);
             const maxDate = contracts.reduce((max, c) => c.created_at && c.created_at > max ? c.created_at : max, contracts[0].created_at);
             const dateRange = `${formatDate(minDate)} TO ${formatDate(maxDate)}`;
 
-            // Set the combined PDF data
             setCombinedPDFData({
                 contracts,
                 dateRange,
@@ -1838,15 +1214,12 @@ const TransactionManagement = () => {
                 proofOfDeliveryData
             });
 
-            // Trigger PDF generation
             setShouldRenderCombinedPDF(true);
 
-            // Auto-trigger download after a short delay to ensure PDF is ready
             setTimeout(() => {
                 if (pdfDownloadRef.current) {
                     pdfDownloadRef.current.click();
                 }
-                // Reset state after download
                 setTimeout(() => {
                     setShouldRenderCombinedPDF(false);
                     setCombinedPDFData(null);
@@ -1857,13 +1230,11 @@ const TransactionManagement = () => {
         } catch (error) {
             console.error('Error generating combined PDF:', error);
             showToast(error.message || 'Failed to generate combined PDF', 'error');
-            // Reset state on error
             setShouldRenderCombinedPDF(false);
             setCombinedPDFData(null);
         }
     };
 
-    // Sorting functions for Summary table
     const handleSummarySort = (field) => {
         const isAsc = summarySortField === field && summarySortDirection === 'asc';
         setSummarySortDirection(isAsc ? 'desc' : 'asc');
@@ -1950,7 +1321,6 @@ const TransactionManagement = () => {
         }
     };
 
-    // Render
     if (loading) return (<Box sx={{ p: 3, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '300px' }}><CircularProgress /><Typography sx={{ mt: 2 }}>Loading...</Typography></Box>);
     if (error) return (<Box sx={{ p: 3 }}><Typography color="error">{error}</Typography></Box>);
     return (
@@ -2109,7 +1479,6 @@ const TransactionManagement = () => {
                                     const total = Math.max(0, (delivery_charge + delivery_surcharge) - delivery_discount);
                                     const remarks = row.remarks || '';
 
-                                    // Format luggage owner name from contracts table fields
                                     const luggageOwner = row.owner_first_name || row.owner_middle_initial || row.owner_last_name
                                         ? `${row.owner_first_name || ''} ${row.owner_middle_initial || ''} ${row.owner_last_name || ''}`.replace(/  +/g, ' ').trim()
                                         : 'N/A';
@@ -2398,7 +1767,6 @@ const TransactionManagement = () => {
                                                 reader.onload = () => {
                                                     const dataUrl = reader.result;
                                                     setESignatureDataUrl(dataUrl);
-                                                    // Always rebuild from latest combinedPDFData; if absent, rebuild via previewSummary
                                                     if (combinedPDFData) {
                                                         setPreviewDoc(
                                                             <CombinedPDFTemplate
@@ -2411,7 +1779,6 @@ const TransactionManagement = () => {
                                                         );
                                                         setPreviewKey(prev => prev + 1);
                                                     } else if (previewSummary) {
-                                                        // In case user uploads before data is set, refetch lightweight rebuild using existing doc
                                                         setPreviewDoc(prev => (
                                                             <CombinedPDFTemplate
                                                                 {...prev?.props}
@@ -2444,7 +1811,6 @@ const TransactionManagement = () => {
                                                             );
                                                             setPreviewKey(prev => prev + 1);
                                                         } else {
-                                                            // Also clear from existing preview doc to handle subsequent uploads
                                                             setPreviewDoc(prev => (
                                                                 <CombinedPDFTemplate
                                                                     {...prev?.props}
@@ -3083,9 +2449,6 @@ const TransactionManagement = () => {
             </Dialog>
 
 
-            {/* Removed Complete Confirmation Dialog */}
-
-            {/* Summarize Confirmation Dialog */}
             <Dialog open={summarizeConfirmDialogOpen} onClose={handleCancelSummarize} maxWidth="md" fullWidth>
                 <DialogTitle>Confirm Summary Generation</DialogTitle>
                 <DialogContent dividers>

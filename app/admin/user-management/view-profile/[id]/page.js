@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Box, Typography, Paper, Grid, IconButton, Button, CardContent, Avatar, Tabs, Tab } from "@mui/material";
+import { Box, Typography, Paper, IconButton, CardContent, Avatar, Tabs, Tab } from "@mui/material";
 import { ChevronLeft as ChevronLeftIcon } from "@mui/icons-material";
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useTheme } from '@mui/material/styles';
@@ -65,21 +65,18 @@ export default function ViewProfile({ params }) {
       if (error) throw error;
       setUser(data);
     } catch (error) {
-      console.error('Error fetching user profile:', error);
       setError('Failed to load user profile');
     } finally {
       setLoading(false);
     }
   };
 
-  const containerStyles = {display: "flex", flexDirection: "column", gap: 4 };
+  const containerStyles = { display: "flex", flexDirection: "column", gap: 4 };
   const headerStyles = { width: "100%", maxWidth: "1000px", display: "flex", alignItems: "center", gap: 2 };
   const profileCardStyles = { borderRadius: 2, background: theme.palette.background.paper };
   const profileContentStyles = { p: 4 };
   const profileHeaderStyles = { display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 3 };
   const avatarStyles = { width: 100, height: 100, border: "2px solid", borderColor: "primary.main" };
-  const buttonContainerStyles = { display: "flex", flexDirection: "column", gap: 2 };
-  const buttonStyles = { borderRadius: 2, textTransform: "none", px: 3 };
   const tabsStyles = { borderBottom: 1, borderColor: 'divider', px: 2 };
   const tabContentStyles = { p: 3 };
   const infoSectionStyles = { display: 'flex', flexDirection: 'row', gap: 6, flexWrap: 'wrap' };
@@ -100,7 +97,6 @@ export default function ViewProfile({ params }) {
     fullName: `${user.first_name || ''} ${user.middle_initial || ''} ${user.last_name || ''}${user.suffix ? ` ${user.suffix}` : ''}`.replace(/  +/g, ' ').trim(),
     employeeId: user.id || '',
     role: user.role_id === 3 ? 'Contractor' : (user.profiles_roles?.role_name || ''),
-    role_id: user.role_id,
     dateRegistered: user.created_at ? new Date(user.created_at).toLocaleString() : '',
     lastUpdated: user.updated_at ? new Date(user.updated_at).toLocaleString() : 'Never',
     lastSignIn: user.last_sign_in_at ? new Date(user.last_sign_in_at).toLocaleString() : 'Never',

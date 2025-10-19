@@ -22,22 +22,13 @@ export default function Page() {
   const [snackbarMessage, setSnackbarMessage] = useState("");
   const [snackbarSeverity, setSnackbarSeverity] = useState("success");
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
-  const [incompleteDialogOpen, setIncompleteDialogOpen] = useState(false);
   const [isAlreadyVerified, setIsAlreadyVerified] = useState(false);
   const [form, setForm] = useState({ first_name: "", middle_initial: "", last_name: "", suffix: "", contact_number: "", birth_date: "", emergency_contact_name: "", emergency_contact_number: "", gov_id_number: "", gov_id_proof: "", gov_id_proof_back: "" });
 
-  // Suffix options
   const suffixes = ["", "Jr", "Jr.", "Sr", "Sr.", "II", "III", "IV", "V"];
-
-  // Add phone number formatting function
   const formatPhoneNumber = (value) => {
-    // If empty, return empty string
     if (!value) return '';
-    
-    // Remove all non-digit characters
     const phoneNumber = value.replace(/\D/g, '');
-    
-    // Only allow up to 10 digits after the country code
     let trimmedNumber = phoneNumber;
     if (trimmedNumber.startsWith('63')) {
       trimmedNumber = trimmedNumber.slice(2);
@@ -45,15 +36,12 @@ export default function Page() {
       trimmedNumber = trimmedNumber.slice(1);
     }
     trimmedNumber = trimmedNumber.slice(0, 10);
-    
-    // Format as +63 XXX XXX XXXX
     if (trimmedNumber.length === 0) return '+63 ';
     if (trimmedNumber.length <= 3) return `+63 ${trimmedNumber}`;
     if (trimmedNumber.length <= 6) return `+63 ${trimmedNumber.slice(0, 3)} ${trimmedNumber.slice(3)}`;
     return `+63 ${trimmedNumber.slice(0, 3)} ${trimmedNumber.slice(3, 6)} ${trimmedNumber.slice(6)}`;
   };
 
-  // Add onFocus handler for phone number
   const handlePhoneFocus = () => {
     if (!form.contact_number) {
       setForm(prev => ({ ...prev, contact_number: '+63' }));
@@ -73,7 +61,6 @@ export default function Page() {
       if (!session || !session.user) { setLoading(false); return; }
       const userEmail = session.user.email;
       
-      // Fetch all profile data including verification status
       const { data, error } = await supabase.from('profiles').select(`
         first_name, middle_initial, last_name, suffix, contact_number, birth_date, 
         emergency_contact_name, emergency_contact_number, gov_id_type, gov_id_number, 
@@ -96,23 +83,12 @@ export default function Page() {
         };
         setForm(cleanData);
         setOriginal({ ...cleanData, gov_id_type: data.gov_id_type });
-        if (data.gov_id_type !== null && data.gov_id_type !== undefined) {
+        if (data.gov_id_type != null) {
           setSelectedGovIdType(Number(data.gov_id_type));
         }
         
-        // Check if user is already verified
-        const isVerified = data.verify_status_id !== null && data.verify_status_id !== undefined;
+        const isVerified = data.verify_status_id != null;
         setIsAlreadyVerified(isVerified);
-        
-        // Log profile completion status for debugging
-        console.log('[ProfileEdit] Loaded profile data:', {
-          hasAllFields: Object.values(cleanData).every(value => value && value.trim() !== ''),
-          hasGovIdType: data.gov_id_type !== null && data.gov_id_type !== undefined,
-          hasGovIdImages: !!(data.gov_id_proof && data.gov_id_proof_back),
-          verifyStatusId: data.verify_status_id,
-          isAlreadyVerified: isVerified,
-          updatedAt: data.updated_at
-        });
       }
       setLoading(false);
     };
@@ -129,27 +105,24 @@ export default function Page() {
   const handleChange = (e) => { 
     const { name, value } = e.target; 
     if (name === 'middle_initial') {
-      // Only allow a single letter
       const singleLetter = value.slice(0, 1).toUpperCase();
       if (singleLetter.match(/^[A-Z]$/) || singleLetter === '') {
         setForm(prev => ({ ...prev, [name]: singleLetter }));
       }
     } else if (name === 'contact_number' || name === 'emergency_contact_number') {
-      // Handle phone number formatting
       const formatted = formatPhoneNumber(value);
       setForm(prev => ({ ...prev, [name]: formatted }));
     } else {
       setForm(prev => ({ ...prev, [name]: value }));
     }
   };
-  const handleKeyPress = (event) => { if (event.key === 'Enter') handleSave(); };
+  const handleKeyPress = (event) => event.key === 'Enter' && handleSave();
   const handleClear = () => { 
     setForm({ first_name: "", middle_initial: "", last_name: "", suffix: "", contact_number: "", birth_date: "", emergency_contact_name: "", emergency_contact_number: "", gov_id_number: "", gov_id_proof: "", gov_id_proof_back: "" });
     setSelectedGovIdType(null);
   };
   const triggerFileInput = (type) => type === 'front' ? fileInputRef.current?.click() : fileInputBackRef.current?.click();
 
-  // Helper to derive file name from signed URL
   const getFileNameFromUrl = (url) => {
     if (!url) return '';
     try {
@@ -162,33 +135,14 @@ export default function Page() {
     }
   };
 
-  // Check if form has unsaved changes
   const hasUnsavedChanges = () => {
     if (!original) return false;
-    
-    // Check form field changes
     const formChanges = Object.keys(form).some(key => form[key] !== (original[key] ?? ""));
-    
-    // Check gov_id_type changes
-    const originalGovIdType = original.gov_id_type !== null && original.gov_id_type !== undefined ? Number(original.gov_id_type) : null;
-    const govIdTypeChanges = selectedGovIdType !== originalGovIdType;
-    
-    const hasChanges = formChanges || govIdTypeChanges;
-    
-    console.log('Checking unsaved changes:', {
-      form,
-      original,
-      selectedGovIdType,
-      originalGovIdType,
-      formChanges,
-      govIdTypeChanges,
-      hasChanges
-    });
-    
-    return hasChanges;
+    const originalGovIdType = original.gov_id_type != null ? Number(original.gov_id_type) : null;
+    const govIdTypeChanges = selectedGovIdType != originalGovIdType;
+    return formChanges || govIdTypeChanges;
   };
 
-  // Handle back button click
   const handleBackClick = () => {
     if (hasUnsavedChanges()) {
       setConfirmDialogOpen(true);
@@ -197,7 +151,6 @@ export default function Page() {
     }
   };
 
-  // Handle confirmation dialog
   const handleConfirmLeave = () => {
     setConfirmDialogOpen(false);
     router.push("/airline/profile");
@@ -207,48 +160,17 @@ export default function Page() {
     setConfirmDialogOpen(false);
   };
 
-  // Check if profile is complete for automatic verification
   const checkProfileCompleteness = () => {
     const requiredFields = [
       'first_name', 'middle_initial', 'last_name', 'contact_number', 'birth_date',
       'emergency_contact_name', 'emergency_contact_number', 'gov_id_number'
     ];
-    
-    // Check if all required fields are filled (excluding optional suffix)
     const hasRequiredFields = requiredFields.every(field => 
       form[field] && form[field].trim() !== ''
     );
-    
-    // Check if government ID type is selected
-    const hasGovIdType = selectedGovIdType !== null && selectedGovIdType !== undefined;
-    
-    // Check if both government ID images are uploaded
+    const hasGovIdType = selectedGovIdType != null;
     const hasGovIdImages = form.gov_id_proof && form.gov_id_proof_back;
-    
-    const isComplete = hasRequiredFields && hasGovIdType && hasGovIdImages;
-    
-    console.log('[ProfileEdit] Profile completeness check:', {
-      hasRequiredFields,
-      hasGovIdType,
-      hasGovIdImages,
-      isComplete,
-      form: {
-        first_name: form.first_name,
-        middle_initial: form.middle_initial,
-        last_name: form.last_name,
-        contact_number: form.contact_number,
-        birth_date: form.birth_date,
-        emergency_contact_name: form.emergency_contact_name,
-        emergency_contact_number: form.emergency_contact_number,
-        gov_id_number: form.gov_id_number,
-        gov_id_proof: !!form.gov_id_proof,
-        gov_id_proof_back: !!form.gov_id_proof_back,
-        suffix: form.suffix // Optional field - not required for verification
-      },
-      selectedGovIdType
-    });
-    
-    return isComplete;
+    return hasRequiredFields && hasGovIdType && hasGovIdImages;
   };
 
   const handleSave = async () => {
@@ -258,14 +180,12 @@ export default function Page() {
     const userEmail = session.user.email;
     const updates = {};
     Object.keys(form).forEach(key => { if (form[key] !== (original ? original[key] : "")) { updates[key] = form[key]; } });
-    if (selectedGovIdType !== null && selectedGovIdType !== undefined) updates.gov_id_type = Number(selectedGovIdType);
+    if (selectedGovIdType != null) updates.gov_id_type = Number(selectedGovIdType);
     if (Object.keys(updates).length === 0) { setLoading(false); router.push("/airline/profile"); return; }
     updates.updated_at = new Date().toISOString();
     
-    // Check if profile is complete for automatic verification
     const isProfileComplete = checkProfileCompleteness();
     if (isProfileComplete) {
-      // Get the "Verified" status ID
       const { data: verifiedStatus } = await supabase
         .from('verify_status')
         .select('id')
@@ -274,7 +194,6 @@ export default function Page() {
       
       if (verifiedStatus) {
         updates.verify_status_id = verifiedStatus.id;
-        console.log('[ProfileEdit] Auto-verifying user due to complete profile');
       }
     }
     
@@ -286,7 +205,6 @@ export default function Page() {
         setSnackbarSeverity('success');
         setSnackbarOpen(true);
         
-        // Refresh the page and redirect after a short delay to show the success message
         setTimeout(() => {
           window.location.reload();
         }, 2000);
@@ -340,7 +258,7 @@ export default function Page() {
     }
   };
 
-  const menuProps = { PaperProps: { style: { maxHeight: 48 * 5 } } };
+  const menuProps = { PaperProps: { style: { maxHeight: 240 } } };
   const containerStyles = { p: 4, maxWidth: "1400px", mx: "auto" };
   const headerStyles = { display: "flex", justifyContent: "space-between", alignItems: "center", mb: 4 };
   const backButtonStyles = { display: "flex", alignItems: "center", gap: 2 };
@@ -432,7 +350,6 @@ export default function Page() {
         <Alert onClose={() => setSnackbarOpen(false)} severity={snackbarSeverity} sx={{ width: '100%' }}>{snackbarMessage}</Alert>
       </Snackbar>
 
-      {/* Confirmation Dialog */}
       <Dialog open={confirmDialogOpen} onClose={handleCancelLeave}>
         <DialogTitle>Unsaved Changes</DialogTitle>
         <DialogContent>

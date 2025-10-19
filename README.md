@@ -1,36 +1,61 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# EasyTrack Web Application
+
+A Next.js application for luggage tracking and management with multi-domain support.
 
 ## Getting Started
 
-First, run the development server:
-
+Install dependencies:
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Run the development server:
+```bash
+npm run dev
+```
 
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+Open [http://localhost:3000](http://localhost:3000) to view the application.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Domain Configuration
 
-## Learn More
+### Production Domains
+- Main Application: `https://ghe-easytrack.org`
+- Admin Portal: `https://admin.ghe-easytrack.org`
+- Airline Portal: `https://airline.ghe-easytrack.org`
 
-To learn more about Next.js, take a look at the following resources:
+### Development Domains
+- Main Application: `http://localhost:3000`
+- Admin Portal: `http://admin.localhost:3000`
+- Airline Portal: `http://airline.localhost:3000`
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Local Development Setup
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Add entries to your hosts file:
+```
+127.0.0.1 admin.localhost
+127.0.0.1 airline.localhost
+```
 
-## Deploy on Vercel
+## Environment Variables
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Set these environment variables for production:
+```bash
+NODE_ENV=production
+NEXT_PUBLIC_APP_URL=https://ghe-easytrack.org
+NEXT_PUBLIC_ADMIN_URL=https://admin.ghe-easytrack.org
+NEXT_PUBLIC_AIRLINE_URL=https://airline.ghe-easytrack.org
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## DNS Configuration
+
+Configure these DNS records:
+```
+ghe-easytrack.org         → Your server IP
+www.ghe-easytrack.org     → Your server IP
+admin.ghe-easytrack.org   → Your server IP
+airline.ghe-easytrack.org → Your server IP
+```
+
+## Deployment
+
+The application supports multi-domain routing with automatic redirects based on the accessed domain. Each portal (admin/airline) has its own domain and layout protection.

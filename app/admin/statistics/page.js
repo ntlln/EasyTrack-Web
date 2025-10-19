@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import {
-  Box, Typography, Card, CardContent, Grid, Divider, MenuItem, Select, LinearProgress, List, ListItem, ListItemText, useTheme, CircularProgress
+  Box, Typography, Card, CardContent, Grid, MenuItem, Select, LinearProgress, useTheme, CircularProgress
 } from '@mui/material';
 import { Gauge } from '@mui/x-charts/Gauge';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
@@ -10,15 +10,8 @@ import IconButton from '@mui/material/IconButton';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
-// Regions fetched from backend `pricing_region`
-// Shape: [{ id, region }]
-// We avoid hardcoding regions and rely on the server source of truth
-
-
-// Price-to-region lookup using actual pricing data
 let priceToRegionMap = new Map();
 
-// Function to fetch pricing data and build price-to-region mapping
 async function fetchPricingData() {
   try {
     const response = await fetch('/api/admin', {
@@ -27,15 +20,11 @@ async function fetchPricingData() {
       body: JSON.stringify({ action: 'getAllPricing' })
     });
     
-    if (!response.ok) {
-      console.error('Failed to fetch pricing data:', response.status);
-      return null;
-    }
+    if (!response.ok) return null;
     
     const data = await response.json();
     const pricingData = data.pricing || [];
     
-    // Build price-to-region mapping
     priceToRegionMap.clear();
     pricingData.forEach(item => {
       if (item.price && item.region) {
@@ -43,30 +32,21 @@ async function fetchPricingData() {
       }
     });
     
-    console.log('Pricing data loaded:', {
-      totalPricingEntries: pricingData.length,
-      priceToRegionMappings: priceToRegionMap.size
-    });
-    
     return pricingData;
   } catch (error) {
-    console.error('Error fetching pricing data:', error);
     return null;
   }
 }
 
-// Function to detect region based on delivery charge using actual pricing data
 function detectRegionFromPrice(deliveryCharge) {
   if (!deliveryCharge || deliveryCharge <= 0) return null;
   
   const price = Number(deliveryCharge);
   
-  // Direct lookup in pricing data
   if (priceToRegionMap.has(price)) {
     return priceToRegionMap.get(price);
   }
   
-  // If exact match not found, try to find closest price
   let minDifference = Infinity;
   let closestRegion = null;
   
@@ -78,7 +58,6 @@ function detectRegionFromPrice(deliveryCharge) {
     }
   }
   
-  // If we found a close match (within 10% difference), use it
   if (closestRegion && minDifference <= price * 0.1) {
     return closestRegion;
   }
@@ -224,50 +203,37 @@ export default function Page() {
     loadRegions();
   }, []);
 
-  // Process contracts to detect regions based on price
   useEffect(() => {
-    function processRegions() {
-      if (contracts.length === 0 || !pricingLoaded) return;
-      
-      setGeocodingLoading(true);
-      const newRegionData = {};
-      
-      contracts.forEach(contract => {
-        // Use delivery charge to detect region from pricing table
-        if (contract.delivery_charge) {
-          const detectedRegion = detectRegionFromPrice(contract.delivery_charge);
-          if (detectedRegion) {
-            newRegionData[contract.id] = detectedRegion;
-          }
-        }
-      });
-      
-      console.log(`Region processing complete: ${Object.keys(newRegionData).length}/${contracts.length} contracts mapped to regions`);
-      
-      setRegionData(newRegionData);
-      setGeocodingLoading(false);
-    }
+    if (contracts.length === 0 || !pricingLoaded) return;
     
-    processRegions();
+    setGeocodingLoading(true);
+    const newRegionData = {};
+    
+    contracts.forEach(contract => {
+      if (contract.delivery_charge) {
+        const detectedRegion = detectRegionFromPrice(contract.delivery_charge);
+        if (detectedRegion) {
+          newRegionData[contract.id] = detectedRegion;
+        }
+      }
+    });
+    
+    setRegionData(newRegionData);
+    setGeocodingLoading(false);
   }, [contracts, pricingLoaded]);
 
-  // Filtered contracts by date
   const filteredContracts = filterByDate(contracts, dateFilter);
-
-  // Statistics (fixed total per requirements)
   const totalDeliveries = 50;
   const successfulDeliveries = filteredContracts.filter(c => c.contract_status?.status_name === 'Delivered').length;
   const failedDeliveries = filteredContracts.filter(c => c.contract_status?.status_name === 'Delivery Failed').length;
   const successRate = totalDeliveries ? (successfulDeliveries / totalDeliveries) * 100 : 0;
 
-  // Average delivery time (in minutes)
   const deliveryTimes = filteredContracts
     .filter(c => c.pickup_at && c.delivered_at)
     .map(c => (new Date(c.delivered_at) - new Date(c.pickup_at)) / 60000)
     .filter(mins => mins > 0);
   const avgDeliveryTime = deliveryTimes.length ? Math.round(deliveryTimes.reduce((a, b) => a + b, 0) / deliveryTimes.length) : 0;
 
-  // Deliveries by region using fetched pricing regions and detected region names
   const deliveriesByRegion = React.useMemo(() => {
     return (regions || []).map(r => {
       const regionName = r.region;
@@ -276,7 +242,6 @@ export default function Page() {
     });
   }, [regions, filteredContracts, regionData]);
 
-  // Compute status counts for filtered contracts (covered by the filters)
   const statusCounts = React.useMemo(() => {
     const counts = {};
     statusList.forEach(s => { counts[s.id] = 0; });
@@ -288,7 +253,6 @@ export default function Page() {
     return counts;
   }, [filteredContracts]);
 
-  // Generate Gemini insight
   async function generateGeminiInsight() {
     setInsightLoading(true);
     setInsight("");
@@ -321,26 +285,12 @@ export default function Page() {
       }
       setInsight(data.insight || "No insight generated.");
     } catch (err) {
-      console.error('Error generating insight:', err);
       setInsight("Failed to generate insight. Please try again later.");
     }
     setInsightLoading(false);
   }
 
-  // Styles
   const containerStyles = { p: 3, bgcolor: theme.palette.background.default, minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center' };
-  const titleStyles = { mb: 3, color: theme.palette.primary.main, fontWeight: 'bold' };
-  const statBoxStyles = {
-    p: 2,
-    borderRadius: 2,
-    bgcolor: theme.palette.background.paper,
-    mb: 2,
-    boxShadow: isDark ? 2 : 0,
-    border: isDark ? `1px solid ${theme.palette.divider}` : undefined,
-    transition: 'background 0.3s',
-  };
-  const statNumberStyles = { fontSize: 32, fontWeight: 'bold' };
-  const statLabelStyles = { fontSize: 16, color: theme.palette.text.secondary };
   const cardStyles = {
     p: 2,
     bgcolor: theme.palette.background.paper,
@@ -348,10 +298,6 @@ export default function Page() {
     boxShadow: isDark ? 2 : 1,
     border: isDark ? `1px solid ${theme.palette.divider}` : undefined,
     transition: 'background 0.3s',
-  };
-  const regionListStyles = {
-    p: 2,
-    borderRadius: 2,
   };
 
   return (
@@ -390,14 +336,7 @@ export default function Page() {
       <Box sx={{ mb: 3, width: '100%', maxWidth: 1200 }}>
         <Grid container spacing={2} justifyContent="center">
           {statusList.map((status) => {
-            const statusFilterMap = {
-              1: 'available',
-              2: 'cancelled',
-              3: 'accepted',
-              4: 'transit',
-              5: 'delivered',
-              6: 'failed'
-            };
+            const statusFilterMap = ['', 'available', 'cancelled', 'accepted', 'transit', 'delivered', 'failed'];
             const filterValue = statusFilterMap[status.id];
             const value = totalDeliveries ? Math.round((statusCounts[status.id] || 0) / totalDeliveries * 100) : 0;
             return (
@@ -414,7 +353,6 @@ export default function Page() {
           })}
         </Grid>
       </Box>
-      {/* Success Rate Progress Bar with Details */}
       <Box sx={{ mb: 3, width: '100%', maxWidth: 1200 }}>
         <Card sx={cardStyles}>
           <CardContent>
@@ -435,7 +373,7 @@ export default function Page() {
                 {regionsLoading ? (
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                     <CircularProgress size={20} />
-                    <Typography>Loading regions…</Typography>
+                    <Typography>Loading regions...</Typography>
                   </Box>
                 ) : (
                   <Grid container spacing={2} justifyContent="center" alignItems="stretch">
@@ -458,7 +396,6 @@ export default function Page() {
           </CardContent>
         </Card>
       </Box>
-      {/* AI Powered Insights Section */}
       <Box sx={{ mb: 3, width: '100%', maxWidth: 1200 }}>
         <Card sx={cardStyles}>
           <CardContent>
@@ -519,7 +456,7 @@ export default function Page() {
       {geocodingLoading && (
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
           <CircularProgress size={20} />
-          <Typography>Processing regions using pricing table data...</Typography>
+          <Typography>Processing regions...</Typography>
         </Box>
       )}
     </Box>

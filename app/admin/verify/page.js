@@ -6,24 +6,20 @@ import { useState, useEffect } from "react";
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
 export default function Page() {
-    // Client and state setup
     const router = useRouter();
     const supabase = createClientComponentClient();
     const [email, setEmail] = useState("");
     const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'error' });
     const [isLoading, setIsLoading] = useState(false);
 
-    // Event handlers
     const handleCloseSnackbar = () => setSnackbar(prev => ({ ...prev, open: false }));
 
     const handleSendVerification = async (e) => {
         e.preventDefault();
-        console.log('[EGCAdminVerify] Send verification email');
         setIsLoading(true);
         setSnackbar({ open: false, message: "", severity: "error" });
 
         try {
-            // Determine the correct redirect URL based on environment
             const isProduction = process.env.NODE_ENV === 'production';
             const redirectUrl = isProduction 
                 ? 'https://www.admin.ghe-easytrack.org/verify'
@@ -39,21 +35,18 @@ export default function Page() {
             setSnackbar({ open: true, message: "Magic link sent! Check your email and click the link to sign in.", severity: "success" });
             setEmail("");
         } catch (error) {
-            console.log('Verification error:', error);
             setSnackbar({ open: true, message: error.message || "Failed to send verification email", severity: "error" });
         } finally {
             setIsLoading(false);
         }
     };
 
-    // Handle magic-link callback: exchange code for a session then redirect
     useEffect(() => {
         const handleExchangeFromUrl = async () => {
             try {
                 const url = new URL(window.location.href);
-
-                // If already signed in, go straight to dashboard
                 const existingSession = await supabase.auth.getSession();
+                
                 if (existingSession?.data?.session) {
                     router.replace('/admin');
                     return;
@@ -68,17 +61,14 @@ export default function Page() {
                 if (!hasCode) return;
 
                 setIsLoading(true);
-                // Use full URL so the SDK can parse params and use stored PKCE verifier
                 const { error } = await supabase.auth.exchangeCodeForSession(window.location.href);
                 if (error) throw error;
 
-                // Verify session is established before redirecting
                 const { data: { session } } = await supabase.auth.getSession();
                 if (!session) throw new Error('No active session after verification');
 
                 router.replace('/admin');
             } catch (err) {
-                console.log('Exchange error:', err);
                 setSnackbar({ open: true, message: err.message || 'Failed to verify magic link', severity: 'error' });
             } finally {
                 setIsLoading(false);
@@ -88,7 +78,6 @@ export default function Page() {
         handleExchangeFromUrl();
     }, [router, supabase]);
 
-    // Styles (same as EGC admin login page)
     const containerStyles = {
         display: "flex",
         width: "100%",
@@ -126,6 +115,7 @@ export default function Page() {
         position: "relative",
         zIndex: 1
     };
+
     const formStyles = { width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' };
     const inputFieldStyles = { width: "70%" };
     const buttonStyles = { 

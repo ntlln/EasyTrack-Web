@@ -7,7 +7,6 @@ export default function LoadingSpinner({ message = "Loading..." }) {
   const [show, setShow] = useState(false);
 
   useEffect(() => {
-    // Small delay to prevent multiple spinners
     const timer = setTimeout(() => setShow(true), 50);
     return () => clearTimeout(timer);
   }, []);
@@ -15,7 +14,7 @@ export default function LoadingSpinner({ message = "Loading..." }) {
   if (!show) return null;
 
   return (
-    <Fade in={true} timeout={100}>
+    <Fade in>
       <Box
         sx={{
           position: 'fixed',

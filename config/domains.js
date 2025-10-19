@@ -1,4 +1,3 @@
-// Domain configuration for different environments
 const domainConfig = {
   development: {
     baseUrl: 'http://localhost:3000',
@@ -47,12 +46,10 @@ export const isWwwDomain = (hostname) => {
 export const getRedirectUrl = (hostname, pathname) => {
   const config = getDomainConfig();
   
-  // Handle www redirect to main domain
   if (isWwwDomain(hostname)) {
     return `https://${config.mainDomain}${pathname}`;
   }
   
-  // Handle main domain with admin/airline paths
   if (isMainDomain(hostname)) {
     if (pathname.startsWith('/admin')) {
       return `${config.adminUrl}${pathname}`;
@@ -60,29 +57,24 @@ export const getRedirectUrl = (hostname, pathname) => {
     if (pathname.startsWith('/airline')) {
       return `${config.airlineUrl}${pathname}`;
     }
-    // For root path on main domain, redirect to admin (or create a landing page)
     if (pathname === '/') {
       return config.adminUrl;
     }
   }
   
   if (isAdminDomain(hostname)) {
-    // For admin domain, redirect to clean URL without /admin prefix
     if (pathname.startsWith('/admin')) {
       return `${config.adminUrl}${pathname.replace('/admin', '') || '/'}`;
     }
-    // For root path on admin domain, redirect to admin dashboard
     if (pathname === '/') {
       return `${config.adminUrl}/`;
     }
   }
   
   if (isAirlineDomain(hostname)) {
-    // For airline domain, redirect to clean URL without /airline prefix
     if (pathname.startsWith('/airline')) {
       return `${config.airlineUrl}${pathname.replace('/airline', '') || '/'}`;
     }
-    // For root path on airline domain, redirect to airline dashboard
     if (pathname === '/') {
       return `${config.airlineUrl}/`;
     }

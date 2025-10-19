@@ -1,6 +1,6 @@
 "use client";
 
-import { Box, Typography, Button, TextField, Checkbox, FormControlLabel, Snackbar, Alert, CircularProgress, IconButton, InputAdornment, Dialog, DialogTitle, DialogContent, DialogActions } from "@mui/material";
+import { Box, Typography, Button, TextField, Checkbox, Snackbar, Alert, CircularProgress, IconButton, InputAdornment, Dialog, DialogTitle, DialogContent, DialogActions } from "@mui/material";
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
@@ -10,10 +10,8 @@ import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import CloseIcon from '@mui/icons-material/Close';
 import TermsAndConditions from '../../components/TermsAndConditions';
 import PrivacyPolicy from '../../components/PrivacyPolicy';
-import LoadingSpinner from '../../components/LoadingSpinner';
 
 export default function Page() {
-    // Client and state setup
     const router = useRouter();
     const supabase = createClientComponentClient();
     const [email, setEmail] = useState("");
@@ -34,7 +32,6 @@ export default function Page() {
 
     useEffect(() => { setLoginStatus(getLoginStatus(email)); }, [email]);
 
-    // Redirect if already signed in and authorized; also listen to auth state changes
     useEffect(() => {
         let mounted = true;
         const run = async () => {
@@ -73,15 +70,13 @@ export default function Page() {
         return () => { mounted = false; sub?.subscription?.unsubscribe?.(); };
     }, [router, supabase]);
 
-    // Event handlers
     const handleCloseSnackbar = () => setSnackbar(prev => ({ ...prev, open: false }));
 
     const handleLogin = async (e) => {
         e.preventDefault();
-        console.log('[ContractorLogin] Submit login');
         setIsLoading(true);
         setSnackbar({ open: false, message: "", severity: "error" });
-        let flowComplete = false; // will be set true when we redirect or intentionally stop at a modal
+        let flowComplete = false;
 
         const status = getLoginStatus(email);
         if (!status.canAttempt) {
@@ -91,15 +86,12 @@ export default function Page() {
         }
 
         try {
-            console.log('[ContractorLogin] Calling signInWithPassword');
             const { data: existingUser, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
-            console.log('[ContractorLogin] Login attempt result:', { hasUser: !!existingUser?.user, signInError });
             
             if (signInError) {
                 if (signInError.message.includes('Email not confirmed')) {
                     setSnackbar({ open: true, message: "Please verify your email first.", severity: "info" });
                     setEmail(""); setPassword(""); setIsLoading(false);
-                    // Redirect to verify page
                     router.push("/airline/verify");
                     flowComplete = true;
                     return;
@@ -119,99 +111,78 @@ export default function Page() {
             }
 
             const userId = existingUser.user.id;
-            console.log('[ContractorLogin] Auth OK. userId=', userId);
             const { data: profile, error: profileErr } = await supabase.from("profiles").select("role_id, last_sign_in_at, profiles_status(status_name)").eq("id", userId).single();
-            console.log('[ContractorLogin] Fetched profile:', { profile, profileErr });
 
             if (!profile) { 
                 await supabase.auth.signOut(); 
-                console.log('No profile found, signing out.');
                 throw new Error("User profile not found."); 
             }
             
             if (profile.profiles_status?.status_name === "Deactivated") { 
                 await supabase.auth.signOut(); 
-                console.log('Account deactivated, signing out.');
                 throw new Error("This account has been deactivated."); 
             }
 
             if (profile.profiles_status?.status_name === "Archived") {
                 await supabase.auth.signOut();
-                console.log('Account archived, signing out.');
                 setSnackbar({ open: true, message: "Account not found.", severity: "error" });
                 setEmail(""); setPassword(""); setIsLoading(false);
                 return;
             }
 
-            console.log('User role_id:', profile.role_id);
-            // Allow airline role; optionally allow admin as well if required
             if (![3, 1].includes(Number(profile.role_id))) {
                 await supabase.auth.signOut();
-                console.log('Role not allowed, signing out.');
                 setSnackbar({ open: true, message: "Access denied: Only airline staff can log in here.", severity: "error" });
                 setEmail(""); setPassword(""); setIsLoading(false);
                 return;
             }
 
-            // First-time login: force password change
             if (!profile.last_sign_in_at) {
-                console.log('[ContractorLogin] First-time login. Forcing password change modal.');
                 resetLoginAttempts(email);
                 setForcePwOpen(true);
                 setIsLoading(false);
-                flowComplete = true; // we intentionally stop at modal; keep session
+                flowComplete = true;
                 return;
             }
 
             resetLoginAttempts(email);
             if (rememberMe) {
-                // Set a cookie to indicate remember me preference
                 document.cookie = `remember_me=true; path=/; max-age=${30 * 24 * 60 * 60}; secure; samesite=strict`;
             }
-            // Set Signed In status and last_sign_in_at
-            let signedInStatusId = null;
+            
             const { data: siRow } = await supabase
                 .from('profiles_status')
                 .select('id')
                 .eq('status_name', 'Signed In')
                 .single();
-            signedInStatusId = siRow?.id || null;
-            const updateOnLogin = { last_sign_in_at: new Date().toISOString() };
-            if (signedInStatusId) updateOnLogin.user_status_id = signedInStatusId;
-            const { error: updErr } = await supabase.from("profiles").update(updateOnLogin).eq("id", userId);
-            if (updErr) console.warn('[ContractorLogin] Failed to update last_sign_in/status:', updErr);
+            
+            const updateOnLogin = { 
+                last_sign_in_at: new Date().toISOString(),
+                ...(siRow?.id && { user_status_id: siRow.id })
+            };
+            
+            await supabase.from("profiles").update(updateOnLogin).eq("id", userId);
             await supabase.auth.refreshSession();
-            console.log('Redirecting to /airline/dashboard...');
             router.replace("/airline/");
             setTimeout(() => router.refresh(), 50);
             flowComplete = true;
         } catch (error) {
-            console.log('Login error:', error);
             setSnackbar({ open: true, message: error.message || "Login failed", severity: "error" });
             setEmail(""); setPassword("");
             try { await supabase.auth.signOut(); } catch (_) {}
         } finally { 
             setIsLoading(false);
-            // Safety: if we didn't navigate or intentionally stop, ensure no session remains
             if (!flowComplete) {
                 try {
                     const { data: { session } } = await supabase.auth.getSession();
-                    if (session) { await supabase.auth.signOut(); console.log('[ContractorLogin] Cleaned up lingering session after failed login.'); }
+                    if (session) { await supabase.auth.signOut(); }
                 } catch (_) {}
             }
         }
     };
 
-    const handleClickShowPassword = () => {
-        setShowPassword(!showPassword);
-    };
-
-    const handleMouseDownPassword = (event) => {
-        event.preventDefault();
-    };
-
-
-    // Styles
+    const handleClickShowPassword = () => setShowPassword(!showPassword);
+    const handleMouseDownPassword = (event) => event.preventDefault();
     const containerStyles = { 
         display: "flex", 
         width: "auto", 
@@ -222,14 +193,15 @@ export default function Page() {
     };
 
     useEffect(() => {
-        // Set background image after component mounts
         const container = document.querySelector('.login-container');
         if (container) {
-            container.style.backgroundImage = "url(/login-bg.png)";
-            container.style.backgroundSize = "80%";
-            container.style.backgroundRepeat = "no-repeat";
-            container.style.backgroundPosition = "center";
-            container.style.backgroundOpacity = "30%";
+            Object.assign(container.style, {
+                backgroundImage: "url(/login-bg.png)",
+                backgroundSize: "80%",
+                backgroundRepeat: "no-repeat",
+                backgroundPosition: "center",
+                backgroundOpacity: "30%"
+            });
         }
     }, []);
 
@@ -323,7 +295,6 @@ export default function Page() {
                 <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: '100%' }}>{snackbar.message}</Alert>
             </Snackbar>
 
-            {/* Force password change dialog for first-time login */}
             <Dialog
                 open={forcePwOpen}
                 onClose={(event, reason) => { if (reason !== 'backdropClick') setForcePwOpen(false); }}
@@ -392,28 +363,22 @@ export default function Page() {
                                 const { error: upErr } = await supabase.auth.updateUser({ password: newPassword });
                                 if (upErr) throw upErr;
 
-                                // Set Activated status and last_sign_in_at
-                                let activatedStatusId = null;
-                                const { data: statusRow, error: statusErr } = await supabase
+                                const { data: statusRow } = await supabase
                                     .from('profiles_status')
                                     .select('id')
                                     .eq('status_name', 'Activated')
                                     .single();
-                                if (!statusErr) activatedStatusId = statusRow?.id || null;
 
-                                const updatePayload = { last_sign_in_at: new Date().toISOString() };
-                                if (activatedStatusId) updatePayload.user_status_id = activatedStatusId;
-                                const { error: profileUpdateErr } = await supabase
-                                    .from('profiles')
-                                    .update(updatePayload)
-                                    .eq('id', userId);
-                                if (profileUpdateErr) throw profileUpdateErr;
-
+                                const updatePayload = { 
+                                    last_sign_in_at: new Date().toISOString(),
+                                    ...(statusRow?.id && { user_status_id: statusRow.id })
+                                };
+                                
+                                await supabase.from('profiles').update(updatePayload).eq('id', userId);
                                 setSnackbar({ open: true, message: 'Password updated successfully.', severity: 'success' });
                                 setForcePwOpen(false);
                                 router.replace('/airline/');
                             } catch (err) {
-                                console.error('[ContractorLogin] Password update error:', err);
                                 setSnackbar({ open: true, message: err.message || 'Failed to update password', severity: 'error' });
                             } finally {
                                 setIsPwUpdating(false);
@@ -425,7 +390,6 @@ export default function Page() {
                 </DialogActions>
             </Dialog>
 
-            {/* Terms and Conditions Modal */}
             <Dialog open={openTerms} onClose={() => setOpenTerms(false)} fullWidth maxWidth="md">
                 <DialogTitle sx={{ position: 'relative', pr: 6 }}>
                     Terms and Conditions
@@ -442,7 +406,6 @@ export default function Page() {
                 </DialogContent>
             </Dialog>
 
-            {/* Privacy Policy Modal */}
             <Dialog open={openPrivacy} onClose={() => setOpenPrivacy(false)} fullWidth maxWidth="md">
                 <DialogTitle sx={{ position: 'relative', pr: 6 }}>
                     Privacy Policy

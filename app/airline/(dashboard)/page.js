@@ -8,38 +8,27 @@ import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useEffect, useState } from 'react';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
-import AssignmentIcon from '@mui/icons-material/Assignment';
 import MyLocationIcon from '@mui/icons-material/MyLocation';
-import BarChartIcon from '@mui/icons-material/BarChart';
 import SupportAgentIcon from '@mui/icons-material/SupportAgent';
-import PaymentIcon from '@mui/icons-material/Payment';
 import WarningIcon from '@mui/icons-material/Warning';
 import LoadingSpinner from '../../components/LoadingSpinner';
 
 export default function Page() {
-  // Theme and client setup
   const theme = useTheme();
-  const isDark = theme.palette.mode === "dark";
   const router = useRouter();
   const supabase = createClientComponentClient();
 
-  // Verification state
   const [isVerified, setIsVerified] = useState(false);
   const [verificationLoading, setVerificationLoading] = useState(true);
   const [showVerificationMessage, setShowVerificationMessage] = useState(false);
 
-  // Dashboard cards configuration
   const cards = [
     { title: "Profile", route: "/airline/profile", icon: AccountCircleIcon, requiresVerification: false },
     { title: "Luggage Tracking", route: "/airline/luggage-tracking", icon: MyLocationIcon, requiresVerification: false },
     { title: "Booking", route: "/airline/booking", icon: LocalShippingIcon, requiresVerification: true },
-    // { title: "Delivery History & Reports", route: "/airline/history-and-reports", icon: AssignmentIcon },
-    // { title: "Statistics", route: "/airline/statistics", icon: BarChartIcon },
     { title: "Message Center", route: "/airline/chat-support", icon: SupportAgentIcon, requiresVerification: false },
-    // { title: "Payments", route: "/airline/payments", icon: PaymentIcon },
   ];
 
-  // Check verification status
   useEffect(() => {
     const checkVerification = async () => {
       try {
@@ -54,14 +43,7 @@ export default function Page() {
 
         const verified = profile?.verify_status?.status_name === 'Verified';
         setIsVerified(verified);
-        
-        console.log('[ContractorDashboard] Verification status:', {
-          verifyStatusId: profile?.verify_status_id,
-          statusName: profile?.verify_status?.status_name,
-          isVerified: verified
-        });
       } catch (error) {
-        console.error('[ContractorDashboard] Error checking verification:', error);
         setIsVerified(false);
       } finally {
         setVerificationLoading(false);
@@ -71,29 +53,17 @@ export default function Page() {
     checkVerification();
   }, [supabase]);
 
-  // Styles
-  const titleStyles = { mb: 4 };
-  const cardStyles = { 
-    height: "100%", 
-    minHeight: "200px",
-    width: "100%",
-    maxWidth: "300px",
-    transition: "all 0.3s ease-in-out"
-  };
-  const linkStyles = { textDecoration: "none", width: "100%" };
-  const iconStyles = { fontSize: 40, color: "primary.main", mb: 2 };
-
-  // Show loading spinner while checking verification
   if (verificationLoading) {
     return <LoadingSpinner />;
   }
 
   return (
     <Box>
-      <Box sx={titleStyles}><Typography variant="h4" color="primary.main" fontWeight="bold">Dashboard</Typography></Box>
+      <Typography variant="h4" color="primary.main" fontWeight="bold" sx={{ mb: 4 }}>
+        Dashboard
+      </Typography>
       
-      {/* Verification Status Alert */}
-      {!verificationLoading && !isVerified && (
+      {!isVerified && (
         <Alert severity="warning" sx={{ mb: 3 }}>
           <Typography variant="body2">
             <strong>Account Not Verified:</strong> Complete your profile verification to access all dashboard features.
@@ -101,28 +71,18 @@ export default function Page() {
         </Alert>
       )}
       
-      <Box sx={{
-        display: 'flex',
-        flexWrap: 'wrap',
-        gap: 3,
-        justifyContent: { xs: 'center', sm: 'flex-start' },
-        alignItems: 'stretch',
-        width: '100%',
-        maxWidth: '1200px',
-        mx: 'auto',
-        px: { xs: 2, sm: 0 }
-      }}>
+      <Grid container spacing={3}>
         {cards.map((card, index) => {
           const isDisabled = card.requiresVerification && !isVerified;
           const cardContent = (
             <Card sx={{ 
-              ...cardStyles, 
+              height: "100%", 
+              width: "35vh",
               cursor: isDisabled ? 'not-allowed' : 'pointer',
               opacity: isDisabled ? 0.5 : 1,
               '&:hover': isDisabled ? {} : { 
                 transform: 'scale(1.02)', 
-                boxShadow: 6,
-                transition: 'all 0.3s ease-in-out' 
+                transition: 'transform 0.2s ease-in-out' 
               }
             }}>
               <CardContent 
@@ -131,13 +91,11 @@ export default function Page() {
                   display: 'flex', 
                   flexDirection: 'column', 
                   alignItems: 'center', 
-                  justifyContent: 'center',
-                  p: 3,
-                  textAlign: 'center'
+                  justifyContent: 'center' 
                 }}
                 onClick={isDisabled ? () => setShowVerificationMessage(true) : undefined}
               >
-                <card.icon sx={{ ...iconStyles, opacity: isDisabled ? 0.5 : 1 }} />
+                <card.icon sx={{ fontSize: 40, color: "primary.main", mb: 2, opacity: isDisabled ? 0.5 : 1 }} />
                 <Typography variant="h6" color="primary.main" fontWeight="bold" textAlign="center">
                   {card.title}
                 </Typography>
@@ -151,28 +109,17 @@ export default function Page() {
           );
 
           return (
-            <Box 
-              key={index}
-              sx={{
-                flex: '1 1 auto',
-                minWidth: { xs: '280px', sm: '250px', md: '280px' },
-                maxWidth: { xs: '100%', sm: '300px' },
-                width: { xs: '100%', sm: 'auto' }
-              }}
-            >
-              {isDisabled ? (
-                cardContent
-              ) : (
-                <Link href={card.route} style={linkStyles}>
+            <Grid item xs={12} sm={6} md={4} key={index}>
+              {isDisabled ? cardContent : (
+                <Link href={card.route} style={{ textDecoration: "none" }}>
                   {cardContent}
                 </Link>
               )}
-            </Box>
+            </Grid>
           );
         })}
-      </Box>
+      </Grid>
 
-      {/* Account Not Verified Message */}
       {showVerificationMessage && (
         <Box sx={{
           position: 'fixed',

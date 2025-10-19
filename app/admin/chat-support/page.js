@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Box, Typography, TextField, IconButton, InputAdornment, Paper, Avatar, Button, useTheme, Autocomplete, CircularProgress, Snackbar, Alert } from "@mui/material";
+import { Box, Typography, TextField, IconButton, InputAdornment, Paper, Avatar, useTheme, Autocomplete, CircularProgress, Snackbar, Alert } from "@mui/material";
 import { useSearchParams } from 'next/navigation';
 import SearchIcon from '@mui/icons-material/Search';
 import SendIcon from '@mui/icons-material/Send';
@@ -9,7 +9,6 @@ import MoreVertIcon from '@mui/icons-material/MoreVert';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
 export default function Page() {
-  // Theme and state setup
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
   const [message, setMessage] = useState("");
@@ -26,12 +25,9 @@ export default function Page() {
   const [conversationsLoading, setConversationsLoading] = useState(false);
   const [shouldAutoScroll, setShouldAutoScroll] = useState(false);
 
-  // Supabase client
   const supabase = createClientComponentClient();
   
-  // Refs for real-time subscriptions and auto-refresh
   const messagesSubscriptionRef = useRef(null);
-  const conversationsSubscriptionRef = useRef(null);
   const autoRefreshIntervalRef = useRef(null);
   const lastMessageTimeRef = useRef(null);
   const messagesEndRef = useRef(null);
@@ -40,7 +36,6 @@ export default function Page() {
   const selectedUserRef = useRef(null);
   const searchParams = useSearchParams();
 
-  // Keep refs in sync with state to avoid stale closures in realtime callbacks
   useEffect(() => {
     currentUserRef.current = currentUser;
   }, [currentUser]);
@@ -49,20 +44,17 @@ export default function Page() {
     selectedUserRef.current = selectedUser;
   }, [selectedUser]);
 
-  // Fetch current user and users on component mount
   useEffect(() => {
     fetchCurrentUser();
     fetchUsers();
   }, []);
 
-  // Fetch conversations when current user is loaded
   useEffect(() => {
     if (currentUser) {
       fetchConversations();
     }
   }, [currentUser]);
 
-  // Open conversation from URL param if provided
   useEffect(() => {
     if (!users.length) return;
     const id = searchParams?.get('openUser');
@@ -72,78 +64,54 @@ export default function Page() {
     }
   }, [users, searchParams]);
 
-  // Fetch messages when selected user changes
   useEffect(() => {
     if (selectedUser && currentUser) {
       fetchMessages();
-      // Mark messages as read when conversation is opened
       markMessagesAsRead();
-      // Don't auto-scroll when switching conversations
       setShouldAutoScroll(false);
     } else {
       setMessages([]);
-      // Reset last message time when no conversation is selected
       lastMessageTimeRef.current = null;
     }
   }, [selectedUser, currentUser]);
 
-  // Set up real-time subscriptions when current user is loaded
   useEffect(() => {
     if (currentUser) {
       setupRealtimeSubscriptions();
       startAutoRefresh();
     }
-
-    // Cleanup subscriptions and auto-refresh on unmount
     return () => {
       cleanupSubscriptions();
       stopAutoRefresh();
     };
   }, [currentUser]);
 
-  // Start auto-refresh when a conversation is selected
   useEffect(() => {
     if (selectedUser && currentUser) {
-      console.log('Conversation selected:', selectedUser.name);
-      // Update last message time for incremental refresh
       if (messages.length > 0) {
         lastMessageTimeRef.current = messages[messages.length - 1].created_at;
-        console.log('Updated last message time for auto-refresh:', lastMessageTimeRef.current);
-      } else {
-        console.log('No messages yet, will fetch all messages on next auto-refresh');
       }
     }
   }, [selectedUser, currentUser, messages]);
 
-  // Auto-scroll to bottom when messages change
   useEffect(() => {
-    // Only auto-scroll if we should and there are messages
     if (shouldAutoScroll && messages.length > 0 && selectedUser) {
       scrollToBottom();
-      setShouldAutoScroll(false); // Reset the flag
+      setShouldAutoScroll(false);
     }
   }, [messages, shouldAutoScroll, selectedUser]);
 
-  // Scroll to bottom function
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
+  const scrollToBottom = () => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
 
-  // Setup real-time subscriptions
   const setupRealtimeSubscriptions = () => {
     if (!currentUser) return;
 
-    console.log('Setting up real-time subscriptions for user:', currentUser.id);
-
-    // Clean up any existing subscription first
     if (messagesSubscriptionRef.current) {
       supabase.removeChannel(messagesSubscriptionRef.current);
     }
 
-    // Subscribe to messages where current user is either sender or receiver (use two filters instead of OR)
     messagesSubscriptionRef.current = supabase
       .channel(`messages-${currentUser.id}-${Date.now()}`)
-      // INSERTs where current user is the sender
       .on(
         'postgres_changes',
         {
@@ -152,12 +120,8 @@ export default function Page() {
           table: 'messages',
           filter: `sender_id=eq.${currentUser.id}`
         },
-        (payload) => {
-          console.log('Real-time INSERT (as sender) received:', payload);
-          handleNewMessage(payload.new);
-        }
+        (payload) => handleNewMessage(payload.new)
       )
-      // INSERTs where current user is the receiver
       .on(
         'postgres_changes',
         {
@@ -166,12 +130,8 @@ export default function Page() {
           table: 'messages',
           filter: `receiver_id=eq.${currentUser.id}`
         },
-        (payload) => {
-          console.log('Real-time INSERT (as receiver) received:', payload);
-          handleNewMessage(payload.new);
-        }
+        (payload) => handleNewMessage(payload.new)
       )
-      // UPDATEs where current user is the sender
       .on(
         'postgres_changes',
         {
@@ -180,12 +140,8 @@ export default function Page() {
           table: 'messages',
           filter: `sender_id=eq.${currentUser.id}`
         },
-        (payload) => {
-          console.log('Real-time UPDATE (as sender) received:', payload);
-          handleMessageUpdate(payload.new);
-        }
+        (payload) => handleMessageUpdate(payload.new)
       )
-      // UPDATEs where current user is the receiver
       .on(
         'postgres_changes',
         {
@@ -194,63 +150,33 @@ export default function Page() {
           table: 'messages',
           filter: `receiver_id=eq.${currentUser.id}`
         },
-        (payload) => {
-          console.log('Real-time UPDATE (as receiver) received:', payload);
-          handleMessageUpdate(payload.new);
-        }
+        (payload) => handleMessageUpdate(payload.new)
       )
-      .subscribe((status) => {
-        console.log('Subscription status:', status);
-        if (status === 'SUBSCRIBED') {
-          console.log('Successfully subscribed to real-time messages');
-        } else if (status === 'CHANNEL_ERROR') {
-          console.error('Real-time subscription error');
-        }
-      });
-
-    console.log('Real-time subscriptions set up for user:', currentUser.id);
+      .subscribe();
   };
 
-  // Start auto-refresh mechanism
   const startAutoRefresh = () => {
     if (!currentUser) return;
-
-    console.log('Starting auto-refresh mechanism');
     
-    // Stop any existing auto-refresh
     stopAutoRefresh();
     
-    // Refresh conversations every 5 seconds
     autoRefreshIntervalRef.current = setInterval(() => {
-      console.log('Auto-refresh interval triggered');
       if (currentUser) {
-        console.log('Auto-refresh: Refreshing conversations and messages');
-        // Silently refresh conversations
         silentRefreshConversations();
-        
-        // Silently refresh messages if a conversation is active
         if (selectedUser) {
-          console.log('Auto-refresh: Refreshing messages for conversation:', selectedUser.name);
           silentRefreshMessages();
-        } else {
-          console.log('Auto-refresh: No conversation selected, skipping message refresh');
         }
-      } else {
-        console.log('Auto-refresh: No current user, skipping refresh');
       }
-    }, 5000); // 5 seconds
+    }, 5000);
   };
 
-  // Stop auto-refresh
   const stopAutoRefresh = () => {
     if (autoRefreshIntervalRef.current) {
-      console.log('Stopping auto-refresh mechanism');
       clearInterval(autoRefreshIntervalRef.current);
       autoRefreshIntervalRef.current = null;
     }
   };
 
-  // Silent refresh conversations (no loading state, no notifications)
   const silentRefreshConversations = async () => {
     if (!currentUser) return;
 
@@ -260,38 +186,28 @@ export default function Page() {
         const data = await response.json();
         const newConversations = data.conversations || [];
         
-        // Only update if there are actual changes
         setConversations(prev => {
           if (JSON.stringify(prev) !== JSON.stringify(newConversations)) {
-            console.log('Auto-refresh: Conversations updated');
             return newConversations;
           }
           return prev;
         });
       }
     } catch (error) {
-      console.log('Auto-refresh: Error refreshing conversations:', error);
+      // Silent error handling
     }
   };
 
-  // Silent refresh messages (no loading state, no notifications)
   const silentRefreshMessages = async () => {
     if (!currentUser || !selectedUser) {
-      // Reset last message time when no conversation is selected
       lastMessageTimeRef.current = null;
       return;
     }
 
     try {
-      console.log('Auto-refresh: Checking for new messages...');
-      
-      // Use incremental refresh if we have a last message time
       let url = `/api/admin?action=messages&senderId=${currentUser.id}&receiverId=${selectedUser.id}`;
       if (lastMessageTimeRef.current) {
         url += `&after=${encodeURIComponent(lastMessageTimeRef.current)}`;
-        console.log('Auto-refresh: Using incremental fetch after:', lastMessageTimeRef.current);
-      } else {
-        console.log('Auto-refresh: Fetching all messages (no last message time)');
       }
       
       const response = await fetch(url);
@@ -299,156 +215,95 @@ export default function Page() {
         const data = await response.json();
         const newMessages = data.messages || [];
         
-        console.log('Auto-refresh: Response received, messages count:', newMessages.length);
-        
         if (newMessages.length > 0) {
-          console.log('Auto-refresh: Found new messages:', newMessages.length);
-          console.log('New messages:', newMessages);
-          
-          // Filter messages to ensure they belong to current conversation (bidirectional)
           const filteredNewMessages = newMessages.filter(msg => 
             (msg.sender_id === currentUser.id && msg.receiver_id === selectedUser.id) ||
             (msg.sender_id === selectedUser.id && msg.receiver_id === currentUser.id)
           );
           
-          console.log('Auto-refresh: Filtered new messages count:', filteredNewMessages.length);
-          
           if (filteredNewMessages.length > 0) {
-            // Update last message time
             lastMessageTimeRef.current = filteredNewMessages[filteredNewMessages.length - 1].created_at;
-            console.log('Auto-refresh: Updated last message time to:', lastMessageTimeRef.current);
             
-            // Add only new messages
             setMessages(prev => {
-              console.log('Auto-refresh: Current messages count:', prev.length);
               const existingIds = new Set(prev.map(msg => msg.id));
               const trulyNewMessages = filteredNewMessages.filter(msg => !existingIds.has(msg.id));
               
-              console.log('Auto-refresh: Truly new messages:', trulyNewMessages.length);
-              
               if (trulyNewMessages.length > 0) {
-                console.log('Auto-refresh: Adding new messages to chat:', trulyNewMessages.length);
-                
-                // Remove any temporary messages that might conflict
                 const filteredPrev = prev.filter(msg => !(msg.id && msg.id.startsWith('temp-')));
-                console.log('Auto-refresh: Filtered previous messages count:', filteredPrev.length);
-                
                 const updatedMessages = [...filteredPrev, ...trulyNewMessages];
-                console.log('Auto-refresh: Final messages count:', updatedMessages.length);
-                
-                // Enable auto-scroll for new messages from auto-refresh
                 setShouldAutoScroll(true);
-                
                 return updatedMessages;
               }
               return prev;
             });
             
-            // Mark messages as read if they're from the other user
             const messagesFromOtherUser = filteredNewMessages.filter(msg => msg.sender_id !== currentUser.id);
             if (messagesFromOtherUser.length > 0) {
-              console.log('Auto-refresh: Marking messages as read');
               markMessagesAsRead();
             }
-          } else {
-            console.log('Auto-refresh: No filtered new messages found');
           }
-        } else {
-          console.log('Auto-refresh: No new messages found');
         }
-      } else {
-        console.log('Auto-refresh: Failed to fetch messages, status:', response.status);
       }
     } catch (error) {
-      console.log('Auto-refresh: Error refreshing messages:', error);
+      // Silent error handling
     }
   };
 
-  // Cleanup subscriptions
   const cleanupSubscriptions = () => {
     if (messagesSubscriptionRef.current) {
-      console.log('Cleaning up message subscription');
       supabase.removeChannel(messagesSubscriptionRef.current);
       messagesSubscriptionRef.current = null;
     }
-    if (conversationsSubscriptionRef.current) {
-      supabase.removeChannel(conversationsSubscriptionRef.current);
-      conversationsSubscriptionRef.current = null;
-    }
   };
 
-  // Handle new message received
   const handleNewMessage = (newMessage) => {
-    console.log('New message received:', newMessage);
-    
     const curUser = currentUserRef.current;
     const selUser = selectedUserRef.current;
 
     if (!curUser || !selUser) return;
     
-    // Check if this message belongs to the current conversation
     const isCurrentConversation = 
       ((newMessage.sender_id === curUser.id && newMessage.receiver_id === selUser.id) ||
        (newMessage.sender_id === selUser.id && newMessage.receiver_id === curUser.id));
     
     if (isCurrentConversation) {
-      // Add message to current conversation immediately
       setMessages(prev => {
-        // Check if message already exists to avoid duplicates
         const exists = prev.some(msg => msg.id === newMessage.id);
-        if (exists) {
-          console.log('Message already exists, skipping duplicate');
-          return prev;
-        }
+        if (exists) return prev;
         
-        // Remove any temporary message with the same content (for sent messages)
         const filteredPrev = prev.filter(msg => !(msg.id && msg.id.startsWith('temp-') && msg.content === newMessage.content));
-        
-        console.log('Adding new message to conversation');
         return [...filteredPrev, newMessage];
       });
       
-      // Update last message time for auto-refresh
       lastMessageTimeRef.current = newMessage.created_at;
-      
-      // Enable auto-scroll for new messages
       setShouldAutoScroll(true);
       
-      // Mark message as read if it's from the other user
       if (newMessage.sender_id !== curUser.id) {
         markMessagesAsRead();
       }
       
-      // Ensure UI syncs by fetching latest messages silently
       silentRefreshMessages();
       
-      // Show notification if message is from other user
       if (newMessage.sender_id !== curUser.id) {
         showSnackbar(`New message from ${selUser.name}`, 'info');
       } else {
         showSnackbar(`Message sent to ${selUser.name}`, 'success');
       }
     } else if (newMessage.sender_id !== (currentUserRef.current?.id)) {
-      // Show notification for messages from other users in different conversations
       const sender = users.find(user => user.id === newMessage.sender_id);
       if (sender) {
         showSnackbar(`New message from ${sender.name}`, 'info');
       }
     }
 
-    // Refresh conversations list to update last message
     fetchConversations();
   };
 
-  // Handle message updates (e.g., read status)
   const handleMessageUpdate = (updatedMessage) => {
-    console.log('Message update received:', updatedMessage);
-
     const curUser = currentUserRef.current;
     const selUser = selectedUserRef.current;
     if (!curUser || !selUser) return;
     
-    // Only update if this message belongs to the current conversation
     const isCurrentConversation = 
       ((updatedMessage.sender_id === curUser.id && updatedMessage.receiver_id === selUser.id) ||
        (updatedMessage.sender_id === selUser.id && updatedMessage.receiver_id === curUser.id));
@@ -462,16 +317,10 @@ export default function Page() {
     }
   };
 
-  // Replace temporary message with real message (fallback)
   const replaceTempMessage = (tempId, realMessage) => {
-    setMessages(prev => 
-      prev.map(msg => 
-        msg.id === tempId ? realMessage : msg
-      )
-    );
+    setMessages(prev => prev.map(msg => msg.id === tempId ? realMessage : msg));
   };
 
-  // Mark messages as read
   const markMessagesAsRead = async () => {
     if (!selectedUser || !currentUser) return;
 
@@ -490,18 +339,14 @@ export default function Page() {
         }),
       });
 
-      if (!response.ok) {
-        console.error('Failed to mark messages as read');
-      } else {
-        // Refresh conversations to update unread counts
+      if (response.ok) {
         fetchConversations();
       }
     } catch (error) {
-      console.error('Error marking messages as read:', error);
+      // Silent error handling
     }
   };
 
-  // Fetch conversations
   const fetchConversations = async () => {
     if (!currentUser) return;
 
@@ -511,32 +356,26 @@ export default function Page() {
       if (response.ok) {
         const data = await response.json();
         setConversations(data.conversations || []);
-      } else {
-        console.error('Failed to fetch conversations');
       }
     } catch (error) {
-      console.error('Error fetching conversations:', error);
+      // Silent error handling
     } finally {
       setConversationsLoading(false);
     }
   };
 
-  // Fetch current user session
   const fetchCurrentUser = async () => {
     try {
       const response = await fetch('/api/admin?action=userSession');
       if (response.ok) {
         const data = await response.json();
         setCurrentUser(data.user);
-      } else {
-        console.error('Failed to fetch current user');
       }
     } catch (error) {
-      console.error('Error fetching current user:', error);
+      // Silent error handling
     }
   };
 
-  // Fetch users from profiles table
   const fetchUsers = async () => {
     try {
       setLoading(true);
@@ -571,75 +410,50 @@ export default function Page() {
       setUsers(formattedUsers);
       setFilteredUsers(formattedUsers);
     } catch (error) {
-      console.error('Error fetching users:', error);
       showSnackbar('Error fetching users', 'error');
     } finally {
       setLoading(false);
     }
   };
 
-  // Fetch messages between current user and selected user
   const fetchMessages = async () => {
     try {
-      console.log('Fetching messages for conversation:', selectedUser.name);
-      console.log('Current user ID:', currentUser.id);
-      console.log('Selected user ID:', selectedUser.id);
-      
-      // Reset last message time when switching conversations
       lastMessageTimeRef.current = null;
       
       const response = await fetch(`/api/admin?action=messages&senderId=${currentUser.id}&receiverId=${selectedUser.id}`);
       if (response.ok) {
         const data = await response.json();
         const messages = data.messages || [];
-        console.log('Fetched messages:', messages.length);
         
-        // Verify message filtering (bidirectional) - this should be redundant since API already filters
         const filteredMessages = messages.filter(msg => 
           (msg.sender_id === currentUser.id && msg.receiver_id === selectedUser.id) ||
           (msg.sender_id === selectedUser.id && msg.receiver_id === currentUser.id)
         );
         
-        console.log('Filtered messages count:', filteredMessages.length);
-        console.log('Message details:', filteredMessages.map(msg => ({
-          id: msg.id,
-          sender_id: msg.sender_id,
-          receiver_id: msg.receiver_id,
-          content: msg.content.substring(0, 50) + '...'
-        })));
-        
         setMessages(filteredMessages);
         
-        // Update last message time for auto-refresh
         if (filteredMessages.length > 0) {
           lastMessageTimeRef.current = filteredMessages[filteredMessages.length - 1].created_at;
-          console.log('Last message time updated:', lastMessageTimeRef.current);
         }
         
-        // Auto-scroll to bottom when messages are loaded
         setShouldAutoScroll(true);
       } else {
-        console.error('Failed to fetch messages');
         showSnackbar('Error fetching messages', 'error');
       }
     } catch (error) {
-      console.error('Error fetching messages:', error);
       showSnackbar('Error fetching messages', 'error');
     }
   };
 
-  // Send message
   const handleSend = async () => {
     if (!message.trim() || !selectedUser || !currentUser || sendingMessage) {
       return;
     }
 
     const messageContent = message.trim();
-    setMessage(""); // Clear input immediately for better UX
-    // Keep focus on the input
+    setMessage("");
     messageInputRef.current?.focus();
 
-    // Create a temporary message object for immediate display
     const tempMessage = {
       id: `temp-${Date.now()}`,
       sender_id: currentUser.id,
@@ -663,9 +477,8 @@ export default function Page() {
       }
     };
 
-    // Add temporary message immediately for instant feedback
     setMessages(prev => [...prev, tempMessage]);
-    setShouldAutoScroll(true); // Enable auto-scroll for sent message
+    setShouldAutoScroll(true);
 
     try {
       setSendingMessage(true);
@@ -687,35 +500,24 @@ export default function Page() {
 
       if (response.ok) {
         const data = await response.json();
-        console.log('Message sent successfully:', data.message);
-        
-        // Replace temporary message with real message immediately
         replaceTempMessage(tempMessage.id, data.message);
-        
         showSnackbar('Message sent successfully', 'success');
       } else {
         const errorData = await response.json();
         showSnackbar(errorData.error || 'Failed to send message', 'error');
-        // Remove temporary message if sending failed
         setMessages(prev => prev.filter(msg => msg.id !== tempMessage.id));
-        // Restore message if sending failed
         setMessage(messageContent);
       }
     } catch (error) {
-      console.error('Error sending message:', error);
       showSnackbar('Error sending message', 'error');
-      // Remove temporary message if sending failed
       setMessages(prev => prev.filter(msg => msg.id !== tempMessage.id));
-      // Restore message if sending failed
       setMessage(messageContent);
     } finally {
       setSendingMessage(false);
-      // Restore focus after sending completes
       messageInputRef.current?.focus();
     }
   };
 
-  // Handle Enter key press
   const handleKeyPress = (event) => {
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
@@ -723,70 +525,42 @@ export default function Page() {
     }
   };
 
-  // Filter users based on search query
   const handleSearchChange = (event, value) => {
     setSearchQuery(value);
-    
-    if (!value) {
-      setFilteredUsers(users);
-      return;
-    }
-
-    const filtered = users.filter(user => 
+    setFilteredUsers(value ? users.filter(user => 
       user.name.toLowerCase().includes(value.toLowerCase()) ||
       user.email.toLowerCase().includes(value.toLowerCase())
-    );
-    setFilteredUsers(filtered);
+    ) : users);
   };
 
-  // Handle user selection
   const handleUserSelect = (event, selectedUser) => {
     setSelectedUser(selectedUser);
-    setSearchQuery(selectedUser ? selectedUser.name : "");
+    setSearchQuery(selectedUser?.name || "");
   };
 
-  // Handle conversation selection
   const handleConversationSelect = (conversation) => {
     const user = users.find(u => u.id === conversation.id);
-    if (user) {
-      // If the same conversation is selected, just refresh messages and do nothing else
-      if (selectedUser && selectedUser.id === user.id) {
-        console.log('Same conversation selected, refreshing messages');
-        fetchMessages();
-        return;
-      }
-
-      console.log('Selecting conversation with:', user.name);
-      
-      // Clear current messages only when switching to a different conversation
-      setMessages([]);
-      lastMessageTimeRef.current = null;
-      
-      setSelectedUser(user);
+    if (!user) return;
+    
+    if (selectedUser?.id === user.id) {
+      fetchMessages();
+      return;
     }
+    
+    setMessages([]);
+    lastMessageTimeRef.current = null;
+    setSelectedUser(user);
   };
 
-  // Show snackbar
-  const showSnackbar = (message, severity = 'success') => {
-    setSnackbar({ open: true, message, severity });
-  };
+  const showSnackbar = (message, severity = 'success') => setSnackbar({ open: true, message, severity });
 
-  // Close snackbar
-  const handleSnackbarClose = () => {
-    setSnackbar(prev => ({ ...prev, open: false }));
-  };
+  const handleSnackbarClose = () => setSnackbar(prev => ({ ...prev, open: false }));
 
-  // Format message time
-  const formatMessageTime = (timestamp) => {
-    const date = new Date(timestamp);
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  };
+  const formatMessageTime = (timestamp) => new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-  // Format conversation time
   const formatConversationTime = (timestamp) => {
     const date = new Date(timestamp);
-    const now = new Date();
-    const diffInHours = (now - date) / (1000 * 60 * 60);
+    const diffInHours = (Date.now() - date.getTime()) / (1000 * 60 * 60);
     
     if (diffInHours < 24) {
       return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -797,45 +571,22 @@ export default function Page() {
     }
   };
 
-  // Get sender label for conversation
   const getSenderLabel = (conversation) => {
-    if (conversation.isOwnMessage) {
-      return 'You';
-    } else {
-      return conversation.name.split(' ')[0] || conversation.name;
-    }
+    return conversation.isOwnMessage ? 'You' : conversation.name.split(' ')[0] || conversation.name;
   };
 
-  // Check if message is from current user
-  const isOwnMessage = (message) => {
-    return message.sender_id === currentUser?.id;
-  };
+  const isOwnMessage = (message) => message.sender_id === currentUser?.id;
+  const isMessageRead = (message) => message.read_at !== null;
+  const isTempMessage = (message) => message.id && message.id.startsWith('temp-');
 
-  // Check if message is read
-  const isMessageRead = (message) => {
-    return message.read_at !== null;
-  };
+  const getAvatarForUserId = (userId) => users.find(u => u.id === userId)?.avatarUrl || null;
 
-  // Check if message is temporary (not yet saved to database)
-  const isTempMessage = (message) => {
-    return message.id && message.id.startsWith('temp-');
-  };
-
-  // Resolve avatar for a given user id from loaded users
-  const getAvatarForUserId = (userId) => {
-    const user = users.find(u => u.id === userId);
-    return user?.avatarUrl || null;
-  };
-
-  // Resolve avatar URL for a message: always show the SENDER's avatar
   const getMessageAvatarUrl = (msg) => {
     const curUser = currentUserRef.current;
     const selUser = selectedUserRef.current;
 
-    // Prefer expanded sender pfp if available
     if (msg.sender && msg.sender.pfp_id) return msg.sender.pfp_id;
 
-    // Fallbacks using known users based on sender_id
     if (curUser && msg.sender_id === curUser.id) {
       return getAvatarForUserId(curUser.id) || null;
     }
@@ -843,11 +594,9 @@ export default function Page() {
       return selUser.avatarUrl || getAvatarForUserId(selUser.id) || null;
     }
 
-    // Last resort: try lookup by sender_id in users list
     return getAvatarForUserId(msg.sender_id) || null;
   };
 
-  // Styles
   const containerStyles = { position: "absolute", top: 0, left: "72px", right: 0, bottom: 0, display: "flex", bgcolor: theme.palette.background.default };
   const sidebarStyles = { width: "350px", flex: "0 0 350px", flexShrink: 0, borderRight: "1px solid", borderColor: "divider", bgcolor: theme.palette.background.paper, display: "flex", flexDirection: "column", p: 2, gap: 2 };
   const searchFieldStyles = { bgcolor: theme.palette.background.default, borderRadius: 2 };

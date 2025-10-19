@@ -2,7 +2,7 @@
 
 import { useState, useContext, useEffect, useRef, Suspense } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { Box, Divider, List, ListItemButton, ListItemIcon, ListItemText, Collapse, Button, IconButton, useMediaQuery, Typography, Snackbar, Alert, Avatar, Tooltip } from "@mui/material";
+import { Box, Divider, List, ListItemButton, ListItemIcon, ListItemText, Collapse, Button, IconButton, Typography, Snackbar, Alert, Avatar, Tooltip } from "@mui/material";
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import GroupsIcon from '@mui/icons-material/Groups';
@@ -41,23 +41,20 @@ function AdminSidebarContent() {
     const router = useRouter();
     const pathname = usePathname();
     const supabase = createClientComponentClient();
-    const isMobile = useMediaQuery(theme.breakpoints.down('md'));
     const [chatUnreadCount, setChatUnreadCount] = useState(0);
     const chatUnreadIntervalRef = useRef(null);
     const [luggageAvailableCount, setLuggageAvailableCount] = useState(0);
     const luggageIntervalRef = useRef(null);
-    const prevUnreadRef = useRef(0);
     const didInitRef = useRef(false);
     const [toast, setToast] = useState({ open: false, title: '', message: '', severity: 'info', targetUserId: null });
     const [profile, setProfile] = useState(null);
     const [corporationName, setCorporationName] = useState('');
     const [isVerified, setIsVerified] = useState(false);
-    const [verificationStatus, setVerificationStatus] = useState(null);
+    const [verificationStatus, setVerificationStatus] = useState('');
     
     const prevUnreadByConvRef = useRef(new Map());
     const closeToast = () => setToast(prev => ({ ...prev, open: false }));
 
-    // Click outside handler
     useEffect(() => {
         const handleClickOutside = (event) => {
             const sidebar = document.querySelector('[data-sidebar]');
@@ -67,7 +64,6 @@ function AdminSidebarContent() {
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
-    // Load state from localStorage after hydration
     useEffect(() => {
         if (typeof window !== 'undefined') {
             const savedState = localStorage.getItem('adminSidebarTransactionsOpen');
@@ -77,12 +73,10 @@ function AdminSidebarContent() {
         }
     }, []);
 
-    // Save state to localStorage
     useEffect(() => {
         if (typeof window !== 'undefined') localStorage.setItem('adminSidebarTransactionsOpen', JSON.stringify(openPages));
     }, [openPages]);
 
-    // Navigation and auth handlers
     const handleClickPages = () => isMinimized ? setIsMinimized(false) : setOpenPages(!openPages);
     const handleNavigation = (route) => { router.push(route); setIsMinimized(true); };
     const isActive = (route) => {
@@ -92,11 +86,9 @@ function AdminSidebarContent() {
         return pathname === route || pathname.startsWith(route + "/");
     };
     const isDropdownActive = () => {
-        // Check if any transaction-related page is active
         return isActive("/admin/luggage-tracking") || isActive("/admin/luggage-management") || isActive("/admin/transaction-management");
     };
 
-    // Auth check
     useEffect(() => {
         const checkSession = async () => {
             const { data: { session } } = await supabase.auth.getSession();
@@ -105,7 +97,6 @@ function AdminSidebarContent() {
                 return;
             }
 
-            // Fetch profile data with role_id, corporation_id, and verification status
             const { data: profileData } = await supabase
                 .from('profiles')
                 .select(`
@@ -116,18 +107,10 @@ function AdminSidebarContent() {
                 .single();
             setProfile(profileData || { email: session.user.email });
             
-            // Set verification status
             const verified = profileData?.verify_status?.status_name === 'Verified';
             setIsVerified(verified);
             setVerificationStatus(profileData?.verify_status?.status_name || 'Not Verified');
-            
-            console.log('[AdminSidebar] Verification status:', {
-                verifyStatusId: profileData?.verify_status_id,
-                statusName: profileData?.verify_status?.status_name,
-                isVerified: verified
-            });
 
-            // Fetch corporation name if available
             if (profileData?.corporation_id) {
                 try {
                     const { data: corp } = await supabase
@@ -141,7 +124,6 @@ function AdminSidebarContent() {
                 setCorporationName('');
             }
 
-            // Start polling unread chat count
             const userId = session.user.id;
             const fetchUnread = async () => {
                 try {
@@ -150,7 +132,6 @@ function AdminSidebarContent() {
                         const data = await res.json();
                         const conversations = data.conversations || [];
                         const totalUnread = conversations.reduce((sum, c) => sum + (c.unreadCount || 0), 0);
-                        // Build map of unread by conversation and detect increases
                         const prevMap = prevUnreadByConvRef.current || new Map();
                         const increases = [];
                         let totalDelta = 0;
@@ -162,9 +143,7 @@ function AdminSidebarContent() {
                                 totalDelta += (cur - prev);
                             }
                         });
-                        // Show toast for increases (skip first init)
                         if (didInitRef.current && totalDelta > 0) {
-                            // Choose most recent among increased conversations
                             const mostRecent = increases.sort((a, b) => new Date(b.lastMessageTime) - new Date(a.lastMessageTime))[0];
                             if (mostRecent) {
                                 const label = `${mostRecent.name}${mostRecent.role ? ` - ${mostRecent.role}` : ''}`;
@@ -172,18 +151,15 @@ function AdminSidebarContent() {
                                 setToast({ open: true, title: label, message: `${mostRecent.lastMessage}${suffix}`.trim(), severity: 'info', targetUserId: mostRecent.id });
                             }
                         }
-                        // Update prev map
                         const nextMap = new Map();
                         conversations.forEach(c => nextMap.set(c.id, c.unreadCount || 0));
                         prevUnreadByConvRef.current = nextMap;
-                        prevUnreadRef.current = totalUnread;
                         setChatUnreadCount(totalUnread);
                         if (!didInitRef.current) didInitRef.current = true;
                     }
                 } catch (_) { /* ignore */ }
             };
 
-            // Luggage available counter (unassigned or status Available)
             const fetchLuggageAvailable = async () => {
                 try {
                     const res = await fetch('/api/admin?action=allContracts');
@@ -193,9 +169,9 @@ function AdminSidebarContent() {
                     const count = rows.reduce((sum, c) => {
                         try {
                             const statusName = (c.contract_status?.status_name || '').toString().toLowerCase();
-                            const isAvailable = statusName.includes('available'); // e.g., "Available for Pickup"
+                            const isAvailable = statusName.includes('available');
                             const isUnassigned = !c.delivery && !c.delivery_id && !c.delivery_personnel_id;
-                            const shouldCount = isAvailable && isUnassigned; // only count when both conditions are true
+                            const shouldCount = isAvailable && isUnassigned;
                             return sum + (shouldCount ? 1 : 0);
                         } catch { return sum; }
                     }, 0);
@@ -203,7 +179,6 @@ function AdminSidebarContent() {
                 } catch (_) { /* ignore */ }
             };
 
-            // initial fetch and interval
             fetchUnread();
             if (chatUnreadIntervalRef.current) clearInterval(chatUnreadIntervalRef.current);
             chatUnreadIntervalRef.current = setInterval(fetchUnread, 5000);
@@ -244,7 +219,7 @@ function AdminSidebarContent() {
                         .eq('id', userId);
                 }
             }
-        } catch (_) { /* ignore status update errors on logout */ }
+        } catch (_) { /* ignore */ }
         await supabase.auth.signOut();
         if (typeof window !== 'undefined') {
             Object.keys(localStorage).filter(key => key.startsWith('sb-') && key.endsWith('-auth-token')).forEach(key => localStorage.removeItem(key));
@@ -253,7 +228,6 @@ function AdminSidebarContent() {
         router.push("/admin/login");
     };
 
-    // Styles
     const activeStyles = { backgroundColor: mode === "light" ? "#f0f0f0" : "#333", color: theme.palette.primary.main, borderRadius: 1 };
     const sidebarStyles = { width: isMinimized ? "64px" : "280px", height: "100vh", bgcolor: "background.paper", display: "flex", flexDirection: "column", borderRight: "1px solid", borderColor: "divider", position: "fixed", dataSidebar: true, overflowY: 'auto', overflowX: 'hidden', transition: theme.transitions.create('width', { easing: theme.transitions.easing.sharp, duration: theme.transitions.duration.enteringScreen }), zIndex: 1200, '&::-webkit-scrollbar': { width: '8px', height: '0px' }, '&::-webkit-scrollbar-track': { background: 'transparent' }, '&::-webkit-scrollbar-thumb': { background: theme.palette.mode === 'light' ? '#ccc' : '#555', borderRadius: '4px' } };
     const headerStyles = { p: 1, display: "flex", justifyContent: "space-between", alignItems: "center", minHeight: "80px", position: "relative" };
@@ -263,7 +237,6 @@ function AdminSidebarContent() {
     const iconStyles = (route) => ({ color: isActive(route) ? theme.palette.primary.main : "primary.main", fontSize: 24 });
     const bottomSectionStyles = { p: 1, display: "flex", flexDirection: "column", gap: 1 };
     const buttonStyles = { textTransform: "none", minWidth: isMinimized ? 'auto' : undefined, px: isMinimized ? 1 : 2, justifyContent: isMinimized ? 'center' : 'flex-start', minHeight: 48, '& .MuiButton-startIcon': { margin: isMinimized ? 0 : undefined } };
-    const modeButtonStyles = { ...buttonStyles, '& .MuiTypography-root': { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontSize: '0.875rem', lineHeight: 1.2 } };
     const ROLE_NAME_BY_ID = { 1: 'Administrator', 2: 'Delivery Personnel', 3: 'Airline Personnel' };
     const transactionsButtonStyles = { 
         ...listItemStyles("/admin/transactions"),
@@ -279,8 +252,6 @@ function AdminSidebarContent() {
             </Box>
 
             <Divider />
-
-            {/* Avatar moved to bottom section above theme button */}
 
             <Box flexGrow={1}>
                 <List component="nav" sx={{ flexGrow: 1 }}>
@@ -474,13 +445,13 @@ function AdminSidebarContent() {
             <Box sx={bottomSectionStyles}>
 				{isMinimized ? (
 					<Box sx={{ display: 'flex', justifyContent: 'center', py: 1 }}>
-						<Avatar src={profile?.pfp_id || undefined} sx={{ width: 40, height: 40, bgcolor: 'primary.main', color: '#fff' }}>
+						<Avatar src={profile?.pfp_id} sx={{ width: 40, height: 40, bgcolor: 'primary.main', color: '#fff' }}>
 							{((profile?.first_name?.[0] || '') + (profile?.last_name?.[0] || '')).toUpperCase() || (profile?.email?.[0] || 'A').toUpperCase()}
 						</Avatar>
 					</Box>
 				) : (
 					<Box sx={{ display: 'flex', alignItems: 'center', px: 1, py: 1, gap: 1 }}>
-						<Avatar src={profile?.pfp_id || undefined} sx={{ bgcolor: 'primary.main', color: '#fff' }}>
+						<Avatar src={profile?.pfp_id} sx={{ bgcolor: 'primary.main', color: '#fff' }}>
 							{((profile?.first_name?.[0] || '') + (profile?.last_name?.[0] || '')).toUpperCase() || (profile?.email?.[0] || 'A').toUpperCase()}
 						</Avatar>
 						<Box sx={{ flex: 1, minWidth: 0 }}>

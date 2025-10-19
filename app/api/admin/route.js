@@ -6,15 +6,7 @@ import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from '@google/ge
 
 export const runtime = 'nodejs';
 
-// Validate API key
 const apiKey = process.env.GEMINI_API_KEY;
-if (!apiKey) {
-  console.error('GEMINI_API_KEY is not set in environment variables');
-} else {
-  console.log('GEMINI_API_KEY is set:', apiKey.substring(0, 5) + '...');
-}
-
-// Initialize Gemini API
 const genAI = new GoogleGenerativeAI(apiKey);
 
 export async function GET(request) {
@@ -22,18 +14,14 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url);
     const action = searchParams.get('action');
     const contractId = searchParams.get('contractId');
-
-    // Use a user-scoped client backed by the anon key and request cookies
     const supabase = createRouteHandlerClient({ cookies });
 
-    // Handle user session fetch for chat support
     if (action === 'userSession') {
       try {
         const authSupabase = createServerComponentClient({ cookies });
         const { data: { session }, error: sessionError } = await authSupabase.auth.getSession();
 
         if (sessionError) {
-          console.error('Session error:', sessionError);
           return NextResponse.json({ error: 'Session error' }, { status: 401 });
         }
 
@@ -56,7 +44,6 @@ export async function GET(request) {
           .single();
 
         if (profileError) {
-          console.error('Profile error:', profileError);
           return NextResponse.json({ error: 'Profile not found' }, { status: 404 });
         }
 
@@ -70,12 +57,10 @@ export async function GET(request) {
 
         return NextResponse.json({ user: userData });
       } catch (error) {
-        console.error('Error in GET /api/admin?action=userSession:', error);
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
       }
     }
 
-    // Handle messages listing between two users (bidirectional)
     if (action === 'messages') {
       try {
         const senderId = searchParams.get('senderId');
@@ -123,18 +108,15 @@ export async function GET(request) {
         const { data: messages, error } = await query;
 
         if (error) {
-          console.error('Error fetching messages:', error);
           return NextResponse.json({ error: error.message }, { status: 500 });
         }
 
         return NextResponse.json({ messages: messages || [] });
       } catch (error) {
-        console.error('Error in GET /api/admin?action=messages:', error);
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
       }
     }
 
-    // Handle recent conversations for a user
     if (action === 'conversations') {
       try {
         const userId = searchParams.get('userId');
@@ -176,7 +158,6 @@ export async function GET(request) {
           .order('created_at', { ascending: false });
 
         if (error) {
-          console.error('Error fetching conversations:', error);
           return NextResponse.json({ error: error.message }, { status: 500 });
         }
 
@@ -219,12 +200,10 @@ export async function GET(request) {
 
         return NextResponse.json({ conversations: formattedConversations });
       } catch (error) {
-        console.error('Error in GET /api/admin?action=conversations:', error);
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
       }
     }
 
-    // Handle logs request
     if (action === 'logs') {
       try {
         const page = parseInt(searchParams.get('page') || '1');
@@ -232,15 +211,9 @@ export async function GET(request) {
         const search = searchParams.get('search') || '';
         const type = searchParams.get('type') || 'all';
 
-        // Get project ref from env or URL
         const projectRef = process.env.NEXT_PUBLIC_SUPABASE_URL?.split('https://')[1]?.split('.')[0];
         if (!projectRef) throw new Error('Project ref not found in NEXT_PUBLIC_SUPABASE_URL');
 
-        // Debug logging
-        console.log('ProjectRef:', projectRef);
-        console.log('ServiceRoleKey:', process.env.SUPABASE_SERVICE_ROLE_KEY?.slice(0, 8) + '...');
-
-        // Build query params for the platform API
         const params = new URLSearchParams({
           source: 'postgres',
           limit: per_page.toString(),
@@ -250,9 +223,6 @@ export async function GET(request) {
         if (type !== 'all') params.append('event_message', type);
 
         const platformUrl = `https://api.supabase.com/v1/projects/${projectRef}/logs?${params.toString()}`;
-
-        // Debug logging
-        console.log('Platform URL:', platformUrl);
 
         const response = await fetch(platformUrl, {
           method: 'GET',
@@ -264,23 +234,15 @@ export async function GET(request) {
         });
 
         if (!response.ok) {
-          const errorText = await response.text();
-          console.error('Supabase Platform Logs API error:', {
-            status: response.status,
-            statusText: response.statusText,
-            error: errorText
-          });
           throw new Error(`Failed to fetch logs: ${response.status} ${response.statusText}`);
         }
 
         const data = await response.json();
-        // data.result is the array of logs, data.count is the total
         return NextResponse.json({
           logs: data.result || [],
           total: data.count || 0
         });
       } catch (error) {
-        console.error('Error in logs handler:', error);
         return NextResponse.json(
           { error: error.message || 'Failed to fetch logs' },
           { status: 500 }
@@ -288,7 +250,6 @@ export async function GET(request) {
       }
     }
 
-    // Handle getContract action for polling
     if (action === 'getContract') {
       const contractId = searchParams.get('contractId');
       const includeSummarized = searchParams.get('includeSummarized') === '1';
@@ -313,7 +274,6 @@ export async function GET(request) {
         `)
         .eq('id', contractId);
 
-      // Only exclude summarized when not explicitly included
       if (!includeSummarized) {
         query = query.is('summary_id', null);
       }
@@ -321,16 +281,6 @@ export async function GET(request) {
       const { data: contract, error: contractError } = await query.single();
 
       if (contractError) {
-        console.error('Error fetching contract for polling:', contractError);
-        
-        // Handle the specific "multiple (or no) rows returned" error
-        if (contractError.message && contractError.message.includes('multiple (or no) rows returned')) {
-          return NextResponse.json(
-            { error: 'Contract not found' },
-            { status: 404 }
-          );
-        }
-        
         return NextResponse.json(
           { error: 'Contract not found' },
           { status: 404 }
@@ -344,7 +294,6 @@ export async function GET(request) {
         );
       }
 
-      // Fetch status for this contract and attach
       let statusObj = null;
       if (contract.contract_status_id != null) {
         const { data: statusRow, error: statusError } = await supabase
@@ -353,15 +302,9 @@ export async function GET(request) {
           .eq('id', contract.contract_status_id)
           .single();
         
-        if (statusError) {
-          console.error('Error fetching contract status:', statusError);
-          statusObj = null;
-        } else {
-          statusObj = statusRow || null;
-        }
+        statusObj = statusError ? null : (statusRow || null);
       }
 
-      // Combine contract data with luggage from contract fields
       const contractWithLuggage = {
         ...contract,
         contract_status: statusObj,
@@ -377,7 +320,6 @@ export async function GET(request) {
       return NextResponse.json({ data: contractWithLuggage });
     }
 
-    // Handle audit logs fetch from audit_logs table
     if (action === 'audit-logs') {
       try {
         const { data: logs, error } = await supabase
@@ -415,7 +357,6 @@ export async function GET(request) {
       }
     }
 
-    // Handle contract location request
     if (contractId) {
       const { data: contract, error: contractError } = await supabase
         .from('contracts')
@@ -434,16 +375,6 @@ export async function GET(request) {
         .single();
 
       if (contractError) {
-        console.error('Error fetching contract:', contractError);
-        
-        // Handle the specific "multiple (or no) rows returned" error
-        if (contractError.message && contractError.message.includes('multiple (or no) rows returned')) {
-          return NextResponse.json(
-            { error: 'Contract not found' },
-            { status: 404 }
-          );
-        }
-        
         return NextResponse.json(
           { error: 'Contract not found' },
           { status: 404 }
@@ -457,7 +388,6 @@ export async function GET(request) {
         );
       }
 
-      // Fetch status for this contract and attach
       let statusObj = null;
       if (contract.contract_status_id != null) {
         const { data: statusRow, error: statusError } = await supabase
@@ -466,15 +396,9 @@ export async function GET(request) {
           .eq('id', contract.contract_status_id)
           .single();
         
-        if (statusError) {
-          console.error('Error fetching contract status:', statusError);
-          statusObj = null;
-        } else {
-          statusObj = statusRow || null;
-        }
+        statusObj = statusError ? null : (statusRow || null);
       }
 
-      // Combine contract data with luggage from contract fields
       const contractWithLuggage = {
         ...contract,
         contract_status: statusObj,
@@ -490,7 +414,6 @@ export async function GET(request) {
       return NextResponse.json({ data: contractWithLuggage });
     }
 
-    // Handle proof of pickup fetch
     if (action === 'getProofOfPickup') {
       const contractIdParam = searchParams.get('contractId');
       if (!contractIdParam) {
@@ -514,7 +437,6 @@ export async function GET(request) {
       return NextResponse.json({ proof_of_pickup: data.proof_of_pickup, pickup_timestamp: data.pickup_at || null });
     }
 
-    // Handle delivery personnel request
     if (action === 'delivery-personnel') {
       const { data: deliveryPersonnel, error } = await supabase
         .from('profiles')
@@ -539,7 +461,6 @@ export async function GET(request) {
       return NextResponse.json({ data: deliveryPersonnel });
     }
 
-    // Handle all contracts for statistics (no summary_id filter)
     if (action === 'allContracts') {
       const { data: contracts, error: contractError } = await supabase
         .from('contracts')
@@ -588,7 +509,6 @@ export async function GET(request) {
       return NextResponse.json({ data: contractsWithLuggage });
     }
 
-    // Handle contracts request (default)
     const { data: contracts, error: contractError } = await supabase
       .from('contracts')
       .select(`
@@ -616,13 +536,11 @@ export async function GET(request) {
       return NextResponse.json({ data: [] });
     }
 
-    // Fetch all contract status rows once and build a map
     const { data: allStatuses } = await supabase
       .from('contract_status')
       .select('id, status_name');
     const statusById = new Map((allStatuses || []).map(s => [s.id, s]));
 
-    // Build final contracts with luggage data from contract fields
     const contractsWithLuggage = contracts.map(c => ({
       ...c,
       contract_status: statusById.get(c.contract_status_id) || null,
@@ -647,7 +565,6 @@ export async function POST(req) {
   try {
     const contentType = req.headers.get('content-type') || '';
 
-    // Handle multipart form data (file uploads)
     if (contentType.includes('multipart/form-data')) {
       const formData = await req.formData();
       const file = formData.get('file');
@@ -658,50 +575,39 @@ export async function POST(req) {
         return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
       }
 
-      // Convert file to buffer
       const bytes = await file.arrayBuffer();
       const buffer = Buffer.from(bytes);
-
-      // Use a user-scoped client for storage operations as well
       const supabase = createRouteHandlerClient({ cookies });
 
-      // Upload file to Supabase storage with upsert
       const { data, error } = await supabase
         .storage
         .from(bucket)
         .upload(path, buffer, {
           contentType: file.type,
           cacheControl: '3600',
-          upsert: true // Allow overwriting existing files
+          upsert: true
         });
 
       if (error) {
-        console.error('Error uploading file:', error);
         return NextResponse.json({ error: error.message }, { status: 500 });
       }
 
-      // Get signed URL for the uploaded file
       const { data: { signedUrl }, error: signedUrlError } = await supabase
         .storage
         .from(bucket)
-        .createSignedUrl(path, 31536000); // URL valid for 1 year
+        .createSignedUrl(path, 31536000);
 
       if (signedUrlError) {
-        console.error('Error getting signed URL:', signedUrlError);
         return NextResponse.json({ error: signedUrlError.message }, { status: 500 });
       }
 
       return NextResponse.json({ signedUrl });
     }
 
-    // Handle JSON data (other actions)
     const body = await req.json();
     const { action, params } = body;
-
-    // Use a user-scoped client backed by the anon key and request cookies
     const supabase = createRouteHandlerClient({ cookies });
 
-    // Handle sending a new message
     if (action === 'sendMessage') {
       try {
         const { senderId, receiverId, content } = params || {};
@@ -746,18 +652,15 @@ export async function POST(req) {
           .single();
 
         if (error) {
-          console.error('Error inserting message:', error);
           return NextResponse.json({ error: error.message }, { status: 500 });
         }
 
         return NextResponse.json({ message });
       } catch (error) {
-        console.error('Error in POST /api/admin (sendMessage):', error);
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
       }
     }
 
-    // Handle marking messages as read
     if (action === 'markRead') {
       try {
         const { receiverId, senderId } = params || {};
@@ -776,35 +679,27 @@ export async function POST(req) {
           .is('read_at', null);
 
         if (error) {
-          console.error('Error updating messages:', error);
           return NextResponse.json({ error: error.message }, { status: 500 });
         }
 
         return NextResponse.json({ success: true });
       } catch (error) {
-        console.error('Error in POST /api/admin (markRead):', error);
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
       }
     }
 
-    // Handle logs request
     if (action === 'logs') {
       const { page = 1, per_page = 10, search, type } = params;
 
-      // Fetch logs from Supabase Postgres
       const { data: logs, error } = await supabase
         .from('pg_stat_activity')
         .select('*')
         .order('query_start', { ascending: false });
 
       if (error) {
-        console.error('Error fetching Postgres logs:', error);
         throw new Error(`Failed to fetch logs: ${error.message}`);
       }
 
-      console.log('Received logs:', { count: logs?.length || 0 });
-
-      // Filter logs based on search term and type
       let filteredLogs = logs || [];
       if (search) {
         const searchLower = search.toLowerCase();
@@ -816,7 +711,6 @@ export async function POST(req) {
         filteredLogs = filteredLogs.filter(log => log.type === type);
       }
 
-      // Apply pagination
       const start = (page - 1) * per_page;
       const end = start + per_page;
       const paginatedLogs = filteredLogs.slice(start, end);
@@ -827,47 +721,25 @@ export async function POST(req) {
       });
     }
 
-    // Handle payment creation
     if (action === 'createPayment') {
       const { invoice_number, summary_stat, created_at, due_date, total_charge, invoice_image, invoice_id } = params;
 
-      console.log('Payment creation params:', {
-        invoice_number,
-        summary_stat,
-        created_at,
-        due_date,
-        total_charge,
-        invoice_image,
-        invoice_id
-      });
-
       if (!invoice_number || !summary_stat || !created_at || !due_date || !total_charge || typeof invoice_image === 'undefined') {
-        console.log('Missing fields:', {
-          invoice_number: !invoice_number,
-          summary_stat: !summary_stat,
-          created_at: !created_at,
-          due_date: !due_date,
-          total_charge: !total_charge,
-          invoice_image: typeof invoice_image === 'undefined'
-        });
         return NextResponse.json({ error: 'Missing required payment fields' }, { status: 400 });
       }
 
       try {
-        // Check if payment with this id already exists
         const { data: existingPayment, error: checkError } = await supabase
           .from('payment')
           .select('id')
           .eq('id', invoice_number)
           .single();
 
-        if (checkError && checkError.code !== 'PGRST116') { // PGRST116 is "no rows returned"
-          console.error('Error checking existing payment:', checkError);
+        if (checkError && checkError.code !== 'PGRST116') {
           return NextResponse.json({ error: checkError.message }, { status: 500 });
         }
 
         if (existingPayment) {
-          // Update existing payment
           const { data, error } = await supabase
             .from('payment')
             .update({
@@ -882,13 +754,11 @@ export async function POST(req) {
             .single();
 
           if (error) {
-            console.error('Error updating payment:', error);
             return NextResponse.json({ error: error.message }, { status: 500 });
           }
 
           return NextResponse.json({ data });
         } else {
-          // Create new payment
           const { data, error } = await supabase
             .from('payment')
             .insert({
@@ -904,19 +774,16 @@ export async function POST(req) {
             .single();
 
           if (error) {
-            console.error('Error creating payment:', error);
             return NextResponse.json({ error: error.message }, { status: 500 });
           }
 
           return NextResponse.json({ data });
         }
       } catch (error) {
-        console.error('Error in payment creation/update:', error);
         return NextResponse.json({ error: error.message }, { status: 500 });
       }
     }
 
-    // Handle delivery_surcharge update
     if (action === 'updatedelivery_Surcharge') {
       const { contractId, delivery_surcharge } = params;
       if (typeof contractId === 'undefined' || typeof delivery_surcharge === 'undefined') {
@@ -935,7 +802,6 @@ export async function POST(req) {
       return NextResponse.json({ success: true });
     }
 
-    // Handle delivery_discount update
     if (action === 'updatedelivery_discount') {
       const { contractId, delivery_discount } = params;
       if (typeof contractId === 'undefined' || typeof delivery_discount === 'undefined') {
@@ -954,14 +820,10 @@ export async function POST(req) {
       return NextResponse.json({ success: true });
     }
 
-    // Handle user status update
     if (action === 'updateUserStatus') {
       const { userId, statusName, verifyStatusId, corporationId } = params;
-      
-      // Prepare update data
       const updateData = {};
       
-      // Handle user status update
       if (statusName) {
         const { data: statusData, error: statusError } = await supabase
           .from('profiles_status')
@@ -975,20 +837,14 @@ export async function POST(req) {
         updateData.user_status_id = statusData.id;
       }
       
-      // Handle verify status update
       if (verifyStatusId !== undefined && verifyStatusId !== '') {
         updateData.verify_status_id = verifyStatusId;
       } else if (verifyStatusId === '') {
         updateData.verify_status_id = null;
       }
 
-      // Handle corporation update
       if (corporationId !== undefined) {
-        if (corporationId === '' || corporationId === null) {
-          updateData.corporation_id = null;
-        } else {
-          updateData.corporation_id = corporationId;
-        }
+        updateData.corporation_id = corporationId === '' || corporationId === null ? null : corporationId;
       }
 
       const { error, data } = await supabase
@@ -1003,7 +859,6 @@ export async function POST(req) {
       return NextResponse.json({ success: true });
     }
 
-    // Handle user deletion
     if (action === 'deleteUser') {
       const { userId } = params;
       const { error } = await supabase
@@ -1018,7 +873,6 @@ export async function POST(req) {
       return NextResponse.json({ success: true });
     }
 
-    // Handle contract assignment
     if (action === 'assignContract') {
       const { contractId, deliveryId, accepted_at } = params;
 
@@ -1033,7 +887,7 @@ export async function POST(req) {
         .from('contracts')
         .update({
           delivery_id: deliveryId,
-          contract_status_id: 3, // 'Accepted - Awaiting Pickup'
+          contract_status_id: 3,
           accepted_at: accepted_at || new Date().toISOString()
         })
         .eq('id', contractId)
@@ -1047,7 +901,6 @@ export async function POST(req) {
       return NextResponse.json({ data });
     }
 
-    // Handle updating summary_id for contracts
     if (action === 'updateContractSummaryId') {
       const { contractIds, summaryId } = params;
 
@@ -1071,7 +924,6 @@ export async function POST(req) {
       return NextResponse.json({ data });
     }
 
-    // Handle creating summary record and updating contracts
     if (action === 'createSummary') {
       const { summaryId, totalContracts, totalAmount, deliveredContracts, failedContracts, contractIds } = params;
 
@@ -1083,11 +935,10 @@ export async function POST(req) {
       }
 
       try {
-        // Create summary record with only existing columns
         const summaryData = {
           id: summaryId,
           created_at: new Date().toISOString(),
-          due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 days from now
+          due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
         };
 
         const { data: summaryRecord, error: summaryError } = await supabase
@@ -1097,11 +948,9 @@ export async function POST(req) {
           .single();
 
         if (summaryError) {
-          console.error('Error creating summary record:', summaryError);
           return NextResponse.json({ error: summaryError.message }, { status: 500 });
         }
 
-        // Update contracts with summary_id
         const { data: updatedContracts, error: contractError } = await supabase
           .from('contracts')
           .update({ summary_id: summaryId })
@@ -1109,7 +958,6 @@ export async function POST(req) {
           .select();
 
         if (contractError) {
-          console.error('Error updating contracts:', contractError);
           return NextResponse.json({ error: contractError.message }, { status: 500 });
         }
 
@@ -1118,12 +966,10 @@ export async function POST(req) {
           contracts: updatedContracts 
         });
       } catch (error) {
-        console.error('Error in createSummary:', error);
         return NextResponse.json({ error: error.message }, { status: 500 });
       }
     }
 
-    // Handle fetching pricing regions
     if (action === 'getPricingRegion') {
       const { data, error } = await supabase
         .from('pricing_region')
@@ -1137,14 +983,12 @@ export async function POST(req) {
       return NextResponse.json({ regions: data });
     }
 
-    // Handle fetching cities by region
     if (action === 'getCitiesByRegion') {
       const { region_id } = params || {};
       if (!region_id) {
         return NextResponse.json({ error: 'Missing region_id' }, { status: 400 });
       }
 
-      // Fetch distinct cities for the given region_id from the pricing table
       const { data, error } = await supabase
         .from('pricing')
         .select('id, city')
@@ -1158,7 +1002,6 @@ export async function POST(req) {
       return NextResponse.json({ cities: data });
     }
 
-    // Handle fetching price by city
     if (action === 'getPriceByCity') {
       const { city_id } = params || {};
       if (!city_id) {
@@ -1178,7 +1021,6 @@ export async function POST(req) {
       return NextResponse.json({ price: data ? data.price : null });
     }
 
-    // Handle fetching all pricing with region name
     if (action === 'getAllPricing') {
       const { data, error } = await supabase
         .from('pricing')
@@ -1190,7 +1032,6 @@ export async function POST(req) {
         return NextResponse.json({ error: error.message }, { status: 500 });
       }
 
-      // Flatten the region object for easier frontend use
       const pricing = (data || []).map(row => ({
         id: row.id,
         city: row.city,
@@ -1202,7 +1043,6 @@ export async function POST(req) {
       return NextResponse.json({ pricing });
     }
 
-    // Handle fetching all corporations (id and name)
     if (action === 'getAllCorporations') {
       const { data, error } = await supabase
         .from('profiles_corporation')
@@ -1216,7 +1056,6 @@ export async function POST(req) {
       return NextResponse.json({ corporations: data || [] });
     }
 
-    // Handle fetching corporation emails
     if (action === 'getCorporationEmails') {
       const { data, error } = await supabase
         .from('profiles_corporation')
@@ -1231,10 +1070,8 @@ export async function POST(req) {
       return NextResponse.json({ corporationEmails: data || [] });
     }
 
-    // Handle fetching summaries
     if (action === 'getSummaries') {
       try {
-        // Fetch summaries with status information
         const { data: summaries, error: summariesError } = await supabase
           .from('summary')
           .select(`
@@ -1247,7 +1084,6 @@ export async function POST(req) {
           return NextResponse.json({ error: summariesError.message }, { status: 500 });
         }
 
-        // Transform the data to flatten the status object
         const summariesWithStatus = (summaries || []).map(summary => ({
           ...summary,
           status_name: summary.summary_status?.status_name || 'N/A',
@@ -1260,7 +1096,6 @@ export async function POST(req) {
       }
     }
 
-    // Handle updating summary invoice ID
     if (action === 'updateSummaryInvoiceId') {
       const { summaryId, invoiceId } = params;
       
@@ -1289,7 +1124,6 @@ export async function POST(req) {
       }
     }
 
-    // Handle updating summary status
     if (action === 'updateSummaryStatus') {
       const { summaryId, statusId } = params;
       
@@ -1318,7 +1152,6 @@ export async function POST(req) {
       }
     }
 
-    // Handle fetching contracts by summary_id (for multiple summaries)
     if (action === 'getContractsBySummaryId') {
       const { summaryIds } = params;
       if (!summaryIds || !Array.isArray(summaryIds)) {
@@ -1353,13 +1186,11 @@ export async function POST(req) {
           return NextResponse.json({ contracts: [] });
         }
 
-        // Fetch all contract status rows once and build a map
         const { data: allStatuses } = await supabase
           .from('contract_status')
           .select('id, status_name');
         const statusById = new Map((allStatuses || []).map(s => [s.id, s]));
 
-        // Build final contracts with luggage data
         const contractsWithStatus = contracts.map(c => ({
           ...c,
           contract_status: statusById.get(c.contract_status_id) || null,
@@ -1379,7 +1210,6 @@ export async function POST(req) {
       }
     }
 
-    // Handle fetching contracts by single summary ID (for PDF generation)
     if (action === 'getContractsBySingleSummaryId') {
       const { summaryId } = params;
       if (!summaryId) {
@@ -1414,13 +1244,11 @@ export async function POST(req) {
           return NextResponse.json({ contracts: [] });
         }
 
-        // Fetch all contract status rows once and build a map
         const { data: allStatuses } = await supabase
           .from('contract_status')
           .select('id, status_name');
         const statusById = new Map((allStatuses || []).map(s => [s.id, s]));
 
-        // Build final contracts with luggage data
         const contractsWithStatus = contracts.map(c => ({
           ...c,
           contract_status: statusById.get(c.contract_status_id) || null,
@@ -1440,7 +1268,6 @@ export async function POST(req) {
       }
     }
 
-    // Handle price update
     if (action === 'updatePrice') {
       const { city_id, price } = params;
       if (!city_id || typeof price === 'undefined') {
@@ -1464,7 +1291,6 @@ export async function POST(req) {
       return NextResponse.json({ data });
     }
 
-    // Handle contract cancellation
     if (action === 'cancelContract') {
       const { contractId } = params;
       if (!contractId) {
@@ -1472,7 +1298,7 @@ export async function POST(req) {
       }
       const { data, error } = await supabase
         .from('contracts')
-        .update({ contract_status_id: 2 }) // 2 = Cancelled
+        .update({ contract_status_id: 2 })
         .eq('id', contractId)
         .select()
         .single();
@@ -1482,19 +1308,16 @@ export async function POST(req) {
       return NextResponse.json({ data });
     }
 
-    // Handle updateRouteHistory
     if (action === 'updateRouteHistory') {
       const { contractId, route_history } = params;
       if (!contractId || !route_history) {
         return NextResponse.json({ error: 'Missing contractId or route_history' }, { status: 400 });
       }
 
-      // Validate route_history format
       if (!Array.isArray(route_history)) {
         return NextResponse.json({ error: 'route_history must be an array' }, { status: 400 });
       }
 
-      // Validate each point in route_history
       for (const point of route_history) {
         if (!point || typeof point !== 'object') {
           return NextResponse.json({ error: 'Invalid route point format' }, { status: 400 });
@@ -1504,7 +1327,6 @@ export async function POST(req) {
         }
       }
 
-      // Update route history in database
       const { error } = await supabase
         .from('contracts')
         .update({
@@ -1513,14 +1335,12 @@ export async function POST(req) {
         .eq('id', contractId);
 
       if (error) {
-        console.error('Error updating route history:', error);
         return NextResponse.json({ error: error.message }, { status: 500 });
       }
 
       return NextResponse.json({ success: true });
     }
 
-    // Handle payments fetch
     if (action === 'getPayments') {
       const { data, error } = await supabase
         .from('payment')
@@ -1532,7 +1352,6 @@ export async function POST(req) {
       return NextResponse.json({ data });
     }
 
-    // Handle payment status update
     if (action === 'updatePaymentStatus') {
       const { payment_id, summary_stat } = params;
       if (!payment_id || !summary_stat) {
@@ -1551,14 +1370,12 @@ export async function POST(req) {
       return NextResponse.json({ data });
     }
 
-    // Handle proof of delivery/passenger form fetch depending on contract status
     if (action === 'getProofOfDelivery') {
       const { contract_id } = params;
       if (!contract_id) {
         return NextResponse.json({ error: 'Missing contract_id' }, { status: 400 });
       }
 
-      // Fetch status and both potential columns so we can decide what to return
       const { data, error } = await supabase
         .from('contracts')
         .select('contract_status_id, passenger_form, proof_of_delivery, delivered_at')
@@ -1573,10 +1390,6 @@ export async function POST(req) {
         return NextResponse.json({ error: 'Contract not found' }, { status: 404 });
       }
 
-      // Choose image source based on status:
-      // - Delivered (status_id 5): use passenger_form
-      // - Delivery Failed (status_id 6): use proof_of_delivery
-      // - Otherwise: prefer passenger_form then fallback to proof_of_delivery
       let payloadUrl = null;
       if (Number(data.contract_status_id) === 5) {
         payloadUrl = data.passenger_form || null;
@@ -1590,14 +1403,12 @@ export async function POST(req) {
         return NextResponse.json({ error: 'No proof available' }, { status: 404 });
       }
 
-      // Keep response key as proof_of_delivery for backward compatibility
       return NextResponse.json({ 
         proof_of_delivery: payloadUrl,
         delivery_timestamp: data.delivered_at || null
       });
     }
 
-    // If this is a Gemini insight request
     if (action === 'geminiInsight') {
       const { stats } = params;
       if (stats) {
@@ -1606,7 +1417,6 @@ export async function POST(req) {
             throw new Error('GEMINI_API_KEY is not configured');
           }
 
-          // Configure the model
           const model = genAI.getGenerativeModel({
             model: "gemini-2.0-flash-lite",
             safetySettings: [
@@ -1640,7 +1450,6 @@ Please provide:
 3. Specific recommendations for improvement
 4. Areas of concern that need attention`;
 
-          console.log('Sending request to Gemini API...');
           const result = await model.generateContent({
             contents: [{ role: 'user', parts: [{ text: prompt }] }],
             generationConfig: {
@@ -1653,15 +1462,10 @@ Please provide:
 
           const response = await result.response;
           let text = response.text();
-          text = text.replace(/\*\*/g, ''); // Remove all **
+          text = text.replace(/\*\*/g, '');
 
           return NextResponse.json({ insight: text });
         } catch (error) {
-          console.error('Gemini API error:', error);
-          // Log more details about the error
-          if (error.response) {
-            console.error('Error response:', await error.response.text());
-          }
           return NextResponse.json({
             error: 'Failed to generate insight. Please check your API key and try again.',
             details: error.message,
@@ -1674,7 +1478,6 @@ Please provide:
 
     return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
   } catch (error) {
-    console.error('Server error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
-} 
+}

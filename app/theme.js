@@ -1,29 +1,33 @@
 import { createTheme } from "@mui/material/styles";
 
-export const getTheme = (mode) =>
-  createTheme({
-    // Color palette
+export const getTheme = (mode) => {
+  const isDark = mode === "dark";
+  const primaryColor = isDark ? "#A3D65C" : "#214D22";
+  const primaryContrast = isDark ? "#1E1E20" : "#FFFFFF";
+  const secondaryColor = isDark ? "#9AA0A6" : "#6B7280";
+  const bgDefault = isDark ? "#1E1E20" : "#FAFAFA";
+  const bgPaper = isDark ? "#242426" : "#FFFFFF";
+  const textPrimary = isDark ? "#EDEDED" : "#1E1E1E";
+  const textSecondary = isDark ? "rgba(237, 237, 237, 0.75)" : "rgba(30, 30, 30, 0.7)";
+  const dividerColor = isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)";
+
+  return createTheme({
     palette: {
       mode,
       primary: { 
-        main: mode === "dark" ? "#A3D65C" : "#214D22", // dark green tone
-        contrastText: mode === "dark" ? "#1E1E20" : "#FFFFFF"
+        main: primaryColor,
+        contrastText: primaryContrast
       },
-      secondary: { main: mode === "dark" ? "#9AA0A6" : "#6B7280" }, // neutral gray
+      secondary: { main: secondaryColor },
       background: {
-        default: mode === "dark" ? "#1E1E20" : "#FAFAFA", // softer contrast for eyes
-        paper: mode === "dark" ? "#242426" : "#FFFFFF",
+        default: bgDefault,
+        paper: bgPaper,
       },
       text: {
-        primary: mode === "dark" ? "#EDEDED" : "#1E1E1E",
-        secondary:
-          mode === "dark"
-            ? "rgba(237, 237, 237, 0.75)"
-            : "rgba(30, 30, 30, 0.7)",
+        primary: textPrimary,
+        secondary: textSecondary,
       },
-      divider: mode === "dark"
-        ? "rgba(255,255,255,0.1)"
-        : "rgba(0,0,0,0.1)",
+      divider: dividerColor,
       success: { 
         main: "#7FB77E",
         contrastText: "#FFFFFF"
@@ -42,7 +46,6 @@ export const getTheme = (mode) =>
       },
     },
 
-    // Typography configuration
     typography: {
       fontFamily: "Onest, sans-serif",
       h1: { fontWeight: 600 },
@@ -56,24 +59,20 @@ export const getTheme = (mode) =>
       button: { textTransform: "none", fontWeight: 500 },
     },
 
-    // Component styles
     components: {
       MuiPaper: {
         styleOverrides: {
           root: {
-            backgroundColor: mode === "dark" ? "#242426" : "#FFFFFF",
+            backgroundColor: bgPaper,
             borderRadius: "12px",
-            boxShadow:
-              mode === "dark"
-                ? "0px 4px 20px rgba(0,0,0,0.6)"
-                : "0px 4px 20px rgba(0,0,0,0.1)",
+            boxShadow: isDark ? "0px 4px 20px rgba(0,0,0,0.6)" : "0px 4px 20px rgba(0,0,0,0.1)",
             padding: "16px",
           },
         },
       },
       MuiCircularProgress: {
         styleOverrides: {
-          root: { color: mode === "dark" ? "#A3D65C" : "#214D22" },
+          root: { color: primaryColor },
         },
       },
       MuiButton: {
@@ -82,10 +81,7 @@ export const getTheme = (mode) =>
             borderRadius: "8px",
             transition: "all 0.2s ease-in-out",
             "&:hover": {
-              boxShadow:
-                mode === "dark"
-                  ? "0px 0px 10px rgba(163, 214, 92, 0.4)"
-                  : "0px 0px 10px rgba(75, 139, 59, 0.3)",
+              boxShadow: isDark ? "0px 0px 10px rgba(163, 214, 92, 0.4)" : "0px 0px 10px rgba(75, 139, 59, 0.3)",
             },
           },
         },
@@ -93,18 +89,12 @@ export const getTheme = (mode) =>
       MuiCard: {
         styleOverrides: {
           root: {
-            backgroundColor: mode === "dark" ? "#242426" : "#FFFFFF",
+            backgroundColor: bgPaper,
             borderRadius: "12px",
-            boxShadow:
-              mode === "dark"
-                ? "0px 4px 20px rgba(0,0,0,0.6)"
-                : "0px 4px 20px rgba(0,0,0,0.1)",
+            boxShadow: isDark ? "0px 4px 20px rgba(0,0,0,0.6)" : "0px 4px 20px rgba(0,0,0,0.1)",
             transition: "all 0.2s ease-in-out",
             "&:hover": {
-              boxShadow:
-                mode === "dark"
-                  ? "0px 8px 30px rgba(0,0,0,0.8)"
-                  : "0px 8px 30px rgba(0,0,0,0.15)",
+              boxShadow: isDark ? "0px 8px 30px rgba(0,0,0,0.8)" : "0px 8px 30px rgba(0,0,0,0.15)",
             },
           },
         },
@@ -115,10 +105,10 @@ export const getTheme = (mode) =>
             "& .MuiOutlinedInput-root": {
               borderRadius: "8px",
               "&:hover .MuiOutlinedInput-notchedOutline": {
-                borderColor: mode === "dark" ? "#A3D65C" : "#4B8B3B",
+                borderColor: primaryColor,
               },
               "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
-                borderColor: mode === "dark" ? "#A3D65C" : "#4B8B3B",
+                borderColor: primaryColor,
                 borderWidth: 2,
               },
             },
@@ -128,22 +118,18 @@ export const getTheme = (mode) =>
       MuiAppBar: {
         styleOverrides: {
           root: {
-            backgroundColor: mode === "dark" ? "#1E1E20" : "#4B8B3B",
-            color: mode === "dark" ? "#EDEDED" : "#FFFFFF",
-            boxShadow: mode === "dark"
-              ? "0px 2px 10px rgba(0,0,0,0.3)"
-              : "0px 2px 10px rgba(0,0,0,0.1)",
+            backgroundColor: isDark ? bgDefault : "#4B8B3B",
+            color: isDark ? textPrimary : "#FFFFFF",
+            boxShadow: isDark ? "0px 2px 10px rgba(0,0,0,0.3)" : "0px 2px 10px rgba(0,0,0,0.1)",
           },
         },
       },
       MuiDrawer: {
         styleOverrides: {
           paper: {
-            backgroundColor: mode === "dark" ? "#242426" : "#FFFFFF",
-            borderRight: `1px solid ${mode === "dark" ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)"}`,
-            boxShadow: mode === "dark"
-              ? "2px 0 10px rgba(0,0,0,0.3)"
-              : "2px 0 10px rgba(0,0,0,0.1)",
+            backgroundColor: bgPaper,
+            borderRight: `1px solid ${dividerColor}`,
+            boxShadow: isDark ? "2px 0 10px rgba(0,0,0,0.3)" : "2px 0 10px rgba(0,0,0,0.1)",
           },
         },
       },
@@ -153,12 +139,12 @@ export const getTheme = (mode) =>
             borderRadius: "8px",
             margin: "4px 8px",
             "&:hover": {
-              backgroundColor: mode === "dark" ? "rgba(163, 214, 92, 0.1)" : "rgba(75, 139, 59, 0.1)",
+              backgroundColor: isDark ? "rgba(163, 214, 92, 0.1)" : "rgba(75, 139, 59, 0.1)",
             },
             "&.Mui-selected": {
-              backgroundColor: mode === "dark" ? "rgba(163, 214, 92, 0.2)" : "rgba(75, 139, 59, 0.2)",
+              backgroundColor: isDark ? "rgba(163, 214, 92, 0.2)" : "rgba(75, 139, 59, 0.2)",
               "&:hover": {
-                backgroundColor: mode === "dark" ? "rgba(163, 214, 92, 0.3)" : "rgba(75, 139, 59, 0.3)",
+                backgroundColor: isDark ? "rgba(163, 214, 92, 0.3)" : "rgba(75, 139, 59, 0.3)",
               },
             },
           },
@@ -182,3 +168,4 @@ export const getTheme = (mode) =>
       },
     },
   });
+};

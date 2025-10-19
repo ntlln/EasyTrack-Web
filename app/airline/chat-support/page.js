@@ -9,7 +9,6 @@ import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useSearchParams } from 'next/navigation';
 
 export default function Page() {
-    // Theme and state setup
     const theme = useTheme();
     const isDark = theme.palette.mode === "dark";
     const [message, setMessage] = useState("");
@@ -33,16 +32,15 @@ export default function Page() {
     const autoRefreshIntervalRef = useRef(null);
     const lastMessageTimeRef = useRef(null);
     const [shouldAutoScroll, setShouldAutoScroll] = useState(false);
+    
     useEffect(() => { currentUserRef.current = currentUser; }, [currentUser]);
     useEffect(() => { selectedUserRef.current = selectedUser; }, [selectedUser]);
 
-    // Initial data load
     useEffect(() => {
         fetchCurrentUser();
         fetchUsers();
     }, []);
 
-    // Load conversations and realtime when user ready
     useEffect(() => {
         if (currentUser) {
             fetchConversations();
@@ -58,7 +56,6 @@ export default function Page() {
         };
     }, [currentUser]);
 
-    // Open conversation from URL param if provided
     useEffect(() => {
         if (!users.length) return;
         const id = searchParams?.get('openUser');
@@ -68,7 +65,6 @@ export default function Page() {
         }
     }, [users, searchParams]);
 
-    // Load messages on conversation change
     useEffect(() => {
         if (currentUser && selectedUser) {
             fetchMessages();
@@ -78,10 +74,8 @@ export default function Page() {
         }
     }, [selectedUser, currentUser]);
 
-    // Track selected conversation changes for incremental refresh and scrolling
     useEffect(() => {
         if (selectedUser && currentUser) {
-            // update last message time when switching conversations
             if (messages.length > 0) {
                 lastMessageTimeRef.current = messages[messages.length - 1].created_at;
             } else {
@@ -93,7 +87,6 @@ export default function Page() {
         }
     }, [selectedUser, currentUser, messages]);
 
-    // Auto-scroll when flagged
     useEffect(() => {
         if (shouldAutoScroll && messages.length > 0 && selectedUser) {
             messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -101,7 +94,6 @@ export default function Page() {
         }
     }, [messages, shouldAutoScroll, selectedUser]);
 
-    // Data functions
     const fetchCurrentUser = async () => {
         try {
             const { data: { session } } = await supabase.auth.getSession();
@@ -122,7 +114,7 @@ export default function Page() {
                 });
             }
         } catch (e) {
-            console.error(e);
+            // Error handling
         }
     };
 
@@ -146,7 +138,7 @@ export default function Page() {
             setUsers(formatted);
             setFilteredUsers(formatted);
         } catch (e) {
-            console.error(e);
+            // Error handling
         } finally {
             setLoadingUsers(false);
         }
@@ -190,7 +182,7 @@ export default function Page() {
 
             setConversations(formatted);
         } catch (e) {
-            console.error(e);
+            // Error handling
         }
     };
 
@@ -209,7 +201,7 @@ export default function Page() {
             if (list.length > 0) lastMessageTimeRef.current = list[list.length - 1].created_at;
             setShouldAutoScroll(true);
         } catch (e) {
-            console.error(e);
+            // Error handling
         }
     };
 
@@ -257,7 +249,6 @@ export default function Page() {
         const temp = { id: `temp-${Date.now()}`, sender_id: currentUser.id, receiver_id: selectedUser.id, content, created_at: new Date().toISOString(), read_at: null };
         setMessages(prev => [...prev, temp]);
         setShouldAutoScroll(true);
-        // Keep focus on the input
         messageInputRef.current?.focus();
         try {
             setSendingMessage(true);
@@ -270,12 +261,10 @@ export default function Page() {
             const json = await res.json();
             setMessages(prev => prev.map(m => m.id === temp.id ? json.message : m));
         } catch (e) {
-            console.error(e);
             setMessages(prev => prev.filter(m => m.id !== temp.id));
             setMessage(content);
         } finally {
             setSendingMessage(false);
-            // Restore focus
             messageInputRef.current?.focus();
         }
     };
@@ -290,11 +279,10 @@ export default function Page() {
             });
             fetchConversations();
         } catch (e) {
-            console.error(e);
+            // Error handling
         }
     };
 
-    // Auto-refresh helpers
     const startAutoRefresh = () => {
         stopAutoRefresh();
         autoRefreshIntervalRef.current = setInterval(() => {
@@ -366,31 +354,45 @@ export default function Page() {
                 }
             }
         } catch (e) {
-            console.log('silent refresh error', e);
+            // Error handling
         }
     };
 
-    // UI helpers
     const formatConversationTime = (ts) => {
-        const date = new Date(ts); const now = new Date();
+        const date = new Date(ts);
+        const now = new Date();
         const diffH = (now - date) / (1000 * 60 * 60);
         if (diffH < 24) return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         if (diffH < 48) return 'Yesterday';
         return date.toLocaleDateString();
     };
+
     const formatMessageTime = (ts) => new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const isOwnMessage = (msg) => msg.sender_id === currentUser?.id;
     const isTempMessage = (msg) => msg.id && String(msg.id).startsWith('temp-');
     const isMessageRead = (msg) => msg.read_at !== null;
     const getSenderLabel = (conv) => conv.isOwnMessage ? 'You' : (conv.name.split(' ')[0] || conv.name);
+    
     const handleSearchChange = (e, value) => {
         setSearchQuery(value);
-        if (!value) { setFilteredUsers(users); return; }
+        if (!value) { 
+            setFilteredUsers(users); 
+            return; 
+        }
         const v = value.toLowerCase();
         setFilteredUsers(users.filter(u => u.name.toLowerCase().includes(v) || u.email.toLowerCase().includes(v)));
     };
-    const handleUserSelect = (e, user) => { setSelectedUser(user); setSearchQuery(user ? user.name : ""); };
-    const handleConversationSelect = (conv) => { const u = users.find(x => x.id === conv.id); if (u) setSelectedUser(u); };
+    
+    const handleUserSelect = (e, user) => { 
+        setSelectedUser(user); 
+        setSearchQuery(user ? user.name : ""); 
+    };
+    
+    const handleConversationSelect = (conv) => { 
+        const u = users.find(x => x.id === conv.id); 
+        if (u) setSelectedUser(u); 
+    };
+    
     const getMessageAvatarUrl = (msg) => {
         if (!currentUser || !selectedUser) return null;
         const senderId = msg.sender_id;
@@ -399,12 +401,10 @@ export default function Page() {
         const found = users.find(u => u.id === senderId);
         return found?.avatarUrl || null;
     };
+    
     const showSnackbar = (message, severity = 'success') => setSnackbar({ open: true, message, severity });
     const handleSnackbarClose = () => setSnackbar(prev => ({ ...prev, open: false }));
 
-    // Message handlers (removed old mock handler, using async handleSend defined above)
-
-    // Styles
     const mainContainerStyles = { position: "absolute", top: 0, left: "72px", right: 0, bottom: 0, display: "flex", bgcolor: theme.palette.background.default };
     const sidebarStyles = { width: "350px", borderRight: "1px solid", borderColor: "divider", bgcolor: theme.palette.background.paper, display: "flex", flexDirection: "column", p: 2, gap: 2 };
     const searchFieldStyles = { bgcolor: theme.palette.background.default, borderRadius: 2 };
@@ -522,7 +522,6 @@ export default function Page() {
                     )}
                 />
                 
-                {/* Conversations */}
                 <Box sx={conversationsContainerStyles}>
                     {conversations.length === 0 ? (
                         <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100%", color: "text.secondary" }}>
@@ -534,17 +533,17 @@ export default function Page() {
                                 <Avatar src={conv.avatarUrl || undefined}>
                                     {(!conv.avatarUrl && conv.name) ? conv.name.charAt(0) : ''}
                                 </Avatar>
-                            <Box sx={{ flexGrow: 1 }}>
+                                <Box sx={{ flexGrow: 1 }}>
                                     <Typography sx={nameStyles}>{conv.name}</Typography>
                                     <Typography sx={messageLineStyles}>
                                         {getSenderLabel(conv)}: {conv.lastMessage}
                                     </Typography>
-                            </Box>
-                            <Box sx={{ textAlign: "right" }}>
+                                </Box>
+                                <Box sx={{ textAlign: "right" }}>
                                     <Typography sx={timeStyles}>{formatConversationTime(conv.lastMessageTime)}</Typography>
                                     {conv.unreadCount > 0 && <Box sx={unreadBadgeStyles}>{conv.unreadCount}</Box>}
-                            </Box>
-                        </Paper>
+                                </Box>
+                            </Paper>
                         ))
                     )}
                 </Box>
@@ -592,12 +591,12 @@ export default function Page() {
                         ) : (
                             <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100%", color: "text.secondary" }}>
                                 <Typography>No messages yet. Start the conversation!</Typography>
-                    </Box>
+                            </Box>
                         )
                     ) : (
                         <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100%", color: "text.secondary" }}>
                             <Typography>Select a conversation to start chatting</Typography>
-                    </Box>
+                        </Box>
                     )}
                 </Box>
 

@@ -1,9 +1,36 @@
 import React from 'react';
-import { Box, Button, Container, Typography, Grid, Avatar, Card, CardContent } from '@mui/material';
+import { Box, Container, Typography, Avatar, Card } from '@mui/material';
 import Layout from '../../components/Layout';
 import Navbar from '../../components/Navbar';
 
 export default function About() {
+  const Divider = () => (
+    <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
+      <Box sx={{ width: '80px', height: '3px', bgcolor: 'primary.main', borderRadius: '2px' }} />
+    </Box>
+  );
+
+  const ValueCard = ({ emoji, title, description }) => (
+    <Box 
+      textAlign="center"
+      sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        height: '100%',
+        p: 2
+      }}
+    >
+      <Typography variant="h4" sx={{ mb: 2, color: 'primary.main' }}>{emoji}</Typography>
+      <Typography variant="h6" sx={{ fontWeight: 600, mb: 1, color: 'primary.main' }}>
+        {title}
+      </Typography>
+      <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+        {description}
+      </Typography>
+    </Box>
+  );
+
   const team = [
     {
       name: 'John Smith',
@@ -31,11 +58,33 @@ export default function About() {
     }
   ];
 
+  const values = [
+    {
+      emoji: '🤝',
+      title: 'Trust',
+      description: 'Building lasting relationships through transparency and reliability'
+    },
+    {
+      emoji: '⚡',
+      title: 'Efficiency',
+      description: 'Optimizing every process for speed and accuracy'
+    },
+    {
+      emoji: '💡',
+      title: 'Innovation',
+      description: 'Embracing new technologies to improve our services'
+    },
+    {
+      emoji: '❤️',
+      title: 'Care',
+      description: 'Treating every package and customer with the utmost care'
+    }
+  ];
+
   return (
     <Layout>
       <Navbar currentPage="about" />
 
-      {/* Welcome Section with Wave Background */}
       <Box
         sx={{
           backgroundImage: 'url(/images/wavebg.svg)',
@@ -76,7 +125,6 @@ export default function About() {
         </Container>
       </Box>
 
-      {/* Our Story Section */}
       <Box sx={{ py: 8, bgcolor: 'background.default' }}>
         <Container maxWidth="lg">
           <Box 
@@ -145,12 +193,7 @@ export default function About() {
         </Container>
       </Box>
 
-      {/* Divider */}
-      <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
-        <Box sx={{ width: '80px', height: '3px', bgcolor: 'primary.main', borderRadius: '2px' }} />
-      </Box>
-
-      {/* Mission & Vision Section */}
+      <Divider />
       <Box sx={{ py: 8, bgcolor: 'background.default' }}>
         <Container maxWidth="lg">
           <Box 
@@ -224,12 +267,7 @@ export default function About() {
         </Container>
       </Box>
 
-      {/* Divider */}
-      <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
-        <Box sx={{ width: '80px', height: '3px', bgcolor: 'primary.main', borderRadius: '2px' }} />
-      </Box>
-
-      {/* Team Section */}
+      <Divider />
       <Box sx={{ py: 8, bgcolor: 'background.default' }}>
         <Container maxWidth="lg">
           <Box 
@@ -309,12 +347,7 @@ export default function About() {
         </Container>
       </Box>
 
-      {/* Divider */}
-      <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
-        <Box sx={{ width: '80px', height: '3px', bgcolor: 'primary.main', borderRadius: '2px' }} />
-      </Box>
-
-      {/* Values Section */}
+      <Divider />
       <Box sx={{ py: 8, bgcolor: 'background.default' }}>
         <Container maxWidth="lg">
           <Box 
@@ -339,102 +372,16 @@ export default function About() {
             gap={4}
             justifyContent="center"
           >
-            <Box 
-              flex={{ xs: '1 1 100%', sm: '1 1 calc(50% - 16px)', md: '1 1 calc(25% - 24px)' }}
-              minWidth={{ xs: '100%', sm: '250px', md: '200px' }}
-              maxWidth={{ xs: '100%', sm: '350px', md: '300px' }}
-            >
+            {values.map((value, index) => (
               <Box 
-                textAlign="center"
-                sx={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  height: '100%',
-                  p: 2
-                }}
+                key={index}
+                flex={{ xs: '1 1 100%', sm: '1 1 calc(50% - 16px)', md: '1 1 calc(25% - 24px)' }}
+                minWidth={{ xs: '100%', sm: '250px', md: '200px' }}
+                maxWidth={{ xs: '100%', sm: '350px', md: '300px' }}
               >
-                <Typography variant="h4" sx={{ mb: 2, color: 'primary.main' }}>🤝</Typography>
-                <Typography variant="h6" sx={{ fontWeight: 600, mb: 1, color: 'primary.main' }}>
-                  Trust
-                </Typography>
-                <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                  Building lasting relationships through transparency and reliability
-                </Typography>
+                <ValueCard {...value} />
               </Box>
-            </Box>
-            <Box 
-              flex={{ xs: '1 1 100%', sm: '1 1 calc(50% - 16px)', md: '1 1 calc(25% - 24px)' }}
-              minWidth={{ xs: '100%', sm: '250px', md: '200px' }}
-              maxWidth={{ xs: '100%', sm: '350px', md: '300px' }}
-            >
-              <Box 
-                textAlign="center"
-                sx={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  height: '100%',
-                  p: 2
-                }}
-              >
-                <Typography variant="h4" sx={{ mb: 2, color: 'primary.main' }}>⚡</Typography>
-                <Typography variant="h6" sx={{ fontWeight: 600, mb: 1, color: 'primary.main' }}>
-                  Efficiency
-                </Typography>
-                <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                  Optimizing every process for speed and accuracy
-                </Typography>
-              </Box>
-            </Box>
-            <Box 
-              flex={{ xs: '1 1 100%', sm: '1 1 calc(50% - 16px)', md: '1 1 calc(25% - 24px)' }}
-              minWidth={{ xs: '100%', sm: '250px', md: '200px' }}
-              maxWidth={{ xs: '100%', sm: '350px', md: '300px' }}
-            >
-              <Box 
-                textAlign="center"
-                sx={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  height: '100%',
-                  p: 2
-                }}
-              >
-                <Typography variant="h4" sx={{ mb: 2, color: 'primary.main' }}>💡</Typography>
-                <Typography variant="h6" sx={{ fontWeight: 600, mb: 1, color: 'primary.main' }}>
-                  Innovation
-                </Typography>
-                <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                  Embracing new technologies to improve our services
-                </Typography>
-              </Box>
-            </Box>
-            <Box 
-              flex={{ xs: '1 1 100%', sm: '1 1 calc(50% - 16px)', md: '1 1 calc(25% - 24px)' }}
-              minWidth={{ xs: '100%', sm: '250px', md: '200px' }}
-              maxWidth={{ xs: '100%', sm: '350px', md: '300px' }}
-            >
-              <Box 
-                textAlign="center"
-                sx={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  height: '100%',
-                  p: 2
-                }}
-              >
-                <Typography variant="h4" sx={{ mb: 2, color: 'primary.main' }}>❤️</Typography>
-                <Typography variant="h6" sx={{ fontWeight: 600, mb: 1, color: 'primary.main' }}>
-                  Care
-                </Typography>
-                <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                  Treating every package and customer with the utmost care
-                </Typography>
-              </Box>
-            </Box>
+            ))}
           </Box>
         </Container>
       </Box>

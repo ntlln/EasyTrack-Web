@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, Suspense } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Box, Typography, TextField, Paper, Divider, IconButton, Collapse, CircularProgress, Snackbar, Alert, Button } from "@mui/material";
 import LoadingSpinner from '../../components/LoadingSpinner';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
@@ -11,21 +11,15 @@ import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import dynamic from 'next/dynamic';
 import { useSearchParams, useRouter } from 'next/navigation';
 
-// Map component
 const MapComponent = dynamic(() => Promise.resolve(({ mapRef, mapError }) => (
   <Box ref={mapRef} sx={{ width: '100%', height: '500px', mt: 2, borderRadius: 1, overflow: 'hidden', border: '1px solid', borderColor: 'divider', position: 'relative', bgcolor: 'background.default' }}>{mapError && (<Box sx={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center', color: 'error.main' }}><Typography color="error">{mapError}</Typography></Box>)}</Box>
 )), { ssr: false });
 
 export default function Page() {
-    return (
-        <Suspense fallback={<div>Loading...</div>}>
-            <LuggageTrackingContent />
-        </Suspense>
-    );
+  return <LuggageTrackingContent />;
 }
 
 function LuggageTrackingContent() {
-  // State and hooks
   const searchParams = useSearchParams();
   const router = useRouter();
   const [contractId, setContractId] = useState("");
@@ -36,9 +30,6 @@ function LuggageTrackingContent() {
   const [map, setMap] = useState(null);
   const [isScriptLoaded, setIsScriptLoaded] = useState(false);
   const [mapError, setMapError] = useState(null);
-  const autoDirectionsRequestedRef = useRef(false);
-  const didInitialRefreshRef = useRef(false);
-  // Directions API related state
   const [routeData, setRouteData] = useState({ eta: null, distanceRemaining: null, progress: 0, polyline: null, totalDistance: null });
   const [isLoadingDirections, setIsLoadingDirections] = useState(false);
   const [directionsError, setDirectionsError] = useState(null);
@@ -55,7 +46,6 @@ function LuggageTrackingContent() {
   const [snackbarMessage, setSnackbarMessage] = useState("");
   const [snackbarSeverity, setSnackbarSeverity] = useState("info");
 
-  // Cooldown effect - updates every second
   useEffect(() => {
     let cooldownInterval;
     if (cooldownRemaining > 0) {
@@ -66,67 +56,43 @@ function LuggageTrackingContent() {
     return () => { if (cooldownInterval) clearInterval(cooldownInterval); };
   }, [cooldownRemaining]);
 
-  // Mount-only fallback to capture contractId immediately on first client render
   useEffect(() => {
-    try {
-      if (typeof window === 'undefined') return;
-      const idFromUrl = new URLSearchParams(window.location.search).get('contractId');
-      if (idFromUrl) {
-        if (!didInitialRefreshRef.current) {
-          didInitialRefreshRef.current = true;
-          router.refresh();
-          setTimeout(() => {
-            setContractId((prev) => prev || idFromUrl);
-            if (!contract) {
-              handleSearch(idFromUrl);
-            }
-          }, 50);
-        } else {
-          setContractId((prev) => prev || idFromUrl);
-          if (!contract) {
-            handleSearch(idFromUrl);
-          }
-        }
+    const checkForContractId = () => {
+      const contractIdFromStorage = localStorage.getItem('trackContractId');
+      if (contractIdFromStorage) {
+        localStorage.removeItem('trackContractId');
+        setContractId(contractIdFromStorage);
+        handleSearch(contractIdFromStorage);
+        return true;
       }
-    } catch {}
-  }, []);
 
-  // Handle contract ID from URL (robust for localhost/navigation)
-  useEffect(() => {
-    try {
-      let idFromUrl = null;
-      if (typeof window !== 'undefined') {
-        idFromUrl = new URLSearchParams(window.location.search).get('contractId');
+      const contractIdFromUrl = searchParams.get('contractId');
+      if (contractIdFromUrl) {
+        setContractId(contractIdFromUrl);
+        handleSearch(contractIdFromUrl);
+        return true;
       }
-      if (!idFromUrl) {
-        idFromUrl = searchParams.get('contractId');
-      }
-      if (idFromUrl && idFromUrl !== contractId) {
-        if (!didInitialRefreshRef.current) {
-          didInitialRefreshRef.current = true;
-          router.refresh();
-          setTimeout(() => {
-            setContractId(idFromUrl);
-            handleSearch(idFromUrl);
-          }, 50);
-        } else {
-          setContractId(idFromUrl);
-          handleSearch(idFromUrl);
-        }
-      }
-    } catch {}
+      
+      return false;
+    };
+
+    if (!checkForContractId()) {
+      const timeoutId = setTimeout(checkForContractId, 200);
+      return () => clearTimeout(timeoutId);
+    }
   }, [searchParams]);
 
-  // Fetch contract and luggage info via API (mirror admin)
   const fetchData = async (id = contractId) => {
-    if (!id.trim()) return;
-    
+    if (!id.trim()) {
+      return;
+    }
+
     const shouldShowErrors = id.length >= previousValidContractIdRef.current.length;
-    
+
     if (shouldShowErrors) {
       setError(null);
     }
-    
+
     setLoading(true);
     try {
       const response = await fetch(`/api/admin?contractId=${id}&includeSummarized=1`);
@@ -146,7 +112,7 @@ function LuggageTrackingContent() {
           current_location_geo: data.current_location_geo || null,
           route_history: data.route_history || []
         };
-        setContract(prev => (JSON.stringify(prev) !== JSON.stringify(newContract) ? newContract : prev));
+        setContract(newContract);
         setRouteData({ eta: null, distanceRemaining: null, progress: 0, polyline: null, totalDistance: null });
       } else {
         if (shouldShowErrors) {
@@ -156,7 +122,7 @@ function LuggageTrackingContent() {
           setSnackbarOpen(true);
         }
       }
-    } catch (err) { 
+    } catch (err) {
       if (shouldShowErrors) {
         setError(err.message || 'Failed to fetch contract');
         setSnackbarMessage('Invalid luggage tracking ID. No contract found.');
@@ -168,11 +134,9 @@ function LuggageTrackingContent() {
     }
   };
 
-  // Reset map/markers only when contractId changes
   useEffect(() => {
     if (!contractId) return;
-    
-    // Reset map and markers
+
     if (map) setMap(null);
     if (markerRef.current) { markerRef.current.map = null; markerRef.current = null; }
     if (currentLocationMarkerRef.current) { currentLocationMarkerRef.current.map = null; currentLocationMarkerRef.current = null; }
@@ -181,7 +145,6 @@ function LuggageTrackingContent() {
     fetchData(contractId);
   }, [contractId]);
 
-  // Real-time subscription for contract changes
   useEffect(() => {
     if (!contractId) return;
 
@@ -194,11 +157,8 @@ function LuggageTrackingContent() {
           const merged = prev ? { ...prev, ...updatedRow } : updatedRow;
           return merged;
         });
-
-        // Note: Map marker updates are now handled manually via the Get Directions button
-        // Real-time updates only update the contract data, not the map visualization
       } catch (err) {
-        console.error('Realtime update handling error:', err);
+        // Handle error silently
       }
     };
 
@@ -236,75 +196,8 @@ function LuggageTrackingContent() {
     };
   }, [contractId, supabase, map]);
 
-  // Update polyline with directions
-  const updatePolylineWithDirections = async (start, end) => {
-    if (!directionsServiceRef.current || !map) return;
 
-    try {
-      const result = await directionsServiceRef.current.route({
-        origin: start,
-        destination: end,
-        travelMode: window.google.maps.TravelMode.DRIVING,
-      });
 
-      const routePath = result.routes[0].overview_path;
-      routeSegmentsRef.current.push(routePath);
-
-      // Create a new polyline for this segment
-      const newPolyline = new window.google.maps.Polyline({
-        path: routePath,
-        geodesic: true,
-        strokeColor: 'success.main',
-        strokeOpacity: 0.8,
-        strokeWeight: 5,
-        map: map
-      });
-
-      // Store the polyline reference
-      if (!polylineRef.current) {
-        polylineRef.current = [];
-      }
-      polylineRef.current.push(newPolyline);
-    } catch (error) {
-      console.error('Error getting directions:', error);
-      // Fallback to straight line if directions service fails
-      const fallbackPath = [start, end];
-      routeSegmentsRef.current.push(fallbackPath);
-
-      const newPolyline = new window.google.maps.Polyline({
-        path: fallbackPath,
-        geodesic: true,
-        strokeColor: 'success.main',
-        strokeOpacity: 0.8,
-        strokeWeight: 6,
-        map: map
-      });
-
-      if (!polylineRef.current) {
-        polylineRef.current = [];
-      }
-      polylineRef.current.push(newPolyline);
-    }
-  };
-
-  // Draw complete route history
-  const drawCompleteRoute = async () => {
-    if (!directionsServiceRef.current || !map || pathRef.current.length < 2) return;
-
-    // Clear existing polylines
-    if (polylineRef.current) {
-      polylineRef.current.forEach(polyline => polyline.setMap(null));
-      polylineRef.current = [];
-    }
-    routeSegmentsRef.current = [];
-
-    // Draw route segments
-    for (let i = 0; i < pathRef.current.length - 1; i++) {
-      await updatePolylineWithDirections(pathRef.current[i], pathRef.current[i + 1]);
-    }
-  };
-
-  // Google Maps script loader (robust)
   useEffect(() => {
     if (!contract) return;
 
@@ -329,16 +222,12 @@ function LuggageTrackingContent() {
     }
   }, [contract, isScriptLoaded]);
 
-  // Initialize map
   useEffect(() => {
     if (isScriptLoaded && contract && !map) {
       initMap();
     }
   }, [isScriptLoaded, contract, map]);
 
-  // Removed auto-run directions - directions should only be triggered by button click
-
-  // Map initialization
   const initMap = () => {
     if (!window.google || !mapRef.current || !contract) return;
     try {
@@ -418,98 +307,11 @@ function LuggageTrackingContent() {
     }
   };
 
-  // Update map location with improved error handling
-  const updateMapLocation = async () => {
-    if (!map || !window.google) {
-      console.log('Map not initialized yet, skipping location update');
-      return;
-    }
-    
-    // Only update if we have a current location marker and current location data
-    if (!currentLocationMarkerRef.current || !contract?.current_location_geo?.coordinates) {
-      console.log('No current location marker or location data, skipping update');
-      return;
-    }
 
-    try {
-      if (contract?.current_location_geo?.coordinates) {
-        const newPosition = {
-          lat: contract.current_location_geo.coordinates[1],
-          lng: contract.current_location_geo.coordinates[0]
-        };
-
-        // Check if the marker is still valid
-        if (currentLocationMarkerRef.current && currentLocationMarkerRef.current.map) {
-          console.log('Updating marker position:', newPosition);
-          currentLocationMarkerRef.current.position = newPosition;
-          
-          // Update map center to follow the marker
-          map.setCenter(newPosition);
-          
-          // Add the new position to the path
-          if (pathRef.current) {
-            pathRef.current.push(newPosition);
-            
-            // Draw the new route segment
-            if (pathRef.current.length >= 2) {
-              const start = pathRef.current[pathRef.current.length - 2];
-              const end = pathRef.current[pathRef.current.length - 1];
-              await updatePolylineWithDirections(start, end);
-            }
-          }
-        } else {
-          console.log('Marker is no longer valid, recreating...');
-          // Recreate the marker if it's no longer valid
-          const currentLocationMarker = document.createElement('div');
-          currentLocationMarker.innerHTML = `
-            <style>
-              @keyframes pulse {
-                0% { transform: scale(1); opacity: 1; }
-                50% { transform: scale(1.2); opacity: 0.8; }
-                100% { transform: scale(1); opacity: 1; }
-              }
-              .location-marker {
-                animation: pulse 2s infinite;
-                filter: drop-shadow(0 0 8px rgba(76, 175, 80, 0.8));
-              }
-            </style>
-            <div class="location-marker">
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <circle cx="12" cy="12" r="10" fill="#4CAF50" fill-opacity="0.6"/>
-                <circle cx="12" cy="12" r="8" fill="#4CAF50" fill-opacity="0.8"/>
-                <circle cx="12" cy="12" r="6" fill="#4CAF50" fill-opacity="0.9"/>
-                <circle cx="12" cy="12" r="4" fill="#4CAF50"/>
-                <circle cx="12" cy="12" r="2" fill="white"/>
-              </svg>
-            </div>
-          `;
-          
-          currentLocationMarkerRef.current = new window.google.maps.marker.AdvancedMarkerElement({
-            map: map,
-            position: newPosition,
-            title: 'Current Location',
-            content: currentLocationMarker,
-            collisionBehavior: window.google.maps.CollisionBehavior.OPTIONAL_AND_HIDES_LOWER_PRIORITY
-          });
-        }
-      }
-    } catch (error) {
-      console.error('Error updating location:', error);
-      // If there's an error with the marker, try to recreate it
-      if (error.message.includes('Cannot read properties of undefined')) {
-        console.log('Attempting to recreate marker...');
-        currentLocationMarkerRef.current = null;
-        // The next location update will recreate the marker
-      }
-    }
+  const handleSearch = (id = contractId) => { 
+    fetchData(id); 
   };
 
-  // Removed Supabase polling to mirror admin behavior (API fetch + realtime updates only)
-
-  // Replace handleSearch to use fetchData
-  const handleSearch = (id = contractId) => { fetchData(id); };
-
-  // Expand/collapse
   const handleExpandClick = () => { setExpanded(!expanded); };
 
   const handleClearSearch = () => {
@@ -534,7 +336,6 @@ function LuggageTrackingContent() {
     setCooldownRemaining(0);
   };
 
-  // Show snackbar
   const handleSnackbarClose = (event, reason) => {
     if (reason === 'clickaway') {
       return;
@@ -542,17 +343,7 @@ function LuggageTrackingContent() {
     setSnackbarOpen(false);
   };
 
-  // Function to format duration
-  const formatDuration = (seconds) => {
-    if (!seconds) return 'N/A';
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    if (hours === 0) return `${minutes} min`;
-    if (minutes === 0) return `${hours} hr`;
-    return `${hours} hr ${minutes} min`;
-  };
 
-  // Button-triggered directions calculation - EXACTLY 2 API CALLS
   const handleGetDirections = async () => {
     if (!directionsServiceRef.current || !contract || !map) {
       setDirectionsError('Map or directions service not available');
@@ -578,8 +369,20 @@ function LuggageTrackingContent() {
       const currentLocation = { lat: contract.current_location_geo.coordinates[1], lng: contract.current_location_geo.coordinates[0] };
       const dropoffLocation = { lat: contract.drop_off_location_geo.coordinates[1], lng: contract.drop_off_location_geo.coordinates[0] };
       const pickupLocation = { lat: contract.pickup_location_geo.coordinates[1], lng: contract.pickup_location_geo.coordinates[0] };
-      const currentToDropoffPromise = directionsServiceRef.current.route({ origin: currentLocation, destination: dropoffLocation, travelMode: window.google.maps.TravelMode.DRIVING, drivingOptions: { departureTime: new Date(), trafficModel: window.google.maps.TrafficModel.BEST_GUESS } });
-      const pickupToDropoffPromise = directionsServiceRef.current.route({ origin: pickupLocation, destination: dropoffLocation, travelMode: window.google.maps.TravelMode.DRIVING });
+      const currentToDropoffPromise = directionsServiceRef.current.route({
+        origin: currentLocation,
+        destination: dropoffLocation,
+        travelMode: window.google.maps.TravelMode.DRIVING,
+        drivingOptions: {
+          departureTime: new Date(),
+          trafficModel: window.google.maps.TrafficModel.BEST_GUESS
+        }
+      });
+      const pickupToDropoffPromise = directionsServiceRef.current.route({
+        origin: pickupLocation,
+        destination: dropoffLocation,
+        travelMode: window.google.maps.TravelMode.DRIVING
+      });
       const [currentToDropoffResult, pickupToDropoffResult] = await Promise.all([currentToDropoffPromise, pickupToDropoffPromise]);
       const currentRoute = currentToDropoffResult.routes[0].legs[0];
       const distanceRemaining = currentRoute.distance.value / 1000;
@@ -587,10 +390,17 @@ function LuggageTrackingContent() {
       const eta = new Date(Date.now() + duration * 1000);
       const totalRoute = pickupToDropoffResult.routes[0].legs[0];
       const totalDistance = totalRoute.distance.value / 1000;
-      const progress = Math.max(0, Math.min(100, (1 - (distanceRemaining / totalDistance)) * 100));
+      const progress = Math.max(0, Math.min(100, ((1 - (distanceRemaining / totalDistance)) * 100)));
       if (polylineRef.current) { polylineRef.current.setMap(null); }
       const routePath = currentToDropoffResult.routes[0].overview_path;
-      polylineRef.current = new window.google.maps.Polyline({ path: routePath, geodesic: true, strokeColor: 'success.main', strokeOpacity: 0.8, strokeWeight: 5, map: map });
+      polylineRef.current = new window.google.maps.Polyline({
+        path: routePath,
+        geodesic: true,
+        strokeColor: 'success.main',
+        strokeOpacity: 0.8,
+        strokeWeight: 5,
+        map: map
+      });
       setRouteData({ eta, distanceRemaining, progress, polyline: routePath, totalDistance });
     } catch (error) {
       setDirectionsError(error.message || 'Failed to calculate directions');
@@ -599,36 +409,35 @@ function LuggageTrackingContent() {
     }
   };
 
-  // Render
   return (
-    <Box sx={{display: "flex", flexDirection: "column", gap: 4 }}>
+    <Box sx={{ display: "flex", flexDirection: "column", gap: 4 }}>
       {!contract ? (
-        <Box sx={{ 
-          display: "flex", 
-          flexDirection: "column", 
-          alignItems: "center", 
-          justifyContent: "center", 
+        <Box sx={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
           minHeight: "80vh",
           gap: 2
         }}>
           <Typography variant="h4" color="primary.main" fontWeight="bold" sx={{ mb: 2 }}>
             Track Luggage
           </Typography>
-          <Box sx={{ 
-            display: 'flex', 
-            alignItems: 'center', 
+          <Box sx={{
+            display: 'flex',
+            alignItems: 'center',
             gap: 1,
             width: "100%",
             maxWidth: "400px"
           }}>
-            <TextField 
-              label="Track Luggage" 
-              placeholder="Enter Contract ID" 
-              variant="outlined" 
-              size="small" 
-              value={contractId} 
-              onChange={(e) => setContractId(e.target.value)} 
-              onKeyPress={(e) => e.key === 'Enter' && handleSearch()} 
+            <TextField
+              label="Track Luggage"
+              placeholder="Enter Contract ID"
+              variant="outlined"
+              size="small"
+              value={contractId}
+              onChange={(e) => setContractId(e.target.value)}
+              onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
               sx={{ width: "100%" }}
               InputProps={{
                 endAdornment: (
@@ -638,7 +447,7 @@ function LuggageTrackingContent() {
                       <IconButton
                         size="small"
                         onClick={handleClearSearch}
-                        sx={{ 
+                        sx={{
                           color: 'text.secondary',
                           '&:hover': { color: 'text.primary' }
                         }}
@@ -666,14 +475,14 @@ function LuggageTrackingContent() {
               <Typography variant="h4" color="primary.main" fontWeight="bold">Luggage Tracking</Typography>
             </Box>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <TextField 
-                label="Track Luggage" 
-                placeholder="Enter Contract ID" 
-                variant="outlined" 
-                size="small" 
-                value={contractId} 
-                onChange={(e) => setContractId(e.target.value)} 
-                onKeyPress={(e) => e.key === 'Enter' && handleSearch()} 
+              <TextField
+                label="Track Luggage"
+                placeholder="Enter Contract ID"
+                variant="outlined"
+                size="small"
+                value={contractId}
+                onChange={(e) => setContractId(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
                 sx={{ width: "300px" }}
                 InputProps={{
                   endAdornment: (
@@ -683,7 +492,7 @@ function LuggageTrackingContent() {
                         <IconButton
                           size="small"
                           onClick={handleClearSearch}
-                          sx={{ 
+                          sx={{
                             color: 'text.secondary',
                             '&:hover': { color: 'text.primary' }
                           }}
@@ -739,7 +548,7 @@ function LuggageTrackingContent() {
                   aria-expanded={expanded}
                   aria-label="show more"
                   size="small"
-                  sx={{ 
+                  sx={{
                     transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)',
                     transition: 'transform 0.3s',
                     color: 'primary.main',
@@ -763,11 +572,9 @@ function LuggageTrackingContent() {
                   <b>Airline Personnel:</b>{' '}
                   <span>
                     {contract.airline
-                      ? `${contract.airline.first_name || ''} ${contract.airline.middle_initial || ''} ${
-                          contract.airline.last_name || ''
-                        }${contract.airline.suffix ? ` ${contract.airline.suffix}` : ''}`
-                          .replace(/  +/g, ' ')
-                          .trim()
+                      ? `${contract.airline.first_name || ''} ${contract.airline.middle_initial || ''} ${contract.airline.last_name || ''}${contract.airline.suffix ? ` ${contract.airline.suffix}` : ''}`
+                        .replace(/\s+/g, ' ')
+                        .trim()
                       : 'N/A'}
                   </span>
                 </Typography>
@@ -783,11 +590,9 @@ function LuggageTrackingContent() {
                   <b>Delivery Personnel:</b>{' '}
                   <span>
                     {contract.delivery
-                      ? `${contract.delivery.first_name || ''} ${contract.delivery.middle_initial || ''} ${
-                          contract.delivery.last_name || ''
-                        }${contract.delivery.suffix ? ` ${contract.delivery.suffix}` : ''}`
-                          .replace(/  +/g, ' ')
-                          .trim()
+                      ? `${contract.delivery.first_name || ''} ${contract.delivery.middle_initial || ''} ${contract.delivery.last_name || ''}${contract.delivery.suffix ? ` ${contract.delivery.suffix}` : ''}`
+                        .replace(/\s+/g, ' ')
+                        .trim()
                       : 'N/A'}
                   </span>
                 </Typography>
@@ -813,8 +618,8 @@ function LuggageTrackingContent() {
               <Box sx={{ ml: 1, mb: 1 }}>
                 <Typography variant="body2">
                   <b>Name:</b> <span>
-                    {contract.owner_first_name || contract.owner_middle_initial || contract.owner_last_name 
-                      ? `${contract.owner_first_name || ''} ${contract.owner_middle_initial || ''} ${contract.owner_last_name || ''}`.replace(/  +/g, ' ').trim()
+                    {contract.owner_first_name || contract.owner_middle_initial || contract.owner_last_name
+                      ? `${contract.owner_first_name || ''} ${contract.owner_middle_initial || ''} ${contract.owner_last_name || ''}`.replace(/\s+/g, ' ').trim()
                       : 'N/A'}
                   </span>
                 </Typography>
@@ -824,7 +629,7 @@ function LuggageTrackingContent() {
                 <Typography variant="body2">
                   <b>Address:</b> <span>
                     {contract.delivery_address || contract.address_line_1 || contract.address_line_2
-                      ? `${contract.delivery_address || ''} ${contract.address_line_1 || ''} ${contract.address_line_2 || ''}`.replace(/  +/g, ' ').trim()
+                      ? `${contract.delivery_address || ''} ${contract.address_line_1 || ''} ${contract.address_line_2 || ''}`.replace(/\s+/g, ' ').trim()
                       : 'N/A'}
                   </span>
                 </Typography>
@@ -955,8 +760,8 @@ function LuggageTrackingContent() {
                   />
                 </Box>
                 <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-                  {routeData.progress > 0 ? 
-                    `Progress calculated from pickup to drop-off location` : 
+                  {routeData.progress > 0 ?
+                    `Progress calculated from pickup to drop-off location` :
                     'Click "Get Directions" to calculate progress'
                   }
                 </Typography>

@@ -11,29 +11,24 @@ import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import dynamic from 'next/dynamic';
 
-// Dynamically import ReactCrop with no SSR
 const ReactCrop = dynamic(() => import('react-image-crop').then(mod => mod.default), {
     ssr: false
 });
 
-// Import the CSS in a way that works with Next.js
 import 'react-image-crop/dist/ReactCrop.css';
 
 export default function Page() {
-    // Client setup
     const router = useRouter();
     const supabase = createClientComponentClient();
     const theme = useTheme();
     const isDark = theme.palette.mode === "dark";
 
-    // Profile states
     const [profile, setProfile] = useState(null);
     const [profileImage, setProfileImage] = useState(null);
     const [roleName, setRoleName] = useState('');
     const [userEmail, setUserEmail] = useState('');
     const [idTypeName, setIdTypeName] = useState('');
 
-    // UI states
     const [uploading, setUploading] = useState(false);
     const [resetLoading, setResetLoading] = useState(false);
     const [resetOpen, setResetOpen] = useState(false);
@@ -44,27 +39,22 @@ export default function Page() {
     const [snackbarMessage, setSnackbarMessage] = useState("");
     const [snackbarSeverity, setSnackbarSeverity] = useState("success");
     const [changePwOpen, setChangePwOpen] = useState(false);
-    const [currentPassword, setCurrentPassword] = useState("");
     const [newPassword, setNewPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
     const [changePwLoading, setChangePwLoading] = useState(false);
-    const [showCurrentPassword, setShowCurrentPassword] = useState(false);
     const [showNewPassword, setShowNewPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [tabIndex, setTabIndex] = useState(0);
 
-    // Image cropping states
     const [cropDialogOpen, setCropDialogOpen] = useState(false);
     const [selectedFile, setSelectedFile] = useState(null);
     const [crop, setCrop] = useState({ unit: 'px', width: 0, height: 0, x: 0, y: 0 });
     const [imgSrc, setImgSrc] = useState('');
     const [imgRef, setImgRef] = useState(null);
     const [isImageLoaded, setIsImageLoaded] = useState(false);
-    // Local state for gov-id signed URLs with auto-refresh on error
     const [govIdFrontUrl, setGovIdFrontUrl] = useState('');
     const [govIdBackUrl, setGovIdBackUrl] = useState('');
 
-    // Data fetching
     useEffect(() => { fetchProfile(); }, []);
     useEffect(() => {
         const fetchIdTypeName = async () => {
@@ -93,7 +83,6 @@ export default function Page() {
         } catch (error) { }
     };
 
-    // Image handling
     const handleImageUpload = async (event) => {
         const file = event.target.files[0];
         if (!file) return;
@@ -195,7 +184,6 @@ export default function Page() {
         }
     };
 
-    // Helper: extract object path from a signed URL for a given bucket
     const extractObjectPath = (signedUrl, bucket) => {
         try {
             const u = new URL(signedUrl);
@@ -206,7 +194,6 @@ export default function Page() {
         } catch (_) { return null; }
     };
 
-    // Refresh front/back gov-id signed URLs on error
     const refreshGovIdUrl = async (which) => {
         if (!profile) return;
         const currentUrl = which === 'front' ? govIdFrontUrl : govIdBackUrl;
@@ -218,13 +205,11 @@ export default function Page() {
         else setGovIdBackUrl(newUrl);
     };
 
-    // Password management
     const handleResetPassword = async () => {
         setResetLoading(true);
         setResetStatus({ message: '', severity: '' });
         if (resetEmail !== userEmail) { setResetStatus({ message: 'Please enter your registered email address', severity: 'error' }); setResetLoading(false); return; }
         try {
-            // Determine the correct redirect URL based on environment
             const isProduction = process.env.NODE_ENV === 'production';
             const redirectUrl = isProduction 
                 ? 'https://www.admin.ghe-easytrack.org/profile/reset-password'
@@ -240,14 +225,38 @@ export default function Page() {
     };
 
     const handleChangePassword = async () => {
-        if (!newPassword || !confirmPassword) { setSnackbarMessage('Please fill in all password fields.'); setSnackbarSeverity('error'); setSnackbarOpen(true); return; }
-        if (newPassword !== confirmPassword) { setSnackbarMessage('Passwords do not match.'); setSnackbarSeverity('error'); setSnackbarOpen(true); return; }
+        if (!newPassword || !confirmPassword) { 
+            setSnackbarMessage('Please fill in all password fields.'); 
+            setSnackbarSeverity('error'); 
+            setSnackbarOpen(true); 
+            return; 
+        }
+        if (newPassword !== confirmPassword) { 
+            setSnackbarMessage('Passwords do not match.'); 
+            setSnackbarSeverity('error'); 
+            setSnackbarOpen(true); 
+            return; 
+        }
         setChangePwLoading(true);
         try {
             const { error } = await supabase.auth.updateUser({ password: newPassword });
-            if (error) { setSnackbarMessage(error.message || 'Failed to change password.'); setSnackbarSeverity('error'); setSnackbarOpen(true); }
-            else { setSnackbarMessage('Password changed successfully!'); setSnackbarSeverity('success'); setSnackbarOpen(true); setChangePwOpen(false); setNewPassword(""); setConfirmPassword(""); }
-        } catch (err) { setSnackbarMessage('Failed to change password.'); setSnackbarSeverity('error'); setSnackbarOpen(true); }
+            if (error) { 
+                setSnackbarMessage(error.message || 'Failed to change password.'); 
+                setSnackbarSeverity('error'); 
+                setSnackbarOpen(true); 
+            } else { 
+                setSnackbarMessage('Password changed successfully!'); 
+                setSnackbarSeverity('success'); 
+                setSnackbarOpen(true); 
+                setChangePwOpen(false); 
+                setNewPassword(""); 
+                setConfirmPassword(""); 
+            }
+        } catch (err) { 
+            setSnackbarMessage('Failed to change password.'); 
+            setSnackbarSeverity('error'); 
+            setSnackbarOpen(true); 
+        }
         finally { setChangePwLoading(false); }
     };
 
@@ -269,7 +278,6 @@ export default function Page() {
         emergencyContactNumber: profile.emergency_contact_number || 'Not provided',
     };
 
-    // Styles
     const containerStyles = {display: "flex", flexDirection: "column", gap: 4 };
     const headerStyles = { width: "100%", maxWidth: "1000px", display: "flex", alignItems: "center", gap: 2 };
     const profileCardStyles = { borderRadius: 2, background: theme.palette.background.paper };
@@ -421,33 +429,11 @@ export default function Page() {
                 </DialogActions>
             </Dialog>
 
-            <Dialog open={changePwOpen} onClose={() => { setChangePwOpen(false); setCurrentPassword(""); setNewPassword(""); setConfirmPassword(""); }} fullWidth maxWidth="xs" PaperProps={{ sx: { backgroundColor: isDark ? theme.palette.grey[900] : theme.palette.background.paper, color: theme.palette.text.primary } }}>
+            <Dialog open={changePwOpen} onClose={() => { setChangePwOpen(false); setNewPassword(""); setConfirmPassword(""); }} fullWidth maxWidth="xs" PaperProps={{ sx: { backgroundColor: isDark ? theme.palette.grey[900] : theme.palette.background.paper, color: theme.palette.text.primary } }}>
                 <DialogTitle sx={dialogTitleStyles}>
                     Change Password
                 </DialogTitle>
                 <DialogContent sx={{ ...dialogContentStyles, gap: 2.5 }}>
-                    <TextField
-                        label="Current Password"
-                        type={showCurrentPassword ? 'text' : 'password'}
-                        value={currentPassword}
-                        onChange={e => setCurrentPassword(e.target.value)}
-                        placeholder="Enter current password"
-                        required
-                        fullWidth
-                        InputLabelProps={{ sx: inputLabelStyles }}
-                        InputProps={{
-                            endAdornment: (
-                                <InputAdornment position="end">
-                                    <Tooltip title={showCurrentPassword ? 'Hide' : 'Show'}>
-                                        <IconButton onClick={() => setShowCurrentPassword(v => !v)} edge="end">
-                                            {showCurrentPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
-                                        </IconButton>
-                                    </Tooltip>
-                                </InputAdornment>
-                            )
-                        }}
-                    />
-
                     <TextField
                         label="New Password"
                         type={showNewPassword ? 'text' : 'password'}
@@ -497,7 +483,7 @@ export default function Page() {
                 </DialogContent>
                 <DialogActions sx={{ px: 3, pb: 3, display: 'flex', flexDirection: 'column', gap: 0.625 }}>
                     <Button variant="contained" color="primary" onClick={handleChangePassword} disabled={changePwLoading || !newPassword || !confirmPassword || confirmPassword !== newPassword} sx={{ width: '100%' }}>{changePwLoading ? "Changing..." : "Change Password"}</Button>
-                    <Button onClick={() => { setChangePwOpen(false); setCurrentPassword(""); setNewPassword(""); setConfirmPassword(""); }} color="secondary" disabled={changePwLoading} sx={{ width: '100%', color: 'error.main' }}>Cancel</Button>
+                    <Button onClick={() => { setChangePwOpen(false); setNewPassword(""); setConfirmPassword(""); }} color="secondary" disabled={changePwLoading} sx={{ width: '100%', color: 'error.main' }}>Cancel</Button>
                 </DialogActions>
             </Dialog>
 

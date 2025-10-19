@@ -2,15 +2,13 @@
 
 import { useState, useEffect } from "react";
 import dynamic from 'next/dynamic';
-import { Box, Tabs, Tab, Typography, Paper, Button, IconButton, CircularProgress, Divider, Collapse, TextField, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Dialog, DialogTitle, DialogContent, DialogActions, Radio, Snackbar, TablePagination, Select, MenuItem, useTheme, FormControl, InputLabel } from "@mui/material";
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import { Box, Tabs, Tab, Typography, Paper, Button, CircularProgress, Divider, TextField, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Dialog, DialogTitle, DialogContent, DialogActions, Radio, Snackbar, TablePagination, Select, MenuItem, useTheme, FormControl, InputLabel } from "@mui/material";
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import { useRouter } from 'next/navigation';
 import SearchIcon from '@mui/icons-material/Search';
 import ClearIcon from '@mui/icons-material/Clear';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
-// Add formatDate helper function at the top level
 const formatDate = (dateString) => {
   if (!dateString) return 'N/A';
   try {
@@ -25,12 +23,10 @@ const formatDate = (dateString) => {
       hour12: false
     });
   } catch (error) {
-    console.error('Error formatting date:', error);
     return 'N/A';
   }
 };
 
-// Add dateOptions constant at the top level
 const dateOptions = [
   { label: 'All Time', value: 'all' },
   { label: 'Today', value: 'today' },
@@ -43,7 +39,6 @@ const dateOptions = [
   { label: 'Last Year', value: 'lastYear' },
 ];
 
-// Add filterByDate helper function
 function filterByDate(contracts, filter) {
   if (filter === 'all') return contracts;
   const now = new Date();
@@ -95,12 +90,10 @@ function filterByDate(contracts, filter) {
   });
 }
 
-// Contract List Component
 const ContractList = ({ onTrackContract, initialSearch, setRedirectContractId, initialStatus }) => {
   const [contractList, setContractList] = useState([]);
   const [contractListLoading, setContractListLoading] = useState(false);
   const [contractListError, setContractListError] = useState(null);
-  const [expandedContracts, setExpandedContracts] = useState([]);
   const [mounted, setMounted] = useState(false);
   const [statusFilter, setStatusFilter] = useState(initialStatus || 'all');
   const [page, setPage] = useState(0);
@@ -110,11 +103,7 @@ const ContractList = ({ onTrackContract, initialSearch, setRedirectContractId, i
   const [cancelling, setCancelling] = useState(false);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
-  const supabase = createClientComponentClient();
-  const router = useRouter();
   const [dateFilter, setDateFilter] = useState('all');
-  const theme = useTheme();
-  const isDark = theme.palette.mode === 'dark';
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [detailsContract, setDetailsContract] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -142,16 +131,13 @@ const ContractList = ({ onTrackContract, initialSearch, setRedirectContractId, i
     setMounted(true);
   }, []);
 
-  // Sync status filter from initialStatus when provided/changed
   useEffect(() => {
     if (initialStatus) {
       setStatusFilter(initialStatus);
     }
   }, [initialStatus]);
 
-  // Fetch contract list
   const fetchContracts = async (isInitialLoad = false) => {
-    // Only show loading indicator on initial load, not on auto-refresh
     if (isInitialLoad) {
       setContractListLoading(true);
     }
@@ -166,7 +152,6 @@ const ContractList = ({ onTrackContract, initialSearch, setRedirectContractId, i
 
       setContractList(result.data || []);
     } catch (err) {
-      console.error('Error in fetchContracts:', err);
       setContractListError(err.message || 'Failed to fetch contracts');
     } finally {
       if (isInitialLoad) {
@@ -178,64 +163,48 @@ const ContractList = ({ onTrackContract, initialSearch, setRedirectContractId, i
   useEffect(() => {
     if (!mounted) return;
 
-    // Initial fetch with loading indicator
     fetchContracts(true);
 
-    // Set up auto-refresh every 5 seconds (quiet refresh)
     const interval = setInterval(() => {
       fetchContracts(false);
     }, 5000);
 
-    // Cleanup interval on unmount
     return () => clearInterval(interval);
   }, [mounted]);
 
-  const handleExpandClick = (contractId) => {
-    setExpandedContracts((prev) =>
-      prev.includes(contractId)
-        ? prev.filter((id) => id !== contractId)
-        : [...prev, contractId]
-    );
-  };
-
-  // Filter contracts based on status and search query
   const filteredContracts = contractList.filter(contract => {
-    if (statusFilter === 'all') return true;
-    const statusId = contract.contract_status?.id;
-    switch (statusFilter) {
-      case 'available':
-        return statusId === 1;
-      case 'accepted':
-        return statusId === 3;
-      case 'transit':
-        return statusId === 4 || statusId === 7;
-      case 'delivered':
-        return statusId === 5;
-      case 'failed':
-        return statusId === 6;
-      case 'cancelled':
-        return statusId === 2;
-      default:
+    if (statusFilter !== 'all') {
+      const statusId = contract.contract_status?.id;
+      const statusMap = {
+        'available': 1,
+        'accepted': 3,
+        'transit': [4, 7],
+        'delivered': 5,
+        'failed': 6,
+        'cancelled': 2
+      };
+      const expectedStatus = statusMap[statusFilter];
+      if (Array.isArray(expectedStatus)) {
+        if (!expectedStatus.includes(statusId)) return false;
+      } else if (statusId !== expectedStatus) {
         return false;
+      }
     }
+
+    if (searchQuery.trim()) {
+      const search = searchQuery.trim().toLowerCase();
+      const idMatch = String(contract.id).toLowerCase().includes(search);
+      const pickupMatch = (contract.pickup_location || '').toLowerCase().includes(search);
+      const dropoffMatch = (contract.drop_off_location || '').toLowerCase().includes(search);
+      const statusMatch = (contract.contract_status?.status_name || '').toLowerCase().includes(search);
+      if (!(idMatch || pickupMatch || dropoffMatch || statusMatch)) return false;
+    }
+
+    return true;
   });
 
-  // Apply search filter (by ID or locations)
-  const searchNormalized = searchQuery.trim().toLowerCase();
-  const filteredContractsWithSearch = filteredContracts.filter(contract => {
-    if (!searchNormalized) return true;
-    const idMatch = String(contract.id).toLowerCase().includes(searchNormalized);
-    const pickupMatch = (contract.pickup_location || '').toLowerCase().includes(searchNormalized);
-    const dropoffMatch = (contract.drop_off_location || '').toLowerCase().includes(searchNormalized);
-    const statusMatch = (contract.contract_status?.status_name || '').toLowerCase().includes(searchNormalized);
-    return idMatch || pickupMatch || dropoffMatch || statusMatch;
-  });
-
-  // Update getFilteredContracts to include date filter
   const getFilteredContracts = () => {
-    const dateFiltered = filterByDate(filteredContractsWithSearch, dateFilter);
-    
-    // Apply pagination
+    const dateFiltered = filterByDate(filteredContracts, dateFilter);
     const startIndex = page * rowsPerPage;
     const endIndex = startIndex + rowsPerPage;
     return dateFiltered.slice(startIndex, endIndex);
@@ -261,31 +230,26 @@ const ContractList = ({ onTrackContract, initialSearch, setRedirectContractId, i
     try {
       const response = await fetch('/api/admin', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'cancelContract',
-          params: {
-            contractId: selectedContractId
-          }
+          params: { contractId: selectedContractId }
         }),
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Failed to cancel contract');
+      
       setSnackbarMessage('Contract cancelled successfully');
       setSnackbarOpen(true);
-      // Refresh the contract list
+      
       const contractsResponse = await fetch('/api/admin?action=allContracts');
       const contractsResult = await contractsResponse.json();
-      if (!contractsResponse.ok) {
-        throw new Error(contractsResult.error || 'Failed to fetch contracts');
+      if (contractsResponse.ok) {
+        setContractList(contractsResult.data || []);
       }
-      setContractList(contractsResult.data || []);
     } catch (err) {
       setSnackbarMessage(err.message || 'Failed to cancel contract');
       setSnackbarOpen(true);
-      setContractListError(err.message || 'Failed to cancel contract');
     } finally {
       setCancelling(false);
       setCancelDialogOpen(false);
@@ -841,7 +805,6 @@ const ContractList = ({ onTrackContract, initialSearch, setRedirectContractId, i
   );
 };
 
-// Add LuggageAssignments component
 const LuggageAssignments = ({ onAssignmentComplete }) => {
   const [assignments, setAssignments] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -864,15 +827,12 @@ const LuggageAssignments = ({ onAssignmentComplete }) => {
     setMounted(true);
   }, []);
 
-  // Fetch data function
   const fetchData = async (isInitialLoad = false) => {
-    // Only show loading indicator on initial load, not on auto-refresh
     if (isInitialLoad) {
       setLoading(true);
     }
     setError(null);
     try {
-      // Fetch contracts
       const contractsResponse = await fetch('/api/admin');
       const contractsResult = await contractsResponse.json();
 
@@ -880,14 +840,12 @@ const LuggageAssignments = ({ onAssignmentComplete }) => {
         throw new Error(contractsResult.error || 'Failed to fetch contracts');
       }
 
-      // Filter for available contracts only
       const availableContracts = (contractsResult.data || []).filter(
         contract => contract.contract_status?.id === 1
       );
       
       setAssignments(availableContracts);
 
-      // Fetch delivery personnel
       const personnelResponse = await fetch('/api/admin?action=delivery-personnel');
       const personnelResult = await personnelResponse.json();
 
@@ -897,7 +855,6 @@ const LuggageAssignments = ({ onAssignmentComplete }) => {
 
       setDeliveryPersonnel(personnelResult.data || []);
     } catch (err) {
-      console.error('Error in fetchData:', err);
       setError(err.message || 'Failed to fetch data');
     } finally {
       if (isInitialLoad) {
@@ -909,15 +866,12 @@ const LuggageAssignments = ({ onAssignmentComplete }) => {
   useEffect(() => {
     if (!mounted) return;
 
-    // Initial fetch with loading indicator
     fetchData(true);
 
-    // Set up auto-refresh every 5 seconds (quiet refresh)
     const interval = setInterval(() => {
       fetchData(false);
     }, 5000);
 
-    // Cleanup interval on unmount
     return () => clearInterval(interval);
   }, [mounted]);
 
@@ -939,9 +893,7 @@ const LuggageAssignments = ({ onAssignmentComplete }) => {
     try {
       const response = await fetch('/api/admin', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'assignContract',
           params: {
@@ -958,14 +910,12 @@ const LuggageAssignments = ({ onAssignmentComplete }) => {
         throw new Error(result.error || 'Failed to assign contract');
       }
 
-      // Update the local state to remove the assigned contract
       setAssignments(prev => prev.filter(c => c.id !== selectedContract.id));
       handleCloseDialog();
       if (onAssignmentComplete) {
         onAssignmentComplete(selectedContract.id);
       }
     } catch (err) {
-      console.error('Error assigning contract:', err);
       setError(err.message || 'Failed to assign contract');
     } finally {
       setAssigning(false);
@@ -991,7 +941,6 @@ const LuggageAssignments = ({ onAssignmentComplete }) => {
     setPage(0);
   };
 
-  // Update getPaginatedAssignments to include date filter
   const getPaginatedAssignments = () => {
     const dateFiltered = filterByDate(assignments, dateFilter);
     const startIndex = page * rowsPerPage;
@@ -1421,20 +1370,17 @@ const LuggageAssignments = ({ onAssignmentComplete }) => {
   );
 };
 
-// Main Page Component
 const Page = () => {
   const [selectedTab, setSelectedTab] = useState(0);
   const [redirectContractId, setRedirectContractId] = useState(null);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const router = useRouter();
-  const theme = useTheme();
 
   const handleTabChange = (event, newValue) => {
     setSelectedTab(newValue);
   };
 
-  // Read status filter from URL on mount
   useEffect(() => {
     if (typeof window === 'undefined') return;
     try {
@@ -1442,12 +1388,7 @@ const Page = () => {
       const statusParam = params.get('status');
       const valid = ['all','available','accepted','transit','delivered','failed','cancelled'];
       if (statusParam && valid.includes(statusParam)) {
-        // If landing on Contract List tab by default, just set filter
         setSelectedTab(0);
-        // Delay set to ensure child mounts
-        setTimeout(() => {
-          // no-op: ContractList reads state from parent props? It keeps internal state, so we'll default via searchQuery
-        }, 0);
       }
     } catch {}
   }, []);
@@ -1457,9 +1398,7 @@ const Page = () => {
     router.push(`/admin/luggage-tracking?contractId=${contractId}`);
   };
 
-  // Handler for assignment completion
   const handleAssignmentComplete = (contractId) => {
-    // Show success message
     setSnackbarMessage('Luggage assigned successfully');
     setSnackbarOpen(true);
   };
@@ -1492,7 +1431,6 @@ const Page = () => {
   );
 };
 
-// Export with dynamic import and no SSR
 export default dynamic(() => Promise.resolve(Page), {
   ssr: false
 });

@@ -4,17 +4,25 @@ import { createClient } from '@supabase/supabase-js';
 import { createServerActionClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 
-// Validation functions
-function validateEmail(email) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email); }
-function sanitizeEmail(email) { return email.trim().toLowerCase(); }
-function validateRole(role) { return role && role !== ''; }
+function validateEmail(email) { 
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email); 
+}
 
-// Password generation
+function sanitizeEmail(email) { 
+    return email.trim().toLowerCase(); 
+}
+
+function validateRole(role) { 
+    return role && role !== ''; 
+}
+
 function generateSecurePassword(length = 8) {
     const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*";
     const randomBytes = crypto.getRandomValues(new Uint8Array(length));
     let password = "";
-    for (let i = 0; i < length; i++) { password += charset[randomBytes[i] % charset.length]; }
+    for (let i = 0; i < length; i++) { 
+        password += charset[randomBytes[i] % charset.length]; 
+    }
     return password;
 }
 
@@ -28,7 +36,6 @@ export async function createUser(formData) {
         const sanitizedEmail = sanitizeEmail(formData.email);
         const encryptedValue = generateSecurePassword();
 
-        // Create user account and send invitation email
         const { data, error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(sanitizedEmail, {
             email: sanitizedEmail,
             data: { password: encryptedValue, role: formData.role_id },
@@ -37,7 +44,6 @@ export async function createUser(formData) {
 
         if (inviteError) throw new Error(inviteError.message);
 
-        // Immediately mark email as verified and set initial password
         const { error: updateError } = await adminClient.auth.admin.updateUserById(data.user.id, {
             email: sanitizedEmail,
             password: encryptedValue,
@@ -47,7 +53,6 @@ export async function createUser(formData) {
 
         if (updateError) throw new Error(updateError.message);
 
-        // Create user profile
         const userScoped = createServerActionClient({ cookies });
         const { error: profileError } = await userScoped.from('profiles').insert({
             id: data.user.id,
@@ -63,7 +68,6 @@ export async function createUser(formData) {
 
         return { success: true, message: 'Account created and verified. Invitation email sent.' };
     } catch (error) {
-        console.error('Error creating user:', error);
         throw new Error(error.message);
     }
 } 

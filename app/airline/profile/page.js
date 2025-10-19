@@ -15,7 +15,6 @@ import 'react-image-crop/dist/ReactCrop.css';
 const ReactCrop = dynamic(() => import('react-image-crop').then(mod => mod.default), { ssr: false });
 
 export default function Page() {
-    // State and client setup
     const router = useRouter();
     const supabase = createClientComponentClient();
     const theme = useTheme();
@@ -46,14 +45,11 @@ export default function Page() {
     const [crop, setCrop] = useState({ unit: 'px', width: 0, height: 0, x: 0, y: 0 });
     const [imgSrc, setImgSrc] = useState('');
     const [imgRef, setImgRef] = useState(null);
-    const [isImageLoaded, setIsImageLoaded] = useState(false);
     const [tabIndex, setTabIndex] = useState(0);
     const [idTypeName, setIdTypeName] = useState('');
-    // Local state for gov-id signed URLs with auto-refresh on error
     const [govIdFrontUrl, setGovIdFrontUrl] = useState('');
     const [govIdBackUrl, setGovIdBackUrl] = useState('');
 
-    // Data fetching
     useEffect(() => { fetchProfile(); }, []);
     const fetchProfile = async () => {
         try {
@@ -71,32 +67,55 @@ export default function Page() {
                 setGovIdFrontUrl(data.gov_id_proof || '');
                 setGovIdBackUrl(data.gov_id_proof_back || '');
             }
-        } catch (error) { console.error('Error fetching profile:', error); }
+        } catch (error) { }
     };
-    const fetchRoleName = async (roleId) => { if (!roleId) return; const { data: roleData } = await supabase.from('profiles_roles').select('role_name').eq('id', roleId).single(); if (roleData?.role_name) setRoleName(roleData.role_name); };
-    const fetchIdTypeName = async (idTypeId) => { if (!idTypeId) return; const { data: idTypeData } = await supabase.from('verify_info_type').select('id_type_name').eq('id', idTypeId).single(); if (idTypeData?.id_type_name) setIdTypeName(idTypeData.id_type_name); };
+    const fetchRoleName = async (roleId) => { 
+        if (!roleId) return; 
+        const { data: roleData } = await supabase.from('profiles_roles').select('role_name').eq('id', roleId).single(); 
+        if (roleData?.role_name) setRoleName(roleData.role_name); 
+    };
+    const fetchIdTypeName = async (idTypeId) => { 
+        if (!idTypeId) return; 
+        const { data: idTypeData } = await supabase.from('verify_info_type').select('id_type_name').eq('id', idTypeId).single(); 
+        if (idTypeData?.id_type_name) setIdTypeName(idTypeData.id_type_name); 
+    };
 
-    // Image handling
     const handleImageUpload = async (event) => {
         const file = event.target.files[0];
         if (!file) return;
-        if (!file.type.startsWith('image/')) { setUploadError('Please upload an image file'); setSnackbarOpen(true); return; }
-        if (file.size > 5 * 1024 * 1024) { setUploadError('File size should be less than 5MB'); setSnackbarOpen(true); return; }
-        setImgRef(null); setIsImageLoaded(false); setCrop({ unit: 'px', width: 0, height: 0, x: 0, y: 0 });
+        if (!file.type.startsWith('image/')) { 
+            setUploadError('Please upload an image file'); 
+            setSnackbarOpen(true); 
+            return; 
+        }
+        if (file.size > 5 * 1024 * 1024) { 
+            setUploadError('File size should be less than 5MB'); 
+            setSnackbarOpen(true); 
+            return; 
+        }
+        setImgRef(null); 
+        setCrop({ unit: 'px', width: 0, height: 0, x: 0, y: 0 });
         const reader = new FileReader();
-        reader.addEventListener('load', () => { setImgSrc(reader.result); setSelectedFile(file); setCropDialogOpen(true); });
+        reader.addEventListener('load', () => { 
+            setImgSrc(reader.result); 
+            setSelectedFile(file); 
+            setCropDialogOpen(true); 
+        });
         reader.readAsDataURL(file);
     };
     const onImageLoad = async (e) => {
         try {
             const { width, height } = e.currentTarget;
             const imageElement = e.currentTarget;
-            setImgRef(imageElement); setIsImageLoaded(true);
+            setImgRef(imageElement);
             const cropSize = Math.min(width, height) * 0.9;
             const x = (width - cropSize) / 2;
             const y = (height - cropSize) / 2;
             setCrop({ unit: 'px', width: cropSize, height: cropSize, x, y });
-        } catch (error) { setUploadError('Failed to initialize image crop'); setSnackbarOpen(true); }
+        } catch (error) { 
+            setUploadError('Failed to initialize image crop'); 
+            setSnackbarOpen(true); 
+        }
     };
     const getCroppedImg = () => {
         if (!imgRef || !crop) return null;
@@ -107,22 +126,45 @@ export default function Page() {
         canvas.height = Math.floor(crop.height * scaleY);
         const ctx = canvas.getContext('2d');
         if (!ctx) return null;
-        ctx.imageSmoothingQuality = 'high'; ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high'; 
+        ctx.imageSmoothingEnabled = true;
         ctx.drawImage(imgRef, Math.floor(crop.x * scaleX), Math.floor(crop.y * scaleY), Math.floor(crop.width * scaleX), Math.floor(crop.height * scaleY), 0, 0, canvas.width, canvas.height);
-        return new Promise((resolve) => { canvas.toBlob((blob) => { if (!blob) { resolve(null); return; } resolve(blob); }, 'image/jpeg', 0.95); });
+        return new Promise((resolve) => { 
+            canvas.toBlob((blob) => { 
+                if (!blob) { 
+                    resolve(null); 
+                    return; 
+                } 
+                resolve(blob); 
+            }, 'image/jpeg', 0.95); 
+        });
     };
     const handleCropComplete = async () => {
         try {
-            if (!imgRef) { setUploadError('Please wait for the image to load completely'); setSnackbarOpen(true); return; }
-            setUploading(true); setUploadError(null);
+            if (!imgRef) { 
+                setUploadError('Please wait for the image to load completely'); 
+                setSnackbarOpen(true); 
+                return; 
+            }
+            setUploading(true); 
+            setUploadError(null);
             if (!crop || !crop.width || !crop.height) throw new Error('Invalid crop data. Please try again.');
             const croppedImage = await getCroppedImg();
             if (!croppedImage) throw new Error('Failed to generate cropped image. Please try again.');
             const croppedFile = new File([croppedImage], selectedFile.name, { type: 'image/jpeg', lastModified: Date.now() });
             await deleteOldProfileImage();
             await uploadNewProfileImage(croppedFile);
-            setCropDialogOpen(false); setImgSrc(''); setSelectedFile(null); setImgRef(null); setIsImageLoaded(false); setCrop({ unit: 'px', width: 0, height: 0, x: 0, y: 0 });
-        } catch (error) { setUploadError(error.message || 'Failed to process image'); setSnackbarOpen(true); } finally { setUploading(false); }
+            setCropDialogOpen(false); 
+            setImgSrc(''); 
+            setSelectedFile(null); 
+            setImgRef(null); 
+            setCrop({ unit: 'px', width: 0, height: 0, x: 0, y: 0 });
+        } catch (error) { 
+            setUploadError(error.message || 'Failed to process image'); 
+            setSnackbarOpen(true); 
+        } finally { 
+            setUploading(false); 
+        }
     };
     const deleteOldProfileImage = async () => {
         if (!profile?.pfp_id) return;
@@ -135,7 +177,9 @@ export default function Page() {
             const filePath = `airlines/${fileName}.${fileExt}`;
             await supabase.storage.from('profile-images').remove([filePath]);
             await supabase.from('profiles').update({ pfp_id: null }).eq('id', profile.id);
-        } catch (error) { }
+        } catch (error) { 
+            // Silently handle error
+        }
     };
     const uploadNewProfileImage = async (file) => {
         try {
@@ -151,10 +195,13 @@ export default function Page() {
             if (updateError) throw new Error(`Failed to update profile: ${updateError.message}`);
             setProfileImage(signedData.signedUrl);
             setProfile(prevProfile => ({ ...prevProfile, pfp_id: signedData.signedUrl }));
-        } catch (error) { setUploadError(error.message || 'Failed to upload image'); setSnackbarOpen(true); throw error; }
+        } catch (error) { 
+            setUploadError(error.message || 'Failed to upload image'); 
+            setSnackbarOpen(true); 
+            throw error; 
+        }
     };
 
-    // Helper: extract object path from a signed URL for a given bucket
     const extractObjectPath = (signedUrl, bucket) => {
         try {
             const u = new URL(signedUrl);
@@ -162,10 +209,11 @@ export default function Page() {
             const idx = u.pathname.indexOf(marker);
             if (idx === -1) return null;
             return u.pathname.substring(idx + marker.length);
-        } catch (_) { return null; }
+        } catch (_) { 
+            return null; 
+        }
     };
 
-    // Refresh front/back gov-id signed URLs on error
     const refreshGovIdUrl = async (which) => {
         if (!profile) return;
         const currentUrl = which === 'front' ? govIdFrontUrl : govIdBackUrl;
@@ -173,16 +221,22 @@ export default function Page() {
         if (!objectPath) return;
         const { data } = await supabase.storage.from('gov-id').createSignedUrl(objectPath, 60 * 60 * 24 * 365);
         const newUrl = data?.signedUrl || '';
-        if (which === 'front') setGovIdFrontUrl(newUrl);
-        else setGovIdBackUrl(newUrl);
+        if (which === 'front') {
+            setGovIdFrontUrl(newUrl);
+        } else {
+            setGovIdBackUrl(newUrl);
+        }
     };
 
-    // Password management
     const handleResetPassword = async () => {
-        setResetLoading(true); setResetStatus({ message: '', severity: '' });
-        if (resetEmail !== userEmail) { setResetStatus({ message: 'Please enter your registered email address', severity: 'error' }); setResetLoading(false); return; }
+        setResetLoading(true); 
+        setResetStatus({ message: '', severity: '' });
+        if (resetEmail !== userEmail) { 
+            setResetStatus({ message: 'Please enter your registered email address', severity: 'error' }); 
+            setResetLoading(false); 
+            return; 
+        }
         try {
-            // Determine the correct redirect URL based on environment
             const isProduction = process.env.NODE_ENV === 'production';
             const redirectUrl = isProduction 
                 ? 'https://www.airline.ghe-easytrack.org/profile/reset-password'
@@ -191,21 +245,54 @@ export default function Page() {
             const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, { redirectTo: redirectUrl });
             if (error) throw error;
             setResetStatus({ message: 'Password reset link sent to your email', severity: 'success' });
-            setTimeout(() => { setResetOpen(false); setResetStatus({ message: '', severity: '' }); setResetEmail(''); }, 2000);
-        } catch (error) { setResetStatus({ message: error.message || 'Failed to send reset link', severity: 'error' }); } finally { setResetLoading(false); }
+            setTimeout(() => { 
+                setResetOpen(false); 
+                setResetStatus({ message: '', severity: '' }); 
+                setResetEmail(''); 
+            }, 2000);
+        } catch (error) { 
+            setResetStatus({ message: error.message || 'Failed to send reset link', severity: 'error' }); 
+        } finally { 
+            setResetLoading(false); 
+        }
     };
     const handleChangePassword = async () => {
-        if (!newPassword || !confirmPassword) { setSnackbarMessage('Please fill in all password fields.'); setSnackbarSeverity('error'); setSnackbarOpen(true); return; }
-        if (newPassword !== confirmPassword) { setSnackbarMessage('Passwords do not match.'); setSnackbarSeverity('error'); setSnackbarOpen(true); return; }
+        if (!newPassword || !confirmPassword) { 
+            setSnackbarMessage('Please fill in all password fields.'); 
+            setSnackbarSeverity('error'); 
+            setSnackbarOpen(true); 
+            return; 
+        }
+        if (newPassword !== confirmPassword) { 
+            setSnackbarMessage('Passwords do not match.'); 
+            setSnackbarSeverity('error'); 
+            setSnackbarOpen(true); 
+            return; 
+        }
         setChangePwLoading(true);
         try {
             const { error } = await supabase.auth.updateUser({ password: newPassword });
-            if (error) { setSnackbarMessage(error.message || 'Failed to change password.'); setSnackbarSeverity('error'); setSnackbarOpen(true); }
-            else { setSnackbarMessage('Password changed successfully!'); setSnackbarSeverity('success'); setSnackbarOpen(true); setChangePwOpen(false); setNewPassword(""); setConfirmPassword(""); }
-        } catch (err) { setSnackbarMessage('Failed to change password.'); setSnackbarSeverity('error'); setSnackbarOpen(true); } finally { setChangePwLoading(false); }
+            if (error) { 
+                setSnackbarMessage(error.message || 'Failed to change password.'); 
+                setSnackbarSeverity('error'); 
+                setSnackbarOpen(true); 
+            } else { 
+                setSnackbarMessage('Password changed successfully!'); 
+                setSnackbarSeverity('success'); 
+                setSnackbarOpen(true); 
+                setChangePwOpen(false); 
+                setNewPassword(""); 
+                setConfirmPassword(""); 
+            }
+        } catch (err) { 
+            setSnackbarMessage('Failed to change password.'); 
+            setSnackbarSeverity('error'); 
+            setSnackbarOpen(true); 
+        } finally { 
+            setChangePwLoading(false); 
+        }
     };
 
-    // Styles
     const containerStyles = {display: "flex", flexDirection: "column", gap: 4 };
     const headerStyles = { width: "100%", maxWidth: "1000px", display: "flex", alignItems: "center", gap: 2 };
     const profileCardStyles = { borderRadius: 2, background: theme.palette.background.paper };
@@ -275,7 +362,6 @@ export default function Page() {
                     </Box>
                 </CardContent>
             </Paper>
-            {/* Tabs for info sections */}
             <Paper elevation={2} sx={{ borderRadius: 2, background: theme.palette.background.paper }}>
                 <Tabs value={tabIndex} onChange={(_, v) => setTabIndex(v)} aria-label="profile info tabs" sx={{ borderBottom: 1, borderColor: 'divider', px: 2 }}>
                     <Tab label="Personal Information" />
@@ -349,7 +435,6 @@ export default function Page() {
                     )}
                 </Box>
             </Paper>
-            {/* Dialogs and snackbars */}
             <Dialog open={resetOpen} onClose={() => { setResetOpen(false); setResetStatus({ message: '', severity: '' }); setResetEmail(''); }} PaperProps={{ sx: dialogStyles }}>
                 <DialogTitle variant="h5" sx={dialogTitleStyles}>Change Password</DialogTitle>
                 <DialogContent sx={dialogContentStyles}>
@@ -441,14 +526,14 @@ export default function Page() {
                     <Button onClick={() => { setChangePwOpen(false); setCurrentPassword(""); setNewPassword(""); setConfirmPassword(""); }} color="secondary" disabled={changePwLoading} sx={{ width: '100%', color: 'error.main' }}>Cancel</Button>
                 </DialogActions>
             </Dialog>
-            <Dialog open={cropDialogOpen} onClose={() => { setCropDialogOpen(false); setImgSrc(''); setSelectedFile(null); setImgRef(null); setIsImageLoaded(false); setCrop({ unit: 'px', width: 0, height: 0, x: 0, y: 0 }); }} maxWidth="md" fullWidth PaperProps={{ sx: dialogStyles }}>
+            <Dialog open={cropDialogOpen} onClose={() => { setCropDialogOpen(false); setImgSrc(''); setSelectedFile(null); setImgRef(null); setCrop({ unit: 'px', width: 0, height: 0, x: 0, y: 0 }); }} maxWidth="md" fullWidth PaperProps={{ sx: dialogStyles }}>
                 <DialogTitle variant="h5" sx={dialogTitleStyles}>Crop Profile Picture</DialogTitle>
                 <DialogContent sx={dialogContentStyles}>
                     {imgSrc && (<ReactCrop crop={crop} onChange={c => setCrop(c)} aspect={1} circularCrop keepRatio minWidth={50} minHeight={50}><img src={imgSrc} onLoad={onImageLoad} style={{ maxWidth: '100%', maxHeight: '70vh' }} alt="Crop preview" crossOrigin="anonymous" loading="eager" ref={el => { if (el) setImgRef(el); }} /></ReactCrop>)}
                 </DialogContent>
                 <DialogActions sx={dialogActionsStyles}>
                     <Button sx={actionButtonStyles} variant="contained" color="primary" onClick={handleCropComplete} disabled={uploading || !imgRef}>{uploading ? "Processing..." : !imgRef ? "Loading..." : "Apply Crop"}</Button>
-                    <Button sx={actionButtonStyles} onClick={() => { setCropDialogOpen(false); setImgSrc(''); setSelectedFile(null); setImgRef(null); setIsImageLoaded(false); setCrop({ unit: 'px', width: 0, height: 0, x: 0, y: 0 }); }} color="secondary" disabled={uploading}>Cancel</Button>
+                    <Button sx={actionButtonStyles} onClick={() => { setCropDialogOpen(false); setImgSrc(''); setSelectedFile(null); setImgRef(null); setCrop({ unit: 'px', width: 0, height: 0, x: 0, y: 0 }); }} color="secondary" disabled={uploading}>Cancel</Button>
                 </DialogActions>
             </Dialog>
             <Snackbar open={snackbarOpen} autoHideDuration={5000} onClose={(_, reason) => { if (reason !== 'clickaway') setSnackbarOpen(false); }} anchorOrigin={{ vertical: 'top', horizontal: 'center' }}>

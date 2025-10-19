@@ -3,35 +3,24 @@
 import { ThemeProvider } from "@mui/material/styles";
 import { CssBaseline, Box } from "@mui/material";
 import { getTheme } from "./theme";
-import { useState, useEffect, createContext, useContext, Suspense } from "react";
+import { useState, useEffect, createContext } from "react";
 import { setCookie, getCookie } from 'cookies-next';
 
 export const ColorModeContext = createContext({ toggleMode: () => {}, mode: "light" });
 
 export default function Layout({ children }) {
-    return (
-        <Suspense fallback={<div>Loading...</div>}>
-            <LayoutContent>{children}</LayoutContent>
-        </Suspense>
-    );
-}
-
-function LayoutContent({ children }) {
-    // State setup
     const [mode, setMode] = useState("light");
 
-    // Theme initialization - check cookies for saved theme, default to light
     useEffect(() => {
         const savedMode = getCookie('theme-mode') || 'light';
         setMode(savedMode);
     }, []);
 
-    // Theme toggle handler
     const toggleMode = () => {
         const newMode = mode === 'light' ? 'dark' : 'light';
         setMode(newMode);
         setCookie('theme-mode', newMode, { 
-            maxAge: 60 * 60 * 24 * 365, // 1 year
+            maxAge: 60 * 60 * 24 * 365,
             sameSite: 'lax'
         });
     };

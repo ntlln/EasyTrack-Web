@@ -1,7 +1,7 @@
 "use client";
 
-import { Box, Button, Container, Typography, Paper, Grid, Card, CardContent, Avatar, Chip, TextField, Divider, IconButton, Collapse, CircularProgress, Snackbar, Alert, ThemeProvider } from '@mui/material';
-import { useState, useEffect, useRef, Suspense } from 'react';
+import { Box, Button, Container, Typography, Paper, TextField, Divider, IconButton, Collapse, CircularProgress, Snackbar, Alert, ThemeProvider } from '@mui/material';
+import { useState, useEffect, useRef } from 'react';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import CloseIcon from '@mui/icons-material/Close';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
@@ -12,17 +12,13 @@ import { isMainDomain, isWwwDomain, getDomainConfig } from '../../config/domains
 import { useRouter } from 'next/navigation';
 import { getTheme } from '../theme';
 
-// Map component
 const MapComponent = dynamic(() => Promise.resolve(({ mapRef, mapError }) => (
   <Box ref={mapRef} sx={{ width: '100%', height: '500px', mt: 2, borderRadius: 1, overflow: 'hidden', border: '1px solid', borderColor: 'divider', position: 'relative', bgcolor: 'background.default' }}>{mapError && (<Box sx={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center', color: 'error.main' }}><Typography color="error">{mapError}</Typography></Box>)}</Box>
 )), { ssr: false });
 
 export default function Test() {
   const router = useRouter();
-  const [selectedVehicle, setSelectedVehicle] = useState('motorcycle');
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  
-  // Luggage tracking states
   const [contractId, setContractId] = useState("");
   const [contract, setContract] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -34,12 +30,10 @@ export default function Test() {
   const [progress, setProgress] = useState(0);
   const [routeDetails, setRouteDetails] = useState({ distance: null, duration: null });
   const [totalRouteDetails, setTotalRouteDetails] = useState({ distance: null, duration: null });
-  const [eta, setEta] = useState(null);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState("");
   const [snackbarSeverity, setSnackbarSeverity] = useState("info");
   
-  // Refs for map functionality
   const mapRef = useRef(null);
   const markerRef = useRef(null);
   const currentLocationMarkerRef = useRef(null);
@@ -47,42 +41,26 @@ export default function Test() {
   const polylineRef = useRef(null);
   const directionsServiceRef = useRef(null);
   const routeSegmentsRef = useRef([]);
+  const previousValidContractIdRef = useRef("");
   const supabase = createClientComponentClient();
   
-  // Domain redirect logic
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const hostname = window.location.hostname;
       const config = getDomainConfig();
       
-      // Handle www redirect to main domain
       if (isWwwDomain(hostname)) {
         const redirectUrl = `https://${config.mainDomain}${window.location.pathname}`;
         window.location.replace(redirectUrl);
         return;
       }
       
-      // Handle main domain redirect to admin portal
       if (isMainDomain(hostname)) {
         router.replace('/admin');
         return;
       }
     }
   }, [router]);
-  
-  // Debug Supabase client
-  useEffect(() => {
-    console.log('Supabase client initialized:', {
-      hasSupabase: !!supabase,
-      supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
-      hasAnonKey: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-      supabaseKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.substring(0, 10) + '...'
-    });
-  }, []);
-  const previousValidContractIdRef = useRef("");
-  const scriptLoadingRef = useRef(false);
-  const mapInitializedRef = useRef(false);
-  const currentContractIdRef = useRef("");
   
   const images = [
     'https://www.shutterstock.com/image-photo/closeup-detail-view-cargo-cart-600nw-2423113091.jpg',
@@ -95,13 +73,11 @@ export default function Test() {
   useEffect(() => {
     const interval = setInterval(() => {
       setCurrentImageIndex((prevIndex) => (prevIndex + 1) % images.length);
-    }, 3000); // Change image every 3 seconds
+    }, 3000);
 
     return () => clearInterval(interval);
   }, [images.length]);
 
-
-  // Fetch contract and luggage info directly from Supabase
   const fetchData = async (id = contractId) => {
     if (!id.trim()) return;
     
@@ -113,28 +89,12 @@ export default function Test() {
     
     setLoading(true);
     try {
-      console.log('Fetching contract data for ID:', id);
-      
-      // Debug: Check if there are any contracts in the database
-      const { data: allContracts, error: debugError } = await supabase
-        .from('contracts')
-        .select('id')
-        .limit(5);
-      console.log('Available contracts in database:', allContracts?.length || 0, 'contracts found');
-      if (debugError) {
-        console.log('Debug error:', debugError);
-      }
-      
-      // Try a simple query first - remove .single() to handle no results gracefully
       const { data: contracts, error: mainContractError } = await supabase
         .from('contracts')
         .select('*')
         .eq('id', id);
 
-      console.log('Contract query result:', { contracts, mainContractError });
-
       if (mainContractError) {
-        console.error('Error fetching contract:', mainContractError);
         throw new Error(`Database error: ${mainContractError.message}`);
       }
 
@@ -143,9 +103,7 @@ export default function Test() {
       }
 
       const contract = contracts[0];
-      console.log('✅ Contract found successfully:', contract.id);
 
-      // Fetch luggage information if available
       let luggage = [];
       if (contract.id) {
         const { data: luggageData, error: luggageError } = await supabase
@@ -158,7 +116,6 @@ export default function Test() {
         }
       }
 
-      // Fetch route history if available
       let route_history = [];
       if (contract.id) {
         const { data: routeData, error: routeError } = await supabase
@@ -175,8 +132,6 @@ export default function Test() {
           }));
         }
       }
-
-      console.log('Received contract data:', contract);
       
       if (contract) {
         previousValidContractIdRef.current = id;
@@ -189,12 +144,11 @@ export default function Test() {
           current_location_geo: contract.current_location_geo || null,
           route_history: route_history || []
         };
-        console.log('Processed contract data:', newContract);
         
         setContract(prev => {
           return JSON.stringify(prev) !== JSON.stringify(newContract) ? newContract : prev;
         });
-        setExpanded(true); // Auto-expand when contract is found
+        setExpanded(true);
       } else {
         if (shouldShowErrors) {
           setError('No contract data found');
@@ -204,7 +158,6 @@ export default function Test() {
         }
       }
     } catch (err) {
-      console.error('Error fetching contract:', err);
       if (shouldShowErrors) {
         setError(err.message || 'Failed to fetch contract');
         setSnackbarMessage(`Contract ID "${id}" (make sure that it's the contract id) not found.`);
@@ -216,14 +169,8 @@ export default function Test() {
     }
   };
 
-  // Reset map/markers when contractId changes
   useEffect(() => {
     if (!contractId) return;
-    
-    console.log('Contract ID changed, resetting map and fetching data:', contractId);
-    
-    mapInitializedRef.current = false;
-    currentContractIdRef.current = contractId;
     
     if (map) setMap(null);
     if (markerRef.current) { markerRef.current.map = null; markerRef.current = null; }
@@ -232,7 +179,6 @@ export default function Test() {
     fetchData(contractId);
   }, [contractId]);
 
-  // Real-time subscription for contract changes
   useEffect(() => {
     if (!contractId) return;
 
@@ -245,11 +191,8 @@ export default function Test() {
           const merged = prev ? { ...prev, ...updatedRow } : updatedRow;
           return merged;
         });
-
-        // Note: Map marker updates are now handled manually via the Get Directions button
-        // Real-time updates only update the contract data, not the map visualization
       } catch (err) {
-        console.error('Realtime update handling error:', err);
+        // Handle error silently
       }
     };
 
@@ -287,7 +230,6 @@ export default function Test() {
     };
   }, [contractId, supabase, map]);
 
-  // Update polyline with directions
   const updatePolylineWithDirections = async (start, end) => {
     if (!directionsServiceRef.current || !map) return;
 
@@ -315,7 +257,6 @@ export default function Test() {
       }
       polylineRef.current.push(newPolyline);
     } catch (error) {
-      console.error('Error getting directions:', error);
       const fallbackPath = [start, end];
       routeSegmentsRef.current.push(fallbackPath);
 
@@ -335,43 +276,23 @@ export default function Test() {
     }
   };
 
-  // Draw complete route history
-  const drawCompleteRoute = async () => {
-    if (!directionsServiceRef.current || !map || pathRef.current.length < 2) return;
-
-    if (polylineRef.current) {
-      polylineRef.current.forEach(polyline => polyline.setMap(null));
-      polylineRef.current = [];
-    }
-    routeSegmentsRef.current = [];
-
-    for (let i = 0; i < pathRef.current.length - 1; i++) {
-      await updatePolylineWithDirections(pathRef.current[i], pathRef.current[i + 1]);
-    }
-  };
-
-  // Google Maps script loader
   useEffect(() => {
     if (!contract) return;
 
-    // If Google Maps is already available (loaded elsewhere), mark as loaded
     if (typeof window !== 'undefined' && window.google) {
       if (!isScriptLoaded) setIsScriptLoaded(true);
       return;
     }
 
     if (!isScriptLoaded) {
-      console.log('Loading Google Maps script...');
       const script = document.createElement('script');
       script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places,marker`;
       script.async = true;
       script.defer = true;
       script.onload = () => {
-        console.log('Google Maps script loaded successfully');
         setIsScriptLoaded(true);
       };
       script.onerror = (error) => {
-        console.error('Failed to load Google Maps:', error);
         setMapError('Failed to load Google Maps');
       };
       document.head.appendChild(script);
@@ -383,28 +304,18 @@ export default function Test() {
     }
   }, [contract, isScriptLoaded]);
 
-  // Initialize map
   useEffect(() => {
     if (isScriptLoaded && contract && !map) {
-      console.log('Initializing map...');
       initMap();
     }
   }, [isScriptLoaded, contract, map]);
 
-  // Map initialization
   const initMap = () => {
     if (!window.google || !mapRef.current || !contract) {
-      console.log('Map initialization skipped:', {
-        hasGoogle: !!window.google,
-        hasMapRef: !!mapRef.current,
-        hasContract: !!contract
-      });
       return;
     }
     
     try {
-      console.log('Initializing map with contract:', contract);
-      
       const defaultCenter = { lat: 14.5350, lng: 120.9821 };
       const mapOptions = {
         center: defaultCenter,
@@ -423,16 +334,13 @@ export default function Test() {
         draggingCursor: 'grabbing'
       };
 
-      console.log('Creating new map instance...');
       const newMap = new window.google.maps.Map(mapRef.current, mapOptions);
       setMap(newMap);
       directionsServiceRef.current = new window.google.maps.DirectionsService();
 
       const markers = [];
 
-      // Add current location marker
       if (contract.current_location_geo?.coordinates) {
-        console.log('Adding current location marker:', contract.current_location_geo.coordinates);
         const currentPosition = {
           lat: contract.current_location_geo.coordinates[1],
           lng: contract.current_location_geo.coordinates[0]
@@ -473,9 +381,7 @@ export default function Test() {
         markers.push(currentPosition);
       }
 
-      // Add pickup location marker
       if (contract.pickup_location_geo?.coordinates) {
-        console.log('Adding pickup location marker:', contract.pickup_location_geo.coordinates);
         const pickupMarker = new window.google.maps.marker.PinElement({
           scale: 1,
           background: 'info.main',
@@ -499,9 +405,7 @@ export default function Test() {
         markers.push(pickupPosition);
       }
 
-      // Add drop-off location marker
       if (contract.drop_off_location_geo?.coordinates) {
-        console.log('Adding drop-off location marker:', contract.drop_off_location_geo.coordinates);
         const dropoffMarker = new window.google.maps.marker.PinElement({
           scale: 1,
           background: 'warning.main',
@@ -525,7 +429,6 @@ export default function Test() {
         markers.push(dropoffPosition);
       }
 
-      // Fit bounds to show all markers
       if (markers.length > 0) {
         if (contract.current_location_geo?.coordinates) {
           const currentPosition = {
@@ -546,15 +449,11 @@ export default function Test() {
           newMap.fitBounds(bounds);
         }
       }
-
-      console.log('Map initialization completed successfully');
     } catch (error) {
-      console.error('Error initializing map:', error);
       setMapError(error.message);
     }
   };
 
-  // Update map location
   const updateMapLocation = async () => {
     if (!map || !window.google) {
       return;
@@ -572,7 +471,6 @@ export default function Test() {
         };
 
         if (currentLocationMarkerRef.current && currentLocationMarkerRef.current.map) {
-          console.log('Updating marker position:', newPosition);
           currentLocationMarkerRef.current.position = newPosition;
           
           map.setCenter(newPosition);
@@ -587,7 +485,6 @@ export default function Test() {
             }
           }
         } else {
-          console.log('Marker is no longer valid, recreating...');
           const currentLocationMarker = document.createElement('div');
           currentLocationMarker.innerHTML = `
             <style>
@@ -622,17 +519,12 @@ export default function Test() {
         }
       }
     } catch (error) {
-      console.error('Error updating location:', error);
       if (error.message.includes('Cannot read properties of undefined')) {
-        console.log('Attempting to recreate marker...');
         currentLocationMarkerRef.current = null;
       }
     }
   };
 
-  // Removed complex polling logic - real-time updates are handled via Supabase subscriptions
-
-  // Handle search
   const handleSearch = (id = contractId) => {
     if (!id.trim()) {
       setSnackbarMessage("Contract ID cannot be empty.");
@@ -643,7 +535,6 @@ export default function Test() {
     fetchData(id);
   };
 
-  // Expand/collapse
   const handleExpandClick = () => { setExpanded(!expanded); };
 
   const handleClearSearch = () => {
@@ -669,7 +560,6 @@ export default function Test() {
     setSnackbarOpen(false);
   };
 
-  // Show snackbar
   const handleSnackbarClose = (event, reason) => {
     if (reason === 'clickaway') {
       return;
@@ -677,7 +567,6 @@ export default function Test() {
     setSnackbarOpen(false);
   };
 
-  // Calculate route details
   const calculateRouteDetails = async (origin, destination) => {
     if (!directionsServiceRef.current || !origin || !destination) {
       return { distance: null, duration: null };
@@ -703,12 +592,10 @@ export default function Test() {
       }
       return { distance: null, duration: null };
     } catch (error) {
-      console.error('Error calculating route:', error);
       return { distance: null, duration: null };
     }
   };
 
-  // Format duration
   const formatDuration = (seconds) => {
     if (!seconds) return 'Calculating...';
     const hours = Math.floor(seconds / 3600);
@@ -723,7 +610,6 @@ export default function Test() {
     }
   };
 
-  // Update route details when location changes
   useEffect(() => {
     const updateRouteDetails = async () => {
       const hasCurrentLocation = contract?.current_location_geo?.coordinates;
@@ -776,75 +662,12 @@ export default function Test() {
         ));
         setProgress(progressPercentage);
       }
-
-      if (details.duration) {
-        const etaTime = new Date(Date.now() + details.duration * 1000);
-        setEta(etaTime);
-      }
     };
 
     updateRouteDetails();
   }, [contract?.current_location_geo?.coordinates]);
 
-  const deliveryVehicles = [
-    {
-      id: 'motorcycle',
-      name: 'Motorcycle',
-      weight: '200kg',
-      baseFare: '₱49',
-      perKm: '₱6/km',
-      icon: '🛵',
-      description: 'Cheapest delivery option; perfect for small items such as food and documents.'
-    },
-    {
-      id: 'sedan',
-      name: 'Sedan',
-      weight: '300kg',
-      baseFare: '₱100',
-      perKm: '₱18/km',
-      icon: '🚗',
-      description: 'Cakes, Food trays & Fragile goods'
-    },
-    {
-      id: 'suv',
-      name: 'Subcompact SUV',
-      weight: '600kg',
-      baseFare: '₱115',
-      perKm: '₱20/km',
-      icon: '🚙',
-      description: 'Small appliances (microwave, fan)'
-    },
-    {
-      id: 'van',
-      name: '7-seater SUV / Small Van',
-      weight: '800kg',
-      baseFare: '₱200',
-      perKm: '₱20/km',
-      icon: '🚐',
-      description: 'Appliance (TV or Aircon), Gaming setup'
-    },
-    {
-      id: 'pickup',
-      name: 'Pickup',
-      weight: '1,000kg',
-      baseFare: '₱250',
-      perKm: '₱25/km',
-      icon: '🛻',
-      description: 'Furniture and bulky items'
-    },
-    {
-      id: 'truck',
-      name: 'Truck',
-      weight: '7,000kg',
-      baseFare: '₱4,320',
-      perKm: '₱48/km',
-      icon: '🚛',
-      description: 'Good for general business delivery'
-    }
-  ];
-
-
-     return (
+  return (
      <ThemeProvider theme={getTheme("light")}>
       <Layout>
        <Navbar currentPage="home" />

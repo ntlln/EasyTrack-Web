@@ -30,10 +30,14 @@ export default function Page() {
     fetchLogs();
   }, []);
 
-  const handleChangePage = (event, newPage) => setPage(newPage);
-  const handleChangeRowsPerPage = (event) => { setRowsPerPage(parseInt(event.target.value, 10)); setPage(0); };
+  const handleChangePage = (_, newPage) => setPage(newPage);
+  const handleChangeRowsPerPage = (event) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
 
   const paginated = logs.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
+  const formatData = (data) => typeof data === 'object' ? JSON.stringify(data) : String(data || '');
 
   return (
     <Box sx={{ p: 2 }}>
@@ -73,8 +77,16 @@ export default function Page() {
                     <TableRow key={idx}>
                       <TableCell>{log.table_name || 'N/A'}</TableCell>
                       <TableCell>{log.event_type || 'N/A'}</TableCell>
-                      <TableCell><pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{typeof log.row_data === 'object' ? JSON.stringify(log.row_data) : String(log.row_data || '')}</pre></TableCell>
-                      <TableCell><pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{typeof log.old_data === 'object' ? JSON.stringify(log.old_data) : String(log.old_data || '')}</pre></TableCell>
+                      <TableCell>
+                        <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                          {formatData(log.row_data)}
+                        </pre>
+                      </TableCell>
+                      <TableCell>
+                        <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                          {formatData(log.old_data)}
+                        </pre>
+                      </TableCell>
                       <TableCell>{log.created_at ? new Date(log.created_at).toLocaleString() : 'N/A'}</TableCell>
                       <TableCell>{log.action_by_name || log.action_by || 'N/A'}</TableCell>
                     </TableRow>

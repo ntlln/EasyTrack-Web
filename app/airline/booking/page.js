@@ -99,7 +99,6 @@ export default function Page() {
     const [isScriptLoaded, setIsScriptLoaded] = useState(false);
     const [mapError, setMapError] = useState(null);
     const [mounted, setMounted] = useState(false);
-    const [isFormMounted, setIsFormMounted] = useState(false);
     const [isVerified, setIsVerified] = useState(false);
     const [verificationLoading, setVerificationLoading] = useState(true);
     const [activeTab, setActiveTab] = useState(0);
@@ -160,7 +159,7 @@ export default function Page() {
         'Terminal 3': { lat: 14.5201168528943, lng: 121.01377520505147 },
     };
 
-    useEffect(() => { setMounted(true); setIsFormMounted(true); }, []);
+    useEffect(() => { setMounted(true); }, []);
 
     useEffect(() => {
         const checkVerification = async () => {
@@ -180,7 +179,6 @@ export default function Page() {
                 const verified = profile?.verify_status?.status_name === 'Verified';
                 setIsVerified(verified);
             } catch (error) {
-                console.error('Error checking verification:', error);
                 setIsVerified(false);
             } finally {
                 setVerificationLoading(false);
@@ -272,7 +270,6 @@ export default function Page() {
                 setBarangays(filteredBarangays);
 
             } catch (error) {
-                console.error('Error loading address data:', error);
                 setSnackbarMessage('Failed to load address data. Please refresh the page.');
                 setSnackbarOpen(true);
             }
@@ -299,7 +296,7 @@ export default function Page() {
                     .eq('id', corporationId)
                     .single();
                 setFlightPrefix(corp?.flight_prefix || '');
-            } catch (_) { }
+            } catch (_) {}
         };
         fetchFlightPrefix();
     }, []);
@@ -341,7 +338,7 @@ export default function Page() {
             try {
                 autocompleteServiceRef.current = new window.google.maps.places.AutocompleteService();
                 placesServiceRef.current = new window.google.maps.places.PlacesService(map);
-            } catch (error) { }
+            } catch (error) {}
         }
     }, [map, activeTab]);
 
@@ -354,6 +351,7 @@ export default function Page() {
             setMap(null);
         }
     }, [activeTab]);
+
 
     const initMap = () => {
         if (!window.google || !mapRef.current) return;
@@ -579,13 +577,26 @@ export default function Page() {
         });
     };
 
+    const debouncedFetchPlaceSuggestions = (input) => {
+        if (!input || input.trim() === '') {
+            setPlaceOptions([]);
+            setPlaceLoading(false);
+            return;
+        }
+
+        setTimeout(() => {
+            fetchPlaceSuggestions(input);
+        }, 3000);
+    };
+
     const handleDropoffInputChange = (event, value) => {
         setDropoffAddress(prev => ({ ...prev, location: value }));
-        fetchPlaceSuggestions(value);
+        debouncedFetchPlaceSuggestions(value);
     };
 
     const handleDropoffSelect = (event, value) => {
         if (!value || !placesServiceRef.current) return;
+
 
         clearPricingSelections();
 
@@ -752,7 +763,6 @@ export default function Page() {
                 const regions = await fetchPricingRegions();
                 setPricingRegions(regions);
             } catch (error) {
-                console.error('Error fetching pricing regions:', error);
                 setSnackbarMessage('Failed to load pricing regions');
                 setSnackbarOpen(true);
             } finally {
@@ -775,7 +785,6 @@ export default function Page() {
                 const cities = await fetchCitiesByRegion(selectedPricingRegion.id);
                 setPricingCities(cities);
             } catch (error) {
-                console.error('Error fetching pricing cities:', error);
                 setSnackbarMessage('Failed to load cities');
                 setSnackbarOpen(true);
                 setPricingCities([]);
@@ -823,9 +832,7 @@ export default function Page() {
                         regionName = (regionComp?.long_name || '').trim();
 
                     }
-                } catch (error) {
-                    console.error('Error geocoding address:', error);
-                }
+                } catch (error) {}
             }
 
             if (cityName && regionName) {
@@ -850,7 +857,6 @@ export default function Page() {
                 setSnackbarOpen(true);
             }
         } catch (err) {
-            console.error('Error computing price', err);
             setMapCityPrice(0);
             setPricingStatus('no_match');
         }
@@ -999,6 +1005,9 @@ export default function Page() {
     const clearPricingSelections = () => {
         setSelectedPricingRegion(null);
         setSelectedPricingCity('');
+        setMapCityPrice(0);
+        setPricingStatus(null);
+        setMapCity('');
     };
 
     const getMultiplierForQty = (quantity) => {
@@ -1020,7 +1029,9 @@ export default function Page() {
         const surchargeText = surchargeCount === 0
             ? 'No surcharge'
             : `+${surchargeCount} tier(s) after 4, 7, 10, 13 luggages: ₱${surchargeAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (base ₱${basePrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} × ${surchargeCount})`;
-        const fullName = `${(form.firstName || '').trim()} ${(form.middleInitial || '').trim()} ${(form.lastName || '').trim()}${form.suffix ? ` ${form.suffix}` : ''}`
+        const fullName = [form.firstName, form.middleInitial, form.lastName, form.suffix]
+            .filter(Boolean)
+            .join(' ')
             .replace(/  +/g, ' ')
             .trim();
         return {
@@ -1035,10 +1046,7 @@ export default function Page() {
     });
 
     const estimatedTotalPrice = passengerCostBreakdown.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
-    const totalLuggages = luggageForms.reduce((sum, form) => {
-        const qty = Number(form?.quantity || 0);
-        return sum + (isNaN(qty) ? 0 : qty);
-    }, 0);
+    const totalLuggages = luggageForms.reduce((sum, form) => sum + (Number(form?.quantity) || 0), 0);
 
     const getCityFromCoordinates = async (lat, lng) => {
         if (!window.google) return null;
@@ -1066,7 +1074,6 @@ export default function Page() {
 
             return city?.replace(/\s*City\s*$/i, '').trim() || null;
         } catch (error) {
-            console.error('Error getting city from coordinates:', error);
             return null;
         }
     };
@@ -1085,15 +1092,12 @@ export default function Page() {
                 const quantity = parseInt(value) || 0;
                 const currentDescriptions = newForms[index].luggageDescriptions || [""];
 
-                if (quantity > currentDescriptions.length) {
-                    const newDescriptions = [...currentDescriptions];
-                    for (let i = currentDescriptions.length; i < quantity; i++) {
-                        newDescriptions.push("");
-                    }
-                    newForms[index].luggageDescriptions = newDescriptions;
-                } else if (quantity < currentDescriptions.length) {
-                    newForms[index].luggageDescriptions = currentDescriptions.slice(0, quantity);
-                }
+            if (quantity > currentDescriptions.length) {
+                const newDescriptions = [...currentDescriptions, ...Array(quantity - currentDescriptions.length).fill("")];
+                newForms[index].luggageDescriptions = newDescriptions;
+            } else if (quantity < currentDescriptions.length) {
+                newForms[index].luggageDescriptions = currentDescriptions.slice(0, quantity);
+            }
             }
 
             return newForms;
@@ -1165,9 +1169,7 @@ export default function Page() {
         if (validationErrors.luggage?.[index]) {
             setValidationErrors(prev => ({
                 ...prev,
-                luggage: prev.luggage.map((formErrors, i) =>
-                    i === index ? {} : formErrors
-                )
+                luggage: prev.luggage.map((formErrors, i) => i === index ? {} : formErrors)
             }));
         }
     };
@@ -1177,11 +1179,8 @@ export default function Page() {
     const validateForm = () => {
         const errors = {};
 
-        if (!pickupAddress.terminal?.trim()) {
-            errors.pickupLocation = 'Terminal selection is required';
-        }
-        if (!pickupAddress.bay) {
-            errors.pickupLocation = 'Bay selection is required';
+        if (!pickupAddress.terminal?.trim() || !pickupAddress.bay) {
+            errors.pickupLocation = 'Terminal and bay selection are required';
         }
 
         if (!dropoffAddress.location?.trim()) {
@@ -1238,8 +1237,8 @@ export default function Page() {
                 .join(' ')
                 .toLowerCase();
             if (normalized && normalizedFullNameCounts[normalized] > 1) {
-                formErrors.firstName = formErrors.firstName || 'Duplicate passenger name';
-                formErrors.lastName = formErrors.lastName || 'Duplicate passenger name';
+                formErrors.firstName = 'Duplicate passenger name';
+                formErrors.lastName = 'Duplicate passenger name';
             }
             if (!form.flightNo || form.flightNo.trim() === '') {
                 formErrors.flightNo = 'Flight number is required';
@@ -1297,7 +1296,6 @@ export default function Page() {
         try {
             const { data: { user }, error: userError } = await supabase.auth.getUser();
             if (userError) {
-                console.error('Error getting user:', userError);
                 setSnackbarMessage('Authentication error. Please try again.');
                 setSnackbarOpen(true);
                 return;
@@ -1305,10 +1303,6 @@ export default function Page() {
 
             const contractTrackingIDs = luggageForms.map(() => generateTrackingID());
 
-            let city = null;
-            if (dropoffAddress.lat && dropoffAddress.lng) {
-                city = await getCityFromCoordinates(dropoffAddress.lat, dropoffAddress.lng);
-            }
 
             const baseDeliveryCharge = mapCityPrice || 0;
 
@@ -1348,7 +1342,6 @@ export default function Page() {
                     .insert(contractData);
 
                 if (contractError) {
-                    console.error('Error inserting contract:', contractError);
                     return;
                 }
             }
@@ -1373,7 +1366,6 @@ export default function Page() {
             setActiveTab(0);
             router.refresh();
         } catch (error) {
-            console.error('Error submitting contract:', error);
             setSnackbarMessage('Error creating booking. Please try again.');
             setSnackbarOpen(true);
         } finally {
@@ -1394,7 +1386,7 @@ export default function Page() {
 
     const closeConfirm = () => setConfirmOpen(false);
 
-    const handleTabChange = (event, newValue) => { setActiveTab(newValue); };
+    const handleTabChange = (event, newValue) => setActiveTab(newValue);
 
     // Fetch all contracts for the current airline with filtering and pagination
     const fetchContracts = async (isInitialLoad = false) => {
@@ -1444,7 +1436,10 @@ export default function Page() {
 
 
     const handleTrackContract = (contractId) => {
-        router.push(`/airline/luggage-tracking?contractId=${contractId}`);
+        router.push('/airline/luggage-tracking');
+        setTimeout(() => {
+            localStorage.setItem('trackContractId', contractId);
+        }, 100);
     };
 
     const handleViewDetails = (contract) => {
@@ -1495,57 +1490,38 @@ export default function Page() {
         }
     };
 
+    const statusMap = {
+        'available': 'available for pickup',
+        'accepted': 'accepted - awaiting pickup',
+        'transit': 'in transit',
+        'delivered': 'delivered',
+        'failed': 'delivery failed',
+        'cancelled': 'cancelled'
+    };
+
     const filteredContracts = contractList.filter(contract => {
-        if (statusFilter !== 'all') {
-            const status = contract.contract_status?.status_name?.toLowerCase();
-            switch (statusFilter) {
-                case 'available':
-                    if (status !== 'available for pickup') return false;
-                    break;
-                case 'accepted':
-                    if (status !== 'accepted - awaiting pickup') return false;
-                    break;
-                case 'transit':
-                    if (status !== 'in transit') return false;
-                    break;
-                case 'delivered':
-                    if (status !== 'delivered') return false;
-                    break;
-                case 'failed':
-                    if (status !== 'delivery failed') return false;
-                    break;
-                case 'cancelled':
-                    if (status !== 'cancelled') return false;
-                    break;
-                default:
-                    return false;
-            }
-        }
-        return true;
+        if (statusFilter === 'all') return true;
+        const status = contract.contract_status?.status_name?.toLowerCase();
+        return status === statusMap[statusFilter];
     });
 
     const searchNormalized = searchQuery.trim().toLowerCase();
     const filteredContractsWithSearch = filteredContracts.filter(contract => {
         if (!searchNormalized) return true;
-        const idMatch = String(contract.id).toLowerCase().includes(searchNormalized);
-        const pickupMatch = (contract.pickup_location || '').toLowerCase().includes(searchNormalized);
-        const dropoffMatch = (contract.drop_off_location || '').toLowerCase().includes(searchNormalized);
-        const statusMatch = (contract.contract_status?.status_name || '').toLowerCase().includes(searchNormalized);
-        return idMatch || pickupMatch || dropoffMatch || statusMatch;
+        const searchableText = [
+            String(contract.id),
+            contract.pickup_location || '',
+            contract.drop_off_location || '',
+            contract.contract_status?.status_name || ''
+        ].join(' ').toLowerCase();
+        return searchableText.includes(searchNormalized);
     });
 
     const dateFilteredContracts = filterByDate(filteredContractsWithSearch, dateFilter);
 
-    const getPaginatedContracts = () => {
-        const startIndex = page * rowsPerPage;
-        const endIndex = startIndex + rowsPerPage;
-        return dateFilteredContracts.slice(startIndex, endIndex);
-    };
+    const getPaginatedContracts = () => dateFilteredContracts.slice(page * rowsPerPage, (page + 1) * rowsPerPage);
 
-    const handleChangePage = (event, newPage) => {
-        setPage(newPage);
-    };
-
+    const handleChangePage = (event, newPage) => setPage(newPage);
     const handleChangeRowsPerPage = (event) => {
         setRowsPerPage(parseInt(event.target.value, 10));
         setPage(0);
@@ -1561,9 +1537,7 @@ export default function Page() {
         { value: 'cancelled', label: 'Cancelled' }
     ];
 
-    const isWithinLuzonBounds = (lat, lng) => {
-        return lat >= 12.5 && lat <= 18.5 && lng >= 119.5 && lng <= 122.5;
-    };
+    const isWithinLuzonBounds = (lat, lng) => lat >= 12.5 && lat <= 18.5 && lng >= 119.5 && lng <= 122.5;
 
     const formatPhoneNumber = (value) => {
         if (!value) return '';
@@ -1584,11 +1558,6 @@ export default function Page() {
         return `+63 ${trimmedNumber.slice(0, 3)} ${trimmedNumber.slice(3, 6)} ${trimmedNumber.slice(6)}`;
     };
 
-    const handlePhoneFocus = () => {
-        if (!contract.contact) {
-            setContract(prev => ({ ...prev, contact: '+63' }));
-        }
-    };
 
     const handleCancelClick = (contractId) => {
         setSelectedContractId(contractId);
@@ -1946,123 +1915,201 @@ export default function Page() {
                             </Box>
 
                             <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
-                                <FormControl fullWidth size="medium">
-                                    <InputLabel>Select Region</InputLabel>
-                                    <Select
-                                        value={selectedPricingRegion?.id || ''}
-                                        label="Select Region"
-                                        onChange={(e) => {
-                                            const region = pricingRegions.find(r => r.id === e.target.value);
-                                            setSelectedPricingRegion(region);
+                                <Autocomplete
+                                    freeSolo
+                                    fullWidth
+                                    options={pricingRegions?.map(region => region.region) || []}
+                                    value={selectedPricingRegion?.region || ''}
+                                    loading={loadingPricingData}
+                                    onChange={(event, newValue) => {
+                                        const selectedRegion = pricingRegions.find(r => r.region === newValue);
+                                        if (selectedRegion) {
+                                            setSelectedPricingRegion(selectedRegion);
                                             setSelectedPricingCity('');
-
-                                            // Clear pricing when region changes
                                             setMapCityPrice(0);
                                             setPricingStatus(null);
                                             setMapCity('');
-                                        }}
-                                    >
-                                        {pricingRegions.map((region) => (
-                                            <MenuItem key={region.id} value={region.id}>
-                                                {region.region}
-                                            </MenuItem>
-                                        ))}
-                                    </Select>
-                                </FormControl>
+                                        } else {
+                                            // If no exact match, clear selection
+                                            setSelectedPricingRegion(null);
+                                            setSelectedPricingCity('');
+                                            setMapCityPrice(0);
+                                            setPricingStatus(null);
+                                            setMapCity('');
+                                        }
+                                    }}
+                                    onInputChange={(event, newInputValue) => {
+                                        // Allow free text input but clear selection if no match
+                                        if (!newInputValue) {
+                                            setSelectedPricingRegion(null);
+                                            setSelectedPricingCity('');
+                                            setMapCityPrice(0);
+                                            setPricingStatus(null);
+                                            setMapCity('');
+                                        }
+                                    }}
+                                    renderInput={(params) => (
+                                        <TextField
+                                            {...params}
+                                            label="Select Region"
+                                            size="medium"
+                                            placeholder="Type to search regions..."
+                                        />
+                                    )}
+                                />
 
-                                <FormControl fullWidth size="medium" disabled={!selectedPricingRegion}>
-                                    <InputLabel>Select City</InputLabel>
-                                    <Select
-                                        value={selectedPricingCity}
-                                        label="Select City"
-                                        onChange={async (e) => {
-                                            const city = pricingCities.find(c => c.city === e.target.value);
-                                            setSelectedPricingCity(e.target.value);
-                                            if (city) {
-                                                const price = Number(city.price) || 0;
-                                                setMapCityPrice(price);
-                                                setPricingStatus('ok');
-                                                setMapCity(city.city);
-
-                                                // Update dropoff address with selected city
-                                                const fullAddress = `${city.city}, ${selectedPricingRegion?.region || ''}, Philippines`;
-                                                setDropoffAddress(prev => ({
-                                                    ...prev,
-                                                    location: fullAddress,
-                                                    lat: null,
-                                                    lng: null
-                                                }));
-
-                                                // Geocode the selected city and re-center the map
-                                                if (window.google && map) {
-                                                    try {
-                                                        const geocoder = new window.google.maps.Geocoder();
-                                                        const results = await new Promise((resolve, reject) => {
-                                                            geocoder.geocode({ address: fullAddress }, (res, status) => {
-                                                                if (status === 'OK') resolve(res);
-                                                                else reject(new Error(status));
-                                                            });
-                                                        });
-
-                                                        if (results && results.length > 0) {
-                                                            const location = results[0].geometry.location;
-                                                            const lat = location.lat();
-                                                            const lng = location.lng();
-
-                                                            // Update coordinates
-                                                            setDropoffAddress(prev => ({
-                                                                ...prev,
-                                                                lat: lat,
-                                                                lng: lng
-                                                            }));
-
-                                                            // Update marker position first
-                                                            if (markerRef.current) {
-                                                                markerRef.current.position = { lat, lng };
-                                                            }
-
-                                                            // Re-center map to the selected city with smooth animation
-                                                            map.panTo({ lat, lng });
-                                                            map.setZoom(12);
-
-                                                            // Ensure map is properly focused on the new location
-                                                            setTimeout(() => {
-                                                                map.panTo({ lat, lng });
-                                                                window.google.maps.event.trigger(map, 'resize');
-                                                            }, 100);
-
-                                                        }
-                                                    } catch (error) {
-                                                        console.error('Error geocoding selected city:', error);
-                                                        setSnackbarMessage('Could not locate city on map');
-                                                        setSnackbarOpen(true);
-                                                    }
-                                                }
+                                <Autocomplete
+                                    freeSolo
+                                    fullWidth
+                                    options={(() => {
+                                        if (!pricingCities || pricingCities.length === 0) return [];
+                                        
+                                        // Sort cities: priced cities first (alphabetically), then unpriced cities (alphabetically)
+                                        const sortedCities = [...pricingCities].sort((a, b) => {
+                                            const aHasPrice = a.price && a.price > 0;
+                                            const bHasPrice = b.price && b.price > 0;
+                                            
+                                            // If both have prices or both don't have prices, sort alphabetically
+                                            if (aHasPrice === bHasPrice) {
+                                                return a.city.localeCompare(b.city);
                                             }
-                                        }}
-                                    >
-                                        {pricingCities.map((city) => (
-                                            <MenuItem key={city.id} value={city.city}>
-                                                <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
-                                                    <Typography variant="body1" sx={{ flex: 1 }}>
-                                                        {city.city}
+                                            
+                                            // Priced cities come first
+                                            return bHasPrice - aHasPrice;
+                                        });
+                                        
+                                        return sortedCities.map(city => city.city);
+                                    })()}
+                                    value={selectedPricingCity}
+                                    loading={loadingPricingData}
+                                    disabled={!selectedPricingRegion}
+                                    onChange={async (event, newValue) => {
+                                        const selectedCity = pricingCities.find(c => c.city === newValue);
+                                        if (selectedCity) {
+                                            setSelectedPricingCity(newValue);
+                                            const price = Number(selectedCity.price) || 0;
+                                            setMapCityPrice(price);
+                                            setPricingStatus('ok');
+                                            setMapCity(selectedCity.city);
+
+                                            // Update dropoff address with selected city
+                                            const fullAddress = `${selectedCity.city}, ${selectedPricingRegion?.region || ''}, Philippines`;
+                                            setDropoffAddress(prev => ({
+                                                ...prev,
+                                                location: fullAddress,
+                                                lat: null,
+                                                lng: null
+                                            }));
+
+                                            // Geocode the selected city and re-center the map
+                                            if (window.google && map) {
+                                                try {
+                                                    const geocoder = new window.google.maps.Geocoder();
+                                                    const results = await new Promise((resolve, reject) => {
+                                                        geocoder.geocode({ address: fullAddress }, (res, status) => {
+                                                            if (status === 'OK') resolve(res);
+                                                            else reject(new Error(status));
+                                                        });
+                                                    });
+
+                                                    if (results && results.length > 0) {
+                                                        const location = results[0].geometry.location;
+                                                        const lat = location.lat();
+                                                        const lng = location.lng();
+
+                                                        // Update coordinates
+                                                        setDropoffAddress(prev => ({
+                                                            ...prev,
+                                                            lat: lat,
+                                                            lng: lng
+                                                        }));
+
+                                                        // Update marker position first
+                                                        if (markerRef.current) {
+                                                            markerRef.current.position = { lat, lng };
+                                                        }
+
+                                                        // Re-center map to the selected city with smooth animation
+                                                        map.panTo({ lat, lng });
+                                                        map.setZoom(12);
+
+                                                        // Ensure map is properly focused on the new location
+                                                        setTimeout(() => {
+                                                            map.panTo({ lat, lng });
+                                                            window.google.maps.event.trigger(map, 'resize');
+                                                        }, 100);
+                                                    }
+                } catch (error) {
+                    setSnackbarMessage('Could not locate city on map');
+                    setSnackbarOpen(true);
+                }
+                                            }
+                                        } else {
+                                            // If no exact match, clear pricing but keep the text
+                                            setSelectedPricingCity(newValue);
+                                            setMapCityPrice(0);
+                                            setPricingStatus(null);
+                                            setMapCity('');
+                                        }
+                                    }}
+                                    onInputChange={(event, newInputValue) => {
+                                        setSelectedPricingCity(newInputValue);
+                                        // Clear pricing when typing manually
+                                        if (newInputValue !== selectedPricingCity) {
+                                            setMapCityPrice(0);
+                                            setPricingStatus(null);
+                                            setMapCity('');
+                                        }
+                                    }}
+                                    renderInput={(params) => (
+                                        <TextField
+                                            {...params}
+                                            label="Select City"
+                                            size="medium"
+                                            placeholder="Type to search cities..."
+                                            disabled={!selectedPricingRegion}
+                                        />
+                                    )}
+                                    renderOption={(props, option) => {
+                                        const city = pricingCities.find(c => c.city === option);
+                                        const hasPrice = city && city.price && city.price > 0;
+                                        return (
+                                            <Box component="li" {...props}>
+                                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                                                    <Typography variant="body2" sx={{ flex: 1, fontWeight: hasPrice ? 600 : 400 }}>
+                                                        {option}
                                                     </Typography>
-                                                    <Typography variant="body2" sx={{
-                                                        color: 'text.primary',
-                                                        fontWeight: 'bold',
-                                                        px: 1,
-                                                        py: 0.5,
-                                                        borderRadius: 1,
-                                                        ml: 2,
-                                                        border: `1px solid ${theme.palette.divider}`
-                                                    }}>
-                                                        ₱{city.price?.toFixed(2) || '0.00'}
-                                                    </Typography>
+                                                    {hasPrice ? (
+                                                        <Typography variant="body2" sx={{
+                                                            color: 'primary.main',
+                                                            fontWeight: 'bold',
+                                                            px: 1,
+                                                            py: 0.5,
+                                                            borderRadius: 1,
+                                                            ml: 2,
+                                                            border: `1px solid ${theme.palette.primary.main}`,
+                                                            backgroundColor: theme.palette.primary.light + '20'
+                                                        }}>
+                                                            ₱{city.price.toFixed(2)}
+                                                        </Typography>
+                                                    ) : (
+                                                        <Typography variant="body2" sx={{
+                                                            color: 'text.secondary',
+                                                            px: 1,
+                                                            py: 0.5,
+                                                            borderRadius: 1,
+                                                            ml: 2,
+                                                            border: `1px solid ${theme.palette.divider}`,
+                                                            fontStyle: 'italic'
+                                                        }}>
+                                                            No pricing
+                                                        </Typography>
+                                                    )}
                                                 </Box>
-                                            </MenuItem>
-                                        ))}
-                                    </Select>
-                                </FormControl>
+                                            </Box>
+                                        );
+                                    }}
+                                />
                             </Box>
 
                             {selectedPricingCity && (
@@ -2083,7 +2130,7 @@ export default function Page() {
                         <Paper elevation={1} sx={{ p: 2, mb: 2, borderRadius: 2, backgroundColor: theme.palette.background.default }}>
 
                             <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                                {isFormMounted && (
+                                {mounted && (
                                     <Box>
                                         <Autocomplete
                                             freeSolo
@@ -2464,11 +2511,7 @@ export default function Page() {
                                             size="small"
                                             value={form.contact}
                                             onChange={(e) => handleLuggageFormChange(index, "contact", e.target.value)}
-                                            onFocus={() => {
-                                                if (!form.contact) {
-                                                    handleLuggageFormChange(index, "contact", "+63");
-                                                }
-                                            }}
+                                            onFocus={() => !form.contact && handleLuggageFormChange(index, "contact", "+63")}
                                             required
                                             error={!!(validationErrors.luggage && validationErrors.luggage[index] && validationErrors.luggage[index].contact)}
                                             helperText={validationErrors.luggage && validationErrors.luggage[index] && validationErrors.luggage[index].contact}

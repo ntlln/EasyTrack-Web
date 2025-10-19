@@ -2,17 +2,15 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Box, MenuItem, TextField, Typography, Button, TableContainer, Table, TableHead, TableRow, TableCell, TableBody, Paper, IconButton, Menu, TablePagination, TableSortLabel, Snackbar, Alert, Dialog, DialogTitle, DialogContent, DialogActions, Grid } from "@mui/material";
-import { MoreVert as MoreVertIcon, Edit as EditIcon, Delete as DeleteIcon, LockReset as LockResetIcon, ChevronLeft as ChevronLeftIcon, Person as PersonIcon } from "@mui/icons-material";
+import { Box, MenuItem, TextField, Typography, Button, TableContainer, Table, TableHead, TableRow, TableCell, TableBody, Paper, IconButton, TablePagination, TableSortLabel, Snackbar, Alert, Dialog, DialogTitle, DialogContent, DialogActions } from "@mui/material";
+import { ChevronLeft as ChevronLeftIcon } from "@mui/icons-material";
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { createUser } from './create-account/actions';
 
 export default function Page() {
-  // Client setup
   const router = useRouter();
   const supabase = createClientComponentClient();
 
-  // State setup
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [anchorEl, setAnchorEl] = useState(null);
@@ -38,7 +36,6 @@ export default function Page() {
   const [createLoading, setCreateLoading] = useState(false);
   const [corporations, setCorporations] = useState([]);
 
-  // Role/Corporation helpers
   const getEgcGheCorporation = () => {
     return corporations.find(c => (c.corporation_name || '').toLowerCase() === 'egc-ghe');
   };
@@ -55,7 +52,6 @@ export default function Page() {
     return rn === 'Contractor' || rn === 'Airline';
   };
 
-  // Data fetching
   useEffect(() => { fetchAccounts(); fetchStatusOptions(); fetchVerifyStatusOptions(); fetchUsers(); fetchRoles(); fetchCorporations(); }, []);
 
   const fetchAccounts = async () => {
@@ -79,7 +75,6 @@ export default function Page() {
       }));
       setAccounts(formattedAccounts);
     } catch (error) {
-      console.error('Error fetching accounts:', error);
       setError('Failed to load accounts');
     } finally {
       setLoading(false);
@@ -96,14 +91,11 @@ export default function Page() {
       setVerifyStatusLoading(true);
       const { data, error } = await supabase.from('verify_status').select('id, status_name');
       if (error) {
-        console.error('Error fetching verify status options:', error);
         setSnackbar({ open: true, message: 'Error fetching verification status options', severity: 'error' });
         return;
       }
-      console.log('Verify status options fetched:', data);
       setVerifyStatusOptions(data || []);
     } catch (error) {
-      console.error('Error in fetchVerifyStatusOptions:', error);
       setSnackbar({ open: true, message: 'Error fetching verification status options', severity: 'error' });
     } finally {
       setVerifyStatusLoading(false);
@@ -116,7 +108,6 @@ export default function Page() {
       if (usersError) throw usersError;
       setUsers(usersData);
     } catch (error) {
-      console.error('Error fetching users:', error);
       setSnackbar({ open: true, message: 'Error fetching users', severity: 'error' });
     }
   };
@@ -127,7 +118,6 @@ export default function Page() {
       if (error) throw error;
       setRoles(data);
     } catch (error) {
-      console.error('Error fetching roles:', error);
       setSnackbar({ open: true, message: 'Error fetching roles', severity: 'error' });
     }
   };
@@ -141,12 +131,10 @@ export default function Page() {
       if (error) throw error;
       setCorporations(data || []);
     } catch (error) {
-      console.error('Error fetching corporations:', error);
       setSnackbar({ open: true, message: 'Error fetching corporations', severity: 'error' });
     }
   };
 
-  // Data filtering and sorting
   const filteredAccounts = accounts.filter(account => {
     const matchesSearch = account.name.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesDepartment = selectedDepartment === 'All Departments' || account.role === selectedDepartment;
@@ -174,7 +162,6 @@ export default function Page() {
     });
   };
 
-  // Event handlers
   const handleChangePage = (event, newPage) => setPage(newPage);
   const handleChangeRowsPerPage = (event) => { setRowsPerPage(parseInt(event.target.value, 10)); setPage(0); };
   const handleOpenMenu = (event, account) => { setAnchorEl(event.currentTarget); setSelectedAccount(account); };
@@ -187,7 +174,6 @@ export default function Page() {
         if (error) throw error;
         fetchAccounts();
       } catch (error) {
-        console.error('Error deleting account:', error);
         setError('Failed to delete account');
       }
     }
@@ -204,9 +190,7 @@ export default function Page() {
     setEditDialog({ open: true, user: acc });
     const selectedStatus = statusOptions.find(opt => opt.id === acc.user_status_id);
     const selectedVerifyStatus = verifyStatusOptions.find(opt => opt.id === acc.verify_status_id);
-    console.log('verifyStatusOptions when opening edit dialog:', verifyStatusOptions);
     
-    // Ensure verify status options are loaded
     if (verifyStatusOptions.length === 0 && !verifyStatusLoading) {
       fetchVerifyStatusOptions();
     }
@@ -241,13 +225,11 @@ export default function Page() {
         }),
       });
       const result = await response.json();
-      console.log('API response:', result);
       if (!response.ok) throw new Error(result.error || 'Failed to update status');
       setSnackbar({ open: true, message: 'User status updated successfully', severity: 'success' });
       await fetchAccounts();
     } catch (error) {
       setSnackbar({ open: true, message: 'Error updating user status', severity: 'error' });
-      console.error('Update failed:', error);
     } finally {
       setEditDialog({ open: false, user: null });
     }
@@ -259,7 +241,6 @@ export default function Page() {
       setSnackbar({ open: true, message: 'User deleted successfully', severity: 'success' });
       fetchAccounts();
     } catch (error) {
-      console.error('Error deleting user:', error);
       setSnackbar({ open: true, message: 'Error deleting user', severity: 'error' });
     } finally {
       setDeleteDialog({ open: false, userId: null });
@@ -267,9 +248,7 @@ export default function Page() {
   };
   const handleSnackbarClose = () => setSnackbar(prev => ({ ...prev, open: false }));
   
-  // Create account handlers
   const handleCreateFormChange = (e) => setCreateForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
-  // Enforce corporation selection rules based on role during creation
   useEffect(() => {
     if (!createDialog.open) return;
     if (!createForm.role_id) return;
@@ -308,8 +287,7 @@ export default function Page() {
     setCreateForm({ email: "", role_id: "", corporation_id: "" });
   };
 
-  // Styles
-  const containerStyles = {display: "flex", flexDirection: "column", gap: 4 };
+  const containerStyles = { display: "flex", flexDirection: "column", gap: 4 };
   const titleStyles = { color: "primary.main", fontWeight: "bold" };
   const titleContainerStyles = { display: "flex", alignItems: "center", gap: 1 };
   const searchContainerStyles = { display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" };
@@ -423,7 +401,6 @@ export default function Page() {
         </TableContainer>
       </Box>
 
-      {/* Context menu removed in favor of stacked action buttons per row */}
 
       <Dialog open={editDialog.open} onClose={() => setEditDialog({ open: false, user: null })}>
         <DialogTitle>Edit User</DialogTitle>
@@ -444,7 +421,6 @@ export default function Page() {
               <MenuItem disabled>No verification status options available</MenuItem>
             )}
           </TextField>
-          {/* Corporation selection removed from Edit User dialog per requirements */}
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setEditDialog({ open: false, user: null })}>Cancel</Button>

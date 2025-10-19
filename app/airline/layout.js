@@ -18,23 +18,18 @@ export default function Layout({ children }) {
 }
 
 function ContractorLayoutContent({ children }) {
-  // Client and state setup
   const pathname = usePathname();
   const router = useRouter();
   const supabase = createClientComponentClient();
   const [checkingSession, setCheckingSession] = useState(true);
-  // Auth page check (support clean URLs on subdomain and internal prefixed paths)
   const normalizedPath = pathname?.startsWith('/airline') ? pathname.replace(/^\/airline/, '') || '/' : pathname;
   const isAuthPage = normalizedPath === "/login" || normalizedPath === "/forgot-password" || normalizedPath === "/reset-password" || normalizedPath === "/verify" || normalizedPath === "/otp";
-  const airlineRoleId = 3; // Contractor
+  const airlineRoleId = 3;
 
-  // Domain-aware redirect logic (only in production)
   useEffect(() => {
     if (typeof window !== 'undefined' && process.env.NODE_ENV === 'production') {
       const hostname = window.location.hostname;
-      const config = getDomainConfig();
       
-      // If on airline domain but accessing /airline path, redirect to clean URL
       if (isAirlineDomain(hostname) && pathname.startsWith('/airline')) {
         const cleanPath = pathname.replace('/airline', '') || '/';
         router.replace(cleanPath);
@@ -42,33 +37,25 @@ function ContractorLayoutContent({ children }) {
     }
   }, [pathname, router]);
 
-  // Timeout manager for automatic logout after 30 minutes of inactivity
   useTimeoutManager();
 
-  // Update document title when pathname changes
   useEffect(() => {
     if (typeof document !== 'undefined') {
       document.title = getPageTitle();
     }
   }, [pathname]);
 
-  // Generate page title based on current path
   const getPageTitle = () => {
     if (!pathname) return 'EasyTrack | Dashboard';
-    
     const pageName = getPageNameFromPath(pathname, '/airline');
     return `EasyTrack | ${pageName}`;
   };
 
-  // Helper function to get page name from path
   const getPageNameFromPath = (path, basePath) => {
     const segments = path.replace(basePath, '').split('/').filter(Boolean);
     
-    if (segments.length === 0) {
-      return 'Dashboard';
-    }
+    if (segments.length === 0) return 'Dashboard';
     
-    // Handle specific page names
     const pageMap = {
       'dashboard': 'Dashboard',
       'profile': 'Profile',
@@ -87,7 +74,6 @@ function ContractorLayoutContent({ children }) {
     const firstSegment = segments[0];
     const pageName = pageMap[firstSegment] || firstSegment.charAt(0).toUpperCase() + firstSegment.slice(1).replace(/-/g, ' ');
     
-    // Handle nested routes
     if (segments.length > 1) {
       const secondSegment = segments[1];
       const nestedPageName = pageMap[secondSegment] || secondSegment.charAt(0).toUpperCase() + secondSegment.slice(1).replace(/-/g, ' ');
@@ -97,7 +83,6 @@ function ContractorLayoutContent({ children }) {
     return pageName;
   };
 
-  // Enhanced session validation
   useEffect(() => {
     if (isAuthPage) {
       setCheckingSession(false);
@@ -134,7 +119,7 @@ function ContractorLayoutContent({ children }) {
                 .eq('id', session.user.id);
             }
           } catch (error) {
-            console.error('Error updating user status:', error);
+            // Error updating user status
           }
           
           await supabase.auth.signOut();
@@ -144,7 +129,6 @@ function ContractorLayoutContent({ children }) {
 
         setCheckingSession(false);
       } catch (error) {
-        console.error('Session validation error:', error);
         router.replace("/airline/login");
       }
     };
@@ -152,14 +136,10 @@ function ContractorLayoutContent({ children }) {
     validateSession();
   }, [pathname, supabase, router, airlineRoleId, isAuthPage]);
 
-  // Styles
   const containerStyles = { display: "flex", minHeight: "100vh", margin: 0, padding: 0, overflowX: "hidden", bgcolor: "background.default" };
   const contentStyles = { flexGrow: 1, p: 4, ml: "64px", minHeight: "100vh", transition: "margin-left 0.3s ease", bgcolor: "background.default" };
 
-  if (checkingSession) {
-    // Add small delay to prevent overlap with main layout loading
-    return <LoadingSpinner />;
-  }
+  if (checkingSession) return <LoadingSpinner />;
   if (isAuthPage) return <Box sx={{ margin: 0, padding: 0, overflowX: "hidden", height: "100vh", bgcolor: "background.default" }}>{children}</Box>;
 
   return (

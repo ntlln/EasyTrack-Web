@@ -5,7 +5,6 @@ const nextConfig = {
   async headers() {
     return [
       {
-        // Apply security headers to all routes
         source: '/(.*)',
         headers: Object.entries(getSecurityHeaders()).map(([key, value]) => ({
           key,
@@ -14,63 +13,11 @@ const nextConfig = {
       },
     ];
   },
-  // Additional security configurations
-  poweredByHeader: false, // Remove X-Powered-By header
-  compress: true, // Enable compression
+  poweredByHeader: false,
+  compress: true,
   experimental: {
-    // Enable security features
     serverComponentsExternalPackages: [],
   },
-  // Domain configuration for production and development
-  async rewrites() {
-    return [
-      // Handle www redirect to main domain
-      {
-        source: '/:path*',
-        destination: '/:path*',
-        has: [
-          {
-            type: 'host',
-            value: 'www.ghe-easytrack.org',
-          },
-        ],
-      },
-      // Handle main domain routing
-      {
-        source: '/:path*',
-        destination: '/:path*',
-        has: [
-          {
-            type: 'host',
-            value: 'ghe-easytrack.org',
-          },
-        ],
-      },
-      // Handle admin domain routing (production)
-      {
-        source: '/admin/:path*',
-        destination: '/admin/:path*',
-        has: [
-          {
-            type: 'host',
-            value: 'admin.ghe-easytrack.org',
-          },
-        ],
-      },
-      // Handle airline domain routing (production)
-      {
-        source: '/airline/:path*',
-        destination: '/airline/:path*',
-        has: [
-          {
-            type: 'host',
-            value: 'airline.ghe-easytrack.org',
-          },
-        ],
-      },
-    ];
-  },
-  // Environment-specific configuration
   env: {
     CUSTOM_KEY: process.env.CUSTOM_KEY,
   },

@@ -6,7 +6,6 @@ import { useState, useEffect } from 'react';
 export default function Navbar({ currentPage = 'home' }) {
   const [activeSection, setActiveSection] = useState(currentPage);
 
-  // Set active section based on current page
   useEffect(() => {
     if (currentPage === 'about') {
       setActiveSection('about');
@@ -14,39 +13,21 @@ export default function Navbar({ currentPage = 'home' }) {
     }
     
     if (currentPage === 'home') {
-      // Add smooth scrolling behavior
       document.documentElement.style.scrollBehavior = 'smooth';
       
       const handleScroll = () => {
-        const sections = ['home'];
-        const scrollPosition = window.scrollY;
-        const headerHeight = 80; // Approximate header height
-      
-        let currentSection = 'home'; // Default to home
-        
-        for (const section of sections) {
-          const element = document.getElementById(section);
-          if (element) {
-            const rect = element.getBoundingClientRect();
-            const elementTop = rect.top;
-            const elementBottom = rect.bottom;
-            
-            // More precise detection: check if section is in the viewport
-            // A section is active if its top is above the middle of the viewport
-            const viewportMiddle = window.innerHeight / 2;
-            
-            if (elementTop <= viewportMiddle && elementBottom > headerHeight) {
-              currentSection = section;
-            }
+        const element = document.getElementById('home');
+        if (element) {
+          const rect = element.getBoundingClientRect();
+          const viewportMiddle = window.innerHeight / 2;
+          
+          if (rect.top <= viewportMiddle && rect.bottom > 80) {
+            setActiveSection('home');
           }
         }
-        
-        setActiveSection(currentSection);
       };
 
-      // Initial call to set the correct section on page load
       handleScroll();
-      
       window.addEventListener('scroll', handleScroll);
       return () => {
         window.removeEventListener('scroll', handleScroll);
@@ -63,7 +44,17 @@ export default function Navbar({ currentPage = 'home' }) {
     }
   };
 
-
+  const getButtonStyles = (section) => ({
+    variant: activeSection === section ? 'contained' : 'text',
+    sx: {
+      bgcolor: activeSection === section ? 'rgba(255, 255, 255, 0.5)' : 'transparent',
+      color: 'primary.contrastText',
+      '&:hover': {
+        bgcolor: activeSection === section ? 'rgba(255, 255, 255, 0.6)' : 'rgba(255, 255, 255, 0.1)'
+      },
+      transition: 'all 0.3s ease'
+    }
+  });
 
   return (
     <Box
@@ -88,30 +79,14 @@ export default function Navbar({ currentPage = 'home' }) {
           
           <Box display="flex" alignItems="center" gap={2}>
             <Button 
-              variant={activeSection === 'home' ? 'contained' : 'text'}
               onClick={handleHomeClick}
-              sx={{ 
-                bgcolor: activeSection === 'home' ? 'rgba(255, 255, 255, 0.5)' : 'transparent',
-                color: activeSection === 'home' ? 'primary.contrastText' : 'primary.contrastText',
-                '&:hover': { 
-                  bgcolor: activeSection === 'home' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(255, 255, 255, 0.1)' 
-                },
-                transition: 'all 0.3s ease'
-              }}
+              {...getButtonStyles('home')}
             >
               Home
             </Button>
             <Button 
-              variant={activeSection === 'about' ? 'contained' : 'text'}
               href="/about" 
-              sx={{ 
-                bgcolor: activeSection === 'about' ? 'rgba(255, 255, 255, 0.5)' : 'transparent',
-                color: activeSection === 'about' ? 'primary.contrastText' : 'primary.contrastText',
-                '&:hover': { 
-                  bgcolor: activeSection === 'about' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(255, 255, 255, 0.1)' 
-                },
-                transition: 'all 0.3s ease'
-              }}
+              {...getButtonStyles('about')}
             >
               About Us
             </Button>

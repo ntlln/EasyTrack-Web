@@ -1,11 +1,10 @@
 "use client";
 
-import { Box, Typography } from "@mui/material";
+import { Box } from "@mui/material";
 
 export default function TermsAndConditions() {
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-
       <ol style={{ paddingLeft: 20, margin: 0, display: "grid", gap: 8 }}>
         <li>
           The service all delivery is subject to acceptance by us by issuing a
@@ -33,9 +32,6 @@ export default function TermsAndConditions() {
           wrapping etc.
         </li>
       </ol>
-      
     </Box>
   );
 }
-
-

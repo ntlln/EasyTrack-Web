@@ -29,15 +29,16 @@ export default function AirlineSidebar() {
 }
 
 function AirlineSidebarContent() {
-    // State and context setup
-    const [openPages, setOpenPages] = useState(() => typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('airlineSidebarTransactionsOpen') || 'true') : true);
+    const [openPages, setOpenPages] = useState(() => {
+        if (typeof window === 'undefined') return true;
+        return JSON.parse(localStorage.getItem('airlineSidebarTransactionsOpen') || 'true');
+    });
     const [isMinimized, setIsMinimized] = useState(true);
     const { mode, toggleMode } = useContext(ColorModeContext);
     const theme = useTheme();
     const router = useRouter();
     const pathname = usePathname();
     const supabase = createClientComponentClient();
-    const isMobile = useMediaQuery(theme.breakpoints.down('md'));
     const [chatUnreadCount, setChatUnreadCount] = useState(0);
     const chatUnreadIntervalRef = useRef(null);
     const prevUnreadRef = useRef(0);
@@ -50,7 +51,6 @@ function AirlineSidebarContent() {
     const [verificationStatus, setVerificationStatus] = useState(null);
     const closeToast = () => setToast(prev => ({ ...prev, open: false }));
 
-    // Click outside handler
     useEffect(() => {
         const handleClickOutside = (event) => {
             const sidebar = document.querySelector('[data-sidebar]');
@@ -60,19 +60,18 @@ function AirlineSidebarContent() {
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
-    // Save state to localStorage
     useEffect(() => {
-        if (typeof window !== 'undefined') localStorage.setItem('airlineSidebarTransactionsOpen', JSON.stringify(openPages));
+        if (typeof window !== 'undefined') {
+            localStorage.setItem('airlineSidebarTransactionsOpen', JSON.stringify(openPages));
+        }
     }, [openPages]);
 
-    // Start polling unread conversations and show toast on increase
     useEffect(() => {
         const setup = async () => {
             const { data: { session } } = await supabase.auth.getSession();
             if (!session?.user) return;
             const userId = session.user.id;
 
-            // Fetch basic profile with role_id, corporation_id, and verification status
             try {
                 const { data: profileData } = await supabase
                     .from('profiles')
@@ -84,16 +83,10 @@ function AirlineSidebarContent() {
                     .single();
                 setProfile(profileData || { email: session.user.email });
                 
-                // Set verification status
                 const verified = profileData?.verify_status?.status_name === 'Verified';
                 setIsVerified(verified);
                 setVerificationStatus(profileData?.verify_status?.status_name || 'Not Verified');
                 
-                console.log('[AirlineSidebar] Verification status:', {
-                    verifyStatusId: profileData?.verify_status_id,
-                    statusName: profileData?.verify_status?.status_name,
-                    isVerified: verified
-                });
                 
                 if (profileData?.corporation_id) {
                     try {
@@ -103,11 +96,11 @@ function AirlineSidebarContent() {
                             .eq('id', profileData.corporation_id)
                             .single();
                         setCorporationName(corp?.corporation_name || '');
-                    } catch (_) { /* ignore */ }
+                    } catch (_) {}
                 } else {
                     setCorporationName('');
                 }
-            } catch (_) { /* ignore profile fetch errors */ }
+            } catch (_) {}
 
             const fetchUnread = async () => {
                 try {
@@ -117,7 +110,6 @@ function AirlineSidebarContent() {
                         const conversations = data.conversations || [];
                         const totalUnread = conversations.reduce((sum, c) => sum + (c.unreadCount || 0), 0);
 
-                        // Compute per-conversation increases
                         const prevMap = prevUnreadByConvRef.current || new Map();
                         const increases = [];
                         let totalDelta = 0;
@@ -139,7 +131,6 @@ function AirlineSidebarContent() {
                             }
                         }
 
-                        // Update refs and state
                         const nextMap = new Map();
                         conversations.forEach(c => nextMap.set(c.id, c.unreadCount || 0));
                         prevUnreadByConvRef.current = nextMap;
@@ -147,10 +138,9 @@ function AirlineSidebarContent() {
                         setChatUnreadCount(totalUnread);
                         if (!didInitRef.current) didInitRef.current = true;
                     }
-                } catch (_) { /* ignore */ }
+                } catch (_) {}
             };
 
-            // initial fetch and interval
             fetchUnread();
             if (chatUnreadIntervalRef.current) clearInterval(chatUnreadIntervalRef.current);
             chatUnreadIntervalRef.current = setInterval(fetchUnread, 5000);
@@ -164,8 +154,13 @@ function AirlineSidebarContent() {
         };
     }, []);
 
-    // Navigation and auth handlers
-    const handleClickPages = () => isMinimized ? setIsMinimized(false) : setOpenPages(!openPages);
+    const handleClickPages = () => {
+        if (isMinimized) {
+            setIsMinimized(false);
+        } else {
+            setOpenPages(!openPages);
+        }
+    };
     const handleNavigation = (route) => { router.push(route); setIsMinimized(true); };
     const isActive = (route) => {
         if (route === "/airline/") {
@@ -174,11 +169,9 @@ function AirlineSidebarContent() {
         return pathname === route || pathname.startsWith(route + "/");
     };
     const isDropdownActive = () => {
-        // Check if any transaction-related page is active
         return isActive("/airline/booking") || isActive("/airline/luggage-tracking");
     };
 
-    // Auth handlers
     const handleLogout = async () => {
         try {
             const { data: { session } } = await supabase.auth.getSession();
@@ -197,16 +190,17 @@ function AirlineSidebarContent() {
                         .eq('id', userId);
                 }
             }
-        } catch (_) { /* ignore status update errors on logout */ }
+        } catch (_) {}
         await supabase.auth.signOut();
         if (typeof window !== 'undefined') {
-            Object.keys(localStorage).filter(key => key.startsWith('sb-') && key.endsWith('-auth-token')).forEach(key => localStorage.removeItem(key));
+            Object.keys(localStorage)
+                .filter(key => key.startsWith('sb-') && key.endsWith('-auth-token'))
+                .forEach(key => localStorage.removeItem(key));
             sessionStorage.clear();
         }
         router.push("/airline/login");
     };
 
-    // Styles
     const activeStyles = { backgroundColor: mode === "light" ? "#f0f0f0" : "#333", color: theme.palette.primary.main, borderRadius: 1 };
     const sidebarStyles = { width: isMinimized ? "64px" : "280px", height: "100vh", bgcolor: "background.paper", display: "flex", flexDirection: "column", borderRight: "1px solid", borderColor: "divider", position: "fixed", dataSidebar: true, overflowY: 'auto', overflowX: 'hidden', transition: theme.transitions.create('width', { easing: theme.transitions.easing.sharp, duration: theme.transitions.duration.enteringScreen }), zIndex: 1200, '&::-webkit-scrollbar': { width: '8px', height: '0px' }, '&::-webkit-scrollbar-track': { background: 'transparent' }, '&::-webkit-scrollbar-thumb': { background: theme.palette.mode === 'light' ? '#ccc' : '#555', borderRadius: '4px' } };
     const headerStyles = { p: 1, display: "flex", justifyContent: "space-between", alignItems: "center", minHeight: "80px", position: "relative" };
