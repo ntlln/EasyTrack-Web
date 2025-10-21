@@ -278,7 +278,11 @@ const ContractList = ({ onTrackContract, initialSearch, setRedirectContractId, i
     setPickupError('');
     setPickupImageUrl(null);
     try {
-      const res = await fetch(`/api/admin?action=getProofOfPickup&contractId=${contractId}`);
+      const res = await fetch('/api/admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'getProofOfPickup', params: { contract_id: contractId } })
+      });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to fetch proof of pickup');
       setPickupImageUrl(data.proof_of_pickup);

@@ -1458,7 +1458,11 @@ export default function Page() {
         setPickupError('');
         setPickupImageUrl(null);
         try {
-            const res = await fetch(`/api/admin?action=getProofOfPickup&contractId=${contractId}`);
+            const res = await fetch('/api/admin', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'getProofOfPickup', params: { contract_id: contractId } })
+            });
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || 'Failed to fetch proof of pickup');
             setPickupImageUrl(data.proof_of_pickup);
@@ -2948,7 +2952,11 @@ export default function Page() {
                         )}
                         {!pickupLoading && !pickupError && pickupImageUrl && (
                             <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '40vh' }}>
-                                <img src={pickupImageUrl} alt="Proof of Pickup" style={{ maxWidth: '100%', maxHeight: '70vh', width: 'auto', height: 'auto', objectFit: 'contain', borderRadius: 8 }} />
+                                <img 
+                                    src={pickupImageUrl} 
+                                    alt="Proof of Pickup" 
+                                    style={{ maxWidth: '100%', maxHeight: '70vh', width: 'auto', height: 'auto', objectFit: 'contain', borderRadius: 8 }} 
+                                />
                             </Box>
                         )}
                     </DialogContent>

@@ -226,7 +226,7 @@ export default function Page() {
   const totalDeliveries = 50;
   const successfulDeliveries = filteredContracts.filter(c => c.contract_status?.status_name === 'Delivered').length;
   const failedDeliveries = filteredContracts.filter(c => c.contract_status?.status_name === 'Delivery Failed').length;
-  const successRate = totalDeliveries ? (successfulDeliveries / totalDeliveries) * 100 : 0;
+  const successRate = totalDeliveries ? Math.min(100, (successfulDeliveries / totalDeliveries) * 100) : 0;
 
   const deliveryTimes = filteredContracts
     .filter(c => c.pickup_at && c.delivered_at)
@@ -338,7 +338,7 @@ export default function Page() {
           {statusList.map((status) => {
             const statusFilterMap = ['', 'available', 'cancelled', 'accepted', 'transit', 'delivered', 'failed'];
             const filterValue = statusFilterMap[status.id];
-            const value = totalDeliveries ? Math.round((statusCounts[status.id] || 0) / totalDeliveries * 100) : 0;
+            const value = totalDeliveries ? Math.min(100, Math.round((statusCounts[status.id] || 0) / totalDeliveries * 100)) : 0;
             return (
               <Grid item xs={12} sm={6} md={4} lg={2} key={status.id}>
                 <Link href={`/admin/luggage-management?status=${encodeURIComponent(filterValue)}`} style={{ textDecoration: 'none' }}>

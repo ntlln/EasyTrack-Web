@@ -184,7 +184,7 @@ export default function Page() {
               4: 'transit', 5: 'delivered', 6: 'failed'
             };
             const filterValue = statusFilterMap[status.id];
-            const value = totalDeliveries ? Math.round((statusCounts[status.id] || 0) / totalDeliveries * 100) : 0;
+            const value = totalDeliveries ? Math.min(100, Math.round((statusCounts[status.id] || 0) / totalDeliveries * 100)) : 0;
             return (
               <Grid item xs={12} sm={6} md={4} lg={2} key={status.id}>
                 <Link href={`/admin/luggage-management?status=${encodeURIComponent(filterValue)}`} style={linkStyles}>

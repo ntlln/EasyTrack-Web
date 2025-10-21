@@ -414,28 +414,6 @@ export async function GET(request) {
       return NextResponse.json({ data: contractWithLuggage });
     }
 
-    if (action === 'getProofOfPickup') {
-      const contractIdParam = searchParams.get('contractId');
-      if (!contractIdParam) {
-        return NextResponse.json({ error: 'Missing contractId' }, { status: 400 });
-      }
-
-      const { data, error } = await supabase
-        .from('contracts')
-        .select('proof_of_pickup, pickup_at')
-        .eq('id', contractIdParam)
-        .single();
-
-      if (error) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
-      }
-
-      if (!data || !data.proof_of_pickup) {
-        return NextResponse.json({ error: 'No proof of pickup available' }, { status: 404 });
-      }
-
-      return NextResponse.json({ proof_of_pickup: data.proof_of_pickup, pickup_timestamp: data.pickup_at || null });
-    }
 
     if (action === 'delivery-personnel') {
       const { data: deliveryPersonnel, error } = await supabase
@@ -1406,6 +1384,36 @@ export async function POST(req) {
       return NextResponse.json({ 
         proof_of_delivery: payloadUrl,
         delivery_timestamp: data.delivered_at || null
+      });
+    }
+
+    if (action === 'getProofOfPickup') {
+      const { contract_id } = params;
+      if (!contract_id) {
+        return NextResponse.json({ error: 'Missing contract_id' }, { status: 400 });
+      }
+
+      const { data, error } = await supabase
+        .from('contracts')
+        .select('proof_of_pickup, pickup_at')
+        .eq('id', contract_id)
+        .single();
+
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+
+      if (!data) {
+        return NextResponse.json({ error: 'Contract not found' }, { status: 404 });
+      }
+
+      if (!data.proof_of_pickup) {
+        return NextResponse.json({ error: 'No proof of pickup available' }, { status: 404 });
+      }
+
+      return NextResponse.json({ 
+        proof_of_pickup: data.proof_of_pickup, 
+        pickup_timestamp: data.pickup_at || null 
       });
     }
 
