@@ -57,6 +57,8 @@ export const getRedirectUrl = (hostname, pathname) => {
     if (pathname.startsWith('/airline')) {
       return `${config.airlineUrl}${pathname}`;
     }
+    // Don't redirect the main domain root path - let it serve normally
+    return null;
   }
 
   if (isAdminDomain(hostname)) {

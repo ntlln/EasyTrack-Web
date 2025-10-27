@@ -15,10 +15,11 @@ export async function middleware(req) {
   }
   
   if (isMainDomain(hostname)) {
-    if (pathname.startsWith('/admin') || pathname.startsWith('/airline') || pathname === '/') {
+    if (pathname.startsWith('/admin') || pathname.startsWith('/airline')) {
       const redirectUrl = getRedirectUrl(hostname, pathname);
       if (redirectUrl) return NextResponse.redirect(redirectUrl);
     }
+    // For the main domain root path, don't redirect - let it serve normally
   }
   
   if (isAdminDomain(hostname)) {
