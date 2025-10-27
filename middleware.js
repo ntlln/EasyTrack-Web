@@ -9,10 +9,19 @@ export async function middleware(req) {
   const hostname = req.headers.get('host') || '';
   const pathname = req.nextUrl.pathname;
   
+  // Debug logging
+  console.log(`[MIDDLEWARE] hostname: ${hostname}, pathname: ${pathname}`);
+  console.log(`[MIDDLEWARE] isWwwDomain: ${isWwwDomain(hostname)}`);
+  console.log(`[MIDDLEWARE] isMainDomain: ${isMainDomain(hostname)}`);
+  
   if (isWwwDomain(hostname)) {
     const config = getDomainConfig();
     const redirectUrl = `https://${config.mainDomain}${pathname}`;
-    return NextResponse.redirect(redirectUrl, { status: 301 });
+    console.log(`[MIDDLEWARE] Redirecting www: ${hostname}${pathname} → ${redirectUrl}`);
+    
+    // Use NextResponse.redirect with absolute URL
+    const url = new URL(redirectUrl);
+    return NextResponse.redirect(url, { status: 301 });
   }
   
   if (isMainDomain(hostname)) {
