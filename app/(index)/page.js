@@ -93,18 +93,7 @@ export default function Test() {
     }
   };
 
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const hostname = window.location.hostname;
-      const config = getDomainConfig();
-
-      if (isWwwDomain(hostname)) {
-        const redirectUrl = `https://${config.mainDomain}${window.location.pathname}`;
-        window.location.replace(redirectUrl);
-        return;
-      }
-    }
-  }, [router]);
+  // Removed client-side www redirect - handled by server-side middleware
 
   const images = [
     'https://www.shutterstock.com/image-photo/closeup-detail-view-cargo-cart-600nw-2423113091.jpg',
