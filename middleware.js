@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { applySecurityHeaders } from './lib/security-headers';
-import { isAdminDomain, isAirlineDomain, isMainDomain, isWwwDomain, getRedirectUrl } from './config/domains';
+import { isAdminDomain, isAirlineDomain, isMainDomain, isWwwDomain, getRedirectUrl, getDomainConfig } from './config/domains';
 
 export async function middleware(req) {
   let res = NextResponse.next();
