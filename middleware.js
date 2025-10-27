@@ -9,9 +9,19 @@ export async function middleware(req) {
   const hostname = req.headers.get('host') || '';
   const pathname = req.nextUrl.pathname;
   
+  // Debug logging for production
+  if (process.env.NODE_ENV === 'production') {
+    console.log(`Middleware: hostname=${hostname}, pathname=${pathname}`);
+  }
+  
   if (isWwwDomain(hostname)) {
     const redirectUrl = getRedirectUrl(hostname, pathname);
-    if (redirectUrl) return NextResponse.redirect(redirectUrl);
+    if (redirectUrl) {
+      if (process.env.NODE_ENV === 'production') {
+        console.log(`Redirecting www: ${hostname}${pathname} → ${redirectUrl}`);
+      }
+      return NextResponse.redirect(redirectUrl, { status: 301 });
+    }
   }
   
   if (isMainDomain(hostname)) {

@@ -35,7 +35,7 @@ export const isAirlineDomain = (hostname) => {
 
 export const isMainDomain = (hostname) => {
   const config = getDomainConfig();
-  return hostname === config.mainDomain || hostname === config.wwwDomain;
+  return hostname === config.mainDomain;
 };
 
 export const isWwwDomain = (hostname) => {
