@@ -45,11 +45,11 @@ export const isWwwDomain = (hostname) => {
 
 export const getRedirectUrl = (hostname, pathname) => {
   const config = getDomainConfig();
-  
+
   if (isWwwDomain(hostname)) {
     return `https://${config.mainDomain}${pathname}`;
   }
-  
+
   if (isMainDomain(hostname)) {
     if (pathname.startsWith('/admin')) {
       return `${config.adminUrl}${pathname}`;
@@ -57,11 +57,8 @@ export const getRedirectUrl = (hostname, pathname) => {
     if (pathname.startsWith('/airline')) {
       return `${config.airlineUrl}${pathname}`;
     }
-    if (pathname === '/') {
-      return config.adminUrl;
-    }
   }
-  
+
   if (isAdminDomain(hostname)) {
     if (pathname.startsWith('/admin')) {
       return `${config.adminUrl}${pathname.replace('/admin', '') || '/'}`;
@@ -70,7 +67,7 @@ export const getRedirectUrl = (hostname, pathname) => {
       return `${config.adminUrl}/`;
     }
   }
-  
+
   if (isAirlineDomain(hostname)) {
     if (pathname.startsWith('/airline')) {
       return `${config.airlineUrl}${pathname.replace('/airline', '') || '/'}`;
@@ -79,6 +76,6 @@ export const getRedirectUrl = (hostname, pathname) => {
       return `${config.airlineUrl}/`;
     }
   }
-  
+
   return null;
 };
